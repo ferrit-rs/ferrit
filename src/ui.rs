@@ -27,8 +27,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     ])
     .areas(area);
 
+    // lazygit's default `sidePanelWidth: 0.3333`: the left column takes a third
+    // of the width, floored so it stays usable on a narrow terminal.
+    let side = (area.width / 3).max(24);
     let [left, right] =
-        Layout::horizontal([Constraint::Length(28), Constraint::Min(0)]).areas(content);
+        Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
 
     draw_left_column(frame, app, left);
     draw_right_pane(frame, app, right);
@@ -46,9 +49,9 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     match pane {
         Pane::Status => app.status_lines(),
         Pane::Files => app.file_lines(),
-        Pane::Branches => mock::BRANCHES.iter().map(|s| theme::branch_line(s)).collect(),
-        Pane::Commits => mock::COMMITS.iter().map(|s| theme::commit_line(s)).collect(),
-        Pane::Stash => mock::STASH.iter().map(|s| Line::raw(*s)).collect(),
+        Pane::Branches => app.branch_lines(),
+        Pane::Commits => app.commit_lines(),
+        Pane::Stash => app.stash_lines(),
     }
 }
 
@@ -78,9 +81,14 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
             },
         );
 
+        let mut block = Block::bordered().title(title).border_style(border);
+        if let Some((cur, total)) = app.counter(pane) {
+            block = block.title_bottom(theme::counter_line(cur, total));
+        }
+
         let list = List::new(pane_lines(app, pane))
-            .block(Block::bordered().title(title).border_style(border))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
+            .block(block)
+            .highlight_style(theme::selection_style());
 
         let mut state = ListState::default();
         let row_ct = app.row_count(pane);
@@ -126,12 +134,13 @@ fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
         Preview::None => {}
     }
 
-    let (title, body) = match app.focus {
-        Pane::Status => (" Status ", mock::RIGHT_STATUS),
-        Pane::Files => (" Diff ", mock::RIGHT_DIFF),
-        Pane::Branches => (" Log ", mock::RIGHT_LOG),
-        Pane::Commits => (" Commit ", mock::RIGHT_COMMIT),
-        Pane::Stash => (" Stash ", mock::RIGHT_STASH),
+    let title = app.focus.right_title();
+    let body = match app.focus {
+        Pane::Status => mock::RIGHT_STATUS,
+        Pane::Files => mock::RIGHT_DIFF,
+        Pane::Branches => mock::RIGHT_LOG,
+        Pane::Commits => mock::RIGHT_COMMIT,
+        Pane::Stash => mock::RIGHT_STASH,
     };
 
     let text: Text = match app.focus {

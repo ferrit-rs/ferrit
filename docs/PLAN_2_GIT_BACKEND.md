@@ -41,6 +41,12 @@ src/git/          <- no `ratatui` import anywhere under here
 Plain owned structs, `#[derive(Debug, Clone)]`, no lifetime tied to
 libgit2. The UI never sees a `git2::*` type.
 
+`BranchEntry` / `CommitEntry` / `StashEntry` and `CommitEntry::author_initials`
+landed early in `src/git/model.rs` as part of phase 1's lazygit re-skin (M6):
+`mock.rs` builds them now, G3..G5 fill the same structs from real reads. Also
+early: `Repo::name()` for the `ferrit -> main` status line, and the right-pane
+contextual titles (`Pane::right_title`).
+
 ```rust
 pub struct StatusHeader {
     pub branch: String,           // "main", or a short hash when detached
@@ -89,6 +95,7 @@ pub struct StashEntry {
 ```rust
 impl Repo {
     pub fn open(path: &Path) -> Result<Repo, GitError>;
+    pub fn name(&self) -> String;                      // repo dir name, infallible
     pub fn status_header(&self) -> Result<StatusHeader, GitError>;
     pub fn files(&self) -> Result<Vec<FileEntry>, GitError>;
     pub fn branches(&self) -> Result<Vec<BranchEntry>, GitError>;

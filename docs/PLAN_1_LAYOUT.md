@@ -9,41 +9,81 @@ code lands.
 
 ## Target screen
 
+Match lazygit's default look: panel titles carry the number in `[N]` and list
+their inert sibling tabs; each list panel shows a bottom-right `N of M` counter;
+Status is one line `repo → branch ↑ahead`; the focused panel border and title
+are green; the selected row is a solid blue bar; the right panel title is
+contextual (`Unstaged changes` for Files, `Log`, `Commit`, `Stash`); the keybar
+reads `Label: key` with the keys in yellow.
+
 ```
-┌─ 1 Status ────────────┐┌─ Diff / main panel ──────────────────────────────┐
-│ ferrit → main ↑2 ↓0   ││                                                  │
-│ ✓ no merge conflicts  ││  diff --git a/src/main.rs b/src/main.rs           │
+┌ [1] Status ───────────┐┌ Unstaged changes ────────────────────────────────┐
+│ ferrit → main ↑2      ││  diff --git a/src/main.rs b/src/main.rs           │
 └───────────────────────┘│  @@ -1,3 +1,7 @@                                  │
-┌─ 2 Files ─────────────┐│  -fn main() {                                     │
-│  M src/main.rs        ││  +fn main() -> Result<()> {                       │
-│  ?? docs/notes.md     ││  +    let repo = git::open(".")?;                 │
-│  A  Cargo.lock        ││       println!("ferrit");                         │
-│                       ││  +    Ok(())                                     │
-│                       ││   }                                              │
-└───────────────────────┘│                                                  │
-┌─ 3 Local Branches ────┐│  (contenu = ce que la pane FOCUS de gauche       │
-│ * main                ││   veut montrer: diff, log du commit, contenu     │
-│   feat/tui-skeleton   ││   du stash, detail de branche...)                │
-│   fix/parse-args      ││                                                  │
-└───────────────────────┘│                                                  │
-┌─ 4 Commits ───────────┐│                                                  │
-│ 5e04050 docs: expand… ││                                                  │
-│ 23023d9 docs: add ins…││                                                  │
-│ 2f9bd4f docs: drop ar…││                                                  │
-│ d5bc03c chore: initial││                                                  │
-└───────────────────────┘│                                                  │
-┌─ 5 Stash ─────────────┐│                                                  │
-│ (vide)                ││                                                  │
+┌ [2] Files - Worktrees ┐│  -fn main() {                                     │
+│  M src/main.rs         ││  +fn main() -> Result<()> {                       │
+│ ?? docs/notes.md       ││  +    let repo = git::open(".")?;                 │
+│ A  Cargo.lock          ││       println!("ferrit");                         │
+│                        ││  +    Ok(())                                     │
+│                1 of 3 ─┘│   }                                              │
+┌ [3] Local branches -  ┐│                                                  │
+│ * main ↑2              ││  right panel = what the focused left panel wants │
+│   feat/tui-skeleton    ││  to show: file diff, commit patch, stash diff,  │
+│                1 of 3 ─┘│  branch log. Hardcoded strings in phase 1.       │
+┌ [4] Commits - Reflog  ┐│                                                  │
+│ 5e04050 MW o docs: ex… ││                                                  │
+│ 23023d9 MW o docs: ad… ││                                                  │
+│ 2f9bd4f MW o docs: dr… ││                                                  │
+│ d5bc03c MW o chore: i… ││                                                  │
+│                1 of 4 ─┘│                                                  │
+┌ [5] Stash ────────────┐│                                                  │
+│ (no stash entries)     ││                                                  │
 └───────────────────────┘└──────────────────────────────────────────────────┘
-┌─ command log ────────────────────────────────────────────────────────────┐
+┌ command log ─────────────────────────────────────────────────────────────┐
 │ $ git status --porcelain                                                  │
 │ $ git diff src/main.rs                                                     │
 └──────────────────────────────────────────────────────────────────────────┘
- <space> stage  <c> commit  <P> push  <p> pull  <?> keybinds  <q> quit
+ Stage: <space> | Commit: c | Push: P | Pull: p | Keybindings: ? | Quit: q
 ```
 
 In phase 1 the command log lines and the diff text are **hardcoded strings**.
 Nothing is computed.
+
+## Palette
+
+One flat palette, tuned to lazygit's defaults. Lives in `theme.rs`, no config
+yet (that is phase 10).
+
+| Role | Colour | lazygit name |
+| --- | --- | --- |
+| Focused panel border + title | green, bold | `activeBorderColor` |
+| Unfocused panel border | gray | `inactiveBorderColor` |
+| Selected row | white on blue, bold | `selectedLineBgColor` |
+| Commit hash + graph node | green | |
+| Author initials | magenta | |
+| Added line / checked-out branch | green | |
+| Removed line / deleted path | red | |
+| Hunk header `@@` | cyan | |
+| Ahead/behind counts, `N of M` counter | gray/yellow | |
+| Keybar key names | yellow | |
+
+## Commit row + graph column
+
+Each Commits row is `<hash8> <initials> <graph-node> <subject>`:
+
+```
+5e04050 MW o docs: expand the layout plan
+│       │  │ └ commit subject, plain
+│       │  └ graph-column glyph
+│       └ author initials, magenta (up to 2, uppercased)
+└ abbreviated hash, green
+```
+
+Graph glyphs: `o` a commit on the current line, `│` a passing lane, `├` `─` a
+merge join. Phase 1 draws a static `o` for every row (linear history). The real
+graph, computed by walking the commit DAG, lands in phase 2 milestone G4;
+`theme::commit_line` already takes the glyph as a parameter so wiring it later
+touches only the backend.
 
 ## In scope
 
@@ -63,7 +103,8 @@ Nothing is computed.
 
 - Any real git: `git2` / `gitoxide`, status, diff, staging, commit, push, pull,
   branch checkout, stash, rebase.
-- Config file, themes, colours beyond a basic focused/unfocused distinction.
+- Config file, theme switching. The fixed lazygit-style palette above is in
+  scope; user-overridable colours are not.
 - Mouse support.
 - Input popups (commit message, confirm dialogs).
 - Async / background workers.
@@ -128,16 +169,17 @@ frame area
 
 content
 └── Layout::horizontal
-    ├── Length(28)    left column    ── fixed width, like lazygit's default
+    ├── Length(w/3)   left column    ── a third of the width, min 24,
+    │                                  matches lazygit sidePanelWidth 0.3333
     └── Min(0)        right pane     ── takes the rest
 
 left column
 └── Layout::vertical
-    ├── Length(4)     1 Status       ── header, always small
-    ├── Min(3)        2 Files
-    ├── Min(3)        3 Local Branches
-    ├── Min(3)        4 Commits
-    └── Length(4)     5 Stash
+    ├── Length(4)     [1] Status     ── header, always small
+    ├── Min(3)        [2] Files
+    ├── Min(3)        [3] Local branches
+    ├── Min(3)        [4] Commits
+    └── Length(4)     [5] Stash
 ```
 
 Later enhancement (not phase 1): accordion behaviour, where the focused left
@@ -189,18 +231,18 @@ No tick, no polling, no async in phase 1.
 | `q` / `Ctrl-c` | quit |
 
 Every other key is ignored. The keybind bar shows the lazygit set
-(`<space> stage`, `<c> commit`, ...) as **inert labels**, so the screen looks
+(`Stage: <space>`, `Commit: c`, ...) as **inert labels**, so the screen looks
 right; those keys do nothing yet.
 
 ## Right pane content by focus (all mock)
 
-| Focus | Right pane shows |
-| --- | --- |
-| Status | short repo summary block (branch, ahead/behind, clean) |
-| Files | a sample `git diff` snippet |
-| Branches | a sample `git log --oneline --graph` snippet |
-| Commits | a sample commit: header + diff |
-| Stash | `(no stash entries)` |
+| Focus | Panel title | Right pane shows |
+| --- | --- | --- |
+| Status | `Status` | short repo summary block (branch, ahead/behind, clean) |
+| Files | `Unstaged changes` | a sample `git diff` snippet, or the image preview when the selected path is an image |
+| Branches | `Log` | a sample `git log --oneline --graph` snippet |
+| Commits | `Commit` | a sample commit: header + diff |
+| Stash | `Stash` | `(no stash entries)` |
 
 ## Milestones
 
@@ -214,6 +256,11 @@ right; those keys do nothing yet.
 - **M4** right pane swaps mock content based on `app.focus`.
 - **M5** polish: status title bar text, `?` help overlay, no horizontal
   overflow at narrow widths, `cargo clippy` clean.
+- **M6** lazygit skin: the palette table above in `theme.rs`, `[N] Tab - Tab`
+  panel titles, bottom-right `N of M` counters, Status collapsed to one line,
+  blue selection bar, `Label: key` keybar, `<hash> <initials> o <subject>`
+  commit rows. Typed `CommitEntry` / `BranchEntry` / `StashEntry` in
+  `src/git/model.rs` so G3..G5 swap the source without touching the UI.
 
 ## Definition of done (phase 1)
 
