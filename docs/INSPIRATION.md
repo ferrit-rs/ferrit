@@ -42,6 +42,57 @@ learn from it, and where we want to differ.
   Commit graph layout algorithm, configurable branching models. Not a TUI but
   the graph logic is reusable.
 
+## lazygit rewrites in Rust (hobby / small)
+
+Both MIT, so code is legally reusable if we keep their copyright notice for any
+non-trivial copied block (record it in `THIRD-PARTY.md`). Neither is an
+architecture reference; read them for feature ideas.
+
+- **lazygitrs** — <https://github.com/Blankeos/lazygitrs> (Rust, MIT)
+  "For me" fork of lazygit. Feature menu worth cherry-picking: AI commit
+  message generation (multi-LLM), 30+ themes with live switching, side-by-side
+  syntax-highlighted diff, GitHub conveniences (copy repo URL, PR ops),
+  editor integration (Helix, Neovim). Author calls it a slopfork; ideas yes,
+  code no.
+
+- **rustygit** — <https://github.com/rustyorg/rustygit> (Rust, MIT)
+  git TUI inspired by lazygit. Tiny, ~28 commits, unmaintained. Nothing to
+  take. Note: unrelated to the `rustygit` *library* crate by Keir Lawson.
+
+## Wider ratatui + git ecosystem
+
+Small single-purpose tools. Each solves one slice of what ferrit needs; good
+for seeing "how did they model this one screen".
+
+- **gitu** — <https://github.com/altsem/gitu> — magit-like client (also listed above).
+- **serie** — <https://github.com/lusingander/serie> — rich commit graph (also above).
+- **giff** — <https://github.com/bahdotsh/giff> — git diff TUI with interactive
+  rebase support. Compare its rebase UI with gitu's.
+- **git-time-machine** — <https://github.com/dinakars777/git-time-machine> —
+  visual reflog TUI for undoing mistakes. Reference for an "undo" view.
+- **deadbranch** — <https://github.com/armgabrielyan/deadbranch> — safely clean
+  stale branches. Reference for the branch-list + bulk-action pattern.
+- **Gitside** — <https://github.com/dev-bhaskar8/gitside> — responsive,
+  mouse-friendly SCM TUI that adapts to narrow tmux panes. Reference for
+  responsive layout and mouse support.
+- **gwm** — <https://github.com/kbrdn1/gwm-cli> — git worktree manager, CLI and
+  TUI in one binary, native libgit2. Reference for worktree handling and for
+  shipping CLI + TUI from one binary.
+- **blippy** — <https://github.com/AksharP5/blippy> — keyboard-first TUI for
+  GitHub issues and PRs. Relevant if ferrit grows a PR/review panel.
+- **gmsg** — <https://github.com/olorikendrick/gmsg> — generate / edit / commit
+  AI commit messages from one TUI. Second data point for the AI-commit feature.
+- **gimoji** — <https://github.com/zeenix/gimoji> — emoji picker for commit
+  messages. Tiny; useful widget pattern for a searchable picker.
+- **wrkflw** — <https://github.com/bahdotsh/wrkflw> — validate and run GitHub
+  Actions workflows locally. Out of scope now, note for a future CI panel.
+- **repgrep** — <https://github.com/acheronfail/repgrep> — interactive
+  find/replace across files on top of ripgrep. Not git, but a clean model for
+  an interactive multi-file action list.
+
+Keep scanning **awesome-ratatui** (<https://github.com/ratatui/awesome-ratatui>,
+"Git / version control" section) as new ones appear.
+
 ## Adjacent VCS TUIs
 
 - **lazyjj** — <https://github.com/Cretezy/lazyjj> (Rust, ratatui)
