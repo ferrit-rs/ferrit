@@ -1,0 +1,48 @@
+//! Headless, read-only git backend. Nothing under `git::` imports `ratatui`.
+//!
+//! Phase 2 wires Status and Files (see `docs/PLAN_2_GIT_BACKEND.md`);
+//! branches, commits, stash and blob reads follow in later milestones.
+
+mod error;
+mod status;
+
+use std::path::Path;
+
+use git2::Repository;
+
+pub use error::{GitError, GitResult};
+pub use status::{Change, FileEntry, StatusHeader};
+
+/// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
+pub struct Repo {
+    inner: Repository,
+}
+
+/// Everything the wired panes need from one refresh.
+#[derive(Debug, Clone, Default)]
+pub struct Snapshot {
+    pub header: StatusHeader,
+    pub files: Vec<FileEntry>,
+}
+
+impl Repo {
+    /// Open the repository at or above `path`. Walks up like `git` does.
+    pub fn open(path: &Path) -> GitResult<Repo> {
+        let inner = Repository::discover(path).map_err(|e| {
+            if e.code() == git2::ErrorCode::NotFound {
+                GitError::NotARepository(path.to_path_buf())
+            } else {
+                GitError::Open(e)
+            }
+        })?;
+        Ok(Repo { inner })
+    }
+
+    /// Re-read every wired pane in one go. Partial failure fails the whole call.
+    pub fn snapshot(&self) -> GitResult<Snapshot> {
+        Ok(Snapshot {
+            header: status::header(&self.inner)?,
+            files: status::files(&self.inner)?,
+        })
+    }
+}

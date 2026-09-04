@@ -37,15 +37,15 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 }
 
-/// Colour each pane's rows by what they mean.
-fn pane_lines(pane: Pane) -> Vec<Line<'static>> {
-    let items = pane.items();
+/// Colour each pane's rows by what they mean. Status and Files come from the
+/// live snapshot on `App`; the rest are still mock.
+fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     match pane {
-        Pane::Status => items.iter().map(|s| theme::status_line(s)).collect(),
-        Pane::Files => items.iter().map(|s| theme::file_line(s)).collect(),
-        Pane::Branches => items.iter().map(|s| theme::branch_line(s)).collect(),
-        Pane::Commits => items.iter().map(|s| theme::commit_line(s)).collect(),
-        Pane::Stash => items.iter().map(|s| Line::raw(*s)).collect(),
+        Pane::Status => app.status_lines(),
+        Pane::Files => app.file_lines(),
+        Pane::Branches => mock::BRANCHES.iter().map(|s| theme::branch_line(s)).collect(),
+        Pane::Commits => mock::COMMITS.iter().map(|s| theme::commit_line(s)).collect(),
+        Pane::Stash => mock::STASH.iter().map(|s| Line::raw(*s)).collect(),
     }
 }
 
@@ -75,13 +75,14 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
             },
         );
 
-        let list = List::new(pane_lines(pane))
+        let list = List::new(pane_lines(app, pane))
             .block(Block::bordered().title(title).border_style(border))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
 
         let mut state = ListState::default();
-        if !pane.items().is_empty() {
-            state.select(Some(app.selected(pane)));
+        let row_ct = app.row_count(pane);
+        if row_ct > 0 {
+            state.select(Some(app.selected(pane).min(row_ct - 1)));
         }
 
         frame.render_stateful_widget(list, rows[i], &mut state);
