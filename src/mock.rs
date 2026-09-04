@@ -70,10 +70,10 @@ diff --git a/docs/PLAN_1_LAYOUT.md b/docs/PLAN_1_LAYOUT.md
 pub const RIGHT_STASH: &str = "(no stash entries)";
 
 /// Help overlay body, toggled with `?`.
-pub const HELP: &str = "1 .. 5      focus that pane
-Tab         focus next pane
-Shift-Tab   focus previous pane
-j / Down    move selection down
-k / Up      move selection up
-?           toggle this help
-q / Ctrl-c  quit";
+pub const HELP: &str = "1 .. 5           focus that pane
+Tab / Right      focus next pane
+Shift-Tab / Left focus previous pane
+j / Down         move selection down
+k / Up           move selection up
+?                toggle this help
+q / Ctrl-c       quit";
