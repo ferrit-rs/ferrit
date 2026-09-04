@@ -6,7 +6,6 @@
 //! otherwise `ratatui-image` falls back to unicode half-blocks, which work
 //! anywhere, so there is always something to show.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use ratatui_image::picker::Picker;
@@ -20,10 +19,11 @@ pub enum Preview {
     None,
     /// An image path that could not be turned into a picture.
     Note(String),
-    /// A decoded image ready for `StatefulImage`. `RefCell` because rendering
-    /// resizes and encodes in place, and `ui::draw` only holds `&App`; boxed
-    /// because a `StatefulProtocol` dwarfs the other variants.
-    Image(Box<RefCell<StatefulProtocol>>),
+    /// A decoded image, held exactly as the ratatui-image examples do: a live
+    /// `StatefulProtocol` that `StatefulImage` resizes and re-encodes in place
+    /// at render time, so `ui::draw` takes `&mut App`. Boxed only because a
+    /// `StatefulProtocol` dwarfs the other variants.
+    Image(Box<StatefulProtocol>),
 }
 
 const IMAGE_EXTS: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico"];
@@ -43,17 +43,10 @@ pub fn from_bytes(picker: &Picker, path: &Path, bytes: &[u8]) -> Preview {
         return Preview::Note(format!("[image] {}  (no bytes)", path.display()));
     }
     match image::load_from_memory(bytes) {
-        Ok(img) => {
-            let mut proto = picker.new_resize_protocol(img);
-            match proto.last_encoding_result() {
-                Some(Err(e)) => Preview::Note(format!(
-                    "[image] {}  ({} bytes)  encode failed: {e}",
-                    path.display(),
-                    bytes.len()
-                )),
-                _ => Preview::Image(Box::new(RefCell::new(proto))),
-            }
-        }
+        // `new_resize_protocol` just stores the source; the first render does
+        // the resize + encode, same as `examples/thread.rs`. Nothing to check
+        // here yet, so hand back the live protocol.
+        Ok(img) => Preview::Image(Box::new(picker.new_resize_protocol(img))),
         Err(e) => Preview::Note(format!(
             "[image] {}  ({} bytes)  decode failed: {e}",
             path.display(),
