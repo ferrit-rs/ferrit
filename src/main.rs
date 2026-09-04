@@ -1,12 +1,10 @@
-mod app;
-mod tui;
-
 use std::path::PathBuf;
 
 use clap::Parser;
 use color_eyre::Result;
 
-use crate::app::App;
+use ferrit::app::App;
+use ferrit::tui;
 
 /// A lazygit-style terminal UI for git, written in Rust.
 #[derive(Parser)]
