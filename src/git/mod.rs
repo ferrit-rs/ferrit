@@ -3,6 +3,7 @@
 //! Phase 2 wires Status and Files (see `docs/PLAN_2_GIT_BACKEND.md`);
 //! branches, commits, stash and blob reads follow in later milestones.
 
+mod blob;
 mod error;
 mod status;
 
@@ -10,6 +11,7 @@ use std::path::Path;
 
 use git2::Repository;
 
+pub use blob::Rev;
 pub use error::{GitError, GitResult};
 pub use status::{Change, FileEntry, StatusHeader};
 
@@ -44,5 +46,10 @@ impl Repo {
             header: status::header(&self.inner)?,
             files: status::files(&self.inner)?,
         })
+    }
+
+    /// Raw bytes of `path` at `rev`. Feeds the right-pane image preview.
+    pub fn blob_bytes(&self, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
+        blob::blob_bytes(&self.inner, path, rev)
     }
 }

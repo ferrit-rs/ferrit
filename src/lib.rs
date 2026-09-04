@@ -5,6 +5,7 @@
 pub mod app;
 pub mod git;
 pub mod mock;
+pub mod preview;
 pub mod theme;
 pub mod tui;
 pub mod ui;

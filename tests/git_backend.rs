@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ferrit::git::{Change, GitError, Repo};
+use ferrit::git::{Change, GitError, Repo, Rev};
 use git2::{IndexAddOption, Repository, Signature};
 
 /// A temp directory that deletes itself on drop.
@@ -117,4 +117,23 @@ fn files_reports_untracked_then_staged() {
     assert_eq!(snap.files.len(), 1);
     assert_eq!(snap.files[0].staged, Change::Added);
     assert_eq!(snap.files[0].worktree, Change::None);
+}
+
+#[test]
+fn blob_bytes_reads_workdir_and_head() {
+    let dir = TempDir::new("blob");
+    let repo = Repository::init(dir.path()).unwrap();
+    std::fs::write(dir.path().join("logo.txt"), b"v1\n").unwrap();
+    commit_all(&repo, "add logo");
+
+    // Working copy diverges from the committed blob.
+    std::fs::write(dir.path().join("logo.txt"), b"v2\n").unwrap();
+
+    let backend = Repo::open(dir.path()).unwrap();
+    let path = Path::new("logo.txt");
+    assert_eq!(backend.blob_bytes(path, Rev::Workdir).unwrap(), b"v2\n");
+    assert_eq!(backend.blob_bytes(path, Rev::Head).unwrap(), b"v1\n");
+
+    let missing = backend.blob_bytes(Path::new("nope.png"), Rev::Head);
+    assert!(matches!(missing, Err(GitError::Read(_))));
 }

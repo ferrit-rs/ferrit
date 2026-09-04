@@ -9,8 +9,11 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
+use ratatui_image::StatefulImage;
+use ratatui_image::protocol::StatefulProtocol;
 
 use crate::app::{App, Pane, PANES};
+use crate::preview::Preview;
 use crate::{mock, theme};
 
 /// Render the full screen for the current `App` state.
@@ -91,6 +94,37 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let idle = Style::new().fg(theme::IDLE);
+
+    // An image selection takes over the right pane; otherwise it is mock text.
+    match app.preview() {
+        Preview::Image(cell) => {
+            let block = Block::bordered()
+                .title(Line::styled(" Preview ", focused))
+                .border_style(idle);
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+            let mut proto = cell.borrow_mut();
+            frame.render_stateful_widget(
+                StatefulImage::<StatefulProtocol>::default(),
+                inner,
+                &mut proto,
+            );
+            return;
+        }
+        Preview::Note(msg) => {
+            let panel = Paragraph::new(msg.as_str())
+                .block(
+                    Block::bordered()
+                        .title(Line::styled(" Preview ", focused))
+                        .border_style(idle),
+                )
+                .wrap(Wrap { trim: false });
+            frame.render_widget(panel, area);
+            return;
+        }
+        Preview::None => {}
+    }
 
     let (title, body) = match app.focus {
         Pane::Status => (" Status ", mock::RIGHT_STATUS),

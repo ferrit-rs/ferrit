@@ -29,6 +29,10 @@ fn main() -> Result<()> {
         }
     };
 
+    // Ask the terminal whether it speaks a graphics protocol, before the
+    // alternate screen is up. Falls back to half-blocks on its own.
+    app.detect_graphics();
+
     let mut terminal = tui::init()?;
     let result = app.run(&mut terminal);
     tui::restore()?;
