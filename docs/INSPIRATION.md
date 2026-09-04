@@ -3,6 +3,13 @@
 Projects worth studying before and while building `ferrit`. For each: what to
 learn from it, and where we want to differ.
 
+**Local reference checkout:** the code-heavy repos below are collected in the
+private [`ferrit-rs/ferrit-references`](https://github.com/ferrit-rs/ferrit-references)
+repo as pinned submodules, so maintainers read the same commits and line
+numbers. Clone with `git clone --recurse-submodules --shallow-submodules`.
+Do not run `cargo build` inside a submodule. Never vendored into `ferrit`;
+any reused block goes through `THIRD-PARTY.md`.
+
 ## The reference: lazygit
 
 - **lazygit** — <https://github.com/jesseduffield/lazygit> (Go, gocui)
