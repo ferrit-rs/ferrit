@@ -29,8 +29,8 @@ src/git/          <- no `ratatui` import anywhere under here
   refs.rs           local branches, which one is HEAD, upstream per branch
   log.rs            recent commits, bounded count
   stash.rs          stash entries
-  blob.rs           raw bytes of a path at a revision (for image preview
-                    in phase 3, and diffs in phase 3+)
+  blob.rs           raw bytes of a path at a revision (image preview now,
+                    diffs in phase 3+)
 ```
 
 `src/ui/` still has no git logic. `app.rs` is the only glue: it owns a
@@ -152,34 +152,34 @@ and the `mod mock;`.
 
 ## Image preview (ratatui-image)
 
-Where it goes: **phase 3**, the diff / right-pane phase. Phase 2's only job
-is the backend hook.
+Pulled forward into **phase 2** (milestone G6). A compatible release
+(`ratatui-image 11`, built against `ratatui 0.30`) exists now, so there is
+no reason to hold the whole feature for phase 3. Phase 3 keeps only the
+polish: richer sixel / kitty output, size cues, hooking Commits as well.
 
-- Backend, now: `Repo::blob_bytes(path, rev)` returns the raw bytes of a
-  blob. `FileEntry::binary` already flags non-text. That is all phase 2
-  ships for this.
-- UI, phase 3: when the focused pane is Files or Commits and the selected
-  entry's path has an image extension (`png jpg jpeg gif webp bmp ico`)
-  and the blob decodes as an image, render it in the right pane with
-  `ratatui-image` instead of a "binary file" notice.
-  - `ratatui_image::picker::Picker` detects the terminal graphics
-    protocol (sixel / kitty / iterm2) once at startup.
+- Backend: `Repo::blob_bytes(path, rev)` with `Rev::{Workdir, Head}`
+  returns the raw bytes of a blob. `FileEntry::binary` flags non-text.
+- UI, shipped: when Files is focused and the selected entry's path has an
+  image extension (`png jpg jpeg gif webp bmp ico`) and the blob decodes,
+  the right pane shows the picture instead of the mock diff. `App` owns a
+  `preview::Preview` rebuilt on every nav key and on `refresh()`.
+  - `ratatui_image::picker::Picker` starts on `halfblocks()`, which draws
+    in any terminal (and in `TestBackend`), so there is always something.
+  - `App::detect_graphics()` runs once before the alternate screen and
+    upgrades the picker to sixel / kitty / iterm2 via
+    `Picker::from_query_stdio()` when the real terminal answers.
   - Decode bytes with the `image` crate, hand the `DynamicImage` to a
-    `StatefulImage` / `Image` widget.
-  - No graphics protocol: degrade to
-    `[image] <name> — <WxH> <format>, <size> (preview needs a
-    sixel / kitty / iterm2 terminal)`. Never an error, never a panic.
-- Dependency note: pin a `ratatui-image` release built against
-  `ratatui 0.30`. If none exists when phase 3 starts, ship the degraded
-  text notice and add the widget when a compatible release lands. The
-  backend accessor is unaffected either way.
-- `src/git/` never imports `ratatui-image` or `image`. Decoding happens in
-  `ui/` (or a small `preview.rs` the UI owns).
+    `StatefulImage` widget. Anything that fails to decode or encode falls
+    back to a `Preview::Note` line. Never an error, never a panic.
+- `src/git/` never imports `ratatui-image` or `image`. Decoding lives in
+  `src/preview.rs`, the only module that touches either crate.
 
 ## Dependencies
 
 ```toml
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
+ratatui-image = { version = "11", default-features = false, features = ["crossterm", "image-defaults"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
 ```
 
 `CommitEntry::time` is a raw epoch `i64` in phase 2 (no date crate). Add
@@ -188,12 +188,8 @@ git2 = { version = "0.21", default-features = false, features = ["vendored-libgi
 `vendored-libgit2` avoids a system libgit2 requirement on contributor
 machines and CI. Drop it later if we want the system lib.
 
-Phase 3 will add:
-
-```toml
-ratatui-image = "<release built against ratatui 0.30>"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
-```
+`ratatui-image 11` needs rustc 1.86, so `Cargo.toml` sets
+`rust-version = "1.86"`.
 
 ## Self-testing (see PLAN_SELF_TESTING.md)
 
@@ -245,10 +241,14 @@ Lands in the same commits as the features:
 - **G3** `branches()`; Branches pane real; mock branch data removed.
 - **G4** `commits(max)`; Commits pane real; mock commit data removed.
 - **G5** `stashes()`; Stash pane real; `mock.rs` deleted.
-- **G6** `blob_bytes(path, rev)` with a unit test on `canonical`. No UI
-  yet; this is the phase 3 hook.
+- **G6** done. `blob_bytes(path, rev)` with `Rev::{Workdir, Head}`, unit
+  tested in `tests/git_backend.rs`. `src/preview.rs` decodes the bytes;
+  the right pane shows the image for an image selection in Files, on a
+  half-block picker that upgrades to sixel / kitty when the terminal
+  answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
+  exercise the path with no repo. Richer graphics polish stays phase 3.
 
-Phase 2 as scheduled now = **G0..G2**. G3..G6 are queued follow-ups.
+Phase 2 as scheduled now = **G0..G2 + G6**. G3..G5 are queued follow-ups.
 
 ## Definition of done (phase 2)
 
@@ -262,9 +262,11 @@ Phase 2 as scheduled now = **G0..G2**. G3..G6 are queued follow-ups.
 - `cargo clippy --all-targets` clean.
 - `tests/git_backend.rs` and `test/scripts/20-status-files.script` pass.
 - No panic on an empty repo, a bare repo, or a detached HEAD.
+- Selecting an image file in Files shows it in the right pane (half-blocks
+  at minimum); a non-decodable or missing blob shows a note, not a panic.
 
 ## After phase 2
 
 Phase 3: real diffs in the right pane (syntax highlight via `syntect`,
-hunk navigation, scrolling) and the `ratatui-image` preview described
-above, consuming `git::blob_bytes`.
+hunk navigation, scrolling), and polish on the image preview that landed
+in G6 (richer sixel / kitty output, size cues, Commits as a source).

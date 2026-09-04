@@ -5,9 +5,30 @@
 //! Commits and Stash stay mock until G3..G5. Values mirror the target screen in
 //! `docs/PLAN_1_LAYOUT.md`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::git::{Change, FileEntry, StatusHeader};
+
+/// An 8x8 PNG, embedded so `App::mock()` can drive the image-preview path with
+/// no repo and nothing on disk.
+pub const LOGO_PNG: &[u8] = &[
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 8, 0, 0, 0, 8, 8, 2, 0,
+    0, 0, 75, 109, 41, 220, 0, 0, 0, 108, 73, 68, 65, 84, 120, 218, 21, 205, 65, 21, 0, 81, 8, 66,
+    81, 163, 24, 133, 40, 70, 121, 81, 136, 66, 20, 162, 204, 31, 151, 92, 14, 206, 12, 59, 104,
+    184, 129, 193, 67, 134, 14, 51, 203, 46, 90, 110, 97, 241, 146, 165, 251, 64, 172, 144, 56, 129,
+    176, 136, 168, 30, 28, 123, 232, 184, 131, 195, 71, 142, 222, 131, 127, 224, 85, 95, 248, 159,
+    33, 208, 247, 110, 204, 26, 153, 243, 31, 219, 196, 212, 15, 194, 6, 133, 203, 95, 118, 72, 104,
+    30, 148, 45, 42, 215, 127, 194, 37, 165, 229, 3, 198, 123, 88, 1, 87, 57, 54, 242, 0, 0, 0, 0,
+    73, 69, 78, 68, 174, 66, 96, 130,
+];
+
+/// Repo-free bytes for an image path in `mock_files()`.
+pub fn mock_image_bytes(path: &Path) -> Option<&'static [u8]> {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("png") => Some(LOGO_PNG),
+        _ => None,
+    }
+}
 
 /// Left pane 1, repo-free: the canonical status header.
 pub fn mock_header() -> StatusHeader {
@@ -41,6 +62,12 @@ pub fn mock_files() -> Vec<FileEntry> {
             staged: Change::Added,
             worktree: Change::None,
             binary: false,
+        },
+        FileEntry {
+            path: PathBuf::from("assets/logo.png"),
+            staged: Change::None,
+            worktree: Change::Untracked,
+            binary: true,
         },
     ]
 }
