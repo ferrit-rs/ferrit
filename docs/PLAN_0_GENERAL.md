@@ -22,9 +22,9 @@ command line: the value is the TUI.
 - **Small keymap.** Resist adding a binding for everything. Menus (`x`) hold
   the long tail.
 - **MIT.** Contributions under DCO (`git commit -s`).
-- **Every feature ships with proof.** A headless test and a screenshot
-  tape, so any agent can self-verify a feature works. See
-  `PLAN_SELF_TESTING.md`.
+- **Every feature ships with proof.** A deterministic headless replay
+  test plus a screenshot artifact, so any agent can self-verify a feature
+  works. See `PLAN_SELF_TESTING.md`.
 
 ## Architecture
 
