@@ -4,5 +4,6 @@
 
 pub mod app;
 pub mod mock;
+pub mod theme;
 pub mod tui;
 pub mod ui;

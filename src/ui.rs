@@ -2,15 +2,16 @@
 //!
 //! Pure rendering. It reads `App` and `mock`, never mutates, never touches a
 //! terminal, so `tests/render.rs` can call it against a `TestBackend`.
+//! Colours come from `theme`.
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
 
 use crate::app::{App, Pane, PANES};
-use crate::mock;
+use crate::{mock, theme};
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame, app: &App) {
@@ -36,6 +37,18 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 }
 
+/// Colour each pane's rows by what they mean.
+fn pane_lines(pane: Pane) -> Vec<Line<'static>> {
+    let items = pane.items();
+    match pane {
+        Pane::Status => items.iter().map(|s| theme::status_line(s)).collect(),
+        Pane::Files => items.iter().map(|s| theme::file_line(s)).collect(),
+        Pane::Branches => items.iter().map(|s| theme::branch_line(s)).collect(),
+        Pane::Commits => items.iter().map(|s| theme::commit_line(s)).collect(),
+        Pane::Stash => items.iter().map(|s| Line::raw(*s)).collect(),
+    }
+}
+
 fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
     let rows: [Rect; 5] = Layout::vertical([
         Constraint::Length(4), // Status: header only
@@ -49,22 +62,25 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
     for (i, &pane) in PANES.iter().enumerate() {
         let focused = app.focus == pane;
         let border = if focused {
-            Style::new().yellow().bold()
+            Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
         } else {
-            Style::new().dark_gray()
+            Style::new().fg(theme::IDLE)
         };
+        let title = Line::styled(
+            format!(" {} ", pane.title()),
+            if focused {
+                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
+            } else {
+                Style::new().fg(theme::IDLE)
+            },
+        );
 
-        let items = pane.items();
-        let list = List::new(items.iter().copied())
-            .block(
-                Block::bordered()
-                    .title(format!(" {} ", pane.title()))
-                    .border_style(border),
-            )
-            .highlight_style(Style::new().reversed());
+        let list = List::new(pane_lines(pane))
+            .block(Block::bordered().title(title).border_style(border))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
 
         let mut state = ListState::default();
-        if !items.is_empty() {
+        if !pane.items().is_empty() {
             state.select(Some(app.selected(pane)));
         }
 
@@ -73,6 +89,8 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
+    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+
     let (title, body) = match app.focus {
         Pane::Status => (" Status ", mock::RIGHT_STATUS),
         Pane::Files => (" Diff ", mock::RIGHT_DIFF),
@@ -81,21 +99,33 @@ fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
         Pane::Stash => (" Stash ", mock::RIGHT_STASH),
     };
 
-    let panel = Paragraph::new(body)
-        .block(Block::bordered().title(title))
+    let text: Text = match app.focus {
+        Pane::Files | Pane::Branches | Pane::Commits => theme::diff_text(body),
+        _ => body.into(),
+    };
+
+    let panel = Paragraph::new(text)
+        .block(
+            Block::bordered()
+                .title(Line::styled(title, focused))
+                .border_style(Style::new().fg(theme::IDLE)),
+        )
         .wrap(Wrap { trim: false });
     frame.render_widget(panel, area);
 }
 
 fn draw_command_log(frame: &mut Frame, area: Rect) {
-    let lines: Vec<Line> = mock::COMMAND_LOG.iter().map(|s| Line::raw(*s)).collect();
-    let panel = Paragraph::new(lines).block(Block::bordered().title(" command log "));
+    let lines: Vec<Line> = mock::COMMAND_LOG.iter().map(|s| theme::log_line(s)).collect();
+    let panel = Paragraph::new(lines).block(
+        Block::bordered()
+            .title(Line::styled(" command log ", Style::new().fg(theme::IDLE)))
+            .border_style(Style::new().fg(theme::IDLE)),
+    );
     frame.render_widget(panel, area);
 }
 
 fn draw_keybar(frame: &mut Frame, area: Rect) {
-    let bar = Paragraph::new(Line::raw(mock::KEYBAR).style(Style::new().dark_gray()));
-    frame.render_widget(bar, area);
+    frame.render_widget(Paragraph::new(theme::keybar_line(mock::KEYBAR)), area);
 }
 
 fn draw_help(frame: &mut Frame, area: Rect) {
@@ -110,8 +140,11 @@ fn draw_help(frame: &mut Frame, area: Rect) {
 
     let overlay = Paragraph::new(mock::HELP).block(
         Block::bordered()
-            .title(" keybindings ")
-            .border_style(Style::new().yellow().bold()),
+            .title(Line::styled(
+                " keybindings ",
+                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD),
+            ))
+            .border_style(Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)),
     );
 
     frame.render_widget(Clear, rect);
