@@ -22,6 +22,9 @@ command line: the value is the TUI.
 - **Small keymap.** Resist adding a binding for everything. Menus (`x`) hold
   the long tail.
 - **MIT.** Contributions under DCO (`git commit -s`).
+- **Every feature ships with proof.** A headless test and a screenshot
+  tape, so any agent can self-verify a feature works. See
+  `PLAN_SELF_TESTING.md`.
 
 ## Architecture
 
@@ -56,6 +59,9 @@ split is a move, not a rewrite.
 | 8 | `PLAN_8_STASH.md` | stash push, pop, apply, drop | todo |
 | 9 | `PLAN_9_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | todo |
 | 10 | `PLAN_10_POLISH.md` | config file, themes, keymap customization, real command-log capture, help | todo |
+
+Cross-cutting: `PLAN_SELF_TESTING.md` (headless snapshot tests + `vhs`
+screenshot tapes) applies to every phase from 1 on.
 
 ### Not scheduled (revisit after phase 10)
 
