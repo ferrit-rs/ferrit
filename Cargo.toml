@@ -1,0 +1,19 @@
+[package]
+name = "ferrit"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+description = "A lazygit-style terminal UI for git, written in Rust"
+authors = ["The ferrit Authors"]
+license = "MIT"
+repository = "https://github.com/ferrit-rs/ferrit"
+homepage = "https://github.com/ferrit-rs/ferrit"
+readme = "README.md"
+keywords = ["git", "tui", "lazygit", "terminal", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "ferrit"
+path = "src/main.rs"
+
+[dependencies]
