@@ -5,6 +5,7 @@
 
 mod blob;
 mod error;
+mod model;
 mod status;
 
 use std::path::Path;
@@ -13,6 +14,7 @@ use git2::Repository;
 
 pub use blob::Rev;
 pub use error::{GitError, GitResult};
+pub use model::{BranchEntry, CommitEntry, StashEntry};
 pub use status::{Change, FileEntry, StatusHeader};
 
 /// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
@@ -38,6 +40,17 @@ impl Repo {
             }
         })?;
         Ok(Repo { inner })
+    }
+
+    /// The repository's directory name, e.g. `ferrit`. Used in the status
+    /// header (`ferrit -> main`). Falls back to `"repo"` for odd layouts.
+    pub fn name(&self) -> String {
+        self.inner
+            .workdir()
+            .and_then(|w| w.file_name())
+            .or_else(|| self.inner.path().parent().and_then(|p| p.file_name()))
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "repo".to_string())
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.
