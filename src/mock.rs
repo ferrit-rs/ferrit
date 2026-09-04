@@ -7,7 +7,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::git::{Change, FileEntry, StatusHeader};
+use crate::git::{
+    BranchEntry, Change, CommitEntry, FileEntry, StashEntry, StatusHeader,
+};
 
 /// An 8x8 PNG, embedded so `App::mock()` can drive the image-preview path with
 /// no repo and nothing on disk.
@@ -72,26 +74,64 @@ pub fn mock_files() -> Vec<FileEntry> {
     ]
 }
 
-/// Left pane 3: local branches, `*` marks the checked-out one.
-pub const BRANCHES: &[&str] = &["* main", "  feat/tui-skeleton", "  fix/parse-args"];
+/// Left pane 3: local branches. `is_head` marks the checked-out one.
+pub fn mock_branches() -> Vec<BranchEntry> {
+    vec![
+        BranchEntry {
+            name: "main".to_string(),
+            is_head: true,
+            upstream: Some("origin/main".to_string()),
+            ahead: 2,
+            behind: 0,
+        },
+        BranchEntry {
+            name: "feat/tui-skeleton".to_string(),
+            is_head: false,
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+        },
+        BranchEntry {
+            name: "fix/parse-args".to_string(),
+            is_head: false,
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+        },
+    ]
+}
 
-/// Left pane 4: recent commits, `<short-hash> <subject>`.
-pub const COMMITS: &[&str] = &[
-    "5e04050 docs: expand the layout plan",
-    "23023d9 docs: add inspiration notes",
-    "2f9bd4f docs: drop the arch stub",
-    "d5bc03c chore: initial commit",
-];
+/// Left pane 4: recent commits, newest first.
+pub fn mock_commits() -> Vec<CommitEntry> {
+    let rows = [
+        ("5e04050", "docs: expand the layout plan"),
+        ("23023d9", "docs: add inspiration notes"),
+        ("2f9bd4f", "docs: drop the arch stub"),
+        ("d5bc03c", "chore: initial commit"),
+    ];
+    rows.iter()
+        .enumerate()
+        .map(|(i, (hash, summary))| CommitEntry {
+            short_hash: hash.to_string(),
+            author: "Max Wells".to_string(),
+            summary: summary.to_string(),
+            time: 1_725_000_000 - (i as i64 * 3600),
+        })
+        .collect()
+}
 
 /// Left pane 5: stash entries. Empty in the canonical state.
-pub const STASH: &[&str] = &[];
+pub fn mock_stashes() -> Vec<StashEntry> {
+    Vec::new()
+}
 
 /// Bottom box: the commands a real run would have shelled out.
 pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/main.rs"];
 
-/// Bottom line: inert lazygit-style key labels. None of these do anything yet.
+/// Bottom line: inert lazygit-style key hints, `Label: key | ...`. None of
+/// these do anything yet except `?` and `q`.
 pub const KEYBAR: &str =
-    " <space> stage  <c> commit  <P> push  <p> pull  <?> keybinds  <q> quit";
+    "Stage: <space> | Commit: c | Push: P | Pull: p | Keybindings: ? | Quit: q";
 
 /// Right pane when Status is focused.
 pub const RIGHT_STATUS: &str = "On branch main

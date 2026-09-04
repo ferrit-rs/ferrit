@@ -16,14 +16,14 @@ fn frame(app: &App, width: u16, height: u16) -> String {
 fn renders_every_region() {
     let out = frame(&App::mock(), 120, 40);
     for expected in [
-        "1 Status",
-        "2 Files",
-        "3 Local Branches",
-        "4 Commits",
-        "5 Stash",
+        "[1] Status",
+        "[2] Files",
+        "[3] Local branches",
+        "[4] Commits",
+        "[5] Stash",
         "command log",
-        "stage",  // keybar label
-        "quit",   // keybar label
+        "Stage:", // keybar label
+        "Quit:",  // keybar label
     ] {
         assert!(out.contains(expected), "missing {expected:?}\n{out}");
     }

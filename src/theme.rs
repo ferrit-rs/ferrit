@@ -1,29 +1,53 @@
 //! Colour palette and the span builders that give each kind of line its
-//! meaning-carrying colour. Phase 1 keeps this to one flat palette: no config,
-//! no themes, just enough colour to tell the panes and the diff apart.
+//! meaning-carrying colour. One flat palette tuned to match lazygit's default
+//! theme: green for the focused pane, a solid blue selection bar, green hashes,
+//! yellow keys. No config, no theme switching yet (that is phase 10).
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 
-/// Border of the focused left pane.
-pub const FOCUS: Color = Color::Cyan;
-/// Border of every unfocused pane and other low-priority chrome.
-pub const IDLE: Color = Color::DarkGray;
+use crate::git::{BranchEntry, CommitEntry, StashEntry};
+
+/// Border and title of the focused left pane (lazygit `activeBorderColor`).
+pub const FOCUS: Color = Color::Green;
+/// Border of every unfocused pane and other low-priority chrome
+/// (lazygit `inactiveBorderColor`, roughly the default foreground).
+pub const IDLE: Color = Color::Gray;
+/// Background of the selected row (lazygit `selectedLineBgColor`).
+pub const SELECTION: Color = Color::Blue;
+/// Text on the selected row.
+pub const SELECTION_FG: Color = Color::White;
 /// Added diff line, checked-out branch.
 pub const ADD: Color = Color::Green;
 /// Removed diff line, deleted path.
 pub const DEL: Color = Color::Red;
 /// Hunk header (`@@ ... @@`).
 pub const HUNK: Color = Color::Cyan;
-/// Commit hash.
-pub const HASH: Color = Color::Yellow;
-/// Modified path, ahead/behind counts.
+/// Commit hash and the graph node.
+pub const HASH: Color = Color::Green;
+/// Author initials in the commit list.
+pub const AUTHOR: Color = Color::Magenta;
+/// Modified path, ahead/behind counts, the `N of M` counter.
 pub const WARN: Color = Color::Yellow;
 /// Key names in the keybind bar.
-pub const KEY: Color = Color::Magenta;
+pub const KEY: Color = Color::Yellow;
 
 fn fg(color: Color) -> Style {
     Style::new().fg(color)
+}
+
+/// Style for the selected row in a left-pane list: solid blue bar, like
+/// lazygit. Filled across the pane width by the `List` widget.
+pub fn selection_style() -> Style {
+    Style::new()
+        .bg(SELECTION)
+        .fg(SELECTION_FG)
+        .add_modifier(Modifier::BOLD)
+}
+
+/// Bottom-right `N of M` counter shown on each list pane's border.
+pub fn counter_line(current: usize, total: usize) -> Line<'static> {
+    Line::styled(format!(" {current} of {total} "), fg(IDLE)).right_aligned()
 }
 
 /// `<status> <path>` from `git status --porcelain`: colour the two-char code by
@@ -45,28 +69,53 @@ pub fn file_line(raw: &str) -> Line<'static> {
     ])
 }
 
-/// `* main` gets green + bold, the rest stay plain.
-pub fn branch_line(raw: &'static str) -> Line<'static> {
-    if let Some(name) = raw.strip_prefix("* ") {
-        Line::from(vec![
-            Span::styled("* ", fg(ADD)),
-            Span::styled(name, Style::new().fg(ADD).add_modifier(Modifier::BOLD)),
-        ])
+/// lazygit branch row: `* main ↑2` for the checked-out branch (green, bold),
+/// `  feat/x` for the rest. Ahead/behind arrows in yellow when there is an
+/// upstream to compare against.
+pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
+    let marker = if entry.is_head { "* " } else { "  " };
+    let name_style = if entry.is_head {
+        Style::new().fg(ADD).add_modifier(Modifier::BOLD)
     } else {
-        Line::raw(raw)
+        Style::new()
+    };
+    let mut spans = vec![
+        Span::styled(marker, fg(ADD)),
+        Span::styled(entry.name.clone(), name_style),
+    ];
+    if entry.upstream.is_some() {
+        if entry.ahead > 0 {
+            spans.push(Span::styled(format!(" \u{2191}{}", entry.ahead), fg(WARN)));
+        }
+        if entry.behind > 0 {
+            spans.push(Span::styled(format!(" \u{2193}{}", entry.behind), fg(WARN)));
+        }
     }
+    Line::from(spans)
 }
 
-/// `<hash> <subject>`: hash in yellow, subject plain.
-pub fn commit_line(raw: &'static str) -> Line<'static> {
-    match raw.split_once(' ') {
-        Some((hash, subject)) => Line::from(vec![
-            Span::styled(hash, fg(HASH)),
-            Span::raw(" "),
-            Span::raw(subject),
-        ]),
-        None => Line::raw(raw),
-    }
+/// lazygit commit row: `<hash> <initials> <graph-node> <subject>`. Hash and
+/// node in green, author initials in magenta, subject plain. `graph` is the
+/// graph-column glyph, a plain `o` for linear history until phase 2 G4.
+pub fn commit_line(entry: &CommitEntry) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(entry.short_hash.clone(), fg(HASH)),
+        Span::raw(" "),
+        Span::styled(entry.author_initials(), fg(AUTHOR)),
+        Span::raw(" "),
+        Span::styled("o", fg(HASH)),
+        Span::raw(" "),
+        Span::raw(entry.summary.clone()),
+    ])
+}
+
+/// lazygit stash row: `stash@{0}: message`.
+pub fn stash_line(entry: &StashEntry) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("stash@{{{}}}", entry.index), fg(HASH)),
+        Span::raw(": "),
+        Span::raw(entry.message.clone()),
+    ])
 }
 
 /// A `git diff` blob, coloured line by line.
@@ -116,25 +165,23 @@ pub fn log_line(raw: &'static str) -> Line<'static> {
     }
 }
 
-/// Keybind bar: `<key>` tokens in magenta, everything else dim.
+/// Keybind bar, lazygit style: `Label: key | Label: key | ...`. The label is
+/// dim, the key (everything after `: ` in a segment) is yellow. A trailing
+/// segment without a colon (like `...`) stays dim.
 pub fn keybar_line(raw: &'static str) -> Line<'static> {
     let mut spans = Vec::new();
-    let mut rest = raw;
-    while let Some(open) = rest.find('<') {
-        if open > 0 {
-            spans.push(Span::styled(&rest[..open], fg(IDLE)));
+    let segments: Vec<&str> = raw.split(" | ").collect();
+    for (i, seg) in segments.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" | ", fg(IDLE)));
         }
-        rest = &rest[open..];
-        match rest.find('>') {
-            Some(close) => {
-                spans.push(Span::styled(&rest[..=close], fg(KEY)));
-                rest = &rest[close + 1..];
+        match seg.split_once(": ") {
+            Some((label, key)) => {
+                spans.push(Span::styled(format!("{label}: "), fg(IDLE)));
+                spans.push(Span::styled(key.to_string(), fg(KEY)));
             }
-            None => break,
+            None => spans.push(Span::styled(seg.to_string(), fg(IDLE))),
         }
-    }
-    if !rest.is_empty() {
-        spans.push(Span::styled(rest, fg(IDLE)));
     }
     Line::from(spans)
 }

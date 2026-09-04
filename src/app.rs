@@ -44,14 +44,27 @@ impl Pane {
         PANES.iter().position(|&p| p == self).unwrap()
     }
 
-    /// Bordered-box title, including the digit that focuses it.
+    /// Bordered-box title, lazygit style: `[N] Tab - Tab - Tab`. The extra tab
+    /// names are inert labels for now; only the first is a real view.
     pub fn title(self) -> &'static str {
         match self {
-            Pane::Status => "1 Status",
-            Pane::Files => "2 Files",
-            Pane::Branches => "3 Local Branches",
-            Pane::Commits => "4 Commits",
-            Pane::Stash => "5 Stash",
+            Pane::Status => "[1] Status",
+            Pane::Files => "[2] Files - Worktrees - Submodules",
+            Pane::Branches => "[3] Local branches - Remotes - Tags",
+            Pane::Commits => "[4] Commits - Reflog",
+            Pane::Stash => "[5] Stash",
+        }
+    }
+
+    /// Contextual title for the right pane when this left pane has focus,
+    /// matching what lazygit shows there.
+    pub fn right_title(self) -> &'static str {
+        match self {
+            Pane::Status => " Status ",
+            Pane::Files => " Unstaged changes ",
+            Pane::Branches => " Log ",
+            Pane::Commits => " Commit ",
+            Pane::Stash => " Stash ",
         }
     }
 }
@@ -67,8 +80,15 @@ pub struct App {
 
     /// `None` in `App::mock()`; otherwise the open repository.
     repo: Option<git::Repo>,
+    /// Repository directory name, shown in the status header (`ferrit -> main`).
+    repo_name: String,
     header: git::StatusHeader,
     files: Vec<git::FileEntry>,
+    /// Branches, Commits and Stash are still mock until phase 2 G3..G5; they
+    /// live here so the render path is identical to the wired panes.
+    branches: Vec<git::BranchEntry>,
+    commits: Vec<git::CommitEntry>,
+    stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
 
@@ -82,14 +102,23 @@ pub struct App {
 
 impl App {
     fn base(repo: Option<git::Repo>) -> Self {
+        let repo_name = repo
+            .as_ref()
+            .map(git::Repo::name)
+            .unwrap_or_else(|| "ferrit".to_string());
         Self {
             focus: Pane::default(),
             selection: [0; 5],
             show_help: false,
             should_quit: false,
             repo,
+            repo_name,
             header: git::StatusHeader::default(),
             files: Vec::new(),
+            // Mock until G3..G5 wire these to the backend.
+            branches: mock::mock_branches(),
+            commits: mock::mock_commits(),
+            stashes: mock::mock_stashes(),
             last_error: None,
             picker: Picker::halfblocks(),
             preview: Preview::None,
@@ -194,35 +223,73 @@ impl App {
         match pane {
             Pane::Status => 0,
             Pane::Files => self.files.len(),
-            Pane::Branches => mock::BRANCHES.len(),
-            Pane::Commits => mock::COMMITS.len(),
-            Pane::Stash => mock::STASH.len(),
+            Pane::Branches => self.branches.len(),
+            Pane::Commits => self.commits.len(),
+            Pane::Stash => self.stashes.len(),
         }
     }
 
-    /// Status pane rows: the header summary, or the error when `refresh()`
-    /// failed.
+    /// `(current, total)` for the pane's `N of M` border counter, or `None`
+    /// when the pane has no selectable rows.
+    pub fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
+        let total = self.row_count(pane);
+        (total > 0).then(|| (self.selected(pane).min(total - 1) + 1, total))
+    }
+
+    /// Status pane: lazygit's one-liner `ferrit -> main ↑2`, plus a conflict
+    /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         if let Some(err) = &self.last_error {
             return vec![theme::error_line(&format!("error: {err}"))];
         }
         let h = &self.header;
-        let mut first = h.branch.clone();
-        if let Some(up) = &h.upstream {
-            first.push_str(&format!(" \u{2192} {up}"));
-        }
+        let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
         if h.ahead > 0 {
-            first.push_str(&format!(" \u{2191}{}", h.ahead));
+            line.push_str(&format!(" \u{2191}{}", h.ahead));
         }
         if h.behind > 0 {
-            first.push_str(&format!(" \u{2193}{}", h.behind));
+            line.push_str(&format!(" \u{2193}{}", h.behind));
         }
-        let second = if h.conflicts > 0 {
-            format!("\u{2717} {} merge conflict(s)", h.conflicts)
-        } else {
-            "\u{2713} no merge conflicts".to_string()
-        };
-        vec![theme::status_line(&first), theme::status_line(&second)]
+        let mut out = vec![theme::status_line(&line)];
+        if h.conflicts > 0 {
+            out.push(theme::error_line(&format!(
+                "\u{2717} {} merge conflict(s)",
+                h.conflicts
+            )));
+        }
+        out
+    }
+
+    /// Branches pane rows, or the empty-state line.
+    pub fn branch_lines(&self) -> Vec<Line<'static>> {
+        if self.branches.is_empty() {
+            return vec![Line::raw("no local branches")];
+        }
+        self.branches.iter().map(theme::branch_line).collect()
+    }
+
+    /// Commits pane rows, or the empty-state line (fresh repo).
+    pub fn commit_lines(&self) -> Vec<Line<'static>> {
+        if self.commits.is_empty() {
+            return vec![Line::raw("no commits yet")];
+        }
+        self.commits.iter().map(theme::commit_line).collect()
+    }
+
+    /// Stash pane rows, or the empty-state line.
+    pub fn stash_lines(&self) -> Vec<Line<'static>> {
+        if self.stashes.is_empty() {
+            return vec![Line::raw("(no stash entries)")];
+        }
+        self.stashes.iter().map(theme::stash_line).collect()
+    }
+
+    /// Porcelain-style `XY path` text for one Files row. Debug/probe helper.
+    pub fn file_display(&self, i: usize) -> String {
+        self.files
+            .get(i)
+            .map(|f| f.display())
+            .unwrap_or_default()
     }
 
     /// Files pane rows, or a single "working tree clean" line.
