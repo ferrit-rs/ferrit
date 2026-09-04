@@ -143,7 +143,15 @@ impl App {
 
     /// Query the real terminal for a graphics protocol and, if it has one,
     /// swap it in for the half-block fallback. Call once, before `run`.
+    ///
+    /// Skipped under VS Code's integrated terminal: it answers the iTerm2
+    /// query but doesn't draw the protocol, so `from_query_stdio` reports a
+    /// working graphics backend that then renders nothing. Half-blocks always
+    /// draw, so that's the better default there.
     pub fn detect_graphics(&mut self) {
+        if std::env::var_os("TERM_PROGRAM").as_deref() == Some(std::ffi::OsStr::new("vscode")) {
+            return;
+        }
         if let Ok(picker) = Picker::from_query_stdio() {
             self.picker = picker;
             self.update_preview();
@@ -201,6 +209,12 @@ impl App {
     /// The right-pane preview for the current selection.
     pub fn preview(&self) -> &Preview {
         &self.preview
+    }
+
+    /// Mutable preview, for `ui::draw`: `StatefulImage` resizes and re-encodes
+    /// the protocol in place at render time (the ratatui-image example pattern).
+    pub fn preview_mut(&mut self) -> &mut Preview {
+        &mut self.preview
     }
 
     /// Focus `pane` and move its cursor to `index`, rebuilding the preview.
