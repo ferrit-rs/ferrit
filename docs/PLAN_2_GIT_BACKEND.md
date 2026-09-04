@@ -229,13 +229,19 @@ Lands in the same commits as the features:
 
 ## Milestones
 
-- **G0** `git::Repo::open`, `git::error`, `status_header`. Status pane
-  shows the real branch and ahead/behind. Non-repo dir exits cleanly.
-  `tests/git_backend.rs` covers header on `canonical` + fresh + non-repo.
-- **G1** `files()`: working-tree entries, staged vs worktree, sorted,
-  `binary` flag. Files pane renders them. Empty -> "working tree clean".
-- **G2** `r` refreshes; `last_error` surfaces in the Status pane instead
-  of propagating. `20-status-files.script` runs green with its git golden.
+- **G0** done. `git::Repo::open`, `git::error`, `status::header`. Status
+  pane shows the real branch and ahead/behind. Non-repo dir prints one line
+  and exits non-zero before the terminal is touched. `tests/git_backend.rs`
+  covers header on a fresh `git init`, a committed repo, and a non-repo dir.
+  (The `xtask fixture canonical` builder is still pending; tests build their
+  own throwaway repos with `git2` for now.)
+- **G1** done. `status::files()`: working-tree entries, staged vs worktree,
+  sorted, `binary` flag (always `false` until a later milestone). Files pane
+  renders them via `theme::file_line`. Empty -> "working tree clean".
+- **G2** partial. `r` triggers `App::refresh()`; a `GitError` during
+  refresh lands in `last_error` and renders red in the Status pane instead
+  of propagating, old snapshot left in place. `20-status-files.script` and
+  its git golden wait on the replay harness (`PLAN_SELF_TESTING.md`).
 - **G3** `branches()`; Branches pane real; mock branch data removed.
 - **G4** `commits(max)`; Commits pane real; mock commit data removed.
 - **G5** `stashes()`; Stash pane real; `mock.rs` deleted.

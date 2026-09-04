@@ -3,6 +3,7 @@
 //! `docs/PLAN_SELF_TESTING.md`.
 
 pub mod app;
+pub mod git;
 pub mod mock;
 pub mod theme;
 pub mod tui;

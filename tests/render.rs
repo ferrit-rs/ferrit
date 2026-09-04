@@ -14,7 +14,7 @@ fn frame(app: &App, width: u16, height: u16) -> String {
 
 #[test]
 fn renders_every_region() {
-    let out = frame(&App::new(), 120, 40);
+    let out = frame(&App::mock(), 120, 40);
     for expected in [
         "1 Status",
         "2 Files",
@@ -31,7 +31,7 @@ fn renders_every_region() {
 
 #[test]
 fn right_pane_follows_focus() {
-    let mut app = App::new();
+    let mut app = App::mock();
 
     app.focus = Pane::Files;
     assert!(frame(&app, 120, 40).contains("diff --git a/src/main.rs"));
@@ -45,7 +45,7 @@ fn right_pane_follows_focus() {
 
 #[test]
 fn help_overlay_toggles() {
-    let mut app = App::new();
+    let mut app = App::mock();
     assert!(!frame(&app, 120, 40).contains("keybindings"));
 
     app.show_help = true;
@@ -55,6 +55,6 @@ fn help_overlay_toggles() {
 #[test]
 fn survives_extremes_without_panicking() {
     for (w, h) in [(40, 20), (20, 8), (200, 60), (1, 1)] {
-        let _ = frame(&App::new(), w, h);
+        let _ = frame(&App::mock(), w, h);
     }
 }
