@@ -1,15 +1,20 @@
 //! Application state and the draw / event loop.
 //!
-//! Phase 1 is navigation only: `App` owns which left pane is focused and one
-//! selection cursor per pane. All displayed data lives in `mock`. There is no
-//! git anywhere.
+//! Phase 2 wired the Status and Files panes to a real read-only `git::Repo`.
+//! `App` owns the repo handle, the cached snapshot, which left pane is focused,
+//! and one selection cursor per pane. Branches, Commits and Stash still read
+//! from `mock` until G3..G5. `App::mock()` is the repo-free path the render
+//! tests use.
+
+use std::path::Path;
 
 use color_eyre::Result;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::text::Line;
 
-use crate::mock;
+use crate::git::{self, GitResult};
 use crate::tui::Tui;
-use crate::ui;
+use crate::{mock, theme, ui};
 
 /// The five left panes, in top-to-bottom screen order.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
@@ -47,17 +52,6 @@ impl Pane {
             Pane::Stash => "5 Stash",
         }
     }
-
-    /// The mock rows this pane lists.
-    pub fn items(self) -> &'static [&'static str] {
-        match self {
-            Pane::Status => mock::STATUS,
-            Pane::Files => mock::FILES,
-            Pane::Branches => mock::BRANCHES,
-            Pane::Commits => mock::COMMITS,
-            Pane::Stash => mock::STASH,
-        }
-    }
 }
 
 #[derive(Default)]
@@ -69,16 +63,104 @@ pub struct App {
     /// Whether the help overlay is up.
     pub show_help: bool,
     should_quit: bool,
+
+    /// `None` in `App::mock()`; otherwise the open repository.
+    repo: Option<git::Repo>,
+    header: git::StatusHeader,
+    files: Vec<git::FileEntry>,
+    /// Last `refresh()` failure, shown in the Status pane. Never a panic.
+    last_error: Option<String>,
 }
 
 impl App {
-    pub fn new() -> Self {
-        Self::default()
+    /// Open the repo at or above `path`, then take one snapshot.
+    pub fn open(path: &Path) -> GitResult<Self> {
+        let repo = git::Repo::open(path)?;
+        let mut app = Self {
+            repo: Some(repo),
+            ..Self::default()
+        };
+        app.refresh();
+        Ok(app)
+    }
+
+    /// Repo-free instance backed by `mock` data, for the render tests.
+    pub fn mock() -> Self {
+        Self {
+            header: mock::mock_header(),
+            files: mock::mock_files(),
+            ..Self::default()
+        }
+    }
+
+    /// Re-read the wired panes. On error keep the old snapshot and stash the
+    /// message; never propagate, never panic. No-op without a repo.
+    pub fn refresh(&mut self) {
+        let Some(repo) = &self.repo else { return };
+        match repo.snapshot() {
+            Ok(snap) => {
+                self.header = snap.header;
+                self.files = snap.files;
+                self.last_error = None;
+            }
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+        let last = self.row_count(Pane::Files).saturating_sub(1);
+        let cursor = &mut self.selection[Pane::Files.index()];
+        *cursor = (*cursor).min(last);
     }
 
     /// Selection cursor for a given pane.
     pub fn selected(&self, pane: Pane) -> usize {
         self.selection[pane.index()]
+    }
+
+    /// Selectable row count for a pane, for clamping the cursor and deciding
+    /// whether to draw a highlight.
+    pub fn row_count(&self, pane: Pane) -> usize {
+        match pane {
+            Pane::Status => 0,
+            Pane::Files => self.files.len(),
+            Pane::Branches => mock::BRANCHES.len(),
+            Pane::Commits => mock::COMMITS.len(),
+            Pane::Stash => mock::STASH.len(),
+        }
+    }
+
+    /// Status pane rows: the header summary, or the error when `refresh()`
+    /// failed.
+    pub fn status_lines(&self) -> Vec<Line<'static>> {
+        if let Some(err) = &self.last_error {
+            return vec![theme::error_line(&format!("error: {err}"))];
+        }
+        let h = &self.header;
+        let mut first = h.branch.clone();
+        if let Some(up) = &h.upstream {
+            first.push_str(&format!(" \u{2192} {up}"));
+        }
+        if h.ahead > 0 {
+            first.push_str(&format!(" \u{2191}{}", h.ahead));
+        }
+        if h.behind > 0 {
+            first.push_str(&format!(" \u{2193}{}", h.behind));
+        }
+        let second = if h.conflicts > 0 {
+            format!("\u{2717} {} merge conflict(s)", h.conflicts)
+        } else {
+            "\u{2713} no merge conflicts".to_string()
+        };
+        vec![theme::status_line(&first), theme::status_line(&second)]
+    }
+
+    /// Files pane rows, or a single "working tree clean" line.
+    pub fn file_lines(&self) -> Vec<Line<'static>> {
+        if self.files.is_empty() {
+            return vec![Line::raw("working tree clean")];
+        }
+        self.files
+            .iter()
+            .map(|f| theme::file_line(&f.display()))
+            .collect()
     }
 
     /// Draw, then block on one event, until `should_quit`. No tick, no polling.
@@ -118,6 +200,7 @@ impl App {
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
+            KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
                 self.focus = PANES[c as usize - '1' as usize];
             }
@@ -134,7 +217,7 @@ impl App {
     }
 
     fn select_down(&mut self) {
-        let last = self.focus.items().len().saturating_sub(1);
+        let last = self.row_count(self.focus).saturating_sub(1);
         let cursor = &mut self.selection[self.focus.index()];
         *cursor = (*cursor + 1).min(last);
     }
@@ -156,7 +239,7 @@ mod tests {
 
     #[test]
     fn arrows_cycle_panes_and_wrap() {
-        let mut app = App::new();
+        let mut app = App::mock();
         press(&mut app, KeyCode::Right);
         assert_eq!(app.focus, Pane::Files);
         press(&mut app, KeyCode::Left);
@@ -167,7 +250,7 @@ mod tests {
 
     #[test]
     fn selection_clamps_at_both_ends() {
-        let mut app = App::new();
+        let mut app = App::mock();
         press(&mut app, KeyCode::Char('2')); // Files: 3 rows
         for _ in 0..10 {
             press(&mut app, KeyCode::Down);
@@ -181,12 +264,19 @@ mod tests {
 
     #[test]
     fn help_overlay_swallows_navigation() {
-        let mut app = App::new();
+        let mut app = App::mock();
         press(&mut app, KeyCode::Char('?'));
         assert!(app.show_help);
         press(&mut app, KeyCode::Right);
         assert_eq!(app.focus, Pane::Status, "nav is inert while help is up");
         press(&mut app, KeyCode::Char('?'));
         assert!(!app.show_help);
+    }
+
+    #[test]
+    fn refresh_without_repo_is_a_noop() {
+        let mut app = App::mock();
+        app.refresh();
+        assert_eq!(app.file_lines().len(), 3);
     }
 }

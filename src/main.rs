@@ -10,7 +10,7 @@ use ferrit::tui;
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Path to the git repository to open (wired up in phase 2).
+    /// Path to the git repository to open.
     #[arg(short, long, default_value = ".")]
     path: PathBuf,
 }
@@ -18,10 +18,19 @@ struct Cli {
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
-    let _ = cli.path;
+
+    // Open the repo before touching the terminal, so a non-repo path is a
+    // plain one-line message and a non-zero exit, no alt-screen garbage.
+    let mut app = match App::open(&cli.path) {
+        Ok(app) => app,
+        Err(e) => {
+            eprintln!("ferrit: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let mut terminal = tui::init()?;
-    let result = App::new().run(&mut terminal);
+    let result = app.run(&mut terminal);
     tui::restore()?;
     result
 }

@@ -21,3 +21,4 @@ ratatui = "0.30"
 crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }

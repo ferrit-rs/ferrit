@@ -28,7 +28,7 @@ fn fg(color: Color) -> Style {
 
 /// `<status> <path>` from `git status --porcelain`: colour the two-char code by
 /// what it means, leave the path plain.
-pub fn file_line(raw: &'static str) -> Line<'static> {
+pub fn file_line(raw: &str) -> Line<'static> {
     let (code, rest) = raw.split_at(raw.len().min(2));
     let color = if code.contains('D') {
         DEL
@@ -39,7 +39,10 @@ pub fn file_line(raw: &'static str) -> Line<'static> {
     } else {
         WARN
     };
-    Line::from(vec![Span::styled(code, fg(color)), Span::raw(rest)])
+    Line::from(vec![
+        Span::styled(code.to_string(), fg(color)),
+        Span::raw(rest.to_string()),
+    ])
 }
 
 /// `* main` gets green + bold, the rest stay plain.
@@ -91,12 +94,18 @@ pub fn diff_text(raw: &'static str) -> Text<'static> {
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.
-pub fn status_line(raw: &'static str) -> Line<'static> {
-    if raw.contains('\u{2191}') || raw.contains('\u{2193}') {
-        Line::styled(raw, fg(WARN))
+pub fn status_line(raw: &str) -> Line<'static> {
+    let style = if raw.contains('\u{2191}') || raw.contains('\u{2193}') {
+        fg(WARN)
     } else {
-        Line::styled(raw, fg(ADD))
-    }
+        fg(ADD)
+    };
+    Line::styled(raw.to_string(), style)
+}
+
+/// A `refresh()` failure, surfaced in the Status pane instead of a panic.
+pub fn error_line(raw: &str) -> Line<'static> {
+    Line::styled(raw.to_string(), fg(DEL))
 }
 
 /// Command-log line: dim the `$` prompt, leave the command bright.

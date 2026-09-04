@@ -1,14 +1,49 @@
-//! Hardcoded sample data for phase 1.
+//! Hardcoded sample data.
 //!
-//! Nothing here is computed. Phase 2 replaces this module one pane at a time
-//! with a real read-only git backend. The values mirror the target screen in
+//! Phase 2 wired Status and Files to a real `git::Repo`; the mock versions of
+//! those two now feed `App::mock()`, the render tests' repo-free path. Branches,
+//! Commits and Stash stay mock until G3..G5. Values mirror the target screen in
 //! `docs/PLAN_1_LAYOUT.md`.
 
-/// Left pane 1: repo status header lines.
-pub const STATUS: &[&str] = &["ferrit \u{2192} main \u{2191}2 \u{2193}0", "\u{2713} no merge conflicts"];
+use std::path::PathBuf;
 
-/// Left pane 2: working-tree changes (porcelain-style prefixes).
-pub const FILES: &[&str] = &[" M src/main.rs", "?? docs/notes.md", "A  Cargo.lock"];
+use crate::git::{Change, FileEntry, StatusHeader};
+
+/// Left pane 1, repo-free: the canonical status header.
+pub fn mock_header() -> StatusHeader {
+    StatusHeader {
+        branch: "main".to_string(),
+        detached: false,
+        upstream: Some("origin/main".to_string()),
+        ahead: 2,
+        behind: 0,
+        conflicts: 0,
+    }
+}
+
+/// Left pane 2, repo-free: 1 modified, 1 untracked, 1 staged.
+pub fn mock_files() -> Vec<FileEntry> {
+    vec![
+        FileEntry {
+            path: PathBuf::from("src/main.rs"),
+            staged: Change::None,
+            worktree: Change::Modified,
+            binary: false,
+        },
+        FileEntry {
+            path: PathBuf::from("docs/notes.md"),
+            staged: Change::None,
+            worktree: Change::Untracked,
+            binary: false,
+        },
+        FileEntry {
+            path: PathBuf::from("Cargo.lock"),
+            staged: Change::Added,
+            worktree: Change::None,
+            binary: false,
+        },
+    ]
+}
 
 /// Left pane 3: local branches, `*` marks the checked-out one.
 pub const BRANCHES: &[&str] = &["* main", "  feat/tui-skeleton", "  fix/parse-args"];
