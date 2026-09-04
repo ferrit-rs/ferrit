@@ -11,8 +11,10 @@ use std::path::Path;
 use color_eyre::Result;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::text::Line;
+use ratatui_image::picker::Picker;
 
 use crate::git::{self, GitResult};
+use crate::preview::{self, Preview};
 use crate::tui::Tui;
 use crate::{mock, theme, ui};
 
@@ -54,7 +56,6 @@ impl Pane {
     }
 }
 
-#[derive(Default)]
 pub struct App {
     /// Which left pane has focus.
     pub focus: Pane,
@@ -70,26 +71,53 @@ pub struct App {
     files: Vec<git::FileEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
+
+    /// Terminal graphics backend for the image preview. Starts on half-blocks
+    /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
+    /// iterm2 when the real terminal supports one.
+    picker: Picker,
+    /// Right-pane image preview for the current selection, rebuilt on nav.
+    preview: Preview,
 }
 
 impl App {
+    fn base(repo: Option<git::Repo>) -> Self {
+        Self {
+            focus: Pane::default(),
+            selection: [0; 5],
+            show_help: false,
+            should_quit: false,
+            repo,
+            header: git::StatusHeader::default(),
+            files: Vec::new(),
+            last_error: None,
+            picker: Picker::halfblocks(),
+            preview: Preview::None,
+        }
+    }
+
     /// Open the repo at or above `path`, then take one snapshot.
     pub fn open(path: &Path) -> GitResult<Self> {
-        let repo = git::Repo::open(path)?;
-        let mut app = Self {
-            repo: Some(repo),
-            ..Self::default()
-        };
+        let mut app = Self::base(Some(git::Repo::open(path)?));
         app.refresh();
         Ok(app)
     }
 
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
-        Self {
-            header: mock::mock_header(),
-            files: mock::mock_files(),
-            ..Self::default()
+        let mut app = Self::base(None);
+        app.header = mock::mock_header();
+        app.files = mock::mock_files();
+        app.update_preview();
+        app
+    }
+
+    /// Query the real terminal for a graphics protocol and, if it has one,
+    /// swap it in for the half-block fallback. Call once, before `run`.
+    pub fn detect_graphics(&mut self) {
+        if let Ok(picker) = Picker::from_query_stdio() {
+            self.picker = picker;
+            self.update_preview();
         }
     }
 
@@ -108,6 +136,51 @@ impl App {
         let last = self.row_count(Pane::Files).saturating_sub(1);
         let cursor = &mut self.selection[Pane::Files.index()];
         *cursor = (*cursor).min(last);
+        self.update_preview();
+    }
+
+    /// Rebuild `preview` for the current focus and selection. Cheap when the
+    /// selection is not an image (the common case); decodes otherwise.
+    fn update_preview(&mut self) {
+        self.preview = self.build_preview();
+    }
+
+    fn build_preview(&self) -> Preview {
+        if self.focus != Pane::Files {
+            return Preview::None;
+        }
+        let Some(entry) = self.files.get(self.selected(Pane::Files)) else {
+            return Preview::None;
+        };
+        if !preview::is_image_path(&entry.path) {
+            return Preview::None;
+        }
+        let bytes = match &self.repo {
+            Some(repo) => match repo.blob_bytes(&entry.path, git::Rev::Workdir) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    return Preview::Note(format!("[image] {}  ({e})", entry.path.display()));
+                }
+            },
+            None => mock::mock_image_bytes(&entry.path)
+                .map(<[u8]>::to_vec)
+                .unwrap_or_default(),
+        };
+        preview::from_bytes(&self.picker, &entry.path, &bytes)
+    }
+
+    /// The right-pane preview for the current selection.
+    pub fn preview(&self) -> &Preview {
+        &self.preview
+    }
+
+    /// Focus `pane` and move its cursor to `index`, rebuilding the preview.
+    /// Test and example helper; the running app goes through `on_key`.
+    pub fn select(&mut self, pane: Pane, index: usize) {
+        self.focus = pane;
+        let last = self.row_count(pane).saturating_sub(1);
+        self.selection[pane.index()] = index.min(last);
+        self.update_preview();
     }
 
     /// Selection cursor for a given pane.
@@ -210,6 +283,9 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => self.select_up(),
             _ => {}
         }
+
+        // Focus or selection may have moved; keep the right-pane preview in sync.
+        self.update_preview();
     }
 
     fn pane_offset(&self, delta: usize) -> Pane {
@@ -251,15 +327,39 @@ mod tests {
     #[test]
     fn selection_clamps_at_both_ends() {
         let mut app = App::mock();
-        press(&mut app, KeyCode::Char('2')); // Files: 3 rows
-        for _ in 0..10 {
+        let last = mock::mock_files().len() - 1;
+        press(&mut app, KeyCode::Char('2')); // focus Files
+        for _ in 0..20 {
             press(&mut app, KeyCode::Down);
         }
-        assert_eq!(app.selected(Pane::Files), 2);
-        for _ in 0..10 {
+        assert_eq!(app.selected(Pane::Files), last);
+        for _ in 0..20 {
             press(&mut app, KeyCode::Up);
         }
         assert_eq!(app.selected(Pane::Files), 0);
+    }
+
+    #[test]
+    fn image_selection_builds_an_image_preview() {
+        let mut app = App::mock();
+        let png = mock::mock_files()
+            .iter()
+            .position(|f| f.path.extension().is_some_and(|e| e == "png"))
+            .expect("mock has a .png entry");
+
+        press(&mut app, KeyCode::Char('2')); // focus Files
+        assert!(matches!(app.preview(), Preview::None), "src/main.rs is not an image");
+
+        for _ in 0..png {
+            press(&mut app, KeyCode::Down);
+        }
+        assert!(
+            matches!(app.preview(), Preview::Image(_)),
+            "the embedded PNG decodes on the half-block picker"
+        );
+
+        press(&mut app, KeyCode::Char('1')); // leave Files
+        assert!(matches!(app.preview(), Preview::None));
     }
 
     #[test]
@@ -276,7 +376,9 @@ mod tests {
     #[test]
     fn refresh_without_repo_is_a_noop() {
         let mut app = App::mock();
+        let before = app.file_lines().len();
         app.refresh();
-        assert_eq!(app.file_lines().len(), 3);
+        assert_eq!(app.file_lines().len(), before);
+        assert_eq!(before, mock::mock_files().len());
     }
 }

@@ -50,7 +50,7 @@ split is a move, not a rewrite.
 | --- | --- | --- | --- |
 | 0 | `PLAN_0_GENERAL.md` | this overview | living |
 | 1 | `PLAN_1_LAYOUT.md` | layout only, mock data, keyboard nav, no git | done |
-| 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data | in progress (G0, G1 done; G2 partial) |
+| 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data; blob reads + image preview | in progress (G0, G1, G6 done; G2 partial; G3..G5 queued) |
 | 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane, syntax highlight, hunk navigation, scrolling | todo |
 | 4 | `PLAN_4_STAGING.md` | stage / unstage at file, hunk, line; refresh after | todo |
 | 5 | `PLAN_5_COMMIT.md` | commit popup (message input), amend, fixup | todo |

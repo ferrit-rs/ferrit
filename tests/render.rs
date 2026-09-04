@@ -2,7 +2,7 @@
 //! `TestBackend` and assert on frame text. No terminal, no timing.
 
 use ferrit::app::{App, Pane};
-use ferrit::ui;
+use ferrit::{mock, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
@@ -41,6 +41,20 @@ fn right_pane_follows_focus() {
 
     app.focus = Pane::Stash;
     assert!(frame(&app, 120, 40).contains("(no stash entries)"));
+}
+
+#[test]
+fn image_selection_takes_over_the_right_pane() {
+    let mut app = App::mock();
+    let png = mock::mock_files()
+        .iter()
+        .position(|f| f.path.extension().is_some_and(|e| e == "png"))
+        .expect("mock has a .png entry");
+
+    app.select(Pane::Files, png);
+    let out = frame(&app, 120, 40);
+    assert!(out.contains("Preview"), "image preview owns the right pane\n{out}");
+    assert!(!out.contains("diff --git"), "the mock diff is gone\n{out}");
 }
 
 #[test]
