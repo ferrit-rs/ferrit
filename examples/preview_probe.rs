@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use ferrit::app::{App, Pane};
-use ferrit::preview::Preview;
+use ferrit::image::preview::Preview;
 
 fn main() {
     let mut app = match App::open(Path::new(".")) {

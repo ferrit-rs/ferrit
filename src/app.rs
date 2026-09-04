@@ -14,7 +14,8 @@ use ratatui::text::Line;
 use ratatui_image::picker::Picker;
 
 use crate::git::{self, GitResult};
-use crate::preview::{self, Preview};
+use crate::image::detect;
+use crate::image::preview::{self, Preview};
 use crate::tui::Tui;
 use crate::{mock, theme, ui};
 
@@ -142,17 +143,10 @@ impl App {
     }
 
     /// Query the real terminal for a graphics protocol and, if it has one,
-    /// swap it in for the half-block fallback. Call once, before `run`.
-    ///
-    /// Skipped under VS Code's integrated terminal: it answers the iTerm2
-    /// query but doesn't draw the protocol, so `from_query_stdio` reports a
-    /// working graphics backend that then renders nothing. Half-blocks always
-    /// draw, so that's the better default there.
+    /// swap it in for the half-block fallback. Call once, before `run`. See
+    /// `image::detect` for hosts that lie about support.
     pub fn detect_graphics(&mut self) {
-        if std::env::var_os("TERM_PROGRAM").as_deref() == Some(std::ffi::OsStr::new("vscode")) {
-            return;
-        }
-        if let Ok(picker) = Picker::from_query_stdio() {
+        if let Some(picker) = detect::detect_picker() {
             self.picker = picker;
             self.update_preview();
         }

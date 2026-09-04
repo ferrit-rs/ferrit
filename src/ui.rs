@@ -12,7 +12,7 @@ use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, Pane, PANES};
-use crate::preview::Preview;
+use crate::image::preview::Preview;
 use crate::{mock, theme};
 
 /// Render the full screen for the current `App` state.

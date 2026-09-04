@@ -1,10 +1,4 @@
-//! Right-pane image preview.
-//!
-//! This is the only module that touches `image` or `ratatui-image`; `src/git/`
-//! stays clean of both and just hands over bytes. When the terminal speaks a
-//! graphics protocol (sixel / kitty / iterm2) the picture renders natively;
-//! otherwise `ratatui-image` falls back to unicode half-blocks, which work
-//! anywhere, so there is always something to show.
+//! Decode file bytes into what the right pane should show.
 
 use std::path::Path;
 
