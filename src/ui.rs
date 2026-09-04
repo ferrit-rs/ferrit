@@ -9,15 +9,14 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
-use ratatui_image::StatefulImage;
-use ratatui_image::protocol::StatefulProtocol;
+use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, Pane, PANES};
 use crate::preview::Preview;
 use crate::{mock, theme};
 
 /// Render the full screen for the current `App` state.
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
     let [content, log, keybar] = Layout::vertical([
@@ -33,12 +32,13 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let [left, right] =
         Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
 
+    let show_help = app.show_help;
     draw_left_column(frame, app, left);
     draw_right_pane(frame, app, right);
     draw_command_log(frame, log);
     draw_keybar(frame, keybar);
 
-    if app.show_help {
+    if show_help {
         draw_help(frame, area);
     }
 }
@@ -100,23 +100,26 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(theme::IDLE);
+    let right_title = app.focus.right_title();
 
     // An image selection takes over the right pane; otherwise it is mock text.
-    match app.preview() {
-        Preview::Image(cell) => {
+    match app.preview_mut() {
+        Preview::Image(proto) => {
+            // Same shape as `render_resized_image` in the ratatui-image demo:
+            // draw the border, then hand `StatefulImage` the inner area and a
+            // `&mut StatefulProtocol` so it resizes + re-encodes to fit.
             let block = Block::bordered()
                 .title(Line::styled(" Preview ", focused))
                 .border_style(idle);
             let inner = block.inner(area);
             frame.render_widget(block, area);
-            let mut proto = cell.borrow_mut();
             frame.render_stateful_widget(
-                StatefulImage::<StatefulProtocol>::default(),
+                StatefulImage::new().resize(Resize::Fit(None)),
                 inner,
-                &mut proto,
+                proto.as_mut(),
             );
             return;
         }
@@ -124,7 +127,7 @@ fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
             let panel = Paragraph::new(msg.as_str())
                 .block(
                     Block::bordered()
-                        .title(Line::styled(" Preview ", focused))
+                        .title(Line::styled(right_title, focused))
                         .border_style(idle),
                 )
                 .wrap(Wrap { trim: false });
@@ -134,7 +137,6 @@ fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
         Preview::None => {}
     }
 
-    let title = app.focus.right_title();
     let body = match app.focus {
         Pane::Status => mock::RIGHT_STATUS,
         Pane::Files => mock::RIGHT_DIFF,
@@ -151,7 +153,7 @@ fn draw_right_pane(frame: &mut Frame, app: &App, area: Rect) {
     let panel = Paragraph::new(text)
         .block(
             Block::bordered()
-                .title(Line::styled(title, focused))
+                .title(Line::styled(right_title, focused))
                 .border_style(Style::new().fg(theme::IDLE)),
         )
         .wrap(Wrap { trim: false });

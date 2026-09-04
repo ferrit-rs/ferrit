@@ -9,7 +9,7 @@ fn main() {
         let mut app = App::mock();
         app.focus = focus;
         let mut t = Terminal::new(TestBackend::new(90, 30)).unwrap();
-        t.draw(|f| ui::draw(f, &app)).unwrap();
+        t.draw(|f| ui::draw(f, &mut app)).unwrap();
         println!("== {focus:?} ==\n{}", t.backend());
     }
 }
