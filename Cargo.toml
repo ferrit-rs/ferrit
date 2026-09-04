@@ -17,3 +17,7 @@ name = "ferrit"
 path = "src/main.rs"
 
 [dependencies]
+ratatui = "0.30"
+crossterm = "0.29"
+clap = { version = "4", features = ["derive"] }
+color-eyre = "0.6"
