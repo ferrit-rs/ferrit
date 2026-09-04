@@ -3,297 +3,257 @@
 ## Goal
 
 Any agent working on `ferrit` (Claude included) can verify a feature works
-end to end, on its own, and produce visual proof. No human has to sit in
-front of the TUI and click around.
+end to end, on its own, and produce visual proof, with no human sitting in
+front of the TUI.
 
-Two layers, both run from `cargo` / a shell, both suitable for CI:
+Sharpened after studying lazygit's setup: the **correctness gate is
+deterministic and headless**. Screenshots are artifacts for humans and for
+PR review, never the thing CI depends on.
 
-- **Layer A, headless assertions.** Render into an in-memory buffer, drive
-  the state machine with synthetic key events, assert on cells and on git
-  state. Fast, deterministic, no terminal.
-- **Layer B, driven binary with screenshots.** Run the real `ferrit`
-  binary in a headless terminal, send real keystrokes, capture real PNG
-  and GIF frames, then cross-check the effect against `git` on disk.
+## What we can do better than lazygit
 
-Layer A answers "the right characters in the right place, the right git
-result". Layer B answers "the real program, launched for real, looks and
-behaves like this", and hands back an image a person can look at.
+lazygit drives its real binary in a pseudo-terminal and asserts on
+captured view text plus git state. Mature and effective, but:
 
-## Why both
+- every integration test carries timing `Sleep`s, because a pty runs the
+  real async event loop and you wait for it to settle
+- they abandoned golden `.git`-directory snapshots: flaky, unreviewable,
+  painful to update
+- tests are Go; the demo `.tape` files that make the README GIFs are a
+  separate mechanism
 
-`TestBackend` can lie by omission: it exercises `ui::draw` and `App::update`
-but not `main`, not `tui::init` / `restore`, not the real event loop, not
-terminal setup. Layer B covers that seam and gives artefacts for PR review.
-Layer A is what you run on every save; Layer B is what you run before a
-commit and in CI.
+`ferrit` gets three things lazygit's stack cannot easily have:
 
-## Tooling
+1. **ratatui `TestBackend`.** Render `ui::draw` into memory, zero
+   terminal, sub-millisecond. A whole fast layer with no clean gocui
+   equivalent.
+2. **A built-in headless replay mode.** The binary steps its own loop
+   synchronously from a script file: one input, one update, one draw, one
+   frame dump, next. No pty, no timers, no sleeps. Deterministic by
+   construction.
+3. **One script format** consumed by both the Rust test harness (the gate)
+   and `vhs` (the GIF). A flow is defined once.
 
-| Tool | Role | Install |
-| --- | --- | --- |
-| `cargo nextest` | test runner for Layer A | `cargo install cargo-nextest` |
-| `insta` | snapshot assertions on rendered buffers | dev-dependency |
-| `vhs` | scripted headless terminal, PNG + GIF output | `brew install vhs` (pulls `ttyd`, `ffmpeg`) |
-| `git` | building fixture repos, cross-checking results | system |
+Adopted straight from lazygit's hard lessons: assert on text not pixels;
+snapshot small targeted regions not whole screens; golden state is
+structured git output, not a directory blob.
 
-`vhs` runs a real terminal (`ttyd` + a headless browser it manages) and
-executes a `.tape` script of `Type` / `Enter` / `Sleep` / `Screenshot`
-commands. It is the closest thing to Playwright for a TUI.
+## The three mechanisms
 
-Nothing here needs a display server. `vhs` is headless by design.
+### 1. `TestBackend` unit snapshots
 
-## Repo fixtures
+`tests/render.rs`. Render one widget or one region, assert with `insta`.
+Targeted: `left_column`, `right_pane`, `status_bar`, never the full
+200x60 buffer. Covers `ui::draw` and the layout math in isolation. Cheap
+enough to run on every save.
 
-Tests never touch the real working tree. A fixture is a throwaway git repo
-built in a temp dir.
+### 2. Headless replay harness (the correctness gate)
 
-```
-tests/support/repo.rs        (Layer A: Rust helper)
-  fn fixture_repo() -> TempDir
-    git init
-    write files, `git add`, `git -c user.email=... commit`
-    make a branch or two, maybe a stash, maybe a dirty file
-    return the TempDir (repo path = dir.path())
-
-test/fixtures/build.sh       (Layer B: shell, same shape)
-  mktemp -d, git init, seed commits/branches/stash, echo the path
-```
-
-The two helpers seed the **same** canonical state so Layer A snapshots and
-Layer B screenshots describe the same repo. Canonical fixture:
+The binary gains a hidden test mode:
 
 ```
-- 4 commits on `main`
-- branches: main, feat/tui-skeleton, fix/parse-args
-- working tree: 1 modified (src/main.rs), 1 untracked (docs/notes.md),
-  1 staged (Cargo.lock)
-- stash: empty
+ferrit --replay SCRIPT --fixture NAME --dump-frames DIR [--size 120x40]
 ```
 
-This is exactly the mock data in `PLAN_1_LAYOUT.md`, so phase 1 screenshots
-of the mock and phase 2+ screenshots of the real backend line up.
+- `--fixture NAME` builds a throwaway repo and works inside it
+- `--replay SCRIPT` reads a script (format below), applies each input to
+  `App::update`, runs `ui::draw` into a `TestBackend` after every step
+- `--dump-frames DIR` writes `NNN-label.txt` (plain char grid) per step;
+  with `--ansi`, also `NNN-label.ansi` with colour attributes
+- the loop is synchronous: input, update, draw, dump, next. No real event
+  source, no clock, no sleeps
 
-## Layer A: headless assertions
+These flags are test-only: hidden from `--help`, behind a hidden `clap`
+attribute, and a no-op unless a `FERRIT_TEST` env or debug build is set.
+They never matter in normal use.
 
-Lives in `tests/`. Depends on the module boundary from `PLAN_0_GENERAL.md`:
-`src/git/` has no ratatui, so it is tested as a plain library; `src/ui/` is
-tested through `TestBackend`.
+Driven from `tests/replay.rs`: for each script under `test/scripts/`, run
+the binary (or an in-process entrypoint), then assert:
+
+- frame text contains the expected strings, or matches a targeted `insta`
+  snapshot of a named region
+- `git -C <fixture>` state matches the golden block in the script
+
+Non-zero exit on any mismatch. No timing knobs anywhere.
+
+### 3. `vhs` artifacts (humans only, not a gate)
+
+`test/tapes/*.tape` are generated from the same scripts by
+`test/gen-tapes.sh`: script tokens map to `Type` / `Screenshot`, and
+`Sleep`s are inserted only so the GIF is watchable. `vhs` renders real
+PNG + GIF. These upload as PR artifacts and feed the README. CI never
+fails on a pixel diff. A change to a reference PNG is a reviewable diff,
+nothing more.
+
+## Script format
+
+`test/scripts/NN-name.script`, one directive per line:
 
 ```
-tests/
-├── support/
-│   ├── mod.rs
-│   └── repo.rs          fixture_repo(), helpers to mutate it
-├── render.rs            TestBackend snapshots of ui::draw
-├── nav.rs               focus + selection state machine
-└── git_backend.rs       src/git/ against fixture repos (phase 2+)
+# stage a file and commit it
+size 120x40
+key 2                       # focus Files
+key j
+key space                   # stage selection
+snapshot files-staged       # dump frame + insta-assert region (focused left pane + right pane)
+expect-text "M  Cargo.lock"
+key c
+type "test: replay commit"
+key enter
+snapshot after-commit
+git status --porcelain=v2   -> "1 M. "
+git log -1 --format=%s      -> "test: replay commit"
 ```
 
-Render test shape:
+Directives: `size WxH`, `resize WxH`, `key <name>`, `type "<text>"`,
+`snapshot <label>`, `expect-text "<s>"`, `expect-no-text "<s>"`,
+`git <args...> -> "<expected substring>"`, `#` comment. The parser is
+shared by `tests/replay.rs` and `gen-tapes.sh`; adding a directive is one
+change in one place.
 
-```rust
-let mut term = Terminal::new(TestBackend::new(120, 40))?;
-let mut app = App::new_with_mock();          // or App::open(fixture.path())
-term.draw(|f| ui::draw(f, &app))?;
-insta::assert_snapshot!("boot", term.backend());
+## Fixtures
 
-app.update(Event::key(KeyCode::Char('2')));  // focus Files
-app.update(Event::key(KeyCode::Char('j')));  // select down
-term.draw(|f| ui::draw(f, &app))?;
-insta::assert_snapshot!("files_focused_row2", term.backend());
+An `xtask` binary owns repo construction, and nothing else does:
+
+```
+cargo run -p xtask -- fixture canonical [--into DIR]
 ```
 
-`insta` writes `.snap` files under `tests/snapshots/`. First run creates
-them; later runs diff. `cargo insta review` accepts or rejects a change,
-same idea as updating a Playwright snapshot. The `.snap` files are
-committed and reviewed like code.
+Builds the canonical state from `PLAN_1_LAYOUT.md`: 4 commits on `main`;
+branches `feat/tui-skeleton`, `fix/parse-args`; working tree with 1
+modified (`src/main.rs`), 1 untracked (`docs/notes.md`), 1 staged
+(`Cargo.lock`); empty stash. `--replay`'s `--fixture` calls the same
+code. Later named fixtures: `conflict`, `detached`, `deep-history`.
 
-What Layer A must cover, by phase:
+Every fixture is a fresh temp dir. Never the real working tree.
 
-| Phase | Layer A assertions |
+## Golden git state
+
+Not a `.git` snapshot. Structured, line-oriented, diffable, and written
+inline in the script next to the step it follows:
+
+- `git status --porcelain=v2`
+- `git log --format='%h %s' -n N`
+- `git stash list`
+- `git rev-parse --abbrev-ref HEAD`
+
+Compared as substring or exact, per directive. A reviewer reads the
+intent straight from the script diff.
+
+## Per-phase coverage
+
+Each phase from 2 on lands, in the same commit as the feature:
+
+- a `test/scripts/` script driving the flow, with its git golden block
+- a targeted mechanism-1 snapshot of the region that changed
+
+| Phase | What the script + golden assert |
 | --- | --- |
-| 1 layout | screen at 80x24, 120x40, 200x60 matches snapshot; `1`-`5` and `Tab` move focus; `j`/`k` clamp at both ends; list scrolls past pane height; resize down to 40x20 does not panic and does not overflow horizontally; `?` overlay toggles |
-| 2 git read | `git::status`, `git::branches`, `git::log`, `git::stashes` against the fixture return the canonical state; panes render that state |
-| 3 diff | `git::diff(path)` hunks match; right pane renders them; hunk navigation moves the viewport |
-| 4 staging | `git::stage` / `git::unstage` at file, hunk, line change the index as `git status --porcelain` confirms |
-| 5 commit | `git::commit(msg)` moves `HEAD`, sets message and parent; amend and fixup shapes correct |
-| 6 branches | checkout / create / delete / merge reflected in refs |
-| 7 remote | ahead / behind counts, upstream tracking parsed correctly (against a local bare "remote") |
-| 8 stash | push / pop / apply / drop change the stash list |
-| 9 rebase | todo list edited, continue / abort / skip drive the right git state; conflict surfaced |
-
-Rule: every feature lands with its Layer A test in the same commit.
-
-## Layer B: driven binary with screenshots
-
-Lives in `test/tapes/`. One `.tape` per user-visible flow.
-
-```
-test/
-├── fixtures/
-│   └── build.sh
-├── tapes/
-│   ├── 00-boot.tape
-│   ├── 01-focus-panes.tape
-│   ├── 04-stage-and-commit.tape
-│   └── ...
-├── shots/                 generated PNG + GIF, git-ignored
-└── shots-ref/             committed reference PNGs for regression
-```
-
-Tape shape:
-
-```
-Output test/shots/04-stage-and-commit.gif
-Set FontSize 14
-Set Width 1200
-Set Height 800
-Set Shell bash
-
-# open ferrit inside the fixture repo (path exported by the runner)
-Type "cd $FERRIT_FIXTURE && ferrit" Enter
-Sleep 800ms
-Screenshot test/shots/04-01-boot.png
-
-Type "2"        Sleep 200ms          # focus Files
-Type "j"        Sleep 150ms
-Type " "        Sleep 250ms          # stage the selected file
-Screenshot test/shots/04-02-staged.png
-
-Type "c"        Sleep 250ms          # commit popup
-Type "test: staged from a vhs tape" Enter
-Sleep 400ms
-Screenshot test/shots/04-03-committed.png
-
-Type "q"
-```
-
-Runner script `test/run-tapes.sh`:
-
-```
-for tape in test/tapes/*.tape; do
-  export FERRIT_FIXTURE="$(test/fixtures/build.sh)"
-  vhs "$tape"
-  # cross-check: the tape said it committed, so the fixture must show it
-  git -C "$FERRIT_FIXTURE" log --oneline | grep -q "staged from a vhs tape" \
-    || { echo "FAIL: $tape did not produce the commit"; exit 1; }
-done
-```
-
-That grep line is the point: the screenshot shows the screen, the `git`
-check proves the action actually happened. A screenshot alone can be a
-frozen frame that lied.
+| 1 layout | focus (`1`-`5`, `Tab`), `j`/`k` clamp, list scroll, resize `40x20`..`200x60` with no panic or horizontal overflow, `?` overlay toggle. No git assertions yet |
+| 2 git read | fixture `canonical`; each pane renders the golden status / branches / log / stash |
+| 3 diff | modify a file, `git::diff` hunks match golden; right pane shows them; hunk nav moves the viewport |
+| 4 staging | stage / unstage at file, hunk, line; `git status --porcelain=v2` golden confirms the index |
+| 5 commit | commit moves `HEAD`; `git log -1` golden has the message and parent; amend and fixup shapes |
+| 6 branches | checkout / create / delete / merge reflected in `git branch` and `rev-parse` golden |
+| 7 remote | ahead / behind and upstream parsed against a local bare remote |
+| 8 stash | push / pop / apply / drop change `git stash list` golden |
+| 9 rebase | todo edited; continue / abort / skip drive the golden git state; conflict surfaced in a frame |
 
 ## The self-test loop an agent runs
 
 ```
-        ┌─────────────────────────────────────────────────────┐
-        │ 1. cargo nextest run           (Layer A, seconds)    │
-        │      fail  -> read the insta diff, fix, repeat       │
-        │      pass  -> continue                               │
-        ├─────────────────────────────────────────────────────┤
-        │ 2. test/run-tapes.sh           (Layer B)             │
-        │      builds a fresh fixture repo per tape            │
-        │      runs vhs, writes test/shots/*.png + *.gif       │
-        │      greps git state to confirm each action landed   │
-        ├─────────────────────────────────────────────────────┤
-        │ 3. agent opens test/shots/*.png and looks at them    │
-        │      layout intact? right pane correct? no overflow? │
-        ├─────────────────────────────────────────────────────┤
-        │ 4. compare against test/shots-ref/*.png              │
-        │      unchanged  -> silent pass                       │
-        │      changed    -> show both, decide intended or bug │
-        ├─────────────────────────────────────────────────────┤
-        │ 5. hand the PNG / GIF to the human (attach to the    │
-        │      PR, or send it) as the proof the feature works  │
-        └─────────────────────────────────────────────────────┘
+1. cargo nextest run
+     mechanism 1 + 2. seconds. deterministic, no sleeps. THIS IS THE GATE.
+     fail -> read the insta diff or the frame .txt under target/, fix, repeat
+
+2. (before a commit, and in CI)  test/gen-tapes.sh && vhs test/tapes/*.tape
+     writes test/shots/*.png + *.gif from the same scripts
+
+3. agent opens the PNG / GIF and looks at layout, alignment, polish
+
+4. compare to test/shots-ref/*.png with a tolerance
+     unchanged -> silent pass
+     intended change -> regenerate, eyeball, copy over shots-ref/, commit with a note
+
+5. attach the PNG / GIF to the PR as human-facing proof
 ```
 
-Steps 1 and 2 are scriptable and gated in CI. Steps 3 and 4 are the agent
-actually looking at the image, which is what "self-test" means here.
+Step 1 is the gate. Steps 2 to 5 are artifacts and review.
 
-## Visual regression
-
-- `test/shots-ref/` holds the accepted PNG for each screenshot name.
-- A change to a reference PNG is a reviewable diff in the PR, same status
-  as changing a `.snap` file.
-- Pixel-exact comparison is too brittle across `vhs` versions and fonts.
-  Compare with a tolerance (for example ImageMagick `compare -metric AE`
-  with a small threshold, or a perceptual hash). Store the threshold in
-  `test/run-tapes.sh`.
-- When a change is intended: regenerate, eyeball, copy `shots/` over
-  `shots-ref/`, commit with a note on what moved and why.
-
-## CI
+## Directory layout
 
 ```
-jobs:
-  layer-a:
-    - cargo install cargo-nextest --locked
-    - cargo nextest run --all-features
-    - cargo insta test            # fails on any unreviewed snapshot change
-
-  layer-b:
-    - uses: charmbracelet/vhs-action
-    - run: test/run-tapes.sh
-    - uses: actions/upload-artifact   # test/shots/*.gif + *.png on every run
+xtask/                       fixture builder, nothing else
+tests/
+├── support/mod.rs           shared helpers
+├── render.rs                mechanism 1: TestBackend region snapshots
+├── replay.rs                mechanism 2: runs every test/scripts/*.script
+└── git_backend.rs           src/git/ unit tests (phase 2+)
+tests/snapshots/             insta .snap files, committed and reviewed
+test/
+├── scripts/*.script         source of truth, one per flow
+├── tapes/*.tape             generated from scripts, git-ignored
+├── gen-tapes.sh
+├── shots/                   generated PNG / GIF, git-ignored
+└── shots-ref/*.png          committed reference images
 ```
-
-The Layer B artefacts attach to every PR, so a reviewer (and Richard) sees
-the feature move without checking anything out.
 
 ## In scope
 
-- `TestBackend` + `insta` harness and the `tests/` tree above.
-- Fixture builders shared by both layers, seeding one canonical repo state.
-- `vhs` tapes for each phase's headline flows.
-- A runner that pairs every tape with a `git` assertion.
-- Tolerant image comparison against committed reference PNGs.
-- CI wiring for both layers with screenshot artefacts on PRs.
+- the three mechanisms above
+- the script format and a parser shared by the harness and `gen-tapes.sh`
+- `xtask` fixture builder with the canonical state
+- inline golden git blocks
+- CI running mechanism 1 + 2 as the gate, `vhs` as artifact upload only
 
 ## Out of scope
 
-- Testing against many real terminal emulators (iTerm2, Kitty, Windows
-  Terminal, tmux nesting). `vhs` renders one way. Real-terminal quirks are
-  handled by bug reports, not this harness.
-- Pixel-perfect fidelity to a specific user's font and theme.
-- Performance benchmarking (separate concern, separate doc if needed).
-- Mouse input (not a feature yet, see `PLAN_1_LAYOUT.md`).
-- Fuzzing the event stream (nice later, not now).
+- a matrix of real terminal emulators (iTerm2, Kitty, Windows Terminal,
+  nested tmux). `vhs` renders one way; real-terminal quirks are bug
+  reports, not this harness
+- pixel-perfect fidelity to a specific font and theme
+- performance benchmarking (its own concern)
+- mouse input (not a feature, see `PLAN_1_LAYOUT.md`)
+- fuzzing the event stream (maybe later)
 
 ## Milestones
 
-- **ST0** `insta` dev-dependency added, `tests/support/repo.rs` builds the
-  canonical fixture, one render snapshot of the phase 1 mock screen passes.
-- **ST1** Layer A covers all of phase 1: focus, selection clamp, scroll,
-  resize, help overlay. Runs under `cargo nextest` in seconds.
-- **ST2** `vhs` installed, `test/fixtures/build.sh` produces the canonical
-  repo, `00-boot.tape` yields a PNG that matches the phase 1 layout.
-- **ST3** `test/run-tapes.sh` runs every tape against a fresh fixture and
-  fails loudly when a tape's `git` assertion does not hold.
-- **ST4** `test/shots-ref/` seeded, tolerant comparison wired, a
-  deliberate layout change is caught as a diff.
-- **ST5** CI runs both layers, uploads screenshot artefacts on PRs.
-- **ST6+** each later phase adds its Layer A tests and at least one tape in
-  the same PR that ships the feature.
+- **ST0** `xtask fixture canonical` builds the repo; one mechanism-1
+  targeted snapshot of the phase 1 mock screen passes.
+- **ST1** `--replay --fixture --dump-frames` in the binary, synchronous
+  loop, one script runs green end to end.
+- **ST2** script parser covers `key` / `type` / `snapshot` /
+  `expect-text` / `git -> `; `tests/replay.rs` runs all of
+  `test/scripts/`.
+- **ST3** phase 1 fully covered by scripts: focus, clamp, scroll, resize,
+  overlay.
+- **ST4** `gen-tapes.sh` + `vhs` produce PNG / GIF from the same scripts;
+  `shots-ref/` seeded; tolerant comparison wired; a deliberate layout
+  change is caught.
+- **ST5** CI: `nextest` as the gate, `vhs` artifacts attached to PRs.
+- **ST6+** every later phase adds its script, git golden, and region
+  snapshot in the same PR as the feature.
 
 ## Definition of done (for the harness)
 
-- `cargo nextest run` exercises rendering and the git backend against
-  throwaway fixtures, with committed `.snap` files.
-- `test/run-tapes.sh` launches the real binary headless, drives it with
-  keystrokes, writes PNG + GIF, and cross-checks each flow against `git`.
-- An agent can run both, view the PNGs, compare to references, and attach
-  the proof to a PR without a human touching a terminal.
-- CI runs both layers and publishes the screenshots per PR.
-- Adding a feature without a Layer A test fails review.
+- one script format defines a flow once; the Rust harness runs it
+  headless and deterministic with no sleeps, asserting frame text and
+  structured git state; this is the CI gate
+- `TestBackend` targeted snapshots cover `ui::draw` regions
+- `vhs` renders PNG / GIF from the same scripts as human-facing proof,
+  not a gate
+- an agent runs `cargo nextest run`, reads failures from frame dumps or
+  `insta` diffs, and attaches `vhs` artifacts to the PR, with no terminal
+  in the loop
+- a feature without a script fails review
 
 ## Relationship to the other plans
 
 - `PLAN_0_GENERAL.md` sets the `src/git/` (no ratatui) vs `src/ui/`
-  (no git logic) boundary that makes Layer A possible. This doc depends
-  on it.
+  (no git logic) boundary that makes mechanisms 1 and 2 possible.
 - `PLAN_1_LAYOUT.md` defines the mock data and target screen that ST0
-  through ST2 assert against.
-- Every `PLAN_N` from 2 on inherits the rule: land the Layer A test and a
-  tape with the feature.
+  through ST3 assert against.
+- The binary's `--replay` / `--fixture` / `--dump-frames` flags are
+  test-only, hidden from `--help`, and inert in a normal run.
+- Every `PLAN_N` from 2 on inherits the rule: land the script, the git
+  golden, and the region snapshot with the feature.
