@@ -16,7 +16,7 @@ code lands.
 └───────────────────────┘│  @@ -1,3 +1,7 @@                                  │
 ┌─ 2 Files ─────────────┐│  -fn main() {                                     │
 │  M src/main.rs        ││  +fn main() -> Result<()> {                       │
-│  ?? docs/PLAN.md      ││  +    let repo = git::open(".")?;                 │
+│  ?? docs/notes.md     ││  +    let repo = git::open(".")?;                 │
 │  A  Cargo.lock        ││       println!("ferrit");                         │
 │                       ││  +    Ok(())                                     │
 │                       ││   }                                              │
