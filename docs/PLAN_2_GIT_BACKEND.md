@@ -253,7 +253,10 @@ Lands in the same commits as the features:
   `Sort::TIME | Sort::TOPOLOGICAL` (TOPOLOGICAL breaks ties between commits
   made in the same second), bounded by `COMMITS_LIMIT`. Unborn branch (fresh
   repo) comes back empty, not an error.
-- **G5** `stashes()`; Stash pane real; `mock.rs` deleted.
+- **G5** done. `git::stash::stashes()`: `stash_foreach`, which needs
+  `&mut git2::Repository` — resolved by making `Repo::snapshot()` take
+  `&mut self` (the plan's "decide at implementation" note), no `RefCell`
+  needed.
 - **G6** done. `blob_bytes(path, rev)` with `Rev::{Workdir, Head}`, unit
   tested in `tests/git_backend.rs`. `src/preview.rs` decodes the bytes;
   the right pane shows the image for an image selection in Files, on a
@@ -261,8 +264,12 @@ Lands in the same commits as the features:
   answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
   exercise the path with no repo. Richer graphics polish stays phase 3.
 
-Phase 2 as scheduled now = **G0..G1 + G3..G4 + G6 done, G2 partial**. G5
-is a queued follow-up.
+`mock.rs` now only feeds `App::mock()` (the repo-free render-test path); every
+pane reads from `git::Repo` when a real repo is open.
+
+Phase 2 as scheduled now = **G0..G1 + G3..G6 done, G2 partial** (the `r`-key
+refresh and `last_error` path are wired; the replay-harness script test
+still waits on `PLAN_SELF_TESTING.md`).
 
 ## Definition of done (phase 2)
 

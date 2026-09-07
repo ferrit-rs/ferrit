@@ -170,6 +170,23 @@ fn commits_on_a_fresh_repo_is_empty() {
 }
 
 #[test]
+fn stashes_lists_saved_entries() {
+    let dir = TempDir::new("stash");
+    let mut repo = Repository::init(dir.path()).unwrap();
+    std::fs::write(dir.path().join("a.txt"), b"a\n").unwrap();
+    commit_all(&repo, "initial commit");
+
+    std::fs::write(dir.path().join("a.txt"), b"changed\n").unwrap();
+    let sig = Signature::now("Test", "test@example.com").unwrap();
+    repo.stash_save(&sig, "wip: first", None).unwrap();
+
+    let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
+    assert_eq!(snap.stashes.len(), 1);
+    assert_eq!(snap.stashes[0].index, 0);
+    assert!(snap.stashes[0].message.contains("wip: first"));
+}
+
+#[test]
 fn blob_bytes_reads_workdir_and_head() {
     let dir = TempDir::new("blob");
     let repo = Repository::init(dir.path()).unwrap();

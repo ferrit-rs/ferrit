@@ -1,10 +1,9 @@
 //! Application state and the draw / event loop.
 //!
-//! Phase 2 wired the Status, Files, Branches and Commits panes to a real
-//! read-only `git::Repo`. `App` owns the repo handle, the cached snapshot,
-//! which left pane is focused, and one selection cursor per pane. Stash
-//! still reads from `mock` until G5. `App::mock()` is the repo-free path the
-//! render tests use.
+//! Phase 2 wired every left pane (Status, Files, Branches, Commits, Stash) to
+//! a real read-only `git::Repo`. `App` owns the repo handle, the cached
+//! snapshot, which left pane is focused, and one selection cursor per pane.
+//! `App::mock()` is the repo-free path the render tests use.
 
 use std::path::Path;
 
@@ -87,8 +86,6 @@ pub struct App {
     files: Vec<git::FileEntry>,
     branches: Vec<git::BranchEntry>,
     commits: Vec<git::CommitEntry>,
-    /// Stash is still mock until phase 2 G5; it lives here so the render
-    /// path is identical to the wired panes.
     stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
@@ -118,8 +115,7 @@ impl App {
             files: Vec::new(),
             branches: Vec::new(),
             commits: Vec::new(),
-            // Mock until G5 wires this to the backend.
-            stashes: mock::mock_stashes(),
+            stashes: Vec::new(),
             last_error: None,
             picker: Picker::halfblocks(),
             preview: Preview::None,
@@ -140,6 +136,7 @@ impl App {
         app.files = mock::mock_files();
         app.branches = mock::mock_branches();
         app.commits = mock::mock_commits();
+        app.stashes = mock::mock_stashes();
         app.update_preview();
         app
     }
@@ -157,13 +154,14 @@ impl App {
     /// Re-read the wired panes. On error keep the old snapshot and stash the
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
-        let Some(repo) = &self.repo else { return };
+        let Some(repo) = &mut self.repo else { return };
         match repo.snapshot() {
             Ok(snap) => {
                 self.header = snap.header;
                 self.files = snap.files;
                 self.branches = snap.branches;
                 self.commits = snap.commits;
+                self.stashes = snap.stashes;
                 self.last_error = None;
             }
             Err(e) => self.last_error = Some(e.to_string()),
