@@ -143,6 +143,33 @@ fn branches_lists_head_first_then_alphabetical() {
 }
 
 #[test]
+fn commits_lists_newest_first_and_respects_the_limit() {
+    let dir = TempDir::new("commits");
+    let repo = Repository::init(dir.path()).unwrap();
+    for i in 0..3 {
+        std::fs::write(dir.path().join("f.txt"), format!("{i}\n")).unwrap();
+        commit_all(&repo, &format!("commit {i}"));
+    }
+
+    let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
+
+    assert_eq!(snap.commits.len(), 3);
+    assert_eq!(snap.commits[0].summary, "commit 2");
+    assert_eq!(snap.commits[1].summary, "commit 1");
+    assert_eq!(snap.commits[2].summary, "commit 0");
+    assert_eq!(snap.commits[0].short_hash.len(), 7);
+}
+
+#[test]
+fn commits_on_a_fresh_repo_is_empty() {
+    let dir = TempDir::new("commits-fresh");
+    Repository::init(dir.path()).unwrap();
+
+    let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
+    assert!(snap.commits.is_empty(), "unborn branch has no history yet");
+}
+
+#[test]
 fn blob_bytes_reads_workdir_and_head() {
     let dir = TempDir::new("blob");
     let repo = Repository::init(dir.path()).unwrap();

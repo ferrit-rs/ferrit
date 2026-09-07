@@ -1,10 +1,10 @@
 //! Application state and the draw / event loop.
 //!
-//! Phase 2 wired the Status, Files and Branches panes to a real read-only
-//! `git::Repo`. `App` owns the repo handle, the cached snapshot, which left
-//! pane is focused, and one selection cursor per pane. Commits and Stash
-//! still read from `mock` until G4..G5. `App::mock()` is the repo-free path
-//! the render tests use.
+//! Phase 2 wired the Status, Files, Branches and Commits panes to a real
+//! read-only `git::Repo`. `App` owns the repo handle, the cached snapshot,
+//! which left pane is focused, and one selection cursor per pane. Stash
+//! still reads from `mock` until G5. `App::mock()` is the repo-free path the
+//! render tests use.
 
 use std::path::Path;
 
@@ -86,9 +86,9 @@ pub struct App {
     header: git::StatusHeader,
     files: Vec<git::FileEntry>,
     branches: Vec<git::BranchEntry>,
-    /// Commits and Stash are still mock until phase 2 G4..G5; they live here
-    /// so the render path is identical to the wired panes.
     commits: Vec<git::CommitEntry>,
+    /// Stash is still mock until phase 2 G5; it lives here so the render
+    /// path is identical to the wired panes.
     stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
@@ -117,8 +117,8 @@ impl App {
             header: git::StatusHeader::default(),
             files: Vec::new(),
             branches: Vec::new(),
-            // Mock until G4..G5 wire these to the backend.
-            commits: mock::mock_commits(),
+            commits: Vec::new(),
+            // Mock until G5 wires this to the backend.
             stashes: mock::mock_stashes(),
             last_error: None,
             picker: Picker::halfblocks(),
@@ -139,6 +139,7 @@ impl App {
         app.header = mock::mock_header();
         app.files = mock::mock_files();
         app.branches = mock::mock_branches();
+        app.commits = mock::mock_commits();
         app.update_preview();
         app
     }
@@ -162,6 +163,7 @@ impl App {
                 self.header = snap.header;
                 self.files = snap.files;
                 self.branches = snap.branches;
+                self.commits = snap.commits;
                 self.last_error = None;
             }
             Err(e) => self.last_error = Some(e.to_string()),

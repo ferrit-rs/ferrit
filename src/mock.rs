@@ -1,9 +1,9 @@
 //! Hardcoded sample data.
 //!
-//! Phase 2 wired Status, Files and Branches to a real `git::Repo`; the mock
-//! versions of those three now feed `App::mock()`, the render tests'
-//! repo-free path. Commits and Stash stay mock until G4..G5. Values mirror
-//! the target screen in `docs/PLAN_1_LAYOUT.md`.
+//! Phase 2 wired Status, Files, Branches and Commits to a real `git::Repo`;
+//! the mock versions of those four now feed `App::mock()`, the render tests'
+//! repo-free path. Stash stays mock until G5. Values mirror the target
+//! screen in `docs/PLAN_1_LAYOUT.md`.
 
 use std::path::{Path, PathBuf};
 

@@ -249,7 +249,10 @@ Lands in the same commits as the features:
   alphabetical, upstream + ahead/behind via `graph_ahead_behind`. Branches
   pane renders them via `theme::branch_line`; folded into `Repo::snapshot()`
   alongside header/files rather than a standalone method, matching G0/G1.
-- **G4** `commits(max)`; Commits pane real; mock commit data removed.
+- **G4** done. `git::log::commits(repo, max)`: revwalk from HEAD,
+  `Sort::TIME | Sort::TOPOLOGICAL` (TOPOLOGICAL breaks ties between commits
+  made in the same second), bounded by `COMMITS_LIMIT`. Unborn branch (fresh
+  repo) comes back empty, not an error.
 - **G5** `stashes()`; Stash pane real; `mock.rs` deleted.
 - **G6** done. `blob_bytes(path, rev)` with `Rev::{Workdir, Head}`, unit
   tested in `tests/git_backend.rs`. `src/preview.rs` decodes the bytes;
@@ -258,8 +261,8 @@ Lands in the same commits as the features:
   answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
   exercise the path with no repo. Richer graphics polish stays phase 3.
 
-Phase 2 as scheduled now = **G0..G1 + G3 + G6 done, G2 partial**. G4..G5
-are queued follow-ups.
+Phase 2 as scheduled now = **G0..G1 + G3..G4 + G6 done, G2 partial**. G5
+is a queued follow-up.
 
 ## Definition of done (phase 2)
 

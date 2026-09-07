@@ -1,11 +1,12 @@
 //! Headless, read-only git backend. Nothing under `git::` imports `ratatui`.
 //!
-//! Phase 2 wires Status, Files and Branches (see
-//! `docs/PLAN_2_GIT_BACKEND.md`); commits, stash and blob reads follow in
-//! later milestones.
+//! Phase 2 wires Status, Files, Branches and Commits (see
+//! `docs/PLAN_2_GIT_BACKEND.md`); stash and blob reads follow in later
+//! milestones.
 
 mod blob;
 mod error;
+mod log;
 mod model;
 mod refs;
 mod status;
@@ -19,6 +20,16 @@ pub use error::{GitError, GitResult};
 pub use model::{BranchEntry, CommitEntry, StashEntry};
 pub use status::{Change, FileEntry, StatusHeader};
 
+/// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
+/// constant until the pane grows real scrolling/paging.
+const COMMITS_LIMIT: usize = 200;
+
+/// Abbreviated hash, the 7 hex chars `git` shows by default. Shared by
+/// `status` (upstream not needed there, but commits/refs both want it).
+pub(crate) fn short_hash(oid: &git2::Oid) -> String {
+    oid.to_string().chars().take(7).collect()
+}
+
 /// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
 pub struct Repo {
     inner: Repository,
@@ -30,6 +41,7 @@ pub struct Snapshot {
     pub header: StatusHeader,
     pub files: Vec<FileEntry>,
     pub branches: Vec<BranchEntry>,
+    pub commits: Vec<CommitEntry>,
 }
 
 impl Repo {
@@ -62,6 +74,7 @@ impl Repo {
             header: status::header(&self.inner)?,
             files: status::files(&self.inner)?,
             branches: refs::branches(&self.inner)?,
+            commits: log::commits(&self.inner, COMMITS_LIMIT)?,
         })
     }
 
