@@ -245,7 +245,10 @@ Lands in the same commits as the features:
   refresh lands in `last_error` and renders red in the Status pane instead
   of propagating, old snapshot left in place. `20-status-files.script` and
   its git golden wait on the replay harness (`PLAN_SELF_TESTING.md`).
-- **G3** `branches()`; Branches pane real; mock branch data removed.
+- **G3** done. `git::refs::branches()`: local branches, HEAD first then
+  alphabetical, upstream + ahead/behind via `graph_ahead_behind`. Branches
+  pane renders them via `theme::branch_line`; folded into `Repo::snapshot()`
+  alongside header/files rather than a standalone method, matching G0/G1.
 - **G4** `commits(max)`; Commits pane real; mock commit data removed.
 - **G5** `stashes()`; Stash pane real; `mock.rs` deleted.
 - **G6** done. `blob_bytes(path, rev)` with `Rev::{Workdir, Head}`, unit
@@ -255,7 +258,8 @@ Lands in the same commits as the features:
   answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
   exercise the path with no repo. Richer graphics polish stays phase 3.
 
-Phase 2 as scheduled now = **G0..G2 + G6**. G3..G5 are queued follow-ups.
+Phase 2 as scheduled now = **G0..G1 + G3 + G6 done, G2 partial**. G4..G5
+are queued follow-ups.
 
 ## Definition of done (phase 2)
 

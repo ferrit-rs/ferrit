@@ -1,11 +1,13 @@
 //! Headless, read-only git backend. Nothing under `git::` imports `ratatui`.
 //!
-//! Phase 2 wires Status and Files (see `docs/PLAN_2_GIT_BACKEND.md`);
-//! branches, commits, stash and blob reads follow in later milestones.
+//! Phase 2 wires Status, Files and Branches (see
+//! `docs/PLAN_2_GIT_BACKEND.md`); commits, stash and blob reads follow in
+//! later milestones.
 
 mod blob;
 mod error;
 mod model;
+mod refs;
 mod status;
 
 use std::path::Path;
@@ -27,6 +29,7 @@ pub struct Repo {
 pub struct Snapshot {
     pub header: StatusHeader,
     pub files: Vec<FileEntry>,
+    pub branches: Vec<BranchEntry>,
 }
 
 impl Repo {
@@ -58,6 +61,7 @@ impl Repo {
         Ok(Snapshot {
             header: status::header(&self.inner)?,
             files: status::files(&self.inner)?,
+            branches: refs::branches(&self.inner)?,
         })
     }
 

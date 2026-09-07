@@ -120,6 +120,29 @@ fn files_reports_untracked_then_staged() {
 }
 
 #[test]
+fn branches_lists_head_first_then_alphabetical() {
+    let dir = TempDir::new("branches");
+    let repo = Repository::init(dir.path()).unwrap();
+    std::fs::write(dir.path().join("f.txt"), b"1\n").unwrap();
+    commit_all(&repo, "initial commit");
+    let head_oid = repo.head().unwrap().target().unwrap();
+    let head_commit = repo.find_commit(head_oid).unwrap();
+    repo.branch("zeta", &head_commit, false).unwrap();
+    repo.branch("alpha", &head_commit, false).unwrap();
+
+    let head_name = repo.head().unwrap().shorthand().unwrap().to_string();
+    let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
+
+    assert_eq!(snap.branches.len(), 3);
+    assert_eq!(snap.branches[0].name, head_name);
+    assert!(snap.branches[0].is_head);
+    assert_eq!(snap.branches[0].upstream, None);
+    let rest: Vec<&str> = snap.branches[1..].iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(rest, ["alpha", "zeta"]);
+    assert!(!snap.branches[1].is_head);
+}
+
+#[test]
 fn blob_bytes_reads_workdir_and_head() {
     let dir = TempDir::new("blob");
     let repo = Repository::init(dir.path()).unwrap();
