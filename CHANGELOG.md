@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-08
+
 ### Added
 
 - Right-pane scroll, lazygit style. The diff view now scrolls without leaving
@@ -45,3 +47,6 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Selection bar, lazygit style: the solid blue row highlight now shows only in
   the focused left pane. Unfocused panes keep their cursor position but draw no
   bar, so the three panes no longer look selected at once.
+
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.1.0
