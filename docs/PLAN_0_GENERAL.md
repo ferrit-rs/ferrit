@@ -31,9 +31,11 @@ command line: the value is the TUI.
 ```
 phase 1:  single crate, module boundary only
   src/
-    git/     <- no ratatui import allowed here
-    ui/      <- no git logic here
-    app.rs   <- glue: state + event -> update -> draw
+    git/       <- no ratatui import allowed here
+    image/     <- preview decode + terminal graphics detection
+    ui/        <- no git logic here
+    events.rs  <- glue: terminal input + fs-watch + poll -> one channel
+    app.rs     <- glue: state + event -> update -> draw
 
 later:  split into two crates in a workspace
   ferrit-git/   library: open repo, status, diff, stage, commit, branch, ...
@@ -51,7 +53,8 @@ split is a move, not a rewrite.
 | 0 | `PLAN_0_GENERAL.md` | this overview | living |
 | 1 | `PLAN_1_LAYOUT.md` | layout only, mock data, keyboard nav, no git | done |
 | 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data; blob reads + image preview | in progress (G0, G1, G3..G6 done; G2 partial) |
-| 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane, syntax highlight, hunk navigation, scrolling | planned |
+| 2.5 | (no file) | live refresh: `src/events.rs` multiplexes terminal input, a recursive fs-watch on the worktree and a 10s poll; a change from another shell re-snapshots on its own, lazygit style | done |
+| 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane via `git diff` / `git show` subprocess (lazygit style, honours user `git config`), git-native colouring, hunk navigation, scrolling | planned |
 | 4 | `PLAN_4_STAGING.md` | stage / unstage at file, hunk, line; refresh after | todo |
 | 5 | `PLAN_5_COMMIT.md` | commit popup (message input), amend, fixup | todo |
 | 6 | `PLAN_6_BRANCHES.md` | checkout, create, delete, fast-forward, merge | todo |
@@ -60,8 +63,14 @@ split is a move, not a rewrite.
 | 9 | `PLAN_9_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | todo |
 | 10 | `PLAN_10_POLISH.md` | config file, themes, keymap customization, real command-log capture, help | todo |
 
-Cross-cutting: `PLAN_SELF_TESTING.md` (headless snapshot tests + `vhs`
-screenshot tapes) applies to every phase from 1 on.
+Cross-cutting:
+
+- `PLAN_SELF_TESTING.md` (headless snapshot tests + `vhs` screenshot tapes)
+  applies to every phase from 1 on.
+- Live refresh (`src/events.rs`) is already wired: every phase from 3 on that
+  adds a cached, rebuilt-on-nav right-pane value must also rebuild it on a
+  background `AppEvent::Refresh`, without discarding scroll or view state that
+  belongs to an unchanged selection. See `PLAN_3_DIFF_VIEW.md` "App wiring".
 
 ### Not scheduled (revisit after phase 10)
 
@@ -79,7 +88,13 @@ without dropping to the shell.
 
 ## Working agreement
 
-- Commit to `main`, small commits, `-s` sign-off (DCO).
+- Push straight to `main`, small commits. No feature branches or PRs for
+  normal work (see `AGENTS.md`). External contributions still come in under
+  DCO with `git commit -s`.
+- Every commit that changes visible behaviour adds a line under
+  `## [Unreleased]` in `CHANGELOG.md`.
+- Before each commit: `cargo build && cargo clippy --all-targets && cargo test`,
+  all green, no warnings.
 - Each phase: land its `PLAN_N` file first, then implement against it, then
   tick the milestones in that file.
 - Update this table's Status column as phases move.
