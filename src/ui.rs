@@ -5,10 +5,12 @@
 //! Colours come from `theme`.
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+};
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, DiffView, Pane, PANES};
@@ -101,6 +103,10 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
+    // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
+    // the diff, one over the left column moves the selection.
+    app.set_right_area(area);
+
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(theme::IDLE);
     let right_title = app.focus.right_title();
@@ -150,19 +156,35 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_style(Style::new().fg(theme::IDLE));
 
     // Real `git diff` / `git show` output: git-native colouring, vertical
-    // scroll from `app.right_scroll()`, and a reverse-highlight on the hunk /
-    // file header a `]` / `[` jump last landed on.
-    if let DiffView::Files(diff) | DiffView::Commit(_, diff) = app.diff_view() {
-        let scroll = app.right_scroll();
-        let anchors = match app.diff_view() {
-            DiffView::Commit(..) => diff.file_lines(),
-            _ => diff.hunk_lines(),
+    // scroll from `app.right_scroll()`, a reverse-highlight on the hunk / file
+    // header a `]` / `[` jump last landed on, and a scrollbar when it overflows.
+    let scroll = app.right_scroll();
+    if matches!(app.diff_view(), DiffView::Files(_) | DiffView::Commit(..)) {
+        let (text, total) = match app.diff_view() {
+            DiffView::Files(diff) | DiffView::Commit(_, diff) => {
+                let anchors = match app.diff_view() {
+                    DiffView::Commit(..) => diff.file_lines(),
+                    _ => diff.hunk_lines(),
+                };
+                let focus = anchors.iter().position(|&l| l == scroll);
+                (theme::render_diff(diff, focus), diff.text.lines().count())
+            }
+            _ => unreachable!("guarded by the matches! above"),
         };
-        let focus = anchors.iter().position(|&l| l == scroll);
-        let panel = Paragraph::new(theme::render_diff(diff, focus))
+        let inner = block.inner(area);
+        let panel = Paragraph::new(text)
             .block(block)
             .scroll((scroll as u16, 0));
         frame.render_widget(panel, area);
+        if total > inner.height as usize {
+            let mut state = ScrollbarState::new(total).position(scroll);
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight),
+                area.inner(Margin { vertical: 1, horizontal: 0 }),
+                &mut state,
+            );
+        }
+        app.set_right_viewport(inner.height as usize);
         return;
     }
 
@@ -212,8 +234,8 @@ fn draw_keybar(frame: &mut Frame, area: Rect) {
 }
 
 fn draw_help(frame: &mut Frame, area: Rect) {
-    let width = 46.min(area.width);
-    let height = 11.min(area.height);
+    let width = 55.min(area.width);
+    let height = 15.min(area.height);
     let rect = Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
         y: area.y + area.height.saturating_sub(height) / 2,

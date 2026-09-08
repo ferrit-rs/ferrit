@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+};
+use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui_image::picker::Picker;
 
@@ -45,9 +48,9 @@ enum RightKey {
     Commit { full_hash: String },
 }
 
-/// Right-pane half-page scroll step. Fixed for phase 3: the rendered pane
-/// height is not threaded into `on_key`.
-const RIGHT_HALF_PAGE: usize = 15;
+/// Mouse-wheel step for the right pane, in lines. Matches gitu's default
+/// `mouse_scroll_lines`.
+const WHEEL_LINES: isize = 3;
 
 /// `(discriminant, diff text)` for cheap "did the right pane actually change"
 /// checks: `String` equality on a few KB, no hashing.
@@ -147,6 +150,14 @@ pub struct App {
     /// First visible line of the right-pane diff. Kept across a `Refresh` of
     /// an unchanged selection; reset to 0 when the selection changes.
     right_scroll: usize,
+    /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
+    /// each frame. Drives the viewport-aware scroll clamp and the page steps.
+    /// 0 before the first draw: the clamp is then permissive by one screen and
+    /// the next frame corrects it.
+    right_viewport: usize,
+    /// Whole right-pane rect from the last frame, for routing the mouse wheel
+    /// to the diff (over the right column) or the selection (over the left).
+    right_area: Rect,
 }
 
 impl App {
@@ -173,6 +184,8 @@ impl App {
             diff: DiffView::None,
             right_key: None,
             right_scroll: 0,
+            right_viewport: 0,
+            right_area: Rect::ZERO,
         }
     }
 
@@ -327,17 +340,34 @@ impl App {
         }
     }
 
-    /// Clamp `right_scroll` so the last line cannot scroll past the top.
-    fn clamp_right_scroll(&mut self) {
-        let max = self.diff_line_count().saturating_sub(1);
-        self.right_scroll = self.right_scroll.min(max);
+    /// Largest first-visible line that still fills the viewport: the last diff
+    /// line lands at the bottom of the pane, never above it. Falls back to
+    /// "line count minus one screen" until the first draw sets a real height.
+    fn max_right_scroll(&self) -> usize {
+        self.diff_line_count()
+            .saturating_sub(self.right_viewport.max(1))
     }
 
-    /// Move the right-pane viewport by `delta` lines, clamped to the diff.
+    /// Clamp `right_scroll` into `0..=max_right_scroll()`.
+    fn clamp_right_scroll(&mut self) {
+        self.right_scroll = self.right_scroll.min(self.max_right_scroll());
+    }
+
+    /// Move the right-pane viewport by `delta` lines, clamped so it stops with
+    /// the last line at the bottom of the pane. `isize::MIN` / `isize::MAX`
+    /// snap to the top / bottom.
     fn scroll_right(&mut self, delta: isize) {
-        let max = self.diff_line_count().saturating_sub(1) as isize;
-        let next = (self.right_scroll as isize + delta).clamp(0, max.max(0));
+        let max = self.max_right_scroll() as isize;
+        let next = (self.right_scroll as isize)
+            .saturating_add(delta)
+            .clamp(0, max.max(0));
         self.right_scroll = next as usize;
+    }
+
+    /// Is the right pane a scrollable real diff right now? The scroll keys and
+    /// the wheel are inert over an image, a `Note`, and the mock bodies.
+    fn right_is_diff(&self) -> bool {
+        matches!(self.diff, DiffView::Files(_) | DiffView::Commit(..))
     }
 
     /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
@@ -357,6 +387,7 @@ impl App {
         };
         if let Some(line) = target {
             self.right_scroll = line;
+            self.clamp_right_scroll();
         }
     }
 
@@ -374,6 +405,32 @@ impl App {
     pub fn set_right_scroll(&mut self, line: usize) {
         self.right_scroll = line;
         self.clamp_right_scroll();
+    }
+
+    /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
+    /// each frame so the scroll clamp and page steps track the real size.
+    pub fn set_right_viewport(&mut self, rows: usize) {
+        self.right_viewport = rows;
+        self.clamp_right_scroll();
+    }
+
+    /// Whole right-pane rect, written by `ui::draw_right_pane` each frame so a
+    /// mouse-wheel event can be routed by its column.
+    pub fn set_right_area(&mut self, area: Rect) {
+        self.right_area = area;
+    }
+
+    /// Feed one key to the handler. Integration-test seam; the running app
+    /// calls `on_key` from `run`.
+    #[doc(hidden)]
+    pub fn feed_key(&mut self, key: KeyEvent) {
+        self.on_key(key);
+    }
+
+    /// Feed one mouse event to the handler. Integration-test seam.
+    #[doc(hidden)]
+    pub fn feed_mouse(&mut self, ev: MouseEvent) {
+        self.on_mouse(ev);
     }
 
     /// Is the right pane currently a native-graphics image? `run` watches this
@@ -547,6 +604,7 @@ impl App {
                 AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                     self.on_key(key);
                 }
+                AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
                 AppEvent::Input(_) => {}
                 AppEvent::Refresh => self.refresh(),
             }
@@ -570,16 +628,30 @@ impl App {
             return;
         }
 
-        // Right-pane diff scroll (lazygit: Ctrl-d / Ctrl-u half page, ] / [
-        // between hunks). These never change the selection, so they skip the
-        // `update_right_pane` rebuild and its diff subprocess.
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        match key.code {
-            KeyCode::Char('d') if ctrl => return self.scroll_right(RIGHT_HALF_PAGE as isize),
-            KeyCode::Char('u') if ctrl => return self.scroll_right(-(RIGHT_HALF_PAGE as isize)),
-            KeyCode::Char(']') => return self.jump_diff_anchor(1),
-            KeyCode::Char('[') => return self.jump_diff_anchor(-1),
-            _ => {}
+        // Right-pane diff scroll, lazygit's "scroll the main view without
+        // leaving the side panel": J / K by a line, PageUp / PageDown by a
+        // page, Ctrl-u / Ctrl-d by a half page, < / > to the ends, ] / [
+        // between hunks (or files, for a commit). Steps come from the tracked
+        // viewport height. None of these change the selection, so they skip
+        // the `update_right_pane` rebuild and its diff subprocess. Inert unless
+        // the right pane is a real diff.
+        if self.right_is_diff() {
+            let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+            let half = (self.right_viewport / 2).max(1) as isize;
+            let page = self.right_viewport.saturating_sub(1).max(1) as isize;
+            match key.code {
+                KeyCode::Char('d') if ctrl => return self.scroll_right(half),
+                KeyCode::Char('u') if ctrl => return self.scroll_right(-half),
+                KeyCode::Char('J') => return self.scroll_right(1),
+                KeyCode::Char('K') => return self.scroll_right(-1),
+                KeyCode::PageDown => return self.scroll_right(page),
+                KeyCode::PageUp => return self.scroll_right(-page),
+                KeyCode::Char('>') => return self.scroll_right(isize::MAX),
+                KeyCode::Char('<') => return self.scroll_right(isize::MIN),
+                KeyCode::Char(']') => return self.jump_diff_anchor(1),
+                KeyCode::Char('[') => return self.jump_diff_anchor(-1),
+                _ => {}
+            }
         }
 
         match key.code {
@@ -597,6 +669,29 @@ impl App {
         }
 
         // Focus or selection may have moved; keep the right-pane preview in sync.
+        self.update_right_pane();
+    }
+
+    /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
+    /// over the main view"); over the left column it nudges the focused pane's
+    /// selection. Clicks and drags are ignored for now.
+    fn on_mouse(&mut self, ev: MouseEvent) {
+        let step = match ev.kind {
+            MouseEventKind::ScrollDown => 1,
+            MouseEventKind::ScrollUp => -1,
+            _ => return,
+        };
+        let a = self.right_area;
+        let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
+        if over_right && self.right_is_diff() {
+            self.scroll_right(step * WHEEL_LINES);
+            return;
+        }
+        if step > 0 {
+            self.select_down();
+        } else {
+            self.select_up();
+        }
         self.update_right_pane();
     }
 

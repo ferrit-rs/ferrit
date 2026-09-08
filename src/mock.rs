@@ -131,8 +131,7 @@ pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/m
 
 /// Bottom line: inert lazygit-style key hints, `Label: key | ...`. None of
 /// these do anything yet except `?` and `q`.
-pub const KEYBAR: &str =
-    "Stage: <space> | Commit: c | Push: P | Pull: p | Keybindings: ? | Quit: q";
+pub const KEYBAR: &str = "Stage: <space> | Commit: c | Push: P | Pull: p | Scroll diff: J/K | Hunk: ]/[ | Keybindings: ? | Quit: q";
 
 /// Right pane when Status is focused.
 pub const RIGHT_STATUS: &str = "On branch main
@@ -173,10 +172,16 @@ diff --git a/docs/PLAN_1_LAYOUT.md b/docs/PLAN_1_LAYOUT.md
 pub const RIGHT_STASH: &str = "(no stash entries)";
 
 /// Help overlay body, toggled with `?`.
-pub const HELP: &str = "1 .. 5           focus that pane
-Tab / Right      focus next pane
-Shift-Tab / Left focus previous pane
-j / Down         move selection down
-k / Up           move selection up
-?                toggle this help
-q / Ctrl-c       quit";
+pub const HELP: &str = "1 .. 5            focus that pane
+Tab / Right       focus next pane
+Shift-Tab / Left  focus previous pane
+j / Down          move selection down
+k / Up            move selection up
+J / K             scroll the diff pane
+PgUp / PgDn       scroll the diff pane a page
+Ctrl-u / Ctrl-d   scroll the diff pane a half page
+< / >             diff pane to top / bottom
+] / [             next / previous hunk or file
+mouse wheel       scroll the pane under the pointer
+?                 toggle this help
+q / Ctrl-c        quit";
