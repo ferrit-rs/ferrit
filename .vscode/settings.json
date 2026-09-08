@@ -1,0 +1,6 @@
+{
+  // The integrated terminal drops graphics escape codes unless this is on.
+  // ferrit's image preview (src/image/detect.rs) drives sixel under VS Code;
+  // without this the right pane renders blank. VS Code >= 1.94.
+  "terminal.integrated.enableImages": true
+}
