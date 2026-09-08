@@ -6,7 +6,7 @@ Replace the two remaining mock diff bodies in the right pane, Files'
 `RIGHT_DIFF` and Commits' `RIGHT_COMMIT`, with real diffs, coloured,
 scrollable, with hunk-to-hunk navigation. Read only: no staging, no
 `git apply`, no index writes. Turning a hunk or a line into something you can
-act on is phase 4.
+act on is phase 5.
 
 Branches' "Log" body and a stash entry's diff stay mock for now; see "Out of
 scope".
@@ -40,7 +40,7 @@ Consequences ferrit takes on deliberately:
   diff renderer the user opts into (`diff.external`). ferrit matches that:
   phase 3 colours exactly what git colours, and an external renderer is a
   named follow-up, not phase 3. Dropping `syntect` also drops a dependency.
-- **Phase 4 staging gets easier, not harder.** A stageable patch is a byte
+- **Phase 5 staging gets easier, not harder.** A stageable patch is a byte
   slice of the diff text (`file header + one hunk`, or `file header + hunk
   header + selected lines`), fed to `git apply --cached`. Same technique as
   `../ferrit-references/tui/gitu/src/git/diff.rs` `format_hunk_patch` /
@@ -190,7 +190,7 @@ split text on "\ndiff --git "         -> one FileMeta per chunk
     "--- " / "+++ "                    -> skip (redundant with diff --git)
     split rest on "\n@@ "              -> one HunkMeta per chunk
       first line "@@ -a,b +c,d @@ ctx" -> header range + parse a,b,c,d
-      remaining lines                  -> body range (used verbatim in phase 4)
+      remaining lines                  -> body range (used verbatim in phase 5)
 ```
 
 lazygit's hunk-header regex is `^@@ -(\d+)[^\+]+\+(\d+)[^@]+@@(.*)$`
@@ -442,7 +442,7 @@ commit metadata; it is just not used for diff text.
 
 ## Out of scope
 
-- Staging / unstaging (phase 4). The parse is shaped for it: patch = slice
+- Staging / unstaging (phase 5). The parse is shaped for it: patch = slice
   of `diff.text`.
 - An external diff renderer (`delta`, `difftastic`) via `diff.external` /
   a ferrit config key. lazygit supports it; ferrit's `DiffCmd` builder
@@ -462,7 +462,7 @@ commit metadata; it is just not used for diff text.
   merge-commit diff.
 - Branches' "Log" body: stays mock `RIGHT_LOG`; `theme::commit_line`'s graph
   glyph stays a static `o` (deferred in `PLAN_1_LAYOUT.md`).
-- A stash entry's diff: Stash right side stays mock. Natural fit for phase 8
+- A stash entry's diff: Stash right side stays mock. Natural fit for phase 9
   (`git stash show -p`, same subprocess pattern).
 - Status pane's right side: stays mock `RIGHT_STATUS`.
 - A size cap before rendering. A huge diff may be slow to style; revisit
@@ -555,10 +555,10 @@ staging path is small and the one to copy (`src/git/diff.rs`,
 lazygit's `pkg/commands/patch/transform.go` does the same line transform but
 also recomputes every `@@` header and offset by hand, because it feeds the
 result to a live on-screen patch-builder. ferrit does not need that; the
-`--recount` shortcut keeps phase 4 to a few dozen lines.
+`--recount` shortcut keeps phase 5 to a few dozen lines.
 
 Cursor/selection state across a background `refresh()`: phase 3's `right_key`
-is file-level. Phase 4's line cursor should stick to the *same hunk* after an
+is file-level. Phase 5's line cursor should stick to the *same hunk* after an
 external change, so key the cursor on a per-hunk content hash (gitu hashes
 `file_header + hunk` for its `Item.id`, `src/items.rs`), and mark context
 lines `unselectable` so the stage cursor skips them. A bare `right_scroll:

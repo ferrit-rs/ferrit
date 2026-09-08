@@ -52,7 +52,7 @@ Nothing is computed.
 ## Palette
 
 One flat palette, tuned to lazygit's defaults. Lives in `theme.rs`, no config
-yet (that is phase 10).
+yet (that is phase 11).
 
 | Role | Colour | lazygit name |
 | --- | --- | --- |

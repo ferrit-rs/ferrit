@@ -1,4 +1,4 @@
-# Plan: phase 5, right-pane scroll behaviour
+# Plan: phase 4, right-pane scroll behaviour
 
 ## Goal
 
@@ -130,7 +130,7 @@ if total > inner.height as usize {
 corners. Drawn only on overflow, like lazyjj and lazygit. The `Note` / mock
 bodies do not get one (they do not overflow in practice; revisit if that
 changes). No theming knob yet, default `Scrollbar` glyphs; a palette entry
-is phase 10.
+is phase 11.
 
 ## Mouse wheel
 
@@ -161,7 +161,7 @@ does; drop it if it complicates the diff test.
 
 Enabling mouse capture also means the terminal no longer does native
 text selection with the mouse. lazygit accepts this; ferrit does too (a
-future `mouse: false` config key is a phase-10 line, not phase 5).
+future `mouse: false` config key is a phase-11 line, not phase 4).
 
 ## Keybar and help
 
@@ -185,16 +185,16 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   main view (Enter on Files/Commits, or a click) so `j` / `k` / `Ctrl-d`
   scroll it and `Esc` returns. That needs `App::focus` to grow from `Pane`
   into something like `Focus { Left(Pane), Right }`, plus an escape stack.
-  Worth doing, its own plan. Phase 5 keeps the left pane always focused and
+  Worth doing, its own plan. Phase 4 keeps the left pane always focused and
   the right pane a follower.
-- **Line-level selection cursor** in the diff (needed for phase 4 staging)
+- **Line-level selection cursor** in the diff (needed for phase 5 staging)
   and keeping that cursor on screen while scrolling (gitui `VerticalScroll`).
-  Phase 5's `right_scroll: usize` has no cursor.
+  Phase 4's `right_scroll: usize` has no cursor.
 - **Horizontal scroll** of un-wrapped lines. Phase 3 soft-wraps; unchanged.
 - **Search in the diff** (`/`), fold / unfold hunks, `space` to stage.
 - **Scroll state for the mock / `Note` bodies**, and a scrollbar on them.
 - **Click to select** a left-pane row or a diff line (`gitu`
-  `MoveToScreenLine`). Only the wheel is wired in phase 5.
+  `MoveToScreenLine`). Only the wheel is wired in phase 4.
 - **Kinetic / smooth scroll, configurable wheel speed.** Fixed 3 lines.
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
@@ -233,7 +233,7 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   wheel on empty, one-line, and huge diffs never panic; `src/git/` still has
   no `ratatui` import; all S0..S2 tests green.
 
-## Definition of done (phase 5)
+## Definition of done (phase 4)
 
 - With a long diff in the right pane, `J` / `K`, `PgUp` / `PgDn`, `Ctrl-d` /
   `Ctrl-u`, `<` / `>` and the mouse wheel scroll it; `j` / `k` still move the
@@ -248,12 +248,12 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
 - `cargo clippy --all-targets` clean; `tests/diff_app.rs` and
   `tests/render.rs` pass.
 
-## After phase 5
+## After phase 4
 
 The right-pane-as-focus-context work (Enter to focus the diff, `Esc` to
 return, `j` / `k` scroll it while focused) is the natural next step and what
 makes ferrit's navigation match lazygit's exactly. It pairs well with phase
-4: once the diff has a line cursor for staging, focusing the pane and moving
+5: once the diff has a line cursor for staging, focusing the pane and moving
 that cursor is the same gesture lazygit uses. Keep `right_scroll` a plain
 `usize` until then, then fold it into a gitui-style `VerticalScroll` that
 also keeps the cursor line on screen.
