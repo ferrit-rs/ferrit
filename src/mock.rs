@@ -111,6 +111,8 @@ pub fn mock_commits() -> Vec<CommitEntry> {
     rows.iter()
         .enumerate()
         .map(|(i, (hash, summary))| CommitEntry {
+            // Pad the 7-char sample to a plausible 40-hex id.
+            full_hash: format!("{hash}{}", "0".repeat(33)),
             short_hash: hash.to_string(),
             author: "Max Wells".to_string(),
             summary: summary.to_string(),

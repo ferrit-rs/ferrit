@@ -14,11 +14,51 @@ use ratatui::text::Line;
 use ratatui_image::picker::Picker;
 
 use crate::events::{AppEvent, Events};
-use crate::git::{self, GitResult};
+use crate::git::{self, DiffOpts, DiffSide, GitResult};
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
 use crate::tui::Tui;
 use crate::{mock, theme, ui};
+
+/// What the right pane shows behind the image preview. A second cached,
+/// rebuilt-on-nav value alongside `preview`, not a replacement: an image
+/// selection still wins. See `docs/PLAN_3_DIFF_VIEW.md`.
+#[derive(Debug, Clone, Default)]
+pub enum DiffView {
+    /// Status / Branches / Stash focused: no real diff, the mock text shows.
+    #[default]
+    None,
+    /// Read failed, or nothing to show. A dim single line, never a panic.
+    Note(String),
+    /// Files pane: one file's `git diff`.
+    Files(git::Diff),
+    /// Commits pane: one commit's metadata and `git show` diff.
+    Commit(git::CommitEntry, git::Diff),
+}
+
+/// Identity of what `DiffView` describes. `update_right_pane` resets the scroll
+/// only when this changes, so a background refresh of an unchanged selection
+/// keeps its viewport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RightKey {
+    File { path: PathBuf, side: DiffSide },
+    Commit { full_hash: String },
+}
+
+/// Right-pane half-page scroll step. Fixed for phase 3: the rendered pane
+/// height is not threaded into `on_key`.
+const RIGHT_HALF_PAGE: usize = 15;
+
+/// `(discriminant, diff text)` for cheap "did the right pane actually change"
+/// checks: `String` equality on a few KB, no hashing.
+fn view_sig(v: &DiffView) -> (u8, &str) {
+    match v {
+        DiffView::None => (0, ""),
+        DiffView::Note(m) => (1, m.as_str()),
+        DiffView::Files(d) => (2, d.text.as_str()),
+        DiffView::Commit(_, d) => (3, d.text.as_str()),
+    }
+}
 
 /// The five left panes, in top-to-bottom screen order.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
@@ -99,6 +139,14 @@ pub struct App {
     picker: Picker,
     /// Right-pane image preview for the current selection, rebuilt on nav.
     preview: Preview,
+    /// Right-pane diff for the current selection, behind any image preview.
+    /// Rebuilt on nav and on background `Refresh`.
+    diff: DiffView,
+    /// What `diff` currently describes. `None` when no diff applies.
+    right_key: Option<RightKey>,
+    /// First visible line of the right-pane diff. Kept across a `Refresh` of
+    /// an unchanged selection; reset to 0 when the selection changes.
+    right_scroll: usize,
 }
 
 impl App {
@@ -122,6 +170,9 @@ impl App {
             last_error: None,
             picker: Picker::halfblocks(),
             preview: Preview::None,
+            diff: DiffView::None,
+            right_key: None,
+            right_scroll: 0,
         }
     }
 
@@ -140,7 +191,7 @@ impl App {
         app.branches = mock::mock_branches();
         app.commits = mock::mock_commits();
         app.stashes = mock::mock_stashes();
-        app.update_preview();
+        app.update_right_pane();
         app
     }
 
@@ -153,7 +204,7 @@ impl App {
                 self.last_error = Some(line);
             }
             self.picker = found.picker;
-            self.update_preview();
+            self.update_right_pane();
         }
     }
 
@@ -177,13 +228,152 @@ impl App {
             let cursor = &mut self.selection[pane];
             *cursor = (*cursor).min(last);
         }
-        self.update_preview();
+        self.update_right_pane();
     }
 
-    /// Rebuild `preview` for the current focus and selection. Cheap when the
-    /// selection is not an image (the common case); decodes otherwise.
-    fn update_preview(&mut self) {
+    /// Rebuild both cached right-pane values (`preview`, then `diff`) for the
+    /// current focus and selection. Cheap when nothing changed.
+    fn update_right_pane(&mut self) {
         self.preview = self.build_preview();
+        self.update_diff();
+    }
+
+    /// Rebuild `diff` from the current focus and selection. An image selection
+    /// owns the right pane, so it clears the diff. A `Refresh` of an unchanged
+    /// selection rebuilds the text but keeps `right_scroll`; a changed
+    /// selection resets the scroll to the top.
+    fn update_diff(&mut self) {
+        if matches!(self.preview, Preview::Image(_)) {
+            self.diff = DiffView::None;
+            self.right_key = None;
+            return;
+        }
+        match self.right_key_for() {
+            None => {
+                self.diff = DiffView::None;
+                self.right_key = None;
+                self.right_scroll = 0;
+            }
+            Some(key) if self.right_key.as_ref() == Some(&key) => {
+                let rebuilt = self.build_diff(&key);
+                if view_sig(&rebuilt) != view_sig(&self.diff) {
+                    self.diff = rebuilt;
+                }
+                self.clamp_right_scroll();
+            }
+            Some(key) => {
+                self.right_scroll = 0;
+                self.diff = self.build_diff(&key);
+                self.right_key = Some(key);
+            }
+        }
+    }
+
+    /// The diff identity for the current focus and selection: a worktree /
+    /// staged file for Files, a commit for Commits, nothing elsewhere.
+    fn right_key_for(&self) -> Option<RightKey> {
+        match self.focus {
+            Pane::Files => {
+                let entry = self.files.get(self.selected(Pane::Files))?;
+                let side = if entry.worktree != git::Change::None {
+                    DiffSide::Worktree
+                } else {
+                    DiffSide::Staged
+                };
+                Some(RightKey::File {
+                    path: entry.path.clone(),
+                    side,
+                })
+            }
+            Pane::Commits => {
+                let entry = self.commits.get(self.selected(Pane::Commits))?;
+                Some(RightKey::Commit {
+                    full_hash: entry.full_hash.clone(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Run the diff subprocess for `key`. No repo (mock) means no diff, so the
+    /// mock sample text keeps showing. An empty result or an error becomes a
+    /// dim one-line `Note`, never a panic.
+    fn build_diff(&self, key: &RightKey) -> DiffView {
+        let Some(repo) = &self.repo else {
+            return DiffView::None;
+        };
+        let opts = DiffOpts::default();
+        match key {
+            RightKey::File { path, side } => match repo.file_diff(path, *side, &opts) {
+                Ok(diff) if diff.files.is_empty() => DiffView::Note("no changes to show".into()),
+                Ok(diff) => DiffView::Files(diff),
+                Err(e) => DiffView::Note(e.to_string()),
+            },
+            RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, &opts) {
+                Ok(diff) => match self.commits.iter().find(|c| &c.full_hash == full_hash) {
+                    Some(entry) => DiffView::Commit(entry.clone(), diff),
+                    None => DiffView::Note("commit not in the list".into()),
+                },
+                Err(e) => DiffView::Note(e.to_string()),
+            },
+        }
+    }
+
+    /// Line count of the current diff text, 0 for `None` / `Note`.
+    fn diff_line_count(&self) -> usize {
+        match &self.diff {
+            DiffView::Files(d) | DiffView::Commit(_, d) => d.text.lines().count(),
+            DiffView::None | DiffView::Note(_) => 0,
+        }
+    }
+
+    /// Clamp `right_scroll` so the last line cannot scroll past the top.
+    fn clamp_right_scroll(&mut self) {
+        let max = self.diff_line_count().saturating_sub(1);
+        self.right_scroll = self.right_scroll.min(max);
+    }
+
+    /// Move the right-pane viewport by `delta` lines, clamped to the diff.
+    fn scroll_right(&mut self, delta: isize) {
+        let max = self.diff_line_count().saturating_sub(1) as isize;
+        let next = (self.right_scroll as isize + delta).clamp(0, max.max(0));
+        self.right_scroll = next as usize;
+    }
+
+    /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
+    /// header, lazygit's `]` / `[`. Hunk headers for a file diff, `diff --git`
+    /// headers for a commit diff.
+    fn jump_diff_anchor(&mut self, dir: isize) {
+        let anchors = match &self.diff {
+            DiffView::Files(d) => d.hunk_lines(),
+            DiffView::Commit(_, d) => d.file_lines(),
+            DiffView::None | DiffView::Note(_) => return,
+        };
+        let cur = self.right_scroll;
+        let target = if dir > 0 {
+            anchors.iter().find(|&&l| l > cur).copied()
+        } else {
+            anchors.iter().rev().find(|&&l| l < cur).copied()
+        };
+        if let Some(line) = target {
+            self.right_scroll = line;
+        }
+    }
+
+    /// Current right-pane diff, for `ui::draw_right_pane`.
+    pub fn diff_view(&self) -> &DiffView {
+        &self.diff
+    }
+
+    /// First visible line of the right-pane diff.
+    pub fn right_scroll(&self) -> usize {
+        self.right_scroll
+    }
+
+    /// Set the right-pane scroll. Test and example helper.
+    pub fn set_right_scroll(&mut self, line: usize) {
+        self.right_scroll = line;
+        self.clamp_right_scroll();
     }
 
     /// Is the right pane currently a native-graphics image? `run` watches this
@@ -235,7 +425,7 @@ impl App {
         self.focus = pane;
         let last = self.row_count(pane).saturating_sub(1);
         self.selection[pane] = index.min(last);
-        self.update_preview();
+        self.update_right_pane();
     }
 
     /// Selection cursor for a given pane.
@@ -380,6 +570,18 @@ impl App {
             return;
         }
 
+        // Right-pane diff scroll (lazygit: Ctrl-d / Ctrl-u half page, ] / [
+        // between hunks). These never change the selection, so they skip the
+        // `update_right_pane` rebuild and its diff subprocess.
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Char('d') if ctrl => return self.scroll_right(RIGHT_HALF_PAGE as isize),
+            KeyCode::Char('u') if ctrl => return self.scroll_right(-(RIGHT_HALF_PAGE as isize)),
+            KeyCode::Char(']') => return self.jump_diff_anchor(1),
+            KeyCode::Char('[') => return self.jump_diff_anchor(-1),
+            _ => {}
+        }
+
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
@@ -395,7 +597,7 @@ impl App {
         }
 
         // Focus or selection may have moved; keep the right-pane preview in sync.
-        self.update_preview();
+        self.update_right_pane();
     }
 
     fn pane_offset(&self, delta: usize) -> Pane {

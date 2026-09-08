@@ -6,7 +6,6 @@ use git2::{Repository, Sort};
 
 use crate::git::error::{GitError, GitResult};
 use crate::git::model::CommitEntry;
-use crate::git::short_hash;
 
 /// Walk HEAD's history, newest first, up to `max` entries. An unborn branch
 /// (fresh repo, no commits) comes back as an empty list, not an error.
@@ -26,8 +25,10 @@ pub fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
         .map(|oid| {
             let oid = oid.map_err(GitError::Read)?;
             let commit = repo.find_commit(oid).map_err(GitError::Read)?;
+            let full_hash = oid.to_string();
             Ok(CommitEntry {
-                short_hash: short_hash(&oid),
+                short_hash: full_hash.chars().take(7).collect(),
+                full_hash,
                 author: commit.author().name().unwrap_or("unknown").to_string(),
                 summary: commit.summary().ok().flatten().unwrap_or("").to_string(),
                 time: commit.time().seconds(),

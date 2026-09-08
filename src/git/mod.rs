@@ -4,6 +4,7 @@
 //! and blob reads are all wired to real `git2` reads (G0..G6).
 
 mod blob;
+mod diff;
 mod error;
 mod log;
 mod model;
@@ -16,6 +17,7 @@ use std::path::Path;
 use git2::Repository;
 
 pub use blob::Rev;
+pub use diff::{Diff, DiffOpts, DiffSide, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
 pub use model::{BranchEntry, CommitEntry, StashEntry};
 pub use status::{Change, FileEntry, StatusHeader};
@@ -91,5 +93,16 @@ impl Repo {
     /// Raw bytes of `path` at `rev`. Feeds the right-pane image preview.
     pub fn blob_bytes(&self, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
         blob::blob_bytes(&self.inner, path, rev)
+    }
+
+    /// One file's diff (`git diff [--cached] -- <path>`), parsed. Untracked
+    /// files come back via `--no-index` as all-additions.
+    pub fn file_diff(&self, path: &Path, side: DiffSide, opts: &DiffOpts) -> GitResult<Diff> {
+        diff::file_diff(&self.inner, path, side, opts)
+    }
+
+    /// One commit's diff against its first parent (`git show <hash>`), parsed.
+    pub fn commit_diff(&self, hash: &str, opts: &DiffOpts) -> GitResult<Diff> {
+        diff::commit_diff(&self.inner, hash, opts)
     }
 }
