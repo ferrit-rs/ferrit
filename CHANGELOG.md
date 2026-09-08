@@ -9,6 +9,15 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Right-pane scroll, lazygit style. The diff view now scrolls without leaving
+  the focused left pane: `J` / `K` by a line, `PageUp` / `PageDown` by a page,
+  `Ctrl-u` / `Ctrl-d` by a half page, `<` / `>` to the ends, `]` / `[` between
+  hunks (or files, in a commit). Step sizes follow the real pane height. A
+  vertical scrollbar shows on the right pane whenever the diff overflows, its
+  thumb tracking the scroll position. The mouse wheel scrolls whichever pane
+  the pointer is over (mouse capture is now enabled). The scroll keys and the
+  wheel are inert over an image, a "no changes" note, and the mock bodies. New
+  keys are listed in the keybar and the `?` help overlay.
 - Real diff view in the right pane, lazygit style. Selecting a Files row runs
   `git diff` (or `git diff --cached` for a fully staged file, `git diff
   --no-index` for an untracked one); selecting a Commits row runs `git show`.
