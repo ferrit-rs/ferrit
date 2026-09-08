@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::pathbuf_init_then_push,
+    clippy::iter_on_single_items,
+    clippy::format_collect,
+    elided_lifetimes_in_paths,
+    reason = "integration test scaffolding: a failed setup is the assertion, helper ergonomics beat lint-cleanliness here"
+)]
 //! Unit coverage for the headless git backend (`ferrit::git`).
 //!
 //! Each test builds a throwaway repository with `git2` directly, then checks
@@ -21,7 +32,7 @@ impl TempDir {
         let mut path = std::env::temp_dir();
         path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
-        TempDir(path)
+        Self(path)
     }
 
     fn path(&self) -> &Path {
@@ -68,7 +79,10 @@ fn fresh_repo_has_a_branch_name_and_no_ahead_behind() {
     Repository::init(dir.path()).unwrap();
 
     let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
-    assert!(!snap.header.branch.is_empty(), "unborn branch still has a name");
+    assert!(
+        !snap.header.branch.is_empty(),
+        "unborn branch still has a name"
+    );
     assert!(!snap.header.detached);
     assert_eq!(snap.header.upstream, None);
     assert_eq!(snap.header.ahead, 0);
@@ -84,7 +98,7 @@ fn header_names_the_checked_out_branch_after_a_commit() {
     std::fs::write(dir.path().join("README.md"), b"hello\n").unwrap();
     commit_all(&repo, "initial commit");
 
-    let head_branch = repo.head().unwrap().shorthand().unwrap().to_string();
+    let head_branch = repo.head().unwrap().shorthand().unwrap().to_owned();
     let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
 
     assert_eq!(snap.header.branch, head_branch);
@@ -130,7 +144,7 @@ fn branches_lists_head_first_then_alphabetical() {
     repo.branch("zeta", &head_commit, false).unwrap();
     repo.branch("alpha", &head_commit, false).unwrap();
 
-    let head_name = repo.head().unwrap().shorthand().unwrap().to_string();
+    let head_name = repo.head().unwrap().shorthand().unwrap().to_owned();
     let snap = Repo::open(dir.path()).unwrap().snapshot().unwrap();
 
     assert_eq!(snap.branches.len(), 3);

@@ -8,7 +8,7 @@ use crate::git::error::{GitError, GitResult};
 use crate::git::model::BranchEntry;
 
 /// Read the local branches, HEAD first, then alphabetical by name.
-pub fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
+pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
     let mut out: Vec<BranchEntry> = repo
         .branches(Some(BranchType::Local))
         .map_err(GitError::Read)?
@@ -19,19 +19,19 @@ pub fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
                 .name()
                 .map_err(GitError::Read)?
                 .unwrap_or("(invalid utf-8)")
-                .to_string();
+                .to_owned();
 
             let (upstream, ahead, behind) = match branch.upstream() {
                 Ok(up) => {
-                    let up_name = up.name().ok().flatten().map(str::to_string);
+                    let up_name = up.name().ok().flatten().map(str::to_owned);
                     let ahead_behind = match (branch.get().target(), up.get().target()) {
                         (Some(local), Some(remote)) => {
                             repo.graph_ahead_behind(local, remote).unwrap_or((0, 0))
-                        }
+                        },
                         _ => (0, 0),
                     };
                     (up_name, ahead_behind.0, ahead_behind.1)
-                }
+                },
                 Err(_) => (None, 0, 0),
             };
 

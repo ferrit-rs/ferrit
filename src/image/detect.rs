@@ -41,7 +41,11 @@ pub fn pick() -> Option<Detected> {
     }
 
     let host = Host::detect();
-    let plan = if over.force_query { Plan::Query } else { host.plan() };
+    let plan = if over.force_query {
+        Plan::Query
+    } else {
+        host.plan()
+    };
 
     let mut picker = match plan {
         Plan::Pin(proto) => {
@@ -50,7 +54,7 @@ pub fn pick() -> Option<Detected> {
             let mut p = Picker::halfblocks();
             p.set_protocol_type(proto);
             p
-        }
+        },
         Plan::Query => Picker::from_query_stdio().ok()?,
         Plan::QueryOr { when, swap_to } => {
             let mut p = Picker::from_query_stdio().ok()?;
@@ -58,7 +62,7 @@ pub fn pick() -> Option<Detected> {
                 p.set_protocol_type(swap_to);
             }
             p
-        }
+        },
     };
 
     if let Some(proto) = over.protocol {
@@ -121,9 +125,7 @@ enum Host {
 
 impl Host {
     fn detect() -> Self {
-        let is = |key, val| {
-            std::env::var_os(key).as_deref() == Some(std::ffi::OsStr::new(val))
-        };
+        let is = |key, val| std::env::var_os(key).as_deref() == Some(std::ffi::OsStr::new(val));
         if is("TERM_PROGRAM", "iTerm.app") || is("LC_TERMINAL", "iTerm2") {
             Self::Iterm2
         } else if is("TERM_PROGRAM", "vscode") {

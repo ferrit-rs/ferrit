@@ -51,11 +51,11 @@ impl Events {
         let (tx, rx) = mpsc::channel();
         spawn_input(tx.clone());
         spawn_poll(tx.clone());
-        let _watch = match watch_root {
+        let watch = match watch_root {
             Some(root) => spawn_watch(tx, root)?,
             None => None,
         };
-        Ok(Self { rx, _watch })
+        Ok(Self { rx, _watch: watch })
     }
 
     /// Block until the next event. `Err` only once every sender is gone.

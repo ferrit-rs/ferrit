@@ -9,7 +9,7 @@ use crate::git::model::CommitEntry;
 
 /// Walk HEAD's history, newest first, up to `max` entries. An unborn branch
 /// (fresh repo, no commits) comes back as an empty list, not an error.
-pub fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
+pub(super) fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
     let mut revwalk = repo.revwalk().map_err(GitError::Read)?;
     if revwalk.push_head().is_err() {
         return Ok(Vec::new());
@@ -29,8 +29,8 @@ pub fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
             Ok(CommitEntry {
                 short_hash: full_hash.chars().take(7).collect(),
                 full_hash,
-                author: commit.author().name().unwrap_or("unknown").to_string(),
-                summary: commit.summary().ok().flatten().unwrap_or("").to_string(),
+                author: commit.author().name().unwrap_or("unknown").to_owned(),
+                summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
                 time: commit.time().seconds(),
             })
         })

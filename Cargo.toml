@@ -16,10 +16,157 @@ categories = ["command-line-utilities", "development-tools"]
 name = "ferrit"
 path = "src/main.rs"
 
+# See also clippy.toml and rust-toolchain.toml.
+#
+# Layout: lint GROUPS first at negative priority (single-lint overrides below
+# always win), then the curated deny list, then WARN nudges, then explicit
+# opt-outs. CI runs `cargo clippy --all-targets --all-features -- -D warnings`,
+# so every warn here is blocking. Integration tests and examples relax the
+# panic-family denies with a file-level `#![allow(..)]` (panicking on failed
+# setup is the assertion there).
+[lints.clippy]
+# -- groups -------------------------------------------------------------------
+all      = { level = "warn", priority = -2 }
+pedantic = { level = "warn", priority = -2 }
+nursery  = { level = "warn", priority = -2 }
+cargo    = { level = "warn", priority = -2 }
+
+# -- DENY: safety / correctness (breaks the build) --------------------------
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+get_unwrap = "deny"
+await_holding_lock = "deny"
+await_holding_invalid_type = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+unnecessary_safety_comment = "deny"
+enum_glob_use = "deny"
+infinite_loop = "deny"
+large_stack_arrays = "deny"
+lossy_float_literal = "deny"
+float_cmp = "deny"
+mem_forget = "deny"
+exit = "deny"
+disallowed_macros = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
+rc_buffer = "deny"
+rc_mutex = "deny"
+mutex_atomic = "deny"
+verbose_file_reads = "deny"
+str_to_string = "deny"
+string_add = "deny"
+format_push_string = "deny"
+unwrap_in_result = "deny"
+panic_in_result_fn = "deny"
+deref_by_slicing = "deny"
+read_zero_byte_vec = "deny"
+clear_with_drain = "deny"
+pathbuf_init_then_push = "deny"
+empty_drop = "deny"
+empty_enum_variants_with_brackets = "deny"
+error_impl_error = "deny"
+iter_over_hash_type = "deny"
+mixed_read_write_in_expression = "deny"
+rest_pat_in_fully_bound_structs = "deny"
+fn_to_numeric_cast_any = "deny"
+as_underscore = "deny"
+
+# -- WARN: quality nudges --------------------------------------------------
+semicolon_if_nothing_returned = "warn"
+redundant_type_annotations = "warn"
+unneeded_field_pattern = "warn"
+same_name_method = "warn"
+impl_trait_in_params = "warn"
+renamed_function_params = "warn"
+str_split_at_newline = "warn"
+needless_raw_string_hashes = "warn"
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
+cast_precision_loss = "warn"
+cast_lossless = "warn"
+redundant_clone = "warn"
+significant_drop_tightening = "warn"
+inefficient_to_string = "warn"
+cloned_instead_of_copied = "warn"
+manual_let_else = "warn"
+trivially_copy_pass_by_ref = "warn"
+explicit_iter_loop = "warn"
+from_over_into = "warn"
+fallible_impl_from = "warn"
+clone_on_ref_ptr = "warn"
+needless_borrow = "warn"
+needless_pass_by_value = "warn"
+unused_async = "warn"
+empty_structs_with_brackets = "warn"
+if_then_some_else_none = "warn"
+try_err = "warn"
+unnecessary_self_imports = "warn"
+branches_sharing_code = "warn"
+use_self = "warn"
+equatable_if_let = "warn"
+manual_string_new = "warn"
+
+# -- ALLOW: group lints that fight this codebase's style ------------------
+module_name_repetitions = "allow"   # git/mod.rs re-exports keep short call sites
+missing_errors_doc = "allow"        # error types are thiserror enums, self-documenting
+missing_panics_doc = "allow"        # panics are denied outright above
+must_use_candidate = "allow"        # too noisy on a binary crate
+missing_const_for_fn = "allow"      # nursery, churny, low value here
+redundant_pub_crate = "allow"       # nursery, conflicts with unreachable_pub
+option_if_let_else = "allow"        # nursery, often less readable than the if-let
+multiple_crate_versions = "allow"   # cargo group, transitive dep graph, not actionable
+too_many_lines = "allow"            # a few render fns are long but linear
+items_after_statements = "allow"    # local `fn` helpers next to their use site are fine
+too_long_first_doc_paragraph = "allow"  # house doc style opens with a full sentence
+partial_pub_fields = "allow"        # view-state structs expose render inputs, keep internals private
+struct_field_names = "allow"        # repeated prefixes here carry meaning, not noise
+similar_names = "allow"             # short local bindings in the render/parse code collide by design
+match_same_arms = "allow"           # explicit arms document intent even when bodies match
+
+[lints.rust]
+unsafe_code = "forbid"              # zero unsafe in this crate, keep it that way
+irrefutable_let_patterns = "deny"
+unused_must_use = "deny"
+non_ascii_idents = "deny"
+let_underscore_lock = "deny"
+unit_bindings = "deny"
+macro_use_extern_crate = "deny"
+unused_lifetimes = "deny"
+single_use_lifetimes = "warn"
+unused_qualifications = "warn"
+unreachable_pub = "warn"
+redundant_lifetimes = "warn"
+trivial_numeric_casts = "warn"
+keyword_idents_2024 = "warn"
+elided_lifetimes_in_paths = "warn"
+ambiguous_negative_literals = "warn"
+redundant_imports = "warn"
+meta_variable_misuse = "warn"
+unnameable_types = "warn"
+unused_crate_dependencies = "allow" # cargo-machete owns this
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+invalid_rust_codeblocks = "deny"
+bare_urls = "warn"
+unescaped_backticks = "warn"
+# The doc build always passes `--document-private-items`, so links into
+# module-private config types (`Host`, `Plan`, `Override`) always resolve.
+private_intra_doc_links = "allow"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
-crossterm = "0.29"
 enum-map = "2"
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }

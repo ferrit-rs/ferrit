@@ -7,6 +7,37 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Added
+
+- Strict Rust tooling, ported from the RUSTIFY reference setup. `rust-toolchain.toml`
+  pins the compiler (1.97.1) so CI and every contributor lint identically.
+  `rustfmt.toml` and `clippy.toml` fix formatting and the MSRV clippy target.
+  `Cargo.toml` grows `[lints.clippy]`, `[lints.rust]` and `[lints.rustdoc]` tables:
+  the clippy `all` / `pedantic` / `nursery` / `cargo` groups run at warn, a curated
+  deny list breaks the build on `unwrap`, `panic`, `todo`, `indexing_slicing`,
+  `print_stdout` / `print_stderr`, `exit`, undocumented `unsafe` and more, and
+  `unsafe_code` is `forbid`. `deny.toml` adds a `cargo deny check` gate over
+  advisories, licences, banned and duplicate deps, and the source allowlist.
+- `.github/workflows/ci.yml`: runs `cargo fmt --check`, `cargo clippy --all-targets
+  --all-features -- -D warnings`, `RUSTDOCFLAGS=-D warnings cargo doc`,
+  `cargo machete`, `cargo deny check` and `cargo nextest run` on every push to
+  `main` and every pull request.
+
+### Changed
+
+- `Repo::file_diff()` and `Repo::commit_diff()` take `DiffOpts` by value instead
+  of by reference. `DiffOpts` is a 12 byte `Copy` struct, so the reference was
+  pure overhead (`clippy::trivially_copy_pass_by_ref`).
+- Lint fallout across `src/`: `map_or_else` instead of `map(..).unwrap_or_else(..)`,
+  checked `usize` / `isize` arithmetic instead of `as` casts in the scroll paths,
+  slice `.get()` instead of indexing, and small scoped `#[expect(..)]` where a
+  lint flags a provably unreachable arm or a disproportionate dependency.
+
+### Removed
+
+- Unused direct dependency `crossterm`. Only the `ratatui::crossterm` re-export
+  was ever used.
+
 ## [0.1.0] - 2026-09-08
 
 ### Added

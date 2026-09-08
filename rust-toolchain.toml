@@ -1,0 +1,8 @@
+# Pinned so `cargo clippy` / `cargo fmt` give every contributor and CI the exact
+# same lints and formatting. Bump this deliberately (its own CHANGELOG line),
+# never as a drive-by. The crate's declared MSRV lives in Cargo.toml
+# (`rust-version`) and clippy.toml (`msrv`) and is lower on purpose.
+[toolchain]
+channel = "1.97.1"
+components = ["clippy", "rustfmt", "rust-src"]
+profile = "default"

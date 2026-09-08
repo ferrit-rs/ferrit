@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::pathbuf_init_then_push,
+    clippy::iter_on_single_items,
+    clippy::format_collect,
+    elided_lifetimes_in_paths,
+    reason = "integration test scaffolding: a failed setup is the assertion, helper ergonomics beat lint-cleanliness here"
+)]
 //! Subprocess coverage for `Repo::file_diff` / `Repo::commit_diff`: build a
 //! throwaway repo with `git2`, then check the plain-text `git diff` / `git show`
 //! output comes back parsed. Needs `git` on `PATH` (the same assumption lazygit
@@ -20,7 +31,7 @@ impl TempDir {
         let mut path = std::env::temp_dir();
         path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
-        TempDir(path)
+        Self(path)
     }
 
     fn path(&self) -> &Path {
@@ -70,7 +81,7 @@ fn modified_tracked_file_diffs_against_the_index() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let diff = backend
-        .file_diff(Path::new("a.txt"), DiffSide::Worktree, &DiffOpts::default())
+        .file_diff(Path::new("a.txt"), DiffSide::Worktree, DiffOpts::default())
         .unwrap();
 
     assert_eq!(diff.files.len(), 1);
@@ -89,10 +100,18 @@ fn untracked_file_comes_back_as_all_additions() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let diff = backend
-        .file_diff(Path::new("new.txt"), DiffSide::Worktree, &DiffOpts::default())
+        .file_diff(
+            Path::new("new.txt"),
+            DiffSide::Worktree,
+            DiffOpts::default(),
+        )
         .unwrap();
 
-    assert_eq!(diff.files.len(), 1, "--no-index fallback produced a section");
+    assert_eq!(
+        diff.files.len(),
+        1,
+        "--no-index fallback produced a section"
+    );
     assert!(diff.text.contains("+fresh line"));
     assert!(diff.text.contains("+second"));
 }
@@ -108,14 +127,14 @@ fn staged_side_diffs_the_index_against_head() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let diff = backend
-        .file_diff(Path::new("s.txt"), DiffSide::Staged, &DiffOpts::default())
+        .file_diff(Path::new("s.txt"), DiffSide::Staged, DiffOpts::default())
         .unwrap();
 
     assert!(diff.text.contains("+staged addition"));
 
     // Worktree side is clean now (everything staged): no file section.
     let worktree = backend
-        .file_diff(Path::new("s.txt"), DiffSide::Worktree, &DiffOpts::default())
+        .file_diff(Path::new("s.txt"), DiffSide::Worktree, DiffOpts::default())
         .unwrap();
     assert!(worktree.files.is_empty());
 }
@@ -130,7 +149,11 @@ fn binary_file_is_flagged_not_dumped() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let diff = backend
-        .file_diff(Path::new("blob.bin"), DiffSide::Worktree, &DiffOpts::default())
+        .file_diff(
+            Path::new("blob.bin"),
+            DiffSide::Worktree,
+            DiffOpts::default(),
+        )
         .unwrap();
 
     assert_eq!(diff.files.len(), 1);
@@ -146,11 +169,14 @@ fn commit_diff_shows_the_root_commit_against_the_empty_tree() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let diff = backend
-        .commit_diff(&oid.to_string(), &DiffOpts::default())
+        .commit_diff(&oid.to_string(), DiffOpts::default())
         .unwrap();
 
     assert!(diff.text.contains("+root content"));
-    assert!(diff.text.contains("new file mode"), "root commit adds the file");
+    assert!(
+        diff.text.contains("new file mode"),
+        "root commit adds the file"
+    );
     assert_eq!(diff.files.len(), 1);
 }
 
@@ -163,7 +189,10 @@ fn commit_diff_on_a_bad_hash_is_no_such_commit() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let err = backend
-        .commit_diff("0000000000000000000000000000000000000000", &DiffOpts::default())
+        .commit_diff(
+            "0000000000000000000000000000000000000000",
+            DiffOpts::default(),
+        )
         .unwrap_err();
 
     assert!(matches!(err, GitError::NoSuchCommit(_)), "got {err:?}");

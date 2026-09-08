@@ -49,7 +49,7 @@ pub(crate) fn short_hash(oid: &git2::Oid) -> String {
 
 impl Repo {
     /// Open the repository at or above `path`. Walks up like `git` does.
-    pub fn open(path: &Path) -> GitResult<Repo> {
+    pub fn open(path: &Path) -> GitResult<Self> {
         let inner = Repository::discover(path).map_err(|e| {
             if e.code() == git2::ErrorCode::NotFound {
                 GitError::NotARepository(path.to_path_buf())
@@ -57,7 +57,7 @@ impl Repo {
                 GitError::Open(e)
             }
         })?;
-        Ok(Repo { inner })
+        Ok(Self { inner })
     }
 
     /// The repository's directory name, e.g. `ferrit`. Used in the status
@@ -67,8 +67,7 @@ impl Repo {
             .workdir()
             .and_then(|w| w.file_name())
             .or_else(|| self.inner.path().parent().and_then(|p| p.file_name()))
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "repo".to_string())
+            .map_or_else(|| "repo".to_owned(), |n| n.to_string_lossy().into_owned())
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.
@@ -97,12 +96,12 @@ impl Repo {
 
     /// One file's diff (`git diff [--cached] -- <path>`), parsed. Untracked
     /// files come back via `--no-index` as all-additions.
-    pub fn file_diff(&self, path: &Path, side: DiffSide, opts: &DiffOpts) -> GitResult<Diff> {
+    pub fn file_diff(&self, path: &Path, side: DiffSide, opts: DiffOpts) -> GitResult<Diff> {
         diff::file_diff(&self.inner, path, side, opts)
     }
 
     /// One commit's diff against its first parent (`git show <hash>`), parsed.
-    pub fn commit_diff(&self, hash: &str, opts: &DiffOpts) -> GitResult<Diff> {
+    pub fn commit_diff(&self, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
         diff::commit_diff(&self.inner, hash, opts)
     }
 }

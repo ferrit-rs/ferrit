@@ -38,14 +38,14 @@ impl Change {
     /// The single-letter code `git status --porcelain` prints.
     pub fn code(self) -> char {
         match self {
-            Change::None => ' ',
-            Change::Modified => 'M',
-            Change::Added => 'A',
-            Change::Deleted => 'D',
-            Change::Renamed => 'R',
-            Change::Typechange => 'T',
-            Change::Untracked => '?',
-            Change::Conflicted => 'U',
+            Self::None => ' ',
+            Self::Modified => 'M',
+            Self::Added => 'A',
+            Self::Deleted => 'D',
+            Self::Renamed => 'R',
+            Self::Typechange => 'T',
+            Self::Untracked => '?',
+            Self::Conflicted => 'U',
         }
     }
 }
@@ -74,7 +74,7 @@ impl FileEntry {
 }
 
 /// Read the header: branch, upstream, ahead/behind, conflict count.
-pub fn header(repo: &Repository) -> GitResult<StatusHeader> {
+pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
     let mut out = StatusHeader::default();
 
     match repo.head() {
@@ -82,17 +82,15 @@ pub fn header(repo: &Repository) -> GitResult<StatusHeader> {
             out.detached = repo.head_detached().unwrap_or(false);
             let local_oid = head.target();
             out.branch = if out.detached {
-                local_oid
-                    .map(|oid| crate::git::short_hash(&oid))
-                    .unwrap_or_else(|| "HEAD".to_string())
+                local_oid.map_or_else(|| "HEAD".to_owned(), |oid| crate::git::short_hash(&oid))
             } else {
-                head.shorthand().unwrap_or("HEAD").to_string()
+                head.shorthand().unwrap_or("HEAD").to_owned()
             };
 
             if !out.detached
                 && let Ok(upstream) = git2::Branch::wrap(head).upstream()
             {
-                out.upstream = upstream.name().ok().flatten().map(str::to_string);
+                out.upstream = upstream.name().ok().flatten().map(str::to_owned);
                 if let (Some(local_oid), Some(up_oid)) = (local_oid, upstream.get().target())
                     && let Ok((ahead, behind)) = repo.graph_ahead_behind(local_oid, up_oid)
                 {
@@ -100,22 +98,24 @@ pub fn header(repo: &Repository) -> GitResult<StatusHeader> {
                     out.behind = behind;
                 }
             }
-        }
+        },
         Err(e) if e.code() == ErrorCode::UnbornBranch => {
             // Fresh repo, no commits yet.
             out.branch = repo
                 .find_reference("HEAD")
                 .ok()
-                .and_then(|r| r.symbolic_target().ok().flatten().map(str::to_string))
-                .map(|t| t.trim_start_matches("refs/heads/").to_string())
-                .unwrap_or_else(|| "main".to_string());
-        }
+                .and_then(|r| r.symbolic_target().ok().flatten().map(str::to_owned))
+                .map_or_else(
+                    || "main".to_owned(),
+                    |t| t.trim_start_matches("refs/heads/").to_owned(),
+                );
+        },
         Err(e) => return Err(GitError::Read(e)),
     }
 
     let index = repo.index().map_err(GitError::Read)?;
     out.conflicts = if index.has_conflicts() {
-        index.conflicts().map(|c| c.count()).unwrap_or(0)
+        index.conflicts().map_or(0, Iterator::count)
     } else {
         0
     };
@@ -125,7 +125,7 @@ pub fn header(repo: &Repository) -> GitResult<StatusHeader> {
 
 /// Read the working-tree entries, sorted by path. Untracked files included,
 /// ignored files excluded.
-pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
+pub(super) fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)

@@ -19,22 +19,19 @@ pub enum Rev {
 }
 
 fn read_err(path: &Path, msg: impl std::fmt::Display) -> GitError {
-    GitError::Read(git2::Error::from_str(&format!(
-        "{}: {msg}",
-        path.display()
-    )))
+    GitError::Read(git2::Error::from_str(&format!("{}: {msg}", path.display())))
 }
 
 /// Read `path` at `rev`. Missing files, bare repos and non-blob entries all
 /// come back as `GitError::Read`, never a panic.
-pub fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
+pub(super) fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
     match rev {
         Rev::Workdir => {
             let root = repo
                 .workdir()
                 .ok_or_else(|| read_err(path, "bare repository has no working directory"))?;
             std::fs::read(root.join(path)).map_err(|e| read_err(path, e))
-        }
+        },
         Rev::Head => {
             let tree = repo
                 .head()
@@ -46,6 +43,6 @@ pub fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<Vec<u8>
                 .as_blob()
                 .ok_or_else(|| read_err(path, "not a blob at HEAD"))?;
             Ok(blob.content().to_vec())
-        }
+        },
     }
 }

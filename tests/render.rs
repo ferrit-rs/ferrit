@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "integration test: a failed setup or a bad slice is the assertion"
+)]
 //! Mechanism 1 from `docs/PLAN_SELF_TESTING.md`: render `ui::draw` into a
 //! `TestBackend` and assert on frame text. No terminal, no timing.
 
@@ -96,7 +103,10 @@ fn image_selection_takes_over_the_right_pane() {
 
     app.select(Pane::Files, png);
     let out = frame(&mut app, 120, 40);
-    assert!(out.contains("Preview"), "image preview owns the right pane\n{out}");
+    assert!(
+        out.contains("Preview"),
+        "image preview owns the right pane\n{out}"
+    );
     assert!(!out.contains("diff --git"), "the mock diff is gone\n{out}");
 }
 

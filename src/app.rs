@@ -5,6 +5,7 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use color_eyre::Result;
@@ -94,11 +95,11 @@ impl Pane {
     /// names are inert labels for now; only the first is a real view.
     pub fn title(self) -> &'static str {
         match self {
-            Pane::Status => "[1] Status",
-            Pane::Files => "[2] Files - Worktrees - Submodules",
-            Pane::Branches => "[3] Local branches - Remotes - Tags",
-            Pane::Commits => "[4] Commits - Reflog",
-            Pane::Stash => "[5] Stash",
+            Self::Status => "[1] Status",
+            Self::Files => "[2] Files - Worktrees - Submodules",
+            Self::Branches => "[3] Local branches - Remotes - Tags",
+            Self::Commits => "[4] Commits - Reflog",
+            Self::Stash => "[5] Stash",
         }
     }
 
@@ -106,11 +107,11 @@ impl Pane {
     /// matching what lazygit shows there.
     pub fn right_title(self) -> &'static str {
         match self {
-            Pane::Status => " Status ",
-            Pane::Files => " Unstaged changes ",
-            Pane::Branches => " Log ",
-            Pane::Commits => " Commit ",
-            Pane::Stash => " Stash ",
+            Self::Status => " Status ",
+            Self::Files => " Unstaged changes ",
+            Self::Branches => " Log ",
+            Self::Commits => " Commit ",
+            Self::Stash => " Stash ",
         }
     }
 }
@@ -164,8 +165,7 @@ impl App {
     fn base(repo: Option<git::Repo>) -> Self {
         let repo_name = repo
             .as_ref()
-            .map(git::Repo::name)
-            .unwrap_or_else(|| "ferrit".to_string());
+            .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -233,7 +233,7 @@ impl App {
                 self.commits = snap.commits;
                 self.stashes = snap.stashes;
                 self.last_error = None;
-            }
+            },
             Err(e) => self.last_error = Some(e.to_string()),
         }
         for pane in PANES {
@@ -266,19 +266,19 @@ impl App {
                 self.diff = DiffView::None;
                 self.right_key = None;
                 self.right_scroll = 0;
-            }
+            },
             Some(key) if self.right_key.as_ref() == Some(&key) => {
                 let rebuilt = self.build_diff(&key);
                 if view_sig(&rebuilt) != view_sig(&self.diff) {
                     self.diff = rebuilt;
                 }
                 self.clamp_right_scroll();
-            }
+            },
             Some(key) => {
                 self.right_scroll = 0;
                 self.diff = self.build_diff(&key);
                 self.right_key = Some(key);
-            }
+            },
         }
     }
 
@@ -288,22 +288,22 @@ impl App {
         match self.focus {
             Pane::Files => {
                 let entry = self.files.get(self.selected(Pane::Files))?;
-                let side = if entry.worktree != git::Change::None {
-                    DiffSide::Worktree
-                } else {
+                let side = if entry.worktree == git::Change::None {
                     DiffSide::Staged
+                } else {
+                    DiffSide::Worktree
                 };
                 Some(RightKey::File {
                     path: entry.path.clone(),
                     side,
                 })
-            }
+            },
             Pane::Commits => {
                 let entry = self.commits.get(self.selected(Pane::Commits))?;
                 Some(RightKey::Commit {
                     full_hash: entry.full_hash.clone(),
                 })
-            }
+            },
             _ => None,
         }
     }
@@ -317,12 +317,12 @@ impl App {
         };
         let opts = DiffOpts::default();
         match key {
-            RightKey::File { path, side } => match repo.file_diff(path, *side, &opts) {
+            RightKey::File { path, side } => match repo.file_diff(path, *side, opts) {
                 Ok(diff) if diff.files.is_empty() => DiffView::Note("no changes to show".into()),
                 Ok(diff) => DiffView::Files(diff),
                 Err(e) => DiffView::Note(e.to_string()),
             },
-            RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, &opts) {
+            RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, opts) {
                 Ok(diff) => match self.commits.iter().find(|c| &c.full_hash == full_hash) {
                     Some(entry) => DiffView::Commit(entry.clone(), diff),
                     None => DiffView::Note("commit not in the list".into()),
@@ -357,11 +357,14 @@ impl App {
     /// the last line at the bottom of the pane. `isize::MIN` / `isize::MAX`
     /// snap to the top / bottom.
     fn scroll_right(&mut self, delta: isize) {
-        let max = self.max_right_scroll() as isize;
-        let next = (self.right_scroll as isize)
-            .saturating_add(delta)
-            .clamp(0, max.max(0));
-        self.right_scroll = next as usize;
+        let mag = delta.unsigned_abs();
+        self.right_scroll = if delta >= 0 {
+            self.right_scroll
+                .saturating_add(mag)
+                .min(self.max_right_scroll())
+        } else {
+            self.right_scroll.saturating_sub(mag)
+        };
     }
 
     /// Is the right pane a scrollable real diff right now? The scroll keys and
@@ -456,7 +459,7 @@ impl App {
                 Ok(bytes) => bytes,
                 Err(e) => {
                     return Preview::Note(format!("[image] {}  ({e})", entry.path.display()));
-                }
+                },
             },
             None => mock::mock_image_bytes(&entry.path)
                 .map(<[u8]>::to_vec)
@@ -518,10 +521,10 @@ impl App {
         let h = &self.header;
         let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
         if h.ahead > 0 {
-            line.push_str(&format!(" \u{2191}{}", h.ahead));
+            let _ = write!(line, " \u{2191}{}", h.ahead);
         }
         if h.behind > 0 {
-            line.push_str(&format!(" \u{2193}{}", h.behind));
+            let _ = write!(line, " \u{2193}{}", h.behind);
         }
         let mut out = vec![theme::status_line(&line)];
         if h.conflicts > 0 {
@@ -561,7 +564,7 @@ impl App {
     pub fn file_display(&self, i: usize) -> String {
         self.files
             .get(i)
-            .map(|f| f.display())
+            .map(git::FileEntry::display)
             .unwrap_or_default()
     }
 
@@ -603,9 +606,9 @@ impl App {
             match events.next()? {
                 AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                     self.on_key(key);
-                }
+                },
                 AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
-                AppEvent::Input(_) => {}
+                AppEvent::Input(_) => {},
                 AppEvent::Refresh => self.refresh(),
             }
         }
@@ -619,10 +622,7 @@ impl App {
         }
 
         if self.show_help {
-            if matches!(
-                key.code,
-                KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc
-            ) {
+            if matches!(key.code, KeyCode::Char('?' | 'q') | KeyCode::Esc) {
                 self.show_help = false;
             }
             return;
@@ -637,8 +637,9 @@ impl App {
         // the right pane is a real diff.
         if self.right_is_diff() {
             let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-            let half = (self.right_viewport / 2).max(1) as isize;
-            let page = self.right_viewport.saturating_sub(1).max(1) as isize;
+            let half = isize::try_from((self.right_viewport / 2).max(1)).unwrap_or(isize::MAX);
+            let page =
+                isize::try_from(self.right_viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
             match key.code {
                 KeyCode::Char('d') if ctrl => return self.scroll_right(half),
                 KeyCode::Char('u') if ctrl => return self.scroll_right(-half),
@@ -650,7 +651,7 @@ impl App {
                 KeyCode::Char('<') => return self.scroll_right(isize::MIN),
                 KeyCode::Char(']') => return self.jump_diff_anchor(1),
                 KeyCode::Char('[') => return self.jump_diff_anchor(-1),
-                _ => {}
+                _ => {},
             }
         }
 
@@ -659,13 +660,15 @@ impl App {
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
-                self.focus = PANES[c as usize - '1' as usize];
-            }
+                if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
+                    self.focus = pane;
+                }
+            },
             KeyCode::Tab | KeyCode::Right => self.focus = self.pane_offset(1),
             KeyCode::BackTab | KeyCode::Left => self.focus = self.pane_offset(PANES.len() - 1),
             KeyCode::Char('j') | KeyCode::Down => self.select_down(),
             KeyCode::Char('k') | KeyCode::Up => self.select_up(),
-            _ => {}
+            _ => {},
         }
 
         // Focus or selection may have moved; keep the right-pane preview in sync.
@@ -696,7 +699,8 @@ impl App {
     }
 
     fn pane_offset(&self, delta: usize) -> Pane {
-        PANES[(self.focus.index() + delta) % PANES.len()]
+        let idx = (self.focus.index() + delta) % PANES.len();
+        PANES.get(idx).copied().unwrap_or(self.focus)
     }
 
     fn select_down(&mut self) {
@@ -712,9 +716,15 @@ impl App {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "unit test: a failed setup or a bad index is the assertion"
+)]
 mod tests {
     use super::*;
-    use ratatui::crossterm::event::KeyCode;
 
     fn press(app: &mut App, code: KeyCode) {
         app.on_key(KeyEvent::from(code));
@@ -755,7 +765,10 @@ mod tests {
             .expect("mock has a .png entry");
 
         press(&mut app, KeyCode::Char('2')); // focus Files
-        assert!(matches!(app.preview(), Preview::None), "src/main.rs is not an image");
+        assert!(
+            matches!(app.preview(), Preview::None),
+            "src/main.rs is not an image"
+        );
 
         for _ in 0..png {
             press(&mut app, KeyCode::Down);

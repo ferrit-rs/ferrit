@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::pathbuf_init_then_push,
+    clippy::iter_on_single_items,
+    clippy::format_collect,
+    elided_lifetimes_in_paths,
+    reason = "integration test scaffolding: a failed setup is the assertion, helper ergonomics beat lint-cleanliness here"
+)]
 //! `App`-level wiring for the right-pane diff: selecting a file builds a real
 //! `DiffView`, a background `refresh()` of the same selection rebuilds the text
 //! but keeps the scroll, and moving to another file resets the scroll to the
@@ -24,7 +35,7 @@ impl TempDir {
         let mut path = std::env::temp_dir();
         path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
-        TempDir(path)
+        Self(path)
     }
 
     fn path(&self) -> &Path {
@@ -96,7 +107,10 @@ fn refresh_keeps_the_scroll_for_an_unchanged_selection() {
     fs::write(dir.path().join("big.txt"), &edited2).unwrap();
     app.refresh();
 
-    assert!(diff_text(&app).contains("+line 10 ALSO"), "diff text rebuilt");
+    assert!(
+        diff_text(&app).contains("+line 10 ALSO"),
+        "diff text rebuilt"
+    );
     assert_eq!(app.right_scroll(), 12, "scroll survives a refresh");
 }
 
@@ -139,7 +153,10 @@ fn shift_j_k_scroll_the_diff_within_the_viewport() {
     app.set_right_viewport(10);
     let count = diff_text(&app).lines().count();
     let max = count.saturating_sub(10);
-    assert!(max > 3, "fixture diff should overflow a 10-row pane, got {count} lines");
+    assert!(
+        max > 3,
+        "fixture diff should overflow a 10-row pane, got {count} lines"
+    );
 
     for _ in 0..3 {
         app.feed_key(char_key('J'));
@@ -149,7 +166,11 @@ fn shift_j_k_scroll_the_diff_within_the_viewport() {
     for _ in 0..500 {
         app.feed_key(char_key('J'));
     }
-    assert_eq!(app.right_scroll(), max, "stops with the last line at the bottom");
+    assert_eq!(
+        app.right_scroll(),
+        max,
+        "stops with the last line at the bottom"
+    );
 
     for _ in 0..500 {
         app.feed_key(char_key('K'));
@@ -204,11 +225,23 @@ fn mouse_wheel_routes_by_column() {
     };
 
     app.feed_mouse(wheel(60));
-    assert_eq!(app.right_scroll(), 3, "wheel over the diff scrolls it three lines");
+    assert_eq!(
+        app.right_scroll(),
+        3,
+        "wheel over the diff scrolls it three lines"
+    );
 
     app.feed_mouse(wheel(5));
-    assert_eq!(app.selected(Pane::Files), 1, "wheel over the list moves the selection");
-    assert_eq!(app.right_scroll(), 0, "the new file's diff starts at the top");
+    assert_eq!(
+        app.selected(Pane::Files),
+        1,
+        "wheel over the list moves the selection"
+    );
+    assert_eq!(
+        app.right_scroll(),
+        0,
+        "the new file's diff starts at the top"
+    );
 }
 
 #[test]

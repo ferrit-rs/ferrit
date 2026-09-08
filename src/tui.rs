@@ -27,7 +27,12 @@ pub fn init() -> io::Result<Tui> {
 
 /// Exact reverse of `init`. Safe to call more than once.
 pub fn restore() -> io::Result<()> {
-    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture, Show)?;
+    execute!(
+        io::stdout(),
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        Show
+    )?;
     disable_raw_mode()
 }
 

@@ -1,0 +1,59 @@
+name: CI
+
+# Every gate that must stay green also runs locally; see AGENTS.md. The
+# toolchain is whatever rust-toolchain.toml pins, so CI and contributors lint
+# with the exact same compiler.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: fmt / clippy / doc / test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (from rust-toolchain.toml)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # setup-rust-toolchain reads rust-toolchain.toml on its own; naming
+          # the components keeps it explicit and fails fast if the pin drops one.
+          components: clippy, rustfmt, rust-src
+          cache: true
+
+      - name: Install cargo-nextest, cargo-machete, cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-machete,cargo-deny
+
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: rustdoc
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features --document-private-items
+
+      - name: cargo-machete
+        run: cargo machete
+
+      - name: cargo-deny
+        run: cargo deny check
+
+      - name: nextest
+        run: cargo nextest run --all-features

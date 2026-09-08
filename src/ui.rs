@@ -13,12 +13,12 @@ use ratatui::widgets::{
 };
 use ratatui_image::{Resize, StatefulImage};
 
-use crate::app::{App, DiffView, Pane, PANES};
+use crate::app::{App, DiffView, PANES, Pane};
 use crate::image::preview::Preview;
 use crate::{mock, theme};
 
 /// Render the full screen for the current `App` state.
-pub fn draw(frame: &mut Frame, app: &mut App) {
+pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
 
     let [content, log, keybar] = Layout::vertical([
@@ -57,7 +57,7 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     }
 }
 
-fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_left_column(frame: &mut Frame<'_>, app: &App, area: Rect) {
     let rows: [Rect; 5] = Layout::vertical([
         Constraint::Length(4), // Status: header only
         Constraint::Min(3),    // Files
@@ -67,7 +67,7 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
     ])
     .areas(area);
 
-    for (i, &pane) in PANES.iter().enumerate() {
+    for (&pane, &row) in PANES.iter().zip(&rows) {
         let focused = app.focus == pane;
         let border = if focused {
             Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
@@ -98,11 +98,11 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
             state.select(Some(app.selected(pane).min(row_ct - 1)));
         }
 
-        frame.render_stateful_widget(list, rows[i], &mut state);
+        frame.render_stateful_widget(list, row, &mut state);
     }
 }
 
-fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
+fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
     // the diff, one over the left column moves the selection.
     app.set_right_area(area);
@@ -128,7 +128,7 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
                 proto.as_mut(),
             );
             return;
-        }
+        },
         Preview::Note(msg) => {
             // Blank every cell first: if the previous frame was an image, its
             // sixel / iTerm2 pixels sit under these cells and a short paragraph
@@ -143,8 +143,8 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
                 .wrap(Wrap { trim: false });
             frame.render_widget(panel, area);
             return;
-        }
-        Preview::None => {}
+        },
+        Preview::None => {},
     }
 
     // Same reason as the `Note` branch: clear any leftover graphics pixels
@@ -168,19 +168,26 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
                 };
                 let focus = anchors.iter().position(|&l| l == scroll);
                 (theme::render_diff(diff, focus), diff.text.lines().count())
-            }
+            },
+            #[expect(
+                clippy::unreachable,
+                reason = "the enclosing `matches!` guard admits only Files/Commit"
+            )]
             _ => unreachable!("guarded by the matches! above"),
         };
         let inner = block.inner(area);
         let panel = Paragraph::new(text)
             .block(block)
-            .scroll((scroll as u16, 0));
+            .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, area);
         if total > inner.height as usize {
             let mut state = ScrollbarState::new(total).position(scroll);
             frame.render_stateful_widget(
                 Scrollbar::new(ScrollbarOrientation::VerticalRight),
-                area.inner(Margin { vertical: 1, horizontal: 0 }),
+                area.inner(Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
                 &mut state,
             );
         }
@@ -208,19 +215,20 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
         Pane::Stash => mock::RIGHT_STASH,
     };
 
-    let text: Text = match app.focus {
+    let text: Text<'_> = match app.focus {
         Pane::Files | Pane::Branches | Pane::Commits => theme::diff_lines(body, None),
         _ => body.into(),
     };
 
-    let panel = Paragraph::new(text)
-        .block(block)
-        .wrap(Wrap { trim: false });
+    let panel = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
     frame.render_widget(panel, area);
 }
 
-fn draw_command_log(frame: &mut Frame, area: Rect) {
-    let lines: Vec<Line> = mock::COMMAND_LOG.iter().map(|s| theme::log_line(s)).collect();
+fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
+    let lines: Vec<Line<'_>> = mock::COMMAND_LOG
+        .iter()
+        .map(|s| theme::log_line(s))
+        .collect();
     let panel = Paragraph::new(lines).block(
         Block::bordered()
             .title(Line::styled(" command log ", Style::new().fg(theme::IDLE)))
@@ -229,11 +237,11 @@ fn draw_command_log(frame: &mut Frame, area: Rect) {
     frame.render_widget(panel, area);
 }
 
-fn draw_keybar(frame: &mut Frame, area: Rect) {
+fn draw_keybar(frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(Paragraph::new(theme::keybar_line(mock::KEYBAR)), area);
 }
 
-fn draw_help(frame: &mut Frame, area: Rect) {
+fn draw_help(frame: &mut Frame<'_>, area: Rect) {
     let width = 55.min(area.width);
     let height = 15.min(area.height);
     let rect = Rect {

@@ -84,7 +84,14 @@ impl Diff {
 }
 
 fn line_of(text: &str, byte: usize) -> usize {
-    text.as_bytes()[..byte.min(text.len())]
+    let end = byte.min(text.len());
+    #[expect(
+        clippy::naive_bytecount,
+        reason = "counts newlines in a header-length prefix; a bytecount dep is overkill for one call"
+    )]
+    text.as_bytes()
+        .get(..end)
+        .unwrap_or_default()
         .iter()
         .filter(|&&b| b == b'\n')
         .count()
@@ -93,15 +100,15 @@ fn line_of(text: &str, byte: usize) -> usize {
 /// Parse plain `git diff` text directly, no subprocess. For tests and any
 /// future caller that already holds diff output.
 pub fn parse_diff(text: &str) -> Diff {
-    Diff::new(text.to_string())
+    Diff::new(text.to_owned())
 }
 
 /// One file's worktree-or-staged diff.
-pub fn file_diff(
+pub(super) fn file_diff(
     repo: &Repository,
     path: &Path,
     side: DiffSide,
-    opts: &DiffOpts,
+    opts: DiffOpts,
 ) -> GitResult<Diff> {
     let workdir = workdir(repo)?;
 
@@ -131,7 +138,7 @@ pub fn file_diff(
             .run(workdir)?;
         // --no-index exits 1 when the files differ, which is the normal case.
         match ni.status.code() {
-            Some(0) | Some(1) => {}
+            Some(0 | 1) => {},
             _ => return Err(GitError::DiffFailed(stderr(&ni))),
         }
         return Ok(Diff::new(String::from_utf8_lossy(&ni.stdout).into_owned()));
@@ -143,14 +150,14 @@ pub fn file_diff(
 /// A commit against its first parent (`git show`). Empty-tree diff for the root
 /// commit; first-parent diff for a merge (`-m --first-parent`). `hash` is a
 /// `CommitEntry::full_hash`.
-pub fn commit_diff(repo: &Repository, hash: &str, opts: &DiffOpts) -> GitResult<Diff> {
+pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
     let workdir = workdir(repo)?;
 
     let out = DiffCmd::base("show", opts)
         .arg("-m")
         .arg("--first-parent")
         .arg("-p")
-        .arg(hash.to_string())
+        .arg(hash.to_owned())
         .run(workdir)?;
 
     if !out.status.success() {
@@ -159,7 +166,7 @@ pub fn commit_diff(repo: &Repository, hash: &str, opts: &DiffOpts) -> GitResult<
             || err.contains("unknown revision")
             || err.contains("ambiguous argument")
         {
-            return Err(GitError::NoSuchCommit(hash.to_string()));
+            return Err(GitError::NoSuchCommit(hash.to_owned()));
         }
         return Err(GitError::DiffFailed(err));
     }
@@ -170,17 +177,16 @@ pub fn commit_diff(repo: &Repository, hash: &str, opts: &DiffOpts) -> GitResult<
 /// `git diff` means "nothing changed" or "needs the `--no-index` fallback".
 fn is_untracked(repo: &Repository, path: &Path) -> bool {
     repo.status_file(path)
-        .map(|s| s.contains(git2::Status::WT_NEW))
-        .unwrap_or(false)
+        .is_ok_and(|s| s.contains(git2::Status::WT_NEW))
 }
 
 fn workdir(repo: &Repository) -> GitResult<&Path> {
     repo.workdir()
-        .ok_or_else(|| GitError::DiffFailed("bare repository has no working tree".to_string()))
+        .ok_or_else(|| GitError::DiffFailed("bare repository has no working tree".to_owned()))
 }
 
 fn stderr(out: &Output) -> String {
-    String::from_utf8_lossy(&out.stderr).trim().to_string()
+    String::from_utf8_lossy(&out.stderr).trim().to_owned()
 }
 
 /// Shared argv builder. The flag set lives here once so an `--ext-diff` /
@@ -190,17 +196,17 @@ struct DiffCmd {
 }
 
 impl DiffCmd {
-    fn base(sub: &str, opts: &DiffOpts) -> Self {
+    fn base(sub: &str, opts: DiffOpts) -> Self {
         let mut args = vec![
-            sub.to_string(),
-            "--no-ext-diff".to_string(),
-            "--color=never".to_string(),
+            sub.to_owned(),
+            "--no-ext-diff".to_owned(),
+            "--color=never".to_owned(),
             format!("--unified={}", opts.context),
             format!("--find-renames={}%", opts.rename_threshold),
-            "--submodule".to_string(),
+            "--submodule".to_owned(),
         ];
         if opts.ignore_whitespace {
-            args.push("--ignore-all-space".to_string());
+            args.push("--ignore-all-space".to_owned());
         }
         Self { args }
     }

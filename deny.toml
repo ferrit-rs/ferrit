@@ -1,0 +1,59 @@
+# cargo-deny policy for ferrit. Run by CI as `cargo deny check`.
+# Superset of `cargo audit`: advisories + licences + banned/duplicate deps + source allowlist.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    # `paste` is unmaintained (RUSTSEC-2024-0436). Transitive only, via
+    # `image` / `ratatui-image` codec deps (pulp -> exr, rav1e -> ravif).
+    # No safe upgrade exists; nothing ferrit can do until upstream drops it.
+    "RUSTSEC-2024-0436",
+]
+
+[licenses]
+version = 2
+# SPDX identifiers: permissive licences plus the weak-copyleft ones already in the tree.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "Unlicense",
+]
+confidence-threshold = 0.9
+
+# `libfuzzer-sys` is `(MIT OR Apache-2.0) AND NCSA`: the MIT/Apache half is
+# covered, the NCSA half is not. NCSA is OSI-approved and permissive (BSD-like).
+# Only reachable through `all-features` -> image/avif -> ravif -> rav1e; ferrit's
+# own `image` feature set never enables avif. Scope the allowance to that crate.
+[[licenses.exceptions]]
+name = "libfuzzer-sys"
+allow = ["NCSA"]
+
+[bans]
+multiple-versions = "warn"       # transitive graph churns; noisy as "deny"
+wildcards = "deny"               # no `foo = "*"` in Cargo.toml
+allow-wildcard-paths = true
+deny = [
+    { name = "openssl" },        # git2 is vendored-libgit2; a native-tls / openssl pull-in is a portability regression
+    { name = "openssl-sys" },
+]
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

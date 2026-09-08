@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "integration test: a failed setup or a bad slice is the assertion"
+)]
 //! Parser coverage for `ferrit::git::parse_diff`: feed it canned plain-text
 //! `git diff` output and check the byte ranges slice back to the right spans,
 //! rename detection fires, and the hunk-header numbers come out.

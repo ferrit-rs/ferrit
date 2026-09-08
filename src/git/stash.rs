@@ -9,12 +9,12 @@ use crate::git::model::StashEntry;
 
 /// Read the stash list. `git2::Repository::stash_foreach` needs `&mut`, so
 /// this is the one read in `Repo::snapshot()` that borrows mutably.
-pub fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
+pub(super) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
     let mut out = Vec::new();
     repo.stash_foreach(|index, message, _oid| {
         out.push(StashEntry {
             index,
-            message: message.to_string(),
+            message: message.to_owned(),
         });
         true
     })

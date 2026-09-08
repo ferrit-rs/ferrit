@@ -24,9 +24,18 @@ fn main() -> Result<()> {
     let mut app = match App::open(&cli.path) {
         Ok(app) => app,
         Err(e) => {
-            eprintln!("ferrit: {e}");
-            std::process::exit(1);
-        }
+            // The TUI has not taken the screen yet: stderr is the only channel,
+            // and a non-zero exit is the contract for "could not open the repo".
+            #[allow(
+                clippy::print_stderr,
+                clippy::exit,
+                reason = "startup failure path, before tui::init: stderr + non-zero exit is the contract"
+            )]
+            {
+                eprintln!("ferrit: {e}");
+                std::process::exit(1);
+            }
+        },
     };
 
     // Ask the terminal whether it speaks a graphics protocol, before the

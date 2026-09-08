@@ -1,0 +1,22 @@
+# Thresholds + API bans that back the lint policy in Cargo.toml `[lints.clippy]`.
+# MSRV is lower than the pinned toolchain on purpose: clippy will not suggest a
+# rewrite that needs a newer stdlib than this.
+msrv = "1.86.0"
+
+cognitive-complexity-threshold = 30
+excessive-nesting-threshold = 6
+large-error-threshold = 160
+stack-size-threshold = 262144
+trivial-copy-size-limit = 16
+array-size-threshold = 32768
+vec-box-size-threshold = 4096
+
+semicolon-inside-block-ignore-singleline = true
+accept-comment-above-statement = true
+accept-comment-above-attributes = true
+check-private-items = true
+
+disallowed-methods = [
+    { path = "std::env::set_var", reason = "unsound in a threaded process; set env before spawning threads or pass config explicitly" },
+    { path = "std::env::remove_var", reason = "same soundness hazard as set_var" },
+]

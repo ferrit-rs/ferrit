@@ -48,7 +48,7 @@ pub struct FileMeta {
 }
 
 /// Split `text` into one `FileMeta` per `diff --git` section.
-pub fn parse(text: &str) -> Vec<FileMeta> {
+pub(super) fn parse(text: &str) -> Vec<FileMeta> {
     let starts = section_starts(text);
     starts
         .iter()
@@ -122,13 +122,15 @@ fn parse_section(text: &str, range: Range<usize>) -> FileMeta {
 
     let mut hunks = Vec::new();
     if let Some(hstart) = first_hunk {
-        let hlines: Vec<(usize, &str)> =
-            lines.iter().copied().filter(|&(o, _)| o >= hstart).collect();
+        let hlines: Vec<(usize, &str)> = lines
+            .iter()
+            .copied()
+            .filter(|&(o, _)| o >= hstart)
+            .collect();
         let mut i = 0;
-        while i < hlines.len() {
-            let (hoff, hline) = hlines[i];
+        while let Some(&(hoff, hline)) = hlines.get(i) {
             let mut j = i + 1;
-            while j < hlines.len() && !hlines[j].1.starts_with("@@ ") {
+            while hlines.get(j).is_some_and(|&(_, l)| !l.starts_with("@@ ")) {
                 j += 1;
             }
             let body_start = (hoff + hline.len() + 1).min(range.end);
@@ -183,18 +185,15 @@ fn path_range(base: usize, rest: &str) -> Range<usize> {
 /// where the tail starts. Falls back to the whole tail if the ` b/` split is
 /// not found (unusual quoting).
 fn git_line_paths(base: usize, rest: &str) -> (Range<usize>, Range<usize>) {
-    match rest.find(" b/") {
-        Some(bpos) => {
-            let old_skip = if rest.starts_with("a/") { 2 } else { 0 };
-            (
-                base + old_skip..base + bpos,
-                base + bpos + 3..base + rest.len(),
-            )
-        }
-        None => {
-            let all = base..base + rest.len();
-            (all.clone(), all)
-        }
+    if let Some(bpos) = rest.find(" b/") {
+        let old_skip = if rest.starts_with("a/") { 2 } else { 0 };
+        (
+            base + old_skip..base + bpos,
+            base + bpos + 3..base + rest.len(),
+        )
+    } else {
+        let all = base..base + rest.len();
+        (all.clone(), all)
     }
 }
 

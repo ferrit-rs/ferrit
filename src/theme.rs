@@ -173,7 +173,7 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
         if focus == Some(i) {
             style = style.add_modifier(Modifier::REVERSED);
         }
-        Line::styled(line.to_string(), style)
+        Line::styled(line.to_owned(), style)
     });
     Text::from(lines.collect::<Vec<_>>())
 }
@@ -191,12 +191,12 @@ pub fn status_line(raw: &str) -> Line<'static> {
     } else {
         fg(ADD)
     };
-    Line::styled(raw.to_string(), style)
+    Line::styled(raw.to_owned(), style)
 }
 
 /// A `refresh()` failure, surfaced in the Status pane instead of a panic.
 pub fn error_line(raw: &str) -> Line<'static> {
-    Line::styled(raw.to_string(), fg(DEL))
+    Line::styled(raw.to_owned(), fg(DEL))
 }
 
 /// Command-log line: dim the `$` prompt, leave the command bright.
@@ -220,8 +220,8 @@ pub fn keybar_line(raw: &'static str) -> Line<'static> {
         match seg.split_once(": ") {
             Some((label, key)) => {
                 spans.push(Span::styled(format!("{label}: "), fg(IDLE)));
-                spans.push(Span::styled(key.to_string(), fg(KEY)));
-            }
+                spans.push(Span::styled(key.to_owned(), fg(KEY)));
+            },
             None => spans.push(Span::styled(seg.to_string(), fg(IDLE))),
         }
     }
