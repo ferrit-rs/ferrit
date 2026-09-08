@@ -146,6 +146,9 @@ impl App {
     /// `image::detect` for hosts that lie about support.
     pub fn detect_graphics(&mut self) {
         if let Some(picker) = detect::detect_picker() {
+            if let Some(line) = detect::debug_line(&picker) {
+                self.last_error = Some(line);
+            }
             self.picker = picker;
             self.update_preview();
         }
