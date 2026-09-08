@@ -36,13 +36,19 @@ fn fg(color: Color) -> Style {
     Style::new().fg(color)
 }
 
-/// Style for the selected row in a left-pane list: solid blue bar, like
-/// lazygit. Filled across the pane width by the `List` widget.
-pub fn selection_style() -> Style {
-    Style::new()
-        .bg(SELECTION)
-        .fg(SELECTION_FG)
-        .add_modifier(Modifier::BOLD)
+/// Style for the selected row in a left-pane list. Like lazygit: a solid blue
+/// bar only in the focused pane, filled across the pane width by the `List`
+/// widget. Unfocused panes keep a cursor position but draw no bar, so only one
+/// selection reads as "live" at a time.
+pub fn selection_style(focused: bool) -> Style {
+    if focused {
+        Style::new()
+            .bg(SELECTION)
+            .fg(SELECTION_FG)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::new()
+    }
 }
 
 /// Bottom-right `N of M` counter shown on each list pane's border.

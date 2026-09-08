@@ -88,7 +88,7 @@ fn draw_left_column(frame: &mut Frame, app: &App, area: Rect) {
 
         let list = List::new(pane_lines(app, pane))
             .block(block)
-            .highlight_style(theme::selection_style());
+            .highlight_style(theme::selection_style(focused));
 
         let mut state = ListState::default();
         let row_ct = app.row_count(pane);

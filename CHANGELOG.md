@@ -18,3 +18,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   stage triggers exactly one refresh. Manual `r` still works.
 - `Repo::workdir()` accessor, exposing the worktree root that the watcher
   recurses from.
+
+### Fixed
+
+- Selection bar, lazygit style: the solid blue row highlight now shows only in
+  the focused left pane. Unfocused panes keep their cursor position but draw no
+  bar, so the three panes no longer look selected at once.
