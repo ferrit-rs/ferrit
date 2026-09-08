@@ -67,17 +67,17 @@ Consequences ferrit takes on deliberately:
                      v
         parse::diff(&text) -> Diff {
             text: String,                 // owned, never mutated after parse
-            files: Vec<FileMeta> {        // every field below is Range<usize>
+            files: Vec<FileMeta> {        // header/path/hunk fields are Range<usize>
                 header,                   //   into `text`
                 old_path, new_path,
                 status: Added|Deleted|Modified|Renamed|Copied,
                 binary: bool,
-                hunks: Vec<HunkMeta> { header, body },
+                hunks: Vec<HunkMeta> { header, body, old/new start+count },
             },
         }
                      |
                      v
-        render::to_text(&diff, &Theme) -> ratatui::text::Text<'static>
+        ui::render_diff(&diff, focus) -> ratatui::text::Text<'static>
             (colour +/-/@@/diff --git/index lines ourselves;
              this is what `git --color=always` would have emitted)
                      |
@@ -88,8 +88,12 @@ Consequences ferrit takes on deliberately:
 
 `--color=never` on purpose: parsing our own plain text is deterministic for
 snapshot tests, and re-colouring from the parse is trivial. lazygit uses
-`--color=always` and an ANSI parser because Go; we get the same picture
-without the escape-sequence round-trip.
+`--color=always` and an ANSI parser for *display*, then runs `git diff` a
+**second** time with `plain=true` (`--color=never`) to get the text it
+actually parses for staging (`WorktreeFileDiff(file, plain, cached)`,
+`pkg/commands/git_commands/working_tree.go`). ferrit runs it once, plain,
+and colours from the parse: same picture, one subprocess, no
+escape-sequence round-trip, and the exact bytes staging will slice.
 
 ## Backend: `src/git/diff.rs` + `src/git/diff/parse.rs`
 
@@ -119,6 +123,10 @@ impl Repo {
     pub fn commit_diff(&self, hash: &str, opts: &DiffOpts) -> GitResult<Diff>;
 }
 ```
+
+Both build their argv through a private `DiffCmd` builder so the
+context / ignore-whitespace / rename-threshold flags live in one place and an
+`--ext-diff` + `-c diff.external=…` addition later is a one-line change.
 
 `Diff` holds *all* files (a commit touches many; a single-file `file_diff`
 just yields a one-element `files`). One owned `Diff` type, not a
@@ -181,9 +189,14 @@ split text on "\ndiff --git "         -> one FileMeta per chunk
     "Binary files ... differ"          -> binary = true, hunks stay empty
     "--- " / "+++ "                    -> skip (redundant with diff --git)
     split rest on "\n@@ "              -> one HunkMeta per chunk
-      first line "@@ -a,b +c,d @@ ctx" -> header range
+      first line "@@ -a,b +c,d @@ ctx" -> header range + parse a,b,c,d
       remaining lines                  -> body range (used verbatim in phase 4)
 ```
+
+lazygit's hunk-header regex is `^@@ -(\d+)[^\+]+\+(\d+)[^@]+@@(.*)$`
+(`pkg/commands/patch/parse.go`); the `,count` parts are optional and default
+to 1. Keep the trailing `ctx` (function context) as part of the header range,
+it is shown as-is.
 
 `../ferrit-references/tui/gitu/src/gitu_diff.rs` is the full-fidelity
 version (1351 lines: quoted paths, mode changes, `\ No newline at end of
@@ -212,13 +225,25 @@ pub enum FileStatus { Added, Deleted, Modified, Renamed, Copied }
 pub struct HunkMeta {
     pub header: Range<usize>,   // the "@@ ... @@ ctx" line
     pub body:   Range<usize>,   // lines after it, up to the next hunk/file
+    // parsed from "@@ -old_start,old_count +new_start,new_count @@".
+    // gitu keeps exactly these four (src/gitu_diff.rs HunkHeader). `]`/`[`
+    // and every phase-4 patch op need the starts; a missing ",count" means 1.
+    pub old_start: u32,
+    pub old_count: u32,
+    pub new_start: u32,
+    pub new_count: u32,
 }
 ```
 
+The full hunk slice (`file header + this hunk`) that a phase-4 patch needs is
+`file.header.start .. hunk.body.end` over `diff.text`, no extra field.
+
 Line-origin (`Context` / `Addition` / `Deletion`) is not stored: it is the
 first byte of each body line (` ` / `+` / `-` / `\`), read at render time.
-This keeps the model a thin index over `text` and makes a phase-4 patch a
-pure slice.
+This keeps the model a thin index over `text` and makes a phase-4 hunk patch
+a pure slice. Iterate body lines with a `split_inclusive('\n')` + `scan`
+that yields `(Range<usize>, &str)` per line (gitu `highlight::line_range_iterator`),
+so a line index maps straight back to a `text` range for line-level staging.
 
 `CommitEntry` (in `src/git/model.rs`) gains `full_hash`:
 
@@ -301,6 +326,12 @@ update_right_pane():
 `build()` failure -> `DiffView::Note(msg)`, `right_scroll` left alone.
 `key_now == None` -> `DiffView::None`.
 
+gitui does the same staleness check before it touches scroll: it compares the
+freshly computed diff to the one on screen and only calls
+`vertical_scroll.reset()` / `horizontal_scroll.reset()` /
+`selected_hunk = None` when they differ
+(`../ferrit-references/tui/gitui/src/components/diff.rs`).
+
 This is the concrete form of `PLAN_0_GENERAL.md`'s cross-cutting rule: a
 phase-3+ cached right-pane value rebuilds on `AppEvent::Refresh` without
 discarding scroll/view state that belongs to an unchanged selection.
@@ -334,18 +365,21 @@ string-sniffs a `&'static str` and cannot take an owned runtime diff. Replace
 with:
 
 ```rust
-// src/ui/diff.rs  (or theme.rs, matching where the other renderers live)
-pub fn render_diff(diff: &git::Diff, focus_hunk: Option<usize>) -> Text<'static>;
+// src/ui/diff.rs  (matching where the other line-renderers live)
+pub fn render_diff(diff: &git::Diff, focus: Option<usize>) -> Text<'static>;
 ```
 
-walking `diff.files` / `hunks` and slicing `diff.text`:
+`focus` is a hunk index for `DiffView::Files`, a file index for
+`DiffView::Commit` (the two never mix in one call). Walk `diff.files` /
+`hunks` and slice `diff.text`:
 
 - file separator `diff --git a/… b/…`: `IDLE` + `BOLD`.
 - hunk header `@@ … @@ ctx`: `HUNK` (cyan), as the mock already did.
 - body line by first byte: `+` -> `ADD` (green), `-` -> `DEL` (red),
   ` ` -> `IDLE`, `\` (`\ No newline…`) -> `IDLE` + dim.
-- `focus_hunk` (from `]` / `[`): that hunk's header gets `REVERSED` so the
-  jump target is visible. Optional polish, drop if it complicates D4.
+- `focus` (from `]` / `[`): the target hunk's / file's header gets
+  `REVERSED` so the jump lands visibly. Optional polish, drop if it
+  complicates D4.
 
 `DiffView::Commit` prepends a metadata block from the `CommitEntry`
 (`git show` also prints it, but we already have it parsed and styled by
@@ -372,10 +406,16 @@ walking `diff.files` / `hunks` and slicing `diff.text`:
 
 - binary file: one dim line `binary file, no diff`.
 - empty (`diff.files` empty, or a file with no hunks): `no changes to show`.
+- Long lines: soft-wrap (`Paragraph::wrap { trim: false }`), lazygit's
+  default. Horizontal scroll for un-wrapped lines
+  (`../ferrit-references/tui/gitui` has a `HorizontalScroll` helper for this)
+  is a later option, not phase 3.
 - Scrolling: `Paragraph::scroll((right_scroll as u16, 0))`. Clamp only to
   the diff's total line count for phase 3; `App` does not track the last
   rendered pane height, so an over-scroll renders a blank tail rather than
   hard-stopping at the last screenful. Pixel-exact bottom clamp is polish.
+- Optional: a one-column gutter bar left of the hunk under `focus`
+  (gitui draws one to mark the selected hunk). Skip if it complicates D4.
 
 ## Keybindings (new in phase 3)
 
@@ -411,7 +451,13 @@ commit metadata; it is just not used for diff text.
 - Language syntax highlighting beyond git's own colouring. lazygit does not
   do it natively; `../ferrit-references/tui/gitu` layers tree-sitter and
   `rendering/delta` is the quality bar, both are post-phase-3 ambitions
-  (`docs/INSPIRATION.md`).
+  (`docs/INSPIRATION.md`). When it lands, the technique is gitu's
+  `mask_old_hunk` / `mask_new_hunk` (`tui/gitu/src/git/diff.rs`): to
+  highlight one side of a hunk, blank the other side's lines to spaces
+  (keeping `\n`) and strip the `+`/`-` prefix, so byte offsets line up and
+  the highlighter sees near-valid source; then zip the old and new highlight
+  spans back over the diff lines.
+- Horizontal scroll of un-wrapped diff lines (phase 3 soft-wraps instead).
 - Word-level / intra-line highlight, side-by-side layout, combined
   merge-commit diff.
 - Branches' "Log" body: stays mock `RIGHT_LOG`; `theme::commit_line`'s graph
@@ -464,7 +510,7 @@ test, then `git` run against them.
   Commits render real diffs via `src/ui/diff.rs`; `theme::diff_text`
   removed. `Ctrl-d` / `Ctrl-u`. `tests/app_refresh.rs` green.
 - **D4** `]` / `[` hunk/file jump. Commit metadata block. Binary / empty
-  notes. `focus_hunk` reverse-highlight (optional).
+  notes. `focus` reverse-highlight (optional).
 - **D5** polish: `cargo clippy --all-targets` clean, no warnings; scrolling
   or resizing past the end of an empty / one-line / huge diff never panics;
   `tests/render.rs` region snapshot; every D0..D2 case covered.
@@ -488,10 +534,37 @@ test, then `git` run against them.
 
 ## After phase 3
 
-Phase 4 builds on `Diff` / `HunkMeta`: a hunk, then a line range, becomes
-selectable; the stage action slices `diff.text` into a patch and runs
-`git apply --cached` (`git apply --cached -R` to unstage), the technique in
-`../ferrit-references/tui/gitu/src/git/diff.rs` and lazygit
-`pkg/commands/patch/`. An external diff renderer, the Branches "Log" graph, a
-stash entry's diff, and Status's right-side summary stay mock/static until
-their own phases or a dedicated follow-up.
+Phase 4 builds on `Diff` / `HunkMeta`. The `../ferrit-references/tui/gitu`
+staging path is small and the one to copy (`src/git/diff.rs`,
+`src/ops/{stage,unstage,discard}.rs`):
+
+- **file**: `git add <path>` / `git restore --staged <path>`. No patch.
+- **hunk**: `format_hunk_patch = file_header + hunk_slice` (both verbatim
+  from `diff.text`), piped to `git apply --cached` (stage) /
+  `git apply --cached --reverse` (unstage). Line counts in the `@@` header
+  are already correct for a whole hunk, so no `--recount`.
+- **line(s)**: `format_line_patch` walks the hunk body with
+  `split_inclusive('\n')`: a selected line is kept; an unselected `+` line
+  is dropped; an unselected `-` line becomes a context line (` ` + rest);
+  everything else kept. Pipe to `git apply --cached --recount` so git
+  recomputes the `@@` counts, we do not. `PatchMode::Reverse` swaps `+`/`-`
+  for unstage.
+- **discard**: same patches to `git apply --reverse` (worktree only) or
+  `git apply --reverse --index` (worktree + index).
+
+lazygit's `pkg/commands/patch/transform.go` does the same line transform but
+also recomputes every `@@` header and offset by hand, because it feeds the
+result to a live on-screen patch-builder. ferrit does not need that; the
+`--recount` shortcut keeps phase 4 to a few dozen lines.
+
+Cursor/selection state across a background `refresh()`: phase 3's `right_key`
+is file-level. Phase 4's line cursor should stick to the *same hunk* after an
+external change, so key the cursor on a per-hunk content hash (gitu hashes
+`file_header + hunk` for its `Item.id`, `src/items.rs`), and mark context
+lines `unselectable` so the stage cursor skips them. A bare `right_scroll:
+usize` is fine while there is no cursor; once there is one, adopt a
+gitui-style `VerticalScroll` that also keeps the cursor line on screen.
+
+An external diff renderer, the Branches "Log" graph, a stash entry's diff,
+and Status's right-side summary stay mock/static until their own phases or a
+dedicated follow-up.
