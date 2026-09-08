@@ -183,6 +183,14 @@ impl App {
         self.preview = self.build_preview();
     }
 
+    /// Is the right pane currently a native-graphics image? `run` watches this
+    /// across frames: when it flips back to `false` the sixel / iTerm2 / kitty
+    /// pixels of the old frame outlive a normal buffer diff and need a full
+    /// `terminal.clear()`.
+    fn preview_is_image(&self) -> bool {
+        matches!(self.preview, Preview::Image(_))
+    }
+
     fn build_preview(&self) -> Preview {
         if self.focus != Pane::Files {
             return Preview::None;
@@ -320,7 +328,15 @@ impl App {
 
     /// Draw, then block on one event, until `should_quit`. No tick, no polling.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
+        let mut prev_was_image = false;
         while !self.should_quit {
+            let is_image = self.preview_is_image();
+            if prev_was_image && !is_image {
+                // Graphics pixels from the last image frame sit outside the
+                // cell buffer; a full clear is the only way to wipe them.
+                terminal.clear()?;
+            }
+            prev_was_image = is_image;
             terminal.draw(|frame| ui::draw(frame, self))?;
             self.handle_events()?;
         }

@@ -124,6 +124,10 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
             return;
         }
         Preview::Note(msg) => {
+            // Blank every cell first: if the previous frame was an image, its
+            // sixel / iTerm2 pixels sit under these cells and a short paragraph
+            // would not overwrite the rows below it.
+            frame.render_widget(Clear, area);
             let panel = Paragraph::new(msg.as_str())
                 .block(
                     Block::bordered()
@@ -136,6 +140,10 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
         }
         Preview::None => {}
     }
+
+    // Same reason as the `Note` branch: clear any leftover graphics pixels
+    // from a previous image frame before drawing the (often short) text pane.
+    frame.render_widget(Clear, area);
 
     let body = match app.focus {
         Pane::Status => mock::RIGHT_STATUS,
