@@ -1,0 +1,8 @@
+{
+  // ferrit's image preview (src/image/detect.rs) drives sixel under VS Code.
+  // The integrated terminal only draws images when BOTH of these are on, and
+  // only in a terminal opened after they took effect (images are not restored
+  // across a window reload). VS Code >= 1.94.
+  "terminal.integrated.enableImages": true,
+  "terminal.integrated.gpuAcceleration": "on"
+}
