@@ -18,6 +18,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   stage triggers exactly one refresh. Manual `r` still works.
 - `Repo::workdir()` accessor, exposing the worktree root that the watcher
   recurses from.
+- Official ratatui logo SVGs vendored under `assets/logos/` (`ratatui-logo.svg`
+  and the monochrome `ratatui-logo-simple.svg`), pulled from the upstream
+  `ratatui/ratatui` repo.
 
 ### Fixed
 
