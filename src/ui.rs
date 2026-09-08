@@ -11,7 +11,7 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListState, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
-use crate::app::{App, Pane, PANES};
+use crate::app::{App, DiffView, Pane, PANES};
 use crate::image::preview::Preview;
 use crate::{mock, theme};
 
@@ -145,6 +145,39 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
     // from a previous image frame before drawing the (often short) text pane.
     frame.render_widget(Clear, area);
 
+    let block = Block::bordered()
+        .title(Line::styled(right_title, focused))
+        .border_style(Style::new().fg(theme::IDLE));
+
+    // Real `git diff` / `git show` output: git-native colouring, vertical
+    // scroll from `app.right_scroll()`, and a reverse-highlight on the hunk /
+    // file header a `]` / `[` jump last landed on.
+    if let DiffView::Files(diff) | DiffView::Commit(_, diff) = app.diff_view() {
+        let scroll = app.right_scroll();
+        let anchors = match app.diff_view() {
+            DiffView::Commit(..) => diff.file_lines(),
+            _ => diff.hunk_lines(),
+        };
+        let focus = anchors.iter().position(|&l| l == scroll);
+        let panel = Paragraph::new(theme::render_diff(diff, focus))
+            .block(block)
+            .scroll((scroll as u16, 0));
+        frame.render_widget(panel, area);
+        return;
+    }
+
+    if let DiffView::Note(msg) = app.diff_view() {
+        let panel = Paragraph::new(Line::styled(
+            msg.clone(),
+            Style::new().fg(theme::IDLE).add_modifier(Modifier::DIM),
+        ))
+        .block(block)
+        .wrap(Wrap { trim: false });
+        frame.render_widget(panel, area);
+        return;
+    }
+
+    // No repo (mock) or a pane with no diff: the sample text.
     let body = match app.focus {
         Pane::Status => mock::RIGHT_STATUS,
         Pane::Files => mock::RIGHT_DIFF,
@@ -154,16 +187,12 @@ fn draw_right_pane(frame: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let text: Text = match app.focus {
-        Pane::Files | Pane::Branches | Pane::Commits => theme::diff_text(body),
+        Pane::Files | Pane::Branches | Pane::Commits => theme::diff_lines(body, None),
         _ => body.into(),
     };
 
     let panel = Paragraph::new(text)
-        .block(
-            Block::bordered()
-                .title(Line::styled(right_title, focused))
-                .border_style(Style::new().fg(theme::IDLE)),
-        )
+        .block(block)
         .wrap(Wrap { trim: false });
     frame.render_widget(panel, area);
 }

@@ -16,6 +16,12 @@ pub enum GitError {
     /// `git2` failed while reading (status, refs, log, ...).
     #[error("git read failed: {}", .0.message())]
     Read(#[source] git2::Error),
+    /// `commit_diff` was handed a hash `git` does not know.
+    #[error("no such commit: {0}")]
+    NoSuchCommit(String),
+    /// A `git diff` / `git show` subprocess exited non-zero. Holds stderr.
+    #[error("git diff failed: {0}")]
+    DiffFailed(String),
 }
 
 pub type GitResult<T> = Result<T, GitError>;

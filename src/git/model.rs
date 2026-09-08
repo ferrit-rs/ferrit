@@ -7,6 +7,9 @@
 /// One row of the Commits pane.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitEntry {
+    /// Full 40-hex object id. Feeds `Repo::commit_diff` and keys the right
+    /// pane; `short_hash` is derived from it so the two never drift.
+    pub full_hash: String,
     /// Abbreviated hash, 7 or 8 hex chars.
     pub short_hash: String,
     /// Full author name, e.g. `Max Wells`.

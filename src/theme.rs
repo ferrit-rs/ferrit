@@ -6,7 +6,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 
-use crate::git::{BranchEntry, CommitEntry, FileEntry, StashEntry};
+use crate::git::{BranchEntry, CommitEntry, Diff, FileEntry, StashEntry};
 
 /// Border and title of the focused left pane (lazygit `activeBorderColor`).
 pub const FOCUS: Color = Color::Green;
@@ -124,28 +124,64 @@ pub fn stash_line(entry: &StashEntry) -> Line<'static> {
     ])
 }
 
-/// A `git diff` blob, coloured line by line.
-pub fn diff_text(raw: &'static str) -> Text<'static> {
-    let lines = raw.lines().map(|line| {
-        let style = if line.starts_with("@@") {
-            fg(HUNK)
-        } else if line.starts_with("diff --git")
-            || line.starts_with("index ")
-            || line.starts_with("commit ")
-            || line.starts_with("Author:")
-            || line.starts_with("Date:")
-        {
-            Style::new().fg(IDLE).add_modifier(Modifier::BOLD)
-        } else if line.starts_with('+') {
-            fg(ADD)
-        } else if line.starts_with('-') {
-            fg(DEL)
-        } else {
-            Style::new()
-        };
-        Line::styled(line, style)
+/// Colour of one diff line, by its leading bytes. Matches what `git --color`
+/// paints: hunk header cyan, `+`/`-` green/red, file/commit metadata bold,
+/// `\ No newline` and `Binary files` dim, everything else (context, message
+/// body) plain.
+fn diff_line_style(line: &str) -> Style {
+    const META: &[&str] = &[
+        "diff --git",
+        "index ",
+        "--- ",
+        "+++ ",
+        "old mode",
+        "new mode",
+        "new file",
+        "deleted file",
+        "rename ",
+        "copy ",
+        "similarity ",
+        "dissimilarity ",
+        "commit ",
+        "Author:",
+        "AuthorDate:",
+        "Commit:",
+        "CommitDate:",
+        "Date:",
+        "Merge:",
+    ];
+    if line.starts_with("@@") {
+        fg(HUNK)
+    } else if line.starts_with("Binary files") || line.starts_with('\\') {
+        Style::new().fg(IDLE).add_modifier(Modifier::DIM)
+    } else if META.iter().any(|p| line.starts_with(p)) {
+        Style::new().fg(IDLE).add_modifier(Modifier::BOLD)
+    } else if line.starts_with('+') {
+        fg(ADD)
+    } else if line.starts_with('-') {
+        fg(DEL)
+    } else {
+        fg(IDLE)
+    }
+}
+
+/// A `git diff` / `git show` blob, coloured line by line. `focus`, when set, is
+/// a 0-based line index that gets `REVERSED` so a `]` / `[` jump lands visibly.
+pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
+    let lines = raw.lines().enumerate().map(|(i, line)| {
+        let mut style = diff_line_style(line);
+        if focus == Some(i) {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+        Line::styled(line.to_string(), style)
     });
     Text::from(lines.collect::<Vec<_>>())
+}
+
+/// Render a parsed `Diff` for the right pane. Thin wrapper over `diff_lines`
+/// over `diff.text`; the parse drives navigation, not colour.
+pub fn render_diff(diff: &Diff, focus: Option<usize>) -> Text<'static> {
+    diff_lines(&diff.text, focus)
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.

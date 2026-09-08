@@ -9,6 +9,18 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Real diff view in the right pane, lazygit style. Selecting a Files row runs
+  `git diff` (or `git diff --cached` for a fully staged file, `git diff
+  --no-index` for an untracked one); selecting a Commits row runs `git show`.
+  Output is coloured from a byte-range parser (`src/git/diff/`): hunk headers
+  cyan, additions green, deletions red, file and commit metadata bold. Vertical
+  scroll with `Ctrl-d` / `Ctrl-u`, jump between hunks (or files, for a commit)
+  with `]` / `[`. The viewport is kept across a background refresh of an
+  unchanged selection and reset to the top when the selection moves. An image
+  selection still owns the pane. `git config` (`diff.algorithm`, rename
+  detection, and so on) is honoured because the diff is a subprocess.
+- `Repo::file_diff()` and `Repo::commit_diff()` on the read-only git backend,
+  plus `git::parse_diff()` for plain-text diff parsing without a subprocess.
 - Live auto refresh, lazygit style. A background event multiplexer
   (`src/events.rs`) feeds the render loop from three sources: terminal input, a
   recursive filesystem watch on the worktree, and a 10 second poll fallback.
