@@ -1,109 +1,189 @@
 //! Which `Picker` (graphics protocol) to render images with.
 //!
-//! See `docs/BUG_IMAGE_PREVIEW.md`: some terminal hosts answer the capability
-//! query with a protocol they then don't actually draw, so a query success is
-//! not proof the picture will show up. The half-block fallback (`Picker::
-//! halfblocks`) always draws, everywhere, but its resolution is the character
-//! grid: in a small pane the picture turns chunky. A native protocol
-//! (kitty / iTerm2 / sixel) draws at the cell's pixel size instead, so it
-//! stays sharp even when the terminal is small.
+//! See `docs/BUG_IMAGE_PREVIEW.md`. A query success is not proof the picture
+//! shows up: some hosts answer `Picker::from_query_stdio` with a protocol they
+//! then never draw. The half-block fallback (`Picker::halfblocks`) draws
+//! everywhere but at character-grid resolution, so a small pane turns chunky;
+//! a native protocol (kitty / iTerm2 / sixel) draws at the cell's pixel size
+//! and stays sharp.
 //!
-//! Environment overrides, all read once here:
-//! - `FERRIT_NO_GRAPHICS`    force half-blocks, skip everything else.
-//! - `FERRIT_FORCE_GRAPHICS` run the capability query even on a host we would
-//!   otherwise pin to a fixed protocol (zellij, VS Code).
-//! - `FERRIT_GRAPHICS=<p>`   force protocol `<p>` (one of `halfblocks`,
-//!   `sixel`, `kitty`, `iterm2`), overriding detection. Use when the picked
-//!   protocol renders blank on some host.
+//! Two inputs decide the protocol:
+//!
+//! - the [`Host`], classified once from the environment. iTerm2, VS Code and
+//!   zellij each mis-answer the query in their own way, so each carries its own
+//!   [`Plan`].
+//! - the [`Override`] knobs, also read once, layered on top of the host rule:
+//!   - `FERRIT_NO_GRAPHICS`    keep half-blocks, skip everything.
+//!   - `FERRIT_FORCE_GRAPHICS` run the query even on a host we would pin.
+//!   - `FERRIT_GRAPHICS=<p>`   force `<p>` (`halfblocks`, `sixel`, `kitty`,
+//!     `iterm2`); final say, overrides every rule below.
 
 use ratatui_image::picker::{Picker, ProtocolType};
 
-/// Query the real terminal for a graphics protocol. Returns `None` when the
-/// query fails, or when the host is known to lie about support, so the
-/// caller keeps its half-block fallback.
+/// Outcome of [`pick`]: the `Picker` to render with, plus the context that
+/// produced it so `FERRIT_DEBUG` can report it.
+pub struct Detected {
+    pub picker: Picker,
+    host: Host,
+    forced: Option<ProtocolType>,
+}
+
+/// Query the terminal and settle on a graphics protocol. `None` means keep the
+/// caller's half-block fallback: either `FERRIT_NO_GRAPHICS`, or the capability
+/// query failed on a host that needs one.
 ///
-/// Call once, before entering the alternate screen, same as the ratatui-image
-/// examples: `Picker::from_query_stdio` reads and writes stdio momentarily.
-pub fn detect_picker() -> Option<Picker> {
-    if std::env::var_os("FERRIT_NO_GRAPHICS").is_some() {
+/// Call once, before entering the alternate screen: `from_query_stdio` reads
+/// and writes stdio for a moment, same as the ratatui-image examples.
+pub fn pick() -> Option<Detected> {
+    let over = Override::read();
+    if over.disabled {
         return None;
     }
-    let forced = protocol_override();
 
-    // Hosts where the capability query is useless or misleading: skip it (also
-    // saves a 2s stdio timeout), start from a plain picker, and pin the
-    // protocol they actually render.
-    if let Some(proto) = pinned_protocol() {
-        let mut picker = Picker::halfblocks();
-        picker.set_protocol_type(forced.unwrap_or(proto));
-        return Some(picker);
-    }
+    let host = Host::detect();
+    let plan = if over.force_query { Plan::Query } else { host.plan() };
 
-    let mut picker = Picker::from_query_stdio().ok()?;
-    if is_iterm2() && picker.protocol_type() == ProtocolType::Kitty {
-        // iTerm2 (>= 3.5) answers the kitty graphics query but only draws part
-        // of the protocol; ratatui-image's kitty encoder uses unicode
-        // placeholders it never renders, so the pane comes out blank. iTerm2's
-        // own inline-image protocol works, so prefer it.
-        picker.set_protocol_type(ProtocolType::Iterm2);
-    }
-    if let Some(proto) = forced {
+    let mut picker = match plan {
+        Plan::Pin(proto) => {
+            // Skip the query (also its ~2s stdio timeout on a mute host), start
+            // from a plain picker, force the protocol this host really draws.
+            let mut p = Picker::halfblocks();
+            p.set_protocol_type(proto);
+            p
+        }
+        Plan::Query => Picker::from_query_stdio().ok()?,
+        Plan::QueryOr { when, swap_to } => {
+            let mut p = Picker::from_query_stdio().ok()?;
+            if p.protocol_type() == when {
+                p.set_protocol_type(swap_to);
+            }
+            p
+        }
+    };
+
+    if let Some(proto) = over.protocol {
         picker.set_protocol_type(proto);
     }
-    Some(picker)
+    Some(Detected {
+        picker,
+        host,
+        forced: over.protocol,
+    })
 }
 
-/// Protocol pinned for the current host without asking it, or `None` to run
-/// the capability query. `FERRIT_FORCE_GRAPHICS` forces the query path.
-///
-/// - **zellij** (>= 0.40) renders sixel in its own pane compositor but has no
-///   passthrough for kitty / iTerm2 graphics.
-/// - **VS Code** integrated terminal renders sixel (and iTerm2) once
-///   `terminal.integrated.enableImages` is on (see `.vscode/settings.json`),
-///   but `from_query_stdio` there reports iTerm2 and then drops every frame.
-///
-/// Old zellij without sixel, or VS Code with the setting off, still come out
-/// blank: `FERRIT_GRAPHICS=halfblocks` (or `FERRIT_NO_GRAPHICS`) falls back.
-fn pinned_protocol() -> Option<ProtocolType> {
-    if std::env::var_os("FERRIT_FORCE_GRAPHICS").is_some() {
-        return None;
+impl Detected {
+    /// One-line report of what [`pick`] settled on, for the Status pane when
+    /// `FERRIT_DEBUG` is set. `None` when it is not.
+    pub fn debug_line(&self) -> Option<String> {
+        std::env::var_os("FERRIT_DEBUG")?;
+        let fs = self.picker.font_size();
+        let tail = if self.forced.is_some() {
+            "  (FERRIT_GRAPHICS)"
+        } else {
+            "  (FERRIT_GRAPHICS to override)"
+        };
+        Some(format!(
+            "graphics: {:?} on {:?}  font {}x{}{tail}",
+            self.picker.protocol_type(),
+            self.host,
+            fs.width,
+            fs.height,
+        ))
     }
-    if std::env::var_os("ZELLIJ").is_some() || is_vscode() {
-        return Some(ProtocolType::Sixel);
+}
+
+/// How to get a protocol for a given [`Host`].
+enum Plan {
+    /// Trust whatever `from_query_stdio` answers.
+    Query,
+    /// Run the query, but if it answers `when`, use `swap_to` instead.
+    QueryOr {
+        when: ProtocolType,
+        swap_to: ProtocolType,
+    },
+    /// Skip the query, this host lies about it: render this protocol.
+    Pin(ProtocolType),
+}
+
+/// The terminal host, as far as graphics support goes. Classified once from the
+/// environment; the order of the checks in [`Host::detect`] is their precedence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Host {
+    /// Real iTerm2, including through ssh / tmux where it exports `LC_TERMINAL`.
+    Iterm2,
+    /// VS Code integrated terminal.
+    Vscode,
+    /// A zellij pane.
+    Zellij,
+    /// Anything else: the capability query is trusted as-is.
+    Other,
+}
+
+impl Host {
+    fn detect() -> Self {
+        let is = |key, val| {
+            std::env::var_os(key).as_deref() == Some(std::ffi::OsStr::new(val))
+        };
+        if is("TERM_PROGRAM", "iTerm.app") || is("LC_TERMINAL", "iTerm2") {
+            Self::Iterm2
+        } else if is("TERM_PROGRAM", "vscode") {
+            Self::Vscode
+        } else if std::env::var_os("ZELLIJ").is_some() {
+            Self::Zellij
+        } else {
+            Self::Other
+        }
     }
-    None
+
+    fn plan(self) -> Plan {
+        match self {
+            // iTerm2 (>= 3.5) answers the kitty graphics query, so the query
+            // returns `Kitty`; it only half-implements the protocol and
+            // ratatui-image's kitty encoder needs the unicode-placeholder part
+            // it never draws. iTerm2's own inline-image protocol works.
+            Self::Iterm2 => Plan::QueryOr {
+                when: ProtocolType::Kitty,
+                swap_to: ProtocolType::Iterm2,
+            },
+            // Both answer the query with a protocol they then drop every frame
+            // of, and both composite sixel themselves: zellij (>= 0.40)
+            // natively, VS Code once `terminal.integrated.enableImages` is on
+            // (see `.vscode/settings.json`).
+            Self::Vscode | Self::Zellij => Plan::Pin(ProtocolType::Sixel),
+            Self::Other => Plan::Query,
+        }
+    }
 }
 
-/// Real iTerm2, including through ssh / tmux where it exports `LC_TERMINAL`.
-fn is_iterm2() -> bool {
-    std::env::var_os("TERM_PROGRAM").as_deref() == Some(std::ffi::OsStr::new("iTerm.app"))
-        || std::env::var_os("LC_TERMINAL").as_deref() == Some(std::ffi::OsStr::new("iTerm2"))
+/// The `FERRIT_*` graphics knobs, read from the environment exactly once.
+struct Override {
+    /// `FERRIT_NO_GRAPHICS`: keep the half-block fallback, detect nothing.
+    disabled: bool,
+    /// `FERRIT_FORCE_GRAPHICS`: run the capability query even on a pinned host.
+    force_query: bool,
+    /// `FERRIT_GRAPHICS=<p>`: the last word on the protocol, if set and valid.
+    protocol: Option<ProtocolType>,
 }
 
-/// A one-line report of what `detect_picker` settled on, for the Status pane
-/// when `FERRIT_DEBUG` is set. `None` means the half-block fallback is in use.
-pub fn debug_line(picker: &Picker) -> Option<String> {
-    std::env::var_os("FERRIT_DEBUG")?;
-    let fs = picker.font_size();
-    Some(format!(
-        "graphics: {:?}  font {}x{}  (FERRIT_GRAPHICS to override)",
-        picker.protocol_type(),
-        fs.width,
-        fs.height,
-    ))
+impl Override {
+    fn read() -> Self {
+        Self {
+            disabled: std::env::var_os("FERRIT_NO_GRAPHICS").is_some(),
+            force_query: std::env::var_os("FERRIT_FORCE_GRAPHICS").is_some(),
+            protocol: std::env::var("FERRIT_GRAPHICS")
+                .ok()
+                .and_then(|v| parse_protocol(&v)),
+        }
+    }
 }
 
-/// `FERRIT_GRAPHICS` parsed into a `ProtocolType`, if set to a known value.
-fn protocol_override() -> Option<ProtocolType> {
-    match std::env::var("FERRIT_GRAPHICS").ok()?.to_ascii_lowercase().as_str() {
+/// `FERRIT_GRAPHICS` value parsed into a `ProtocolType`, if it names one.
+fn parse_protocol(s: &str) -> Option<ProtocolType> {
+    match s.to_ascii_lowercase().as_str() {
         "halfblocks" | "halfblock" | "hb" => Some(ProtocolType::Halfblocks),
         "sixel" => Some(ProtocolType::Sixel),
         "kitty" => Some(ProtocolType::Kitty),
         "iterm2" | "iterm" => Some(ProtocolType::Iterm2),
         _ => None,
     }
-}
-
-fn is_vscode() -> bool {
-    std::env::var_os("TERM_PROGRAM").as_deref() == Some(std::ffi::OsStr::new("vscode"))
 }

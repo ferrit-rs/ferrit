@@ -145,11 +145,11 @@ impl App {
     /// swap it in for the half-block fallback. Call once, before `run`. See
     /// `image::detect` for hosts that lie about support.
     pub fn detect_graphics(&mut self) {
-        if let Some(picker) = detect::detect_picker() {
-            if let Some(line) = detect::debug_line(&picker) {
+        if let Some(found) = detect::pick() {
+            if let Some(line) = found.debug_line() {
                 self.last_error = Some(line);
             }
-            self.picker = picker;
+            self.picker = found.picker;
             self.update_preview();
         }
     }
