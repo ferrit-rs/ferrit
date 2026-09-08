@@ -35,32 +35,41 @@ crisp even in a small pane.
 
 ## Fix
 
-`src/image/detect.rs`, `detect_picker()`:
+`src/image/detect.rs`, `pick()`. The host and the `FERRIT_*` knobs are each
+classified once, into a `Host` enum and an `Override` struct; every `Host`
+carries its own `Plan` (`Query`, `QueryOr { when, swap_to }`, or `Pin`).
 
-1. `FERRIT_NO_GRAPHICS` set: return `None`, caller keeps `Picker::halfblocks()`.
-2. `pinned_protocol()`: on a host where the query is misleading, skip it (also
-   avoids a 2s stdio timeout), take a plain `Picker::halfblocks()`, and pin
-   the protocol the host really draws:
-   - `ZELLIJ` set: `Sixel`. zellij (>= 0.40) composites sixel itself but has
-     no passthrough for kitty / iTerm2.
-   - `TERM_PROGRAM == "vscode"`: `Sixel`. The integrated terminal draws sixel
-     once `terminal.integrated.enableImages` is on (shipped in
-     `.vscode/settings.json`), but answers the query as iTerm2 and then drops
-     every frame.
-   `FERRIT_FORCE_GRAPHICS` disables this skip and runs the query anyway.
-3. Otherwise `Picker::from_query_stdio()`, then:
-   - iTerm2 (`TERM_PROGRAM == "iTerm.app"` or `LC_TERMINAL == "iTerm2"`, the
-     latter surviving ssh / tmux) that came back as `Kitty` is forced to
-     `Iterm2`. iTerm2 >= 3.5 answers the kitty query but only half-implements
-     it and `ratatui-image`'s kitty encoder needs the placeholder part.
-4. `FERRIT_GRAPHICS=<halfblocks|sixel|kitty|iterm2>` forces that protocol
-   last, overriding every rule above. Use it when a picked protocol still
-   renders blank (old zellij with no sixel, VS Code with the setting off).
+1. `FERRIT_NO_GRAPHICS` set (`Override::disabled`): return `None`, caller keeps
+   `Picker::halfblocks()`.
+2. `Host::detect()` classifies the terminal, checks in precedence order:
+   - `TERM_PROGRAM == "iTerm.app"` or `LC_TERMINAL == "iTerm2"` (the latter
+     surviving ssh / tmux) -> `Host::Iterm2`.
+   - `TERM_PROGRAM == "vscode"` -> `Host::Vscode`.
+   - `ZELLIJ` set -> `Host::Zellij`.
+   - else `Host::Other`.
+3. `Host::plan()` says how to get a protocol:
+   - `Iterm2` -> `QueryOr { when: Kitty, swap_to: Iterm2 }`: run the query, but
+     rewrite a `Kitty` answer to `Iterm2`. iTerm2 >= 3.5 answers the kitty
+     query but only half-implements it and `ratatui-image`'s kitty encoder
+     needs the unicode-placeholder part it never draws.
+   - `Vscode` / `Zellij` -> `Pin(Sixel)`: skip the query (also its ~2s stdio
+     timeout), take a plain `Picker::halfblocks()`, force `Sixel`. zellij
+     (>= 0.40) composites sixel itself; VS Code draws it once
+     `terminal.integrated.enableImages` is on (shipped in
+     `.vscode/settings.json`). Both answer the query with a protocol they then
+     drop every frame of.
+   - `Other` -> `Query`: trust `Picker::from_query_stdio()`.
+   `FERRIT_FORCE_GRAPHICS` (`Override::force_query`) replaces the host's plan
+   with `Query`.
+4. `FERRIT_GRAPHICS=<halfblocks|sixel|kitty|iterm2>` (`Override::protocol`)
+   forces that protocol last, overriding every rule above. Use it when a
+   picked protocol still renders blank (old zellij with no sixel, VS Code with
+   the setting off).
 
-`FERRIT_DEBUG` set: `detect::debug_line()` returns a one-liner
-(`graphics: Sixel  font 7x15  ...`) that `App::detect_graphics` stashes in
-`last_error` so the chosen protocol and detected font size show in the
-Status pane.
+`FERRIT_DEBUG` set: `Detected::debug_line()` returns a one-liner
+(`graphics: Sixel on Vscode  font 7x15  ...`) that `App::detect_graphics`
+stashes in `last_error` so the chosen protocol, the detected host, and the
+font size show in the Status pane.
 
 ## Result
 
