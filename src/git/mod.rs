@@ -82,6 +82,12 @@ impl Repo {
         })
     }
 
+    /// The worktree root, or `None` for a bare repo. The filesystem watcher
+    /// recurses from here; `.git` lives under it in the normal layout.
+    pub fn workdir(&self) -> Option<&Path> {
+        self.inner.workdir()
+    }
+
     /// Raw bytes of `path` at `rev`. Feeds the right-pane image preview.
     pub fn blob_bytes(&self, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
         blob::blob_bytes(&self.inner, path, rev)

@@ -5,13 +5,14 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use color_eyre::Result;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::text::Line;
 use ratatui_image::picker::Picker;
 
+use crate::events::{AppEvent, Events};
 use crate::git::{self, GitResult};
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
@@ -324,8 +325,22 @@ impl App {
         self.files.iter().map(theme::file_line).collect()
     }
 
-    /// Draw, then block on one event, until `should_quit`. No tick, no polling.
+    /// Worktree root to hand the filesystem watcher, or `None` for a bare
+    /// repo (and for `App::mock`, which has no repo).
+    fn watch_root(&self) -> Option<PathBuf> {
+        self.repo
+            .as_ref()
+            .and_then(git::Repo::workdir)
+            .map(Path::to_path_buf)
+    }
+
+    /// Draw, then block for the next event, until `should_quit`. Events come
+    /// from three sources multiplexed by `Events`: terminal input, a recursive
+    /// filesystem watch on the worktree, and a 10s poll fallback. A change
+    /// staged from another shell arrives as `AppEvent::Refresh`, so the panes
+    /// track the repo the way lazygit's do.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
+        let events = Events::new(self.watch_root().as_deref())?;
         let mut prev_was_image = false;
         while !self.should_quit {
             let is_image = self.preview_is_image();
@@ -336,16 +351,14 @@ impl App {
             }
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw(frame, self))?;
-            self.handle_events()?;
-        }
-        Ok(())
-    }
 
-    fn handle_events(&mut self) -> Result<()> {
-        if let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            self.on_key(key);
+            match events.next()? {
+                AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                    self.on_key(key);
+                }
+                AppEvent::Input(_) => {}
+                AppEvent::Refresh => self.refresh(),
+            }
         }
         Ok(())
     }
