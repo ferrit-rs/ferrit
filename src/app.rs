@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use color_eyre::Result;
+use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::text::Line;
 use ratatui_image::picker::Picker;
@@ -20,7 +21,7 @@ use crate::tui::Tui;
 use crate::{mock, theme, ui};
 
 /// The five left panes, in top-to-bottom screen order.
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
 pub enum Pane {
     #[default]
     Status,
@@ -40,8 +41,8 @@ pub const PANES: [Pane; 5] = [
 ];
 
 impl Pane {
-    /// Position in `PANES`, used to index `App::selection`. The variant order
-    /// is the `PANES` order, so the discriminant is the index.
+    /// Position in `PANES`, for the focus-cycling arithmetic in `pane_offset`.
+    /// The variant order is the `PANES` order, so the discriminant is it.
     pub fn index(self) -> usize {
         self as usize
     }
@@ -74,8 +75,8 @@ impl Pane {
 pub struct App {
     /// Which left pane has focus.
     pub focus: Pane,
-    /// Selection cursor per pane, indexed by `Pane::index`.
-    pub selection: [usize; 5],
+    /// Selection cursor per pane, keyed by `Pane`.
+    pub selection: EnumMap<Pane, usize>,
     /// Whether the help overlay is up.
     pub show_help: bool,
     should_quit: bool,
@@ -108,7 +109,7 @@ impl App {
             .unwrap_or_else(|| "ferrit".to_string());
         Self {
             focus: Pane::default(),
-            selection: [0; 5],
+            selection: EnumMap::default(),
             show_help: false,
             should_quit: false,
             repo,
@@ -173,7 +174,7 @@ impl App {
         }
         for pane in PANES {
             let last = self.row_count(pane).saturating_sub(1);
-            let cursor = &mut self.selection[pane.index()];
+            let cursor = &mut self.selection[pane];
             *cursor = (*cursor).min(last);
         }
         self.update_preview();
@@ -233,13 +234,13 @@ impl App {
     pub fn select(&mut self, pane: Pane, index: usize) {
         self.focus = pane;
         let last = self.row_count(pane).saturating_sub(1);
-        self.selection[pane.index()] = index.min(last);
+        self.selection[pane] = index.min(last);
         self.update_preview();
     }
 
     /// Selection cursor for a given pane.
     pub fn selected(&self, pane: Pane) -> usize {
-        self.selection[pane.index()]
+        self.selection[pane]
     }
 
     /// Selectable row count for a pane, for clamping the cursor and deciding
@@ -403,12 +404,12 @@ impl App {
 
     fn select_down(&mut self) {
         let last = self.row_count(self.focus).saturating_sub(1);
-        let cursor = &mut self.selection[self.focus.index()];
+        let cursor = &mut self.selection[self.focus];
         *cursor = (*cursor + 1).min(last);
     }
 
     fn select_up(&mut self) {
-        let cursor = &mut self.selection[self.focus.index()];
+        let cursor = &mut self.selection[self.focus];
         *cursor = cursor.saturating_sub(1);
     }
 }

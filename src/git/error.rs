@@ -1,39 +1,21 @@
-//! One error type for the backend. Converts into `color_eyre::Report` at the
-//! edge (it implements `std::error::Error`), so `main` and `App` can use `?`
-//! or turn it into a message without knowing about `git2`.
+//! One error type for the backend. `thiserror` derives `Display` and
+//! `std::error::Error` (including `source`), so `main` and `App` can `?` it
+//! into a `color_eyre::Report` or turn it into a message without knowing about
+//! `git2`.
 
-use std::fmt;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum GitError {
     /// No git repository at or above the given path.
+    #[error("not a git repository: {0}")]
     NotARepository(PathBuf),
     /// `git2` failed while opening the repository.
-    Open(git2::Error),
+    #[error("cannot open repository: {}", .0.message())]
+    Open(#[source] git2::Error),
     /// `git2` failed while reading (status, refs, log, ...).
-    Read(git2::Error),
-}
-
-impl fmt::Display for GitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GitError::NotARepository(path) => {
-                write!(f, "not a git repository: {}", path.display())
-            }
-            GitError::Open(e) => write!(f, "cannot open repository: {}", e.message()),
-            GitError::Read(e) => write!(f, "git read failed: {}", e.message()),
-        }
-    }
-}
-
-impl std::error::Error for GitError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            GitError::NotARepository(_) => None,
-            GitError::Open(e) | GitError::Read(e) => Some(e),
-        }
-    }
+    #[error("git read failed: {}", .0.message())]
+    Read(#[source] git2::Error),
 }
 
 pub type GitResult<T> = Result<T, GitError>;
