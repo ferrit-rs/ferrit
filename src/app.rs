@@ -1,10 +1,9 @@
 //! Application state and the draw / event loop.
 //!
-//! Phase 2 wired the Status and Files panes to a real read-only `git::Repo`.
-//! `App` owns the repo handle, the cached snapshot, which left pane is focused,
-//! and one selection cursor per pane. Branches, Commits and Stash still read
-//! from `mock` until G3..G5. `App::mock()` is the repo-free path the render
-//! tests use.
+//! Phase 2 wired every left pane (Status, Files, Branches, Commits, Stash) to
+//! a real read-only `git::Repo`. `App` owns the repo handle, the cached
+//! snapshot, which left pane is focused, and one selection cursor per pane.
+//! `App::mock()` is the repo-free path the render tests use.
 
 use std::path::Path;
 
@@ -85,8 +84,6 @@ pub struct App {
     repo_name: String,
     header: git::StatusHeader,
     files: Vec<git::FileEntry>,
-    /// Branches, Commits and Stash are still mock until phase 2 G3..G5; they
-    /// live here so the render path is identical to the wired panes.
     branches: Vec<git::BranchEntry>,
     commits: Vec<git::CommitEntry>,
     stashes: Vec<git::StashEntry>,
@@ -116,10 +113,9 @@ impl App {
             repo_name,
             header: git::StatusHeader::default(),
             files: Vec::new(),
-            // Mock until G3..G5 wire these to the backend.
-            branches: mock::mock_branches(),
-            commits: mock::mock_commits(),
-            stashes: mock::mock_stashes(),
+            branches: Vec::new(),
+            commits: Vec::new(),
+            stashes: Vec::new(),
             last_error: None,
             picker: Picker::halfblocks(),
             preview: Preview::None,
@@ -138,6 +134,9 @@ impl App {
         let mut app = Self::base(None);
         app.header = mock::mock_header();
         app.files = mock::mock_files();
+        app.branches = mock::mock_branches();
+        app.commits = mock::mock_commits();
+        app.stashes = mock::mock_stashes();
         app.update_preview();
         app
     }
@@ -155,18 +154,23 @@ impl App {
     /// Re-read the wired panes. On error keep the old snapshot and stash the
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
-        let Some(repo) = &self.repo else { return };
+        let Some(repo) = &mut self.repo else { return };
         match repo.snapshot() {
             Ok(snap) => {
                 self.header = snap.header;
                 self.files = snap.files;
+                self.branches = snap.branches;
+                self.commits = snap.commits;
+                self.stashes = snap.stashes;
                 self.last_error = None;
             }
             Err(e) => self.last_error = Some(e.to_string()),
         }
-        let last = self.row_count(Pane::Files).saturating_sub(1);
-        let cursor = &mut self.selection[Pane::Files.index()];
-        *cursor = (*cursor).min(last);
+        for pane in PANES {
+            let last = self.row_count(pane).saturating_sub(1);
+            let cursor = &mut self.selection[pane.index()];
+            *cursor = (*cursor).min(last);
+        }
         self.update_preview();
     }
 

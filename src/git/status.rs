@@ -83,7 +83,7 @@ pub fn header(repo: &Repository) -> GitResult<StatusHeader> {
             let local_oid = head.target();
             out.branch = if out.detached {
                 local_oid
-                    .map(|oid| short_hash(&oid))
+                    .map(|oid| crate::git::short_hash(&oid))
                     .unwrap_or_else(|| "HEAD".to_string())
             } else {
                 head.shorthand().unwrap_or("HEAD").to_string()
@@ -190,8 +190,4 @@ fn worktree_change(s: Status) -> Change {
     } else {
         Change::None
     }
-}
-
-fn short_hash(oid: &git2::Oid) -> String {
-    oid.to_string().chars().take(7).collect()
 }
