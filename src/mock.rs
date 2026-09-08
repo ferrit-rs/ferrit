@@ -1,9 +1,8 @@
 //! Hardcoded sample data.
 //!
-//! Phase 2 wired Status and Files to a real `git::Repo`; the mock versions of
-//! those two now feed `App::mock()`, the render tests' repo-free path. Branches,
-//! Commits and Stash stay mock until G3..G5. Values mirror the target screen in
-//! `docs/PLAN_1_LAYOUT.md`.
+//! Every pane now reads from a real `git::Repo`; this module only feeds
+//! `App::mock()`, the render tests' repo-free path. Values mirror the target
+//! screen in `docs/PLAN_1_LAYOUT.md`.
 
 use std::path::{Path, PathBuf};
 
