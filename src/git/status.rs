@@ -156,38 +156,40 @@ pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     Ok(out)
 }
 
+/// First flag the status carries wins; table order is the priority.
+/// `CONFLICTED` leads both tables so a conflicted path never reads as a plain
+/// modification.
+fn first_change(s: Status, table: &[(Status, Change)]) -> Change {
+    table
+        .iter()
+        .find(|(flag, _)| s.contains(*flag))
+        .map_or(Change::None, |&(_, change)| change)
+}
+
 fn staged_change(s: Status) -> Change {
-    if s.contains(Status::CONFLICTED) {
-        Change::Conflicted
-    } else if s.contains(Status::INDEX_NEW) {
-        Change::Added
-    } else if s.contains(Status::INDEX_MODIFIED) {
-        Change::Modified
-    } else if s.contains(Status::INDEX_DELETED) {
-        Change::Deleted
-    } else if s.contains(Status::INDEX_RENAMED) {
-        Change::Renamed
-    } else if s.contains(Status::INDEX_TYPECHANGE) {
-        Change::Typechange
-    } else {
-        Change::None
-    }
+    first_change(
+        s,
+        &[
+            (Status::CONFLICTED, Change::Conflicted),
+            (Status::INDEX_NEW, Change::Added),
+            (Status::INDEX_MODIFIED, Change::Modified),
+            (Status::INDEX_DELETED, Change::Deleted),
+            (Status::INDEX_RENAMED, Change::Renamed),
+            (Status::INDEX_TYPECHANGE, Change::Typechange),
+        ],
+    )
 }
 
 fn worktree_change(s: Status) -> Change {
-    if s.contains(Status::CONFLICTED) {
-        Change::Conflicted
-    } else if s.contains(Status::WT_NEW) {
-        Change::Untracked
-    } else if s.contains(Status::WT_MODIFIED) {
-        Change::Modified
-    } else if s.contains(Status::WT_DELETED) {
-        Change::Deleted
-    } else if s.contains(Status::WT_RENAMED) {
-        Change::Renamed
-    } else if s.contains(Status::WT_TYPECHANGE) {
-        Change::Typechange
-    } else {
-        Change::None
-    }
+    first_change(
+        s,
+        &[
+            (Status::CONFLICTED, Change::Conflicted),
+            (Status::WT_NEW, Change::Untracked),
+            (Status::WT_MODIFIED, Change::Modified),
+            (Status::WT_DELETED, Change::Deleted),
+            (Status::WT_RENAMED, Change::Renamed),
+            (Status::WT_TYPECHANGE, Change::Typechange),
+        ],
+    )
 }

@@ -6,7 +6,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 
-use crate::git::{BranchEntry, CommitEntry, StashEntry};
+use crate::git::{BranchEntry, CommitEntry, FileEntry, StashEntry};
 
 /// Border and title of the focused left pane (lazygit `activeBorderColor`).
 pub const FOCUS: Color = Color::Green;
@@ -50,10 +50,10 @@ pub fn counter_line(current: usize, total: usize) -> Line<'static> {
     Line::styled(format!(" {current} of {total} "), fg(IDLE)).right_aligned()
 }
 
-/// `<status> <path>` from `git status --porcelain`: colour the two-char code by
-/// what it means, leave the path plain.
-pub fn file_line(raw: &str) -> Line<'static> {
-    let (code, rest) = raw.split_at(raw.len().min(2));
+/// Files row, porcelain layout `XY path` (X = staged, Y = worktree): colour the
+/// two-char code by what it means, leave the path plain.
+pub fn file_line(entry: &FileEntry) -> Line<'static> {
+    let code = format!("{}{}", entry.staged.code(), entry.worktree.code());
     let color = if code.contains('D') {
         DEL
     } else if code.contains('?') {
@@ -64,8 +64,8 @@ pub fn file_line(raw: &str) -> Line<'static> {
         WARN
     };
     Line::from(vec![
-        Span::styled(code.to_string(), fg(color)),
-        Span::raw(rest.to_string()),
+        Span::styled(code, fg(color)),
+        Span::raw(format!(" {}", entry.path.display())),
     ])
 }
 

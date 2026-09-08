@@ -39,9 +39,10 @@ pub const PANES: [Pane; 5] = [
 ];
 
 impl Pane {
-    /// Position in `PANES`, used to index `App::selection`.
+    /// Position in `PANES`, used to index `App::selection`. The variant order
+    /// is the `PANES` order, so the discriminant is the index.
     pub fn index(self) -> usize {
-        PANES.iter().position(|&p| p == self).unwrap()
+        self as usize
     }
 
     /// Bordered-box title, lazygit style: `[N] Tab - Tab - Tab`. The extra tab
@@ -320,10 +321,7 @@ impl App {
         if self.files.is_empty() {
             return vec![Line::raw("working tree clean")];
         }
-        self.files
-            .iter()
-            .map(|f| theme::file_line(&f.display()))
-            .collect()
+        self.files.iter().map(theme::file_line).collect()
     }
 
     /// Draw, then block on one event, until `should_quit`. No tick, no polling.
