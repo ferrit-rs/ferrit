@@ -3,6 +3,7 @@
 //! `docs/PLAN_SELF_TESTING.md`.
 
 pub mod app;
+pub mod events;
 pub mod git;
 pub mod image;
 pub mod mock;
