@@ -130,7 +130,7 @@ if total > inner.height as usize {
 corners. Drawn only on overflow, like lazyjj and lazygit. The `Note` / mock
 bodies do not get one (they do not overflow in practice; revisit if that
 changes). No theming knob yet, default `Scrollbar` glyphs; a palette entry
-is phase 11.
+is phase 12.
 
 ## Mouse wheel
 
@@ -161,7 +161,7 @@ does; drop it if it complicates the diff test.
 
 Enabling mouse capture also means the terminal no longer does native
 text selection with the mouse. lazygit accepts this; ferrit does too (a
-future `mouse: false` config key is a phase-11 line, not phase 4).
+future `mouse: false` config key is a phase-12 line, not phase 4).
 
 ## Keybar and help
 
@@ -187,7 +187,7 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   into something like `Focus { Left(Pane), Right }`, plus an escape stack.
   Worth doing, its own plan. Phase 4 keeps the left pane always focused and
   the right pane a follower.
-- **Line-level selection cursor** in the diff (needed for phase 5 staging)
+- **Line-level selection cursor** in the diff (needed for phase 6 staging)
   and keeping that cursor on screen while scrolling (gitui `VerticalScroll`).
   Phase 4's `right_scroll: usize` has no cursor.
 - **Horizontal scroll** of un-wrapped lines. Phase 3 soft-wraps; unchanged.

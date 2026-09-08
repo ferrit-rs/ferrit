@@ -1,4 +1,4 @@
-# Plan: phase 5, staging
+# Plan: phase 6, staging
 
 ## Goal
 
@@ -7,9 +7,9 @@ unstage at **file**, **hunk** and **line** granularity, plus **discard** of a
 worktree change, with the panes refreshing after. This is the first phase that
 writes to the repository (the index, and for discard the worktree). Nothing
 here rewrites history; `HEAD` never moves. Committing the staged index is
-phase 6.
+phase 7.
 
-Scope is exactly `PLAN_0_GENERAL.md`'s phase 5 line: "stage / unstage at file,
+Scope is exactly `PLAN_0_GENERAL.md`'s phase 6 line: "stage / unstage at file,
 hunk, line; refresh after". Staging a whole directory, a `--patch`-style
 interactive builder, and partial-line (intra-line) staging are out.
 
@@ -17,7 +17,7 @@ interactive builder, and partial-line (intra-line) staging are out.
 
 Same technique as `../ferrit-references/tui/gitu/src/git/diff.rs`
 (`format_hunk_patch` / `format_line_patch`) and lazygit `pkg/commands/patch/`.
-Phase 3 was built for this on purpose (`PLAN_3_DIFF_VIEW.md` "Phase 5 staging
+Phase 3 was built for this on purpose (`PLAN_3_DIFF_VIEW.md` "Phase 6 staging
 gets easier, not harder"): the parser already hands back byte `Range`s into one
 owned `Diff::text`, so a stageable patch is a substring plus a synthesized
 header, never a re-serialization.
@@ -103,7 +103,7 @@ the rest of `git::`. Reuses `diff::DiffCmd`'s spawn pattern (`git -C <workdir>
 
 ```rust
 //! Write the index (and, for discard, the worktree) by piping a patch built
-//! from `Diff` byte ranges to `git apply`. See docs/PLAN_5_STAGING.md.
+//! from `Diff` byte ranges to `git apply`. See docs/PLAN_6_STAGING.md.
 
 use std::ops::Range;
 
@@ -219,7 +219,7 @@ silently excludes them.
 ## App wiring
 
 Phase 3 owns `diff: DiffView`, `right_key: Option<RightKey>`,
-`right_scroll: usize`. Phase 5 adds a cursor and a selection anchor, and a
+`right_scroll: usize`. Phase 6 adds a cursor and a selection anchor, and a
 `Mode` so `<space>` / `d` mean different things in the left pane vs the diff.
 
 ```rust
@@ -285,7 +285,7 @@ apply ok
 ```
 
 This is the phase 3 rule taken one level deeper: phase 3 keeps `right_scroll`
-across a refresh of an unchanged *file* selection; phase 5 keeps the *cursor*
+across a refresh of an unchanged *file* selection; phase 6 keeps the *cursor*
 across a refresh where the file is the same but a hunk just moved to the index.
 `PLAN_3_DIFF_VIEW.md` "After phase 3" called this exact shot ("key the cursor
 on a per-hunk content hash").
@@ -315,7 +315,7 @@ pub fn render_diff(
   `Unstaged changes  (hunk 1/3)` or `(lines 41-42)` while in `Mode::Diff`, so
   it is obvious what `<space>` will hit. lazygit shows the range in the view
   title the same way.
-- **discard confirm**: a small centered modal, the phase 6 popup primitive
+- **discard confirm**: a small centered modal, the phase 7 popup primitive
   borrowed early if it exists, else a one-line `y/n` prompt in the keybar
   region. `PLAN_0_GENERAL.md` principle: "Anything that loses work asks
   first." Staging never asks; discard always does.
@@ -327,7 +327,7 @@ pub fn render_diff(
   +------------------------------------------------+
 ```
 
-## Keybindings (new in phase 5)
+## Keybindings (new in phase 6)
 
 Active per `Mode`, same "inert otherwise" rule as phase 1's keybar and phase
 3's diff keys.
@@ -360,7 +360,7 @@ one `git` call, reversible, and every git TUI has it. Keybar gains
 | CRLF / `core.autocrlf` | not our problem: the patch is git's own diff output fed back to git's own apply |
 | submodule change | `--submodule` (phase 3) already summarizes it; `<space>` stages the pointer via `git add`, no line granule |
 | apply fails (context drift after an external edit mid-action) | `ApplyFailed` -> Status pane red line -> auto `refresh()` so the diff re-reads and the user retries |
-| conflicted file (`UU`) | `<space>` inert in phase 5; resolving conflicts is phase 10 |
+| conflicted file (`UU`) | `<space>` inert in phase 6; resolving conflicts is phase 11 |
 | empty selection (`V` over only context lines) | `<space>` is a no-op, brief keybar note "nothing to stage" |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
@@ -432,7 +432,7 @@ still pending, so scripts wait.
   background `refresh()` fires never loses the cursor or double-applies;
   `tests/render.rs` region snapshot; `40-stage.script` ready for the harness.
 
-## Definition of done (phase 5)
+## Definition of done (phase 6)
 
 - `<space>` stages and unstages a whole file from the Files pane, and a hunk
   or a line-selection from inside the diff, with the panes reflecting the new
@@ -451,15 +451,15 @@ still pending, so scripts wait.
 - Untracked, binary, rename, mode-change, and no-newline files each stage
   without a panic (whole-file where line granularity does not apply).
 
-## After phase 5
+## After phase 6
 
-Phase 6 commits the staged index: a message-input popup, `git commit`, plus
+Phase 7 commits the staged index: a message-input popup, `git commit`, plus
 `--amend`, reword, and `fixup!` / `squash!` shapes for autosquash. It builds
 directly on the index this phase writes; `git status --porcelain=v2`'s staged
 column is the precondition it checks before enabling the commit key. See
-`PLAN_6_COMMIT.md`.
+`PLAN_7_COMMIT.md`.
 
-Deferred out of phase 5, revisit with their own phases or a follow-up:
+Deferred out of phase 6, revisit with their own phases or a follow-up:
 
 - hunk / line staging *within* a rename or a copy (file-level only for now).
 - an across-files patch builder (assemble, review, then apply once), lazygit
@@ -467,6 +467,6 @@ Deferred out of phase 5, revisit with their own phases or a follow-up:
   workflow needs the staged-patch preview.
 - `--patch`-style "split this hunk" (`s` in `git add -p`). The parser has the
   hunk body; splitting is a UI affordance on top, not a backend change.
-- staging a conflicted file's resolution (phase 10, conflict flow).
+- staging a conflicted file's resolution (phase 11, conflict flow).
 - an undo of the last stage/discard via the reflog / `git stash` (see
-  `INSPIRATION.md` git-time-machine); phase 11 territory.
+  `INSPIRATION.md` git-time-machine); phase 12 territory.
