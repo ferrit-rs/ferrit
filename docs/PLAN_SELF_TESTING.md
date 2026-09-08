@@ -152,12 +152,13 @@ Each phase from 2 on lands, in the same commit as the feature:
 | 1 layout | focus (`1`-`5`, `Tab`), `j`/`k` clamp, list scroll, resize `40x20`..`200x60` with no panic or horizontal overflow, `?` overlay toggle. No git assertions yet |
 | 2 git read | fixture `canonical`; each pane renders the golden status / branches / log / stash |
 | 3 diff | modify a file, `git::diff` hunks match golden; right pane shows them; hunk nav moves the viewport |
-| 4 staging | stage / unstage at file, hunk, line; `git status --porcelain=v2` golden confirms the index |
-| 5 commit | commit moves `HEAD`; `git log -1` golden has the message and parent; amend and fixup shapes |
-| 6 branches | checkout / create / delete / merge reflected in `git branch` and `rev-parse` golden |
-| 7 remote | ahead / behind and upstream parsed against a local bare remote |
-| 8 stash | push / pop / apply / drop change `git stash list` golden |
-| 9 rebase | todo edited; continue / abort / skip drive the golden git state; conflict surfaced in a frame |
+| 4 scroll behavior | `J` / `K` / page / half-page / `<` / `>` move `right_scroll` clamped to `line_count - viewport`; wheel routes by column; scrollbar present on overflow, absent when it fits |
+| 5 staging | stage / unstage at file, hunk, line; `git status --porcelain=v2` golden confirms the index |
+| 6 commit | commit moves `HEAD`; `git log -1` golden has the message and parent; amend and fixup shapes |
+| 7 branches | checkout / create / delete / merge reflected in `git branch` and `rev-parse` golden |
+| 8 remote | ahead / behind and upstream parsed against a local bare remote |
+| 9 stash | push / pop / apply / drop change `git stash list` golden |
+| 10 rebase | todo edited; continue / abort / skip drive the golden git state; conflict surfaced in a frame |
 
 ## The self-test loop an agent runs
 

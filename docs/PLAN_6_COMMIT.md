@@ -1,14 +1,14 @@
-# Plan: phase 5, commit
+# Plan: phase 6, commit
 
 ## Goal
 
-Commit the staged index from phase 4. A message-input popup, then `git
+Commit the staged index from phase 5. A message-input popup, then `git
 commit`, plus the three shapes lazygit and gitu expose: **amend** the last
 commit, **reword** the last commit's message, and stage a **`fixup!` /
 `squash!`** commit for a later autosquash rebase. This phase moves `HEAD`.
-Rebasing to actually apply the fixups is phase 9; phase 5 only creates them.
+Rebasing to actually apply the fixups is phase 10; phase 6 only creates them.
 
-Scope is `PLAN_0_GENERAL.md`'s phase 5 line: "commit popup (message input),
+Scope is `PLAN_0_GENERAL.md`'s phase 6 line: "commit popup (message input),
 amend, fixup". A full commit-message editor with body wrapping rules, a
 conventional-commit assistant, and AI-generated messages are out (the last one
 is explicitly "Not scheduled" in `PLAN_0`).
@@ -66,7 +66,7 @@ the popup until it closes. This is the first real input popup in ferrit
 - Subject line and body in one `tui-textarea` (multiline). First line is the
   subject; a blank second line is inserted on save if the user typed a body
   straight after the subject, matching git convention. No hard wrap, no
-  enforced 50/72 (a lint hint in the footer is optional polish, not phase 5).
+  enforced 50/72 (a lint hint in the footer is optional polish, not phase 6).
 - Footer shows the precondition (`N files staged`) and the two toggles.
 - `Ctrl-S` (or `Ctrl-Enter`) commits. `Esc` cancels and **keeps the draft**
   (see "Draft persistence").
@@ -103,12 +103,12 @@ and its selection cursor; it is a mode flag, not a new widget.
 
 ## Backend: `src/git/commit.rs`
 
-New module under `src/git/`, sibling of `apply.rs` (phase 4). No `ratatui`.
+New module under `src/git/`, sibling of `apply.rs` (phase 5). No `ratatui`.
 Reuses the `git -C <workdir> ...` spawn pattern from `diff.rs` / `apply.rs`.
 
 ```rust
 //! Create commits by shelling out to `git commit`, so hooks, signing and
-//! commit.* config all apply. See docs/PLAN_5_COMMIT.md.
+//! commit.* config all apply. See docs/PLAN_6_COMMIT.md.
 
 /// What kind of commit to make.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,7 +144,7 @@ impl Repo {
 }
 ```
 
-`GitError` gains, matching phase 3/4 shape:
+`GitError` gains, matching phase 3/5 shape:
 
 ```rust
 #[error("git commit failed: {0}")]
@@ -180,13 +180,13 @@ rewrite it; ferrit re-reads `HEAD` after and shows the result.
 
 `AGENTS.md`: normal work pushes to `main`, external contributions come in under
 DCO with `git commit -s`. Default the `sign_off` toggle from, in order:
-`commit.gpgSign`-style config if a `ferrit.signOff` key ever exists (phase 10),
+`commit.gpgSign`-style config if a `ferrit.signOff` key ever exists (phase 11),
 else a `--signoff`-implying env, else **off**, with `Ctrl-O` to flip it per
 commit. Do not silently sign every commit; make it visible in the footer.
 
 ## App wiring
 
-Phase 4 added `mode: Mode`. Phase 5 adds a `Popup` that, when `Some`, owns all
+Phase 5 added `mode: Mode`. Phase 6 adds a `Popup` that, when `Some`, owns all
 input (like `show_help` does today in `on_key`, but richer).
 
 ```rust
@@ -194,7 +194,7 @@ enum Popup {
     Commit(CommitDraft),      // c / A / w / s
     FixupPick,                // f: Commits pane is the picker
     Note(String),             // HookRejected / CommitFailed, dismissible
-    Confirm { .. },           // reused from phase 4's discard confirm
+    Confirm { .. },           // reused from phase 5's discard confirm
 }
 
 struct CommitDraft {
@@ -205,7 +205,7 @@ struct CommitDraft {
 }
 
 struct App {
-    // ...phase 3..4 fields...
+    // ...phase 3..5 fields...
     popup: Option<Popup>,
     /// Survives an Esc-cancel of the commit popup so a mistyped keystroke does
     /// not lose a paragraph. Cleared on a successful commit.
@@ -253,12 +253,12 @@ do_commit():
 After `HEAD` moves, phase 2's `refresh()` already re-reads the Commits pane, so
 the new commit appears at the top with no extra code. Phase 3's
 `update_right_pane` sees an empty staged diff and renders the "no changes"
-`Note`. Phase 4's diff cursor, if it was in `Mode::Diff`, drops to `Nav`
+`Note`. Phase 5's diff cursor, if it was in `Mode::Diff`, drops to `Nav`
 because the staged side is now empty.
 
 A commit made from another shell arrives as an `AppEvent::Refresh` (phase 2.5
 fs-watch on `.git/`), so the Commits pane updates on its own, same as staging
-did in phase 4.
+did in phase 5.
 
 ## Rendering (`src/ui/`)
 
@@ -273,10 +273,10 @@ did in phase 4.
   `theme` role, distinct from the green focus border and the blue selection
   bar) and the keybar switches to `Enter pick   Esc cancel`.
 - Keybar (`mock::KEYBAR`) gains `Commit: c | Amend: A | Reword: w | Fixup: f`.
-  `HELP` gains the same. The bar is context-sensitive from phase 4 already;
-  phase 5 adds the popup-open variant.
+  `HELP` gains the same. The bar is context-sensitive from phase 5 already;
+  phase 6 adds the popup-open variant.
 
-## Keybindings (new in phase 5)
+## Keybindings (new in phase 6)
 
 | Key | Context | Action |
 | --- | --- | --- |
@@ -304,17 +304,17 @@ tree, which is what `git commit --amend` does.
 | empty subject line | commit blocked, popup stays, keybar note; a body with no subject is not allowed |
 | `pre-commit` hook rewrites files | git aborts with "files were modified by this hook"; shown as `HookRejected`, draft kept, `refresh()` so the user sees the new worktree state |
 | `commit-msg` hook rewrites the message | commit succeeds; ferrit re-reads `HEAD` and the Commits pane shows the final message |
-| GPG passphrase prompt | `git` needs a tty or a pinentry; if it blocks, the subprocess hangs. Phase 5 runs `git commit` with inherited stdio for exactly this reason, or documents that a gpg-agent / pinentry-tty must be configured. Revisit if it bites. |
+| GPG passphrase prompt | `git` needs a tty or a pinentry; if it blocks, the subprocess hangs. Phase 6 runs `git commit` with inherited stdio for exactly this reason, or documents that a gpg-agent / pinentry-tty must be configured. Revisit if it bites. |
 | detached HEAD | `c` commits onto the detached HEAD (git allows it, with its own warning in stderr, surfaced as a `Note`) |
-| merge in progress (`MERGE_HEAD` present) | `c` finalizes the merge commit; message pre-filled from `MERGE_MSG`. Full merge-conflict flow is phase 9; a clean merge commit is fine here. |
-| amend a pushed commit | ferrit does not warn (phase 7 tracks ahead/behind; a "this is published" guard is a phase 7+ polish) |
+| merge in progress (`MERGE_HEAD` present) | `c` finalizes the merge commit; message pre-filled from `MERGE_MSG`. Full merge-conflict flow is phase 10; a clean merge commit is fine here. |
+| amend a pushed commit | ferrit does not warn (phase 8 tracks ahead/behind; a "this is published" guard is a phase 8+ polish) |
 | `--no-verify` on | footer shows `verify: off` in red so it is never a silent skip |
 | commit succeeds, fs-watch also fires | `do_commit`'s explicit `refresh()` and the `AppEvent::Refresh` both run `refresh()`; it is idempotent, no double commit |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
 Throwaway `git2` fixture repos, `git` run against them; replay scripts wait on
-ST1..ST3 like phases 3 and 4.
+ST1..ST3 like phases 3 and 5.
 
 - `tests/git_commit.rs`: fixture repo, then via `Repo`:
   - `commit(Normal)` with a staged file: `git log -1 --format=%s` matches;
@@ -331,7 +331,7 @@ ST1..ST3 like phases 3 and 4.
   - `sign_off: true` -> the message has a `Signed-off-by:` trailer with the
     fixture's `user.email`.
   - root commit on an unborn branch.
-- `tests/app_commit.rs` (extends phase 4's `app_stage.rs`): stage a file,
+- `tests/app_commit.rs` (extends phase 5's `app_stage.rs`): stage a file,
   press `c`, type a message into the draft, `Ctrl-S`, assert `app.commits[0]`
   is the new commit, `app.popup` is `None`, `app.commit_draft` is `None`, the
   staged diff view is a `Note`. Then press `c` again, type, `Esc`, press `c`
@@ -345,7 +345,7 @@ ST1..ST3 like phases 3 and 4.
   size 120x40
   fixture canonical
   key 2                       # Files
-  key a                       # stage all (phase 4)
+  key a                       # stage all (phase 5)
   key c                       # commit popup
   type "test: replay commit"
   key ctrl-s
@@ -390,7 +390,7 @@ add: `git commit` is a subprocess, no new git library surface.
   another shell mid-popup does not corrupt state; `tests/render.rs` popup
   snapshots; `50-commit.script` ready for the harness.
 
-## Definition of done (phase 5)
+## Definition of done (phase 6)
 
 - `c` commits the staged index with a typed message; the Commits pane shows
   the new commit at the top and the staged diff empties, with no keypress
@@ -409,21 +409,21 @@ add: `git commit` is a subprocess, no new git library surface.
   `tests/app_commit.rs` pass; the unborn-branch and merge-in-progress paths
   do not panic.
 
-## After phase 5
+## After phase 6
 
-Phase 6 is branches: checkout, create, delete, fast-forward, merge. It uses
+Phase 7 is branches: checkout, create, delete, fast-forward, merge. It uses
 the Commits pane picker pattern this phase introduced for `f`, and the popup
 primitive from `src/ui/popup.rs` for the "new branch name" input.
 
-Deferred out of phase 5, their own phases or a follow-up:
+Deferred out of phase 6, their own phases or a follow-up:
 
 - applying the `fixup!` / `squash!` commits via autosquash rebase (`git rebase
-  -i --autosquash`), phase 9.
-- a "this commit is already pushed, amend anyway?" guard, phase 7 (needs
+  -i --autosquash`), phase 10.
+- a "this commit is already pushed, amend anyway?" guard, phase 8 (needs
   upstream tracking).
 - 50/72 subject/body lint, `commit.template` rendering, a conventional-commit
-  scaffold: phase 10 polish.
+  scaffold: phase 11 polish.
 - AI-generated commit messages (`INSPIRATION.md`: lazygitrs, gmsg): "Not
-  scheduled" in `PLAN_0_GENERAL.md`, revisit after phase 10.
+  scheduled" in `PLAN_0_GENERAL.md`, revisit after phase 11.
 - opening `$EDITOR` for the message instead of the in-TUI textarea: a config
-  option, phase 10.
+  option, phase 11.
