@@ -9,6 +9,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Left click on a left-pane row focuses that pane and moves its selection
+  cursor to the clicked row (lazygit style), rebuilding the right pane the
+  same way a `j` / `k` move would. Clicking a pane's border or title focuses
+  it without moving the cursor; a click past the last row, on the command
+  log, or in a gap does nothing; any click dismisses the help overlay.
+  Right click, middle click, drag and mouse move stay inert for now.
 - Strict Rust tooling, ported from the RUSTIFY reference setup. `rust-toolchain.toml`
   pins the compiler (1.97.1) so CI and every contributor lint identically.
   `rustfmt.toml` and `clippy.toml` fix formatting and the MSRV clippy target.

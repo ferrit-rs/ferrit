@@ -11,9 +11,9 @@ use std::path::{Path, PathBuf};
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-use ratatui::layout::Rect;
+use ratatui::layout::{Position, Rect};
 use ratatui::text::Line;
 use ratatui_image::picker::Picker;
 
@@ -704,13 +704,59 @@ impl App {
         self.update_right_pane();
     }
 
-    /// Clicks and drags are ignored for now; only the wheel is wired.
+    /// A left click focuses the pane it lands in and, when it lands on a
+    /// list row, moves that pane's selection cursor there too (lazygit's
+    /// `HandleClick`, steps 3 / 4 / 5 / 7). Any click dismisses the help
+    /// overlay first. Right click, middle click, drag and move are no-ops
+    /// for now.
     fn on_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
-            MouseEventKind::ScrollDown => self.wheel(ev, 1),
-            MouseEventKind::ScrollUp => self.wheel(ev, -1),
-            _ => {},
+            MouseEventKind::ScrollDown => return self.wheel(ev, 1),
+            MouseEventKind::ScrollUp => return self.wheel(ev, -1),
+            MouseEventKind::Down(MouseButton::Left) => {},
+            MouseEventKind::Down(MouseButton::Right) => return, // phase 12: `x` context menu
+            _ => return,                                        // middle click, drag, move
         }
+
+        if self.show_help {
+            self.show_help = false; // any click dismisses the overlay
+            return;
+        }
+
+        if let Some(pane) = self.pane_at(ev.column, ev.row) {
+            self.click_pane(pane, ev.row);
+            self.update_right_pane(); // step 7: rebuild for the new focus/selection
+        }
+        // else: right pane / command log / keybar / gap. no-op for now
+        // (right pane: hook for the right-pane-focus plan).
+    }
+
+    /// Which left pane a screen cell is in, `None` for the right pane, the
+    /// command log, the keybar or an inter-pane gap.
+    fn pane_at(&self, col: u16, row: u16) -> Option<Pane> {
+        let point = Position::new(col, row);
+        PANES.into_iter().find(|&pane| self.left_areas[pane].contains(point))
+    }
+
+    /// Focus `pane`, then move its cursor to `screen_row` if that row maps
+    /// to a real entry. Returns whether the cursor moved: `false` for the
+    /// border / title row and for a click past the last entry.
+    fn click_pane(&mut self, pane: Pane, screen_row: u16) -> bool {
+        self.focus = pane; // focus first, even on the border or past the tail
+        let Some(idx) = self.click_row(pane, screen_row) else {
+            return false;
+        };
+        self.selection[pane] = idx;
+        true
+    }
+
+    /// Screen row -> model index for a left pane. `None` for the border /
+    /// title row, or a click past the last entry.
+    fn click_row(&self, pane: Pane, screen_row: u16) -> Option<usize> {
+        let area = self.left_areas[pane];
+        let inner_row = screen_row.checked_sub(area.y.saturating_add(1))?;
+        let idx = self.list_offset[pane].saturating_add(usize::from(inner_row));
+        (idx < self.row_count(pane)).then_some(idx)
     }
 
     /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
