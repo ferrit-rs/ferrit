@@ -178,3 +178,33 @@ fn only_a_left_click_routes_to_a_pane() {
     assert_eq!(app.focus, Pane::Status, "none of these focus Files");
     assert_eq!(app.selected(Pane::Files), 0);
 }
+
+#[test]
+fn extreme_coordinates_and_offsets_never_panic() {
+    let mut app = App::mock();
+    let tiny = Rect {
+        x: 0,
+        y: u16::MAX - 1,
+        width: 5,
+        height: 2,
+    };
+    app.set_left_area(Pane::Files, tiny);
+    // A naive `list_offset + inner_row` would overflow here; click_row must
+    // saturate instead, same as `area.y + 1` must saturate for a pane
+    // pinned at the very bottom of `u16`'s range.
+    app.set_list_offset(Pane::Files, usize::MAX);
+
+    for (column, row) in [
+        (0, 0),
+        (u16::MAX, u16::MAX),
+        (0, u16::MAX),
+        (u16::MAX, 0),
+        (tiny.y, tiny.y), // exactly the border row of a pane near u16::MAX
+    ] {
+        app.feed_mouse(left_click(column, row));
+    }
+
+    // Reaching this line without a panic is the real assertion; none of
+    // those clicks landed on a real row, so nothing should have moved.
+    assert_eq!(app.selected(Pane::Files), 0);
+}
