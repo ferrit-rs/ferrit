@@ -181,5 +181,6 @@ Ctrl-u / Ctrl-d   scroll the diff pane a half page
 < / >             diff pane to top / bottom
 ] / [             next / previous hunk or file
 mouse wheel       scroll the pane under the pointer
+click a row       focus that pane, move the cursor there
 ?                 toggle this help
 q / Ctrl-c        quit";
