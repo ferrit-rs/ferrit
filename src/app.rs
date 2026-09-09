@@ -704,15 +704,19 @@ impl App {
         self.update_right_pane();
     }
 
-    /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
-    /// over the main view"); over the left column it nudges the focused pane's
-    /// selection. Clicks and drags are ignored for now.
+    /// Clicks and drags are ignored for now; only the wheel is wired.
     fn on_mouse(&mut self, ev: MouseEvent) {
-        let step = match ev.kind {
-            MouseEventKind::ScrollDown => 1,
-            MouseEventKind::ScrollUp => -1,
-            _ => return,
-        };
+        match ev.kind {
+            MouseEventKind::ScrollDown => self.wheel(ev, 1),
+            MouseEventKind::ScrollUp => self.wheel(ev, -1),
+            _ => {},
+        }
+    }
+
+    /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
+    /// over the main view"); over the left column it nudges the focused
+    /// pane's selection.
+    fn wheel(&mut self, ev: MouseEvent, step: isize) {
         let a = self.right_area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
         if over_right && self.right_is_diff() {
