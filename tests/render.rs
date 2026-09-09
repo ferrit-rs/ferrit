@@ -157,6 +157,30 @@ fn click_moves_focus_and_selection_on_screen() {
 }
 
 #[test]
+fn click_on_the_command_log_or_keybar_is_a_no_op() {
+    let mut app = App::mock();
+    frame(&mut app, 120, 40); // a real draw, so left_areas / list_offset are set
+
+    // src/ui.rs `draw` reserves the bottom of the screen for the command
+    // log (4 rows) then the keybar (1 row): at height 40 that is rows
+    // 35..39 and row 39. Neither is a left pane's rect.
+    for row in [36, 39] {
+        app.feed_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 5,
+            row,
+            modifiers: KeyModifiers::NONE,
+        });
+    }
+
+    assert_eq!(
+        app.focus,
+        Pane::Status,
+        "a click on the log or the keybar moves nothing"
+    );
+}
+
+#[test]
 fn image_selection_takes_over_the_right_pane() {
     let mut app = App::mock();
     let png = mock::mock_files()
