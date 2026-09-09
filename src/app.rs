@@ -735,7 +735,9 @@ impl App {
     /// command log, the keybar or an inter-pane gap.
     fn pane_at(&self, col: u16, row: u16) -> Option<Pane> {
         let point = Position::new(col, row);
-        PANES.into_iter().find(|&pane| self.left_areas[pane].contains(point))
+        PANES
+            .into_iter()
+            .find(|&pane| self.left_areas[pane].contains(point))
     }
 
     /// Focus `pane`, then move its cursor to `screen_row` if that row maps
