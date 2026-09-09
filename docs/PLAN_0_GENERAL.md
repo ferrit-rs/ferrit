@@ -56,7 +56,7 @@ split is a move, not a rewrite.
 | 2.5 | (no file) | live refresh: `src/events.rs` multiplexes terminal input, a recursive fs-watch on the worktree and a 10s poll; a change from another shell re-snapshots on its own, lazygit style | ✅ done |
 | 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane via `git diff` / `git show` subprocess (lazygit style, honours user `git config`), git-native colouring, hunk navigation, scrolling | ✅ done |
 | 4 | `PLAN_4_SCROLL_BEHAVIOR.md` | right-pane scroll keys (lazygit style, no left-pane fight), viewport-aware clamp, scrollbar widget, mouse wheel | ✅ done |
-| 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | 📅 planned |
+| 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | ✅ done |
 | 6 | `PLAN_6_STAGING.md` | stage / unstage at file, hunk, line; refresh after | 📅 planned |
 | 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | 📅 planned |
 | 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | 👉 todo |

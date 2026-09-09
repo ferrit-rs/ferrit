@@ -408,12 +408,12 @@ row, redraw, assert the focused-border style moved from `Status` to
 
 ## Milestones
 
-- **C0** `App::left_areas` + `list_offset` (both `EnumMap<Pane, _>`),
+- **C0** done. `App::left_areas` + `list_offset` (both `EnumMap<Pane, _>`),
   `set_left_area` / `set_list_offset` seams. `draw_left_column` takes
   `&mut App`, writes the rect **before** reading `pane_lines`, and copies
   `ListState::offset()` back after `render_stateful_widget` each frame. No
   behaviour change yet; existing tests green.
-- **C1** `on_mouse` handles `Down(MouseButton::Left)`: `pane_at()`
+- **C1** done. `on_mouse` handles `Down(MouseButton::Left)`: `pane_at()`
   (`Rect::contains`) to route, then `click_pane()` which focuses the pane
   (step 3) and calls `click_row()` (the `ViewIndexToModelIndex` helper) to
   select or, on the border / past-the-tail, returns `false` with the cursor
@@ -421,12 +421,17 @@ row, redraw, assert the focused-border style moved from `Status` to
   `wheel()`, unchanged. `Down(Right)` is an explicit `// phase 12` no-op.
   Help overlay dismissed by a click. `tests/mouse.rs` select / border /
   tail / gap / help / non-left-button cases.
-- **C2** `tests/render.rs` click-moves-focus frame. `mock::HELP` gains a
-  "click a row to select it" line; `mock::KEYBAR` unchanged (no new key).
-- **C3** polish: `cargo clippy --all-targets` clean; right / middle click,
-  drag and move are no-ops; clicks on every gap (log, keybar, inter-pane
-  border, past the last row) never panic; `src/git/` still has no `ratatui`
-  import; C0..C2 tests green.
+- **C2** done. `tests/render.rs` click-moves-focus frame
+  (`click_moves_focus_and_selection_on_screen`, plus `focused_border_rows`
+  alongside the existing `selection_bar_rows`). `mock::HELP` gains a
+  "click a row" line; `mock::KEYBAR` unchanged (no new key).
+- **C3** done. `cargo clippy --all-targets` clean; right / middle click,
+  drag and move are no-ops (`only_a_left_click_routes_to_a_pane`); a
+  `u16::MAX` click and a `usize::MAX` `list_offset` never panic
+  (`extreme_coordinates_and_offsets_never_panic`); a real-frame click on
+  the command log or the keybar is a no-op
+  (`click_on_the_command_log_or_keybar_is_a_no_op`); `src/git/` still has
+  no `ratatui` import; C0..C2 tests green.
 
 ## Definition of done (phase 5)
 
