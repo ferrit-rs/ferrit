@@ -159,6 +159,9 @@ pub struct App {
     /// Whole right-pane rect from the last frame, for routing the mouse wheel
     /// to the diff (over the right column) or the selection (over the left).
     right_area: Rect,
+    /// Each left pane's bordered rect from the last frame, for routing a
+    /// click to the pane it landed in. `Rect::ZERO` before the first draw.
+    left_areas: EnumMap<Pane, Rect>,
 }
 
 impl App {
@@ -186,6 +189,7 @@ impl App {
             right_scroll: 0,
             right_viewport: 0,
             right_area: Rect::ZERO,
+            left_areas: EnumMap::default(),
         }
     }
 
@@ -421,6 +425,12 @@ impl App {
     /// mouse-wheel event can be routed by its column.
     pub fn set_right_area(&mut self, area: Rect) {
         self.right_area = area;
+    }
+
+    /// A left pane's bordered rect, written by `ui::draw_left_column` each
+    /// frame so a click can be routed to the pane it landed in.
+    pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
+        self.left_areas[pane] = area;
     }
 
     /// Feed one key to the handler. Integration-test seam; the running app

@@ -57,7 +57,7 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     }
 }
 
-fn draw_left_column(frame: &mut Frame<'_>, app: &App, area: Rect) {
+fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let rows: [Rect; 5] = Layout::vertical([
         Constraint::Length(4), // Status: header only
         Constraint::Min(3),    // Files
@@ -68,6 +68,10 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &App, area: Rect) {
     .areas(area);
 
     for (&pane, &row) in PANES.iter().zip(&rows) {
+        // Remembered for click routing: written before the list body is
+        // read, so this `&mut` borrow never overlaps the `&self` one below.
+        app.set_left_area(pane, row);
+
         let focused = app.focus == pane;
         let border = if focused {
             Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
