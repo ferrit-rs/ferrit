@@ -96,13 +96,16 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .block(block)
             .highlight_style(theme::selection_style(focused));
 
-        let mut state = ListState::default();
+        let mut state = ListState::default().with_offset(app.list_offset(pane));
         let row_ct = app.row_count(pane);
         if row_ct > 0 {
             state.select(Some(app.selected(pane).min(row_ct - 1)));
         }
 
         frame.render_stateful_widget(list, row, &mut state);
+        // Ratatui may have moved the offset to keep the selection on screen;
+        // copy it back so a click in a scrolled list maps to the right row.
+        app.set_list_offset(pane, state.offset());
     }
 }
 

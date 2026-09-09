@@ -162,6 +162,11 @@ pub struct App {
     /// Each left pane's bordered rect from the last frame, for routing a
     /// click to the pane it landed in. `Rect::ZERO` before the first draw.
     left_areas: EnumMap<Pane, Rect>,
+    /// `ListState::offset` for each left pane, copied back by
+    /// `ui::draw_left_column` after `render_stateful_widget` moves it to
+    /// keep the selection on screen. Lets a click in a scrolled list map to
+    /// the right row. Only valid post-render; 0 before the first draw.
+    list_offset: EnumMap<Pane, usize>,
 }
 
 impl App {
@@ -190,6 +195,7 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             left_areas: EnumMap::default(),
+            list_offset: EnumMap::default(),
         }
     }
 
@@ -431,6 +437,19 @@ impl App {
     /// frame so a click can be routed to the pane it landed in.
     pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
         self.left_areas[pane] = area;
+    }
+
+    /// A left pane's list scroll offset, read by `ui::draw_left_column`
+    /// before it builds that pane's `ListState`.
+    pub fn list_offset(&self, pane: Pane) -> usize {
+        self.list_offset[pane]
+    }
+
+    /// A left pane's list scroll offset, written by `ui::draw_left_column`
+    /// after `render_stateful_widget` so a click in a scrolled list maps to
+    /// the right row.
+    pub fn set_list_offset(&mut self, pane: Pane, offset: usize) {
+        self.list_offset[pane] = offset;
     }
 
     /// Feed one key to the handler. Integration-test seam; the running app
