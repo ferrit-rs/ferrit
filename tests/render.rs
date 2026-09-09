@@ -14,6 +14,7 @@ use ferrit::app::{App, Pane};
 use ferrit::{mock, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::style::Color;
 
 fn frame(app: &mut App, width: u16, height: u16) -> String {
@@ -91,6 +92,68 @@ fn only_the_focused_pane_shows_the_selection_bar() {
     assert!(files.is_disjoint(&branches));
     assert!(branches.is_disjoint(&commits));
     assert!(files.is_disjoint(&commits));
+}
+
+/// Rows in the left column (x < 40 at width 120) whose border is drawn in
+/// the focused colour, i.e. the bordered rect of whichever pane has focus.
+fn focused_border_rows(app: &mut App) -> BTreeSet<u16> {
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal.draw(|f| ui::draw(f, app)).unwrap();
+    let buf = terminal.backend().buffer();
+    let mut rows = BTreeSet::new();
+    for y in 0..buf.area.height {
+        if buf[(0, y)].style().fg == Some(Color::Green) {
+            rows.insert(y);
+        }
+    }
+    rows
+}
+
+#[test]
+fn click_moves_focus_and_selection_on_screen() {
+    let mut app = App::mock();
+    // A first frame lays out the panes, populating `left_areas` /
+    // `list_offset` the way a real draw does before any click lands.
+    let out = frame(&mut app, 120, 40);
+    assert!(
+        focused_border_rows(&mut app).iter().all(|&y| y < 4),
+        "Status starts out focused"
+    );
+
+    let hash = mock::mock_commits()
+        .get(1)
+        .expect("mock has at least two commits")
+        .short_hash
+        .clone();
+    let row = u16::try_from(
+        out.lines()
+            .position(|l| l.contains(hash.as_str()))
+            .unwrap_or_else(|| panic!("commit {hash} not found in the rendered frame\n{out}")),
+    )
+    .unwrap();
+
+    app.feed_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 5,
+        row,
+        modifiers: KeyModifiers::NONE,
+    });
+
+    assert_eq!(app.focus, Pane::Commits, "the click moved focus to Commits");
+    assert_eq!(
+        app.selected(Pane::Commits),
+        1,
+        "the click selected the clicked commit"
+    );
+    assert_eq!(
+        selection_bar_rows(&mut app),
+        BTreeSet::from([row]),
+        "the highlight moved to the exact row that was clicked"
+    );
+    assert!(
+        focused_border_rows(&mut app).contains(&row),
+        "the focused border now covers the clicked row"
+    );
 }
 
 #[test]
