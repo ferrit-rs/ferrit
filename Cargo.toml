@@ -173,4 +173,5 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 notify-debouncer-full = "0.7"
 ratatui = "0.30"
 ratatui-image = { version = "11", default-features = false, features = ["crossterm", "image-defaults"] }
+syntect = "5"
 thiserror = "2"

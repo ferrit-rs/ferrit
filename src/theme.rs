@@ -4,11 +4,39 @@
 //! yellow keys. No config, no theme switching yet (that is phase 10).
 
 use std::ops::Range;
+use std::sync::OnceLock;
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
+use syntect::parsing::SyntaxSet;
 
 use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, StashEntry};
+
+/// Prefixes of diff metadata lines (file/commit headers), never source code.
+/// Shared by `diff_line_style` (colouring) and `is_code_line` (highlight gate).
+const META: &[&str] = &[
+    "diff --git",
+    "index ",
+    "--- ",
+    "+++ ",
+    "old mode",
+    "new mode",
+    "new file",
+    "deleted file",
+    "rename ",
+    "copy ",
+    "similarity ",
+    "dissimilarity ",
+    "commit ",
+    "Author:",
+    "AuthorDate:",
+    "Commit:",
+    "CommitDate:",
+    "Date:",
+    "Merge:",
+];
 
 /// Border and title of the focused left pane (lazygit `activeBorderColor`).
 pub const FOCUS: Color = Color::Green;
@@ -134,27 +162,6 @@ pub fn stash_line(entry: &StashEntry) -> Line<'static> {
 /// `\ No newline` and `Binary files` dim, everything else (context, message
 /// body) plain.
 fn diff_line_style(line: &str) -> Style {
-    const META: &[&str] = &[
-        "diff --git",
-        "index ",
-        "--- ",
-        "+++ ",
-        "old mode",
-        "new mode",
-        "new file",
-        "deleted file",
-        "rename ",
-        "copy ",
-        "similarity ",
-        "dissimilarity ",
-        "commit ",
-        "Author:",
-        "AuthorDate:",
-        "Commit:",
-        "CommitDate:",
-        "Date:",
-        "Merge:",
-    ];
     if line.starts_with("@@") {
         fg(HUNK)
     } else if line.starts_with("Binary files") || line.starts_with('\\') {
@@ -183,13 +190,50 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
     Text::from(lines.collect::<Vec<_>>())
 }
 
-/// Render a parsed `Diff` for the right pane: `diff_lines` colouring, a
-/// lazygit-style `old new│` gutter from `Diff::line_numbers` in front of every
-/// line (blank on headers, one-sided on an addition/deletion), and, when
-/// `focus` is set, a `FOCUS_BOX` background boxing every line of the hunk (or
-/// file, in a commit) a `]` / `[` jump last landed on, its header reversed.
+/// A diff content line (context, addition or deletion): the only kind fed to
+/// the syntax highlighter. File/commit metadata, hunk headers, `Binary
+/// files` and `\ No newline` stay plain-coloured via `diff_line_style`.
+fn is_code_line(line: &str) -> bool {
+    if line.starts_with("@@") || line.starts_with("Binary files") || line.starts_with('\\') {
+        return false;
+    }
+    if META.iter().any(|p| line.starts_with(p)) {
+        return false;
+    }
+    line.starts_with('+') || line.starts_with('-') || line.starts_with(' ')
+}
+
+/// Bundled syntax definitions (`default-fancy`'s `SyntaxSet`), loaded once.
+fn syntax_set() -> &'static SyntaxSet {
+    static SET: OnceLock<SyntaxSet> = OnceLock::new();
+    SET.get_or_init(SyntaxSet::load_defaults_newlines)
+}
+
+/// Bundled colour theme for diff code content, loaded once. `None` (no
+/// highlighting, plain colours only) if the theme name is ever missing,
+/// rather than panicking.
+fn syntax_theme() -> Option<&'static SynTheme> {
+    static THEME: OnceLock<Option<SynTheme>> = OnceLock::new();
+    THEME
+        .get_or_init(|| ThemeSet::load_defaults().themes.remove("base16-ocean.dark"))
+        .as_ref()
+}
+
+fn to_color(c: SynColor) -> Color {
+    Color::Rgb(c.r, c.g, c.b)
+}
+
+/// Render a parsed `Diff` for the right pane: a lazygit-style `old new│`
+/// gutter from `Diff::line_numbers` in front of every line (blank on
+/// headers, one-sided on an addition/deletion), per-language syntax
+/// highlighting of code content (`Diff::line_extensions` picks the syntax,
+/// `+`/`-`/` ` prefixes keep their add/delete/idle colour), and, when
+/// `focus` is set, a `FOCUS_BOX` background boxing every line of the hunk
+/// (or file, in a commit) a `]` / `[` jump last landed on, its header
+/// reversed.
 pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
     let numbers = diff.line_numbers();
+    let extensions = diff.line_extensions();
     let width = numbers
         .iter()
         .flat_map(|&pair| <[_; 2]>::from(pair))
@@ -197,19 +241,25 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
         .max()
         .map_or(3, |n| n.to_string().len());
 
-    let lines = diff.text.lines().enumerate().map(|(i, line)| {
+    let theme = syntax_theme();
+    let set = syntax_set();
+    let mut highlighter: Option<(Option<String>, HighlightLines<'static>)> = None;
+
+    let mut out = Vec::with_capacity(diff.text.lines().count());
+    for (i, line) in diff.text.lines().enumerate() {
         let boxed = focus.is_some_and(|r| r.contains(&i));
         let header = focus.is_some_and(|r| r.start == i);
-        let mut content_style = diff_line_style(line);
-        let mut gutter_style = Style::new().fg(IDLE).add_modifier(Modifier::DIM);
-        if boxed {
-            content_style = content_style.bg(FOCUS_BOX);
-            gutter_style = gutter_style.bg(FOCUS_BOX);
-        }
-        if header {
-            content_style = content_style.add_modifier(Modifier::REVERSED);
-            gutter_style = gutter_style.add_modifier(Modifier::REVERSED);
-        }
+        let overlay = |mut style: Style| -> Style {
+            if boxed {
+                style = style.bg(FOCUS_BOX);
+            }
+            if header {
+                style = style.add_modifier(Modifier::REVERSED);
+            }
+            style
+        };
+
+        let gutter_style = overlay(Style::new().fg(IDLE).add_modifier(Modifier::DIM));
         let (old, new) = numbers.get(i).copied().unwrap_or((None, None));
         let gutter = format!(
             "{:>w$} {:>w$}│",
@@ -217,12 +267,47 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
             new.map_or_else(String::new, |n| n.to_string()),
             w = width
         );
-        Line::from(vec![
-            Span::styled(gutter, gutter_style),
-            Span::styled(line.to_owned(), content_style),
-        ])
-    });
-    Text::from(lines.collect::<Vec<_>>())
+        let mut spans = vec![Span::styled(gutter, gutter_style)];
+
+        let ext = extensions.get(i).cloned().flatten();
+        let mut highlighted = false;
+        if let Some(theme) = theme {
+            if is_code_line(line) {
+                let need_new = !matches!(&highlighter, Some((cur, _)) if *cur == ext);
+                if need_new {
+                    let syntax = ext
+                        .as_deref()
+                        .and_then(|e| set.find_syntax_by_extension(e))
+                        .unwrap_or_else(|| set.find_syntax_plain_text());
+                    highlighter = Some((ext.clone(), HighlightLines::new(syntax, theme)));
+                }
+                if let Some((_, hl)) = highlighter.as_mut() {
+                    let prefix = line.get(..1).unwrap_or_default();
+                    let rest = line.get(1..).unwrap_or_default();
+                    let prefix_color = match prefix {
+                        "+" => ADD,
+                        "-" => DEL,
+                        _ => IDLE,
+                    };
+                    spans.push(Span::styled(prefix.to_owned(), overlay(fg(prefix_color))));
+                    for (style, text) in hl.highlight_line(rest, set).unwrap_or_default() {
+                        spans.push(Span::styled(
+                            text.to_owned(),
+                            overlay(Style::new().fg(to_color(style.foreground))),
+                        ));
+                    }
+                    highlighted = true;
+                }
+            }
+        }
+
+        if !highlighted {
+            spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line))));
+        }
+
+        out.push(Line::from(spans));
+    }
+    Text::from(out)
 }
 
 /// `git --shortstat` style summary shown above a diff: `N file(s) changed, X

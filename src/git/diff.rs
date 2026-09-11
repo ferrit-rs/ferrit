@@ -123,6 +123,24 @@ impl Diff {
         out
     }
 
+    /// File extension (no dot) for every line of `text`, one entry per file
+    /// section (`new_path`, falling back to `old_path` for a delete), used to
+    /// pick a syntect syntax per line. `None` where the path has no extension.
+    pub fn line_extensions(&self) -> Vec<Option<String>> {
+        let total = self.text.lines().count();
+        let mut out = vec![None; total];
+        let starts = self.file_lines();
+        for (idx, file) in self.files.iter().enumerate() {
+            let start = starts.get(idx).copied().unwrap_or(total);
+            let end = starts.get(idx + 1).copied().unwrap_or(total);
+            let ext = file_extension(&self.text, file);
+            if let Some(slice) = out.get_mut(start..end) {
+                slice.fill(ext);
+            }
+        }
+        out
+    }
+
     /// Files changed, insertions and deletions, lazygit/git-shortstat style.
     /// Derived from `line_numbers()`: a line with only a new number is an
     /// insertion, a line with only an old number is a deletion.
@@ -151,6 +169,20 @@ pub struct DiffStat {
     pub files: usize,
     pub insertions: usize,
     pub deletions: usize,
+}
+
+/// Extension (no dot) of a file's new path, or its old path for a delete.
+fn file_extension(text: &str, file: &FileMeta) -> Option<String> {
+    let range = if file.new_path.is_empty() {
+        file.old_path.clone()
+    } else {
+        file.new_path.clone()
+    };
+    let path = text.get(range)?;
+    Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_owned)
 }
 
 fn line_of(text: &str, byte: usize) -> usize {

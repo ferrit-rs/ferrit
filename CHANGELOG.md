@@ -21,6 +21,14 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   a commit) in a dim background tint, not just its header line, so the
   boundary a jump landed on stays visible even after scrolling the header out
   of view.
+- Diff and commit view: real per-language syntax highlighting of code content
+  (the `+`/`-`/` ` prefix keeps its add/delete/idle colour, the rest is
+  tokenised and coloured by `syntect`), with the language picked from the
+  changed file's extension (`Diff::line_extensions`) and falling back to
+  plain-text tokenising when the extension is unknown. Adds the `syntect`
+  dependency (bundled `default-fancy` syntaxes and colour themes, so no
+  external files or config are needed) instead of the cheaper plain-color
+  scheme it replaces, matching lazygit's real highlighted diff content.
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.
