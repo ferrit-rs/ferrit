@@ -4,5 +4,11 @@
   // only in a terminal opened after they took effect (images are not restored
   // across a window reload). VS Code >= 1.94.
   "terminal.integrated.enableImages": true,
-  "terminal.integrated.gpuAcceleration": "on"
+  "terminal.integrated.gpuAcceleration": "on",
+
+  // taplo's Cargo.toml schema doesn't know clippy's lint table shape (level+priority),
+  // false "anyOf" errors on [lints.clippy]/[lints.rust]. cargo itself validates this.
+  "evenBetterToml.schema.associations": {
+    "^Cargo\\.toml$": ""
+  }
 }
