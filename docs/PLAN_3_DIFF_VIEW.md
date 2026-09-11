@@ -34,12 +34,12 @@ Consequences ferrit takes on deliberately:
   don't page), `diff.noprefix`, and anything else the user set applies,
   because it is their `git` running. `git2::Patch` would have ignored all of
   it.
-- **No `syntect`.** lazygit shows git's own colouring: hunk header, `+`/`-`
-  lines, and (when enabled) whitespace-error and word-diff. It does not do
-  language syntax highlighting; the "delta look" is delta, an *external*
-  diff renderer the user opts into (`diff.external`). ferrit matches that:
-  phase 3 colours exactly what git colours, and an external renderer is a
-  named follow-up, not phase 3. Dropping `syntect` also drops a dependency.
+- **`syntect` added after all, post-D5.** The plan originally matched
+  lazygit (git's own +/-/@@ colouring only, no language highlighting,
+  `syntect` dropped). That held through D0-D5. A follow-up phase D
+  (below) added real per-language syntax highlighting on top of it anyway,
+  by explicit request, closer to gitu/delta than lazygit. See "Dependencies"
+  and "Out of scope".
 - **Phase 6 staging gets easier, not harder.** A stageable patch is a byte
   slice of the diff text (`file header + one hunk`, or `file header + hunk
   header + selected lines`), fed to `git apply --cached`. Same technique as
@@ -365,21 +365,24 @@ string-sniffs a `&'static str` and cannot take an owned runtime diff. Replace
 with:
 
 ```rust
-// src/ui/diff.rs  (matching where the other line-renderers live)
-pub fn render_diff(diff: &git::Diff, focus: Option<usize>) -> Text<'static>;
+// src/theme.rs (actual home; ended up next to the other line-renderers there)
+pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static>;
 ```
 
-`focus` is a hunk index for `DiffView::Files`, a file index for
-`DiffView::Commit` (the two never mix in one call). Walk `diff.files` /
-`hunks` and slice `diff.text`:
+`focus` is a `Range<usize>` of line indices (the whole focused hunk/file
+block, header to next header), not a single index: phase C boxes the whole
+range, not just the header line. Walk `diff.files` / `hunks` and slice
+`diff.text`:
 
 - file separator `diff --git a/… b/…`: `IDLE` + `BOLD`.
 - hunk header `@@ … @@ ctx`: `HUNK` (cyan), as the mock already did.
 - body line by first byte: `+` -> `ADD` (green), `-` -> `DEL` (red),
-  ` ` -> `IDLE`, `\` (`\ No newline…`) -> `IDLE` + dim.
-- `focus` (from `]` / `[`): the target hunk's / file's header gets
-  `REVERSED` so the jump lands visibly. Optional polish, drop if it
-  complicates D4.
+  ` ` -> `IDLE`, `\` (`\ No newline…`) -> `IDLE` + dim. Post-phase-D, the
+  rest of a code line (after the prefix) is `syntect`-tokenised instead of
+  flat-coloured; the prefix keeps its add/delete/idle colour either way.
+- `focus`: every line in the range gets a `FOCUS_BOX` background, and the
+  range's first line (the hunk/file header) also gets `REVERSED`, so a `]`
+  / `[` jump lands visibly on the whole block, not just one line.
 
 `DiffView::Commit` prepends a metadata block from the `CommitEntry`
 (`git show` also prints it, but we already have it parsed and styled by
@@ -434,11 +437,16 @@ line index, computed from the parse.
 
 ## Dependencies
 
-None added. `std::process::Command` runs `git`. `git2` (in the tree since
-phase 2) still backs Status / Files / Branches / Commits / Stash and the
-commit metadata; it is just not used for diff text.
+D0-D5: none added. `std::process::Command` runs `git`. `git2` (in the tree
+since phase 2) still backs Status / Files / Branches / Commits / Stash and
+the commit metadata; it is just not used for diff text.
 
-`syntect` is NOT added (removed from this plan versus the earlier draft).
+Post-D5: `syntect = "5"` added (default features, bundled syntaxes +
+themes, no external files/config). Used only in `theme::render_diff` to
+tokenise and colour the code content of a `+`/`-`/` ` line, keyed off the
+changed file's extension (`Diff::line_extensions`); the `+`/`-`/` ` prefix
+itself keeps its plain add/delete/idle colour. Falls back to plain-text
+tokenising when the extension is unknown or has no bundled syntax.
 
 ## Out of scope
 
@@ -448,15 +456,16 @@ commit metadata; it is just not used for diff text.
   a ferrit config key. lazygit supports it; ferrit's `DiffCmd` builder
   leaves room for one `--ext-diff` + `-c diff.external=…` addition later.
   Named follow-up, not phase 3.
-- Language syntax highlighting beyond git's own colouring. lazygit does not
-  do it natively; `../ferrit-references/tui/gitu` layers tree-sitter and
-  `rendering/delta` is the quality bar, both are post-phase-3 ambitions
-  (`docs/INSPIRATION.md`). When it lands, the technique is gitu's
-  `mask_old_hunk` / `mask_new_hunk` (`tui/gitu/src/git/diff.rs`): to
-  highlight one side of a hunk, blank the other side's lines to spaces
-  (keeping `\n`) and strip the `+`/`-` prefix, so byte offsets line up and
-  the highlighter sees near-valid source; then zip the old and new highlight
-  spans back over the diff lines.
+- ~~Language syntax highlighting beyond git's own colouring~~: done, see
+  phase D below. What is still out of scope is gitu's finer technique
+  (`mask_old_hunk` / `mask_new_hunk`, `tui/gitu/src/git/diff.rs`: blank the
+  other side's lines to spaces and strip the `+`/`-` prefix so the
+  highlighter sees near-valid source on both sides of a hunk, then zip the
+  spans back). ferrit's phase D highlights each line's own text directly
+  (prefix stripped, rest tokenised standalone), which is simpler and good
+  enough; the gitu technique is a quality follow-up if standalone-line
+  tokenising ever looks wrong on multi-line constructs (block comments,
+  multi-line strings).
 - Horizontal scroll of un-wrapped diff lines (phase 3 soft-wraps instead).
 - Word-level / intra-line highlight, side-by-side layout, combined
   merge-commit diff.
@@ -495,25 +504,40 @@ test, then `git` run against them.
 
 ## Milestones
 
-- **D0** `src/git/diff.rs` + `src/git/diff/parse.rs`: `DiffSide`, `DiffOpts`,
+- **D0** done. `src/git/diff.rs` + `src/git/diff/parse.rs`: `DiffSide`, `DiffOpts`,
   `Diff`, `FileMeta`, `FileStatus`, `HunkMeta`. `parse::diff` with
   `tests/diff_parse.rs` green (rename / mode / no-newline / multi-file).
-- **D1** `Repo::file_diff` (both sides, `--no-index` for untracked, binary
+- **D1** done. `Repo::file_diff` (both sides, `--no-index` for untracked, binary
   detection). `GitError::DiffFailed`. `tests/git_diff.rs` file-diff cases.
-- **D2** `CommitEntry::full_hash`; `short_hash` derived from it;
+- **D2** done. `CommitEntry::full_hash`; `short_hash` derived from it;
   `git::log::commits` + `mock::mock_commits` updated. `Repo::commit_diff`
   (`-m --first-parent`, root commit, `NoSuchCommit`). `tests/git_diff.rs`
   commit cases.
-- **D3** `DiffView` + `right_key` + `right_scroll` in `App`;
+- **D3** done. `DiffView` + `right_key` + `right_scroll` in `App`;
   `update_preview()` renamed `update_right_pane()` across all five call
   sites, with the change-detect / scroll-preserve logic above. Files and
-  Commits render real diffs via `src/ui/diff.rs`; `theme::diff_text`
+  Commits render real diffs via `theme::render_diff`; `theme::diff_text`
   removed. `Ctrl-d` / `Ctrl-u`. `tests/app_refresh.rs` green.
-- **D4** `]` / `[` hunk/file jump. Commit metadata block. Binary / empty
-  notes. `focus` reverse-highlight (optional).
-- **D5** polish: `cargo clippy --all-targets` clean, no warnings; scrolling
+- **D4** done. `]` / `[` hunk/file jump. Commit metadata block. Binary / empty
+  notes. `focus` reverse-highlight: done as a boxed background + reversed
+  header on the focused hunk/file (`theme::FOCUS_BOX`, the `overlay` closure
+  in `render_diff`), not just the header line.
+- **D5** done. `cargo clippy --all-targets` clean, no warnings; scrolling
   or resizing past the end of an empty / one-line / huge diff never panics;
   `tests/render.rs` region snapshot; every D0..D2 case covered.
+
+Post-D5 additions, same `render_diff` pipeline, each its own commit:
+
+- **phase A** lazygit-style `old new│` line-number gutter
+  (`Diff::line_numbers`).
+- **phase B** `git --shortstat`-style summary line above the diff
+  (`Diff::stat` / `DiffStat`, `theme::stat_line`).
+- **phase C** boxed hunk/file focus highlight (`FOCUS_BOX` background over
+  the whole focused block, not just a reversed header line).
+- **phase D** real per-language syntax highlighting via `syntect`
+  (`Diff::line_extensions`, `theme::render_diff`'s `HighlightLines` cache,
+  `is_code_line` gate that skips file/hunk headers and metadata). See
+  "Dependencies" and "Out of scope" above.
 
 ## Definition of done (phase 3)
 
