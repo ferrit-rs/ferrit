@@ -6,6 +6,7 @@
 //! `App::mock()` is the repo-free path the render tests use.
 
 use std::fmt::Write as _;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use color_eyre::Result;
@@ -14,7 +15,7 @@ use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Position, Rect};
-use ratatui::text::Line;
+use ratatui::text::{Line, Text};
 use ratatui_image::picker::Picker;
 
 use crate::events::{AppEvent, Events};
@@ -47,6 +48,14 @@ pub enum DiffView {
 enum RightKey {
     File { path: PathBuf, side: DiffSide },
     Commit { full_hash: String },
+}
+
+struct RenderedDiff {
+    key: Option<RightKey>,
+    source: String,
+    focus: Option<Range<usize>>,
+    width: usize,
+    text: Text<'static>,
 }
 
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default
@@ -148,6 +157,9 @@ pub struct App {
     diff: DiffView,
     /// What `diff` currently describes. `None` when no diff applies.
     right_key: Option<RightKey>,
+    /// Cached styled diff. Scroll changes only Paragraph offset, so it must
+    /// not rerun syntax highlighting or rebuild every line.
+    rendered_diff: Option<RenderedDiff>,
     /// First visible line of the right-pane diff. Kept across a `Refresh` of
     /// an unchanged selection; reset to 0 when the selection changes.
     right_scroll: usize,
@@ -196,6 +208,7 @@ impl App {
             preview: Preview::None,
             diff: DiffView::None,
             right_key: None,
+            rendered_diff: None,
             right_scroll: 0,
             right_viewport: 0,
             right_area: Rect::ZERO,
@@ -418,6 +431,41 @@ impl App {
     /// Current right-pane diff, for `ui::draw_right_pane`.
     pub fn diff_view(&self) -> &DiffView {
         &self.diff
+    }
+
+    /// Return cached styled diff. Cache invalidates on selection, diff text,
+    /// focus range, or pane width; pure scrolling reuses `Text`.
+    pub fn rendered_diff(
+        &mut self,
+        focus: Option<&Range<usize>>,
+        width: usize,
+    ) -> Option<(Text<'static>, usize, git::DiffStat)> {
+        let key = &self.right_key;
+        let cache = &mut self.rendered_diff;
+        match &self.diff {
+            DiffView::Files(diff) | DiffView::Commit(_, diff) => {
+                let cache_hit = cache.as_ref().is_some_and(|cached| {
+                    cached.key.as_ref() == key.as_ref()
+                        && cached.source == diff.text
+                        && cached.focus.as_ref() == focus
+                        && cached.width == width
+                });
+                if !cache_hit {
+                    let text = theme::render_diff(diff, focus, width);
+                    *cache = Some(RenderedDiff {
+                        key: key.clone(),
+                        source: diff.text.clone(),
+                        focus: focus.cloned(),
+                        width,
+                        text,
+                    });
+                }
+                cache
+                    .as_ref()
+                    .map(|cached| (cached.text.clone(), diff.text.lines().count(), diff.stat()))
+            },
+            DiffView::None | DiffView::Note(_) => None,
+        }
     }
 
     /// First visible line of the right-pane diff.

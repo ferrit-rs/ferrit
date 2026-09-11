@@ -226,33 +226,27 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // header a `]` / `[` jump last landed on, and a scrollbar when it overflows.
     let scroll = app.right_scroll();
     if matches!(app.diff_view(), DiffView::Files(_) | DiffView::Commit(..)) {
-        let (text, total, stat) = match app.diff_view() {
-            DiffView::Files(diff) | DiffView::Commit(_, diff) => {
-                let anchors = match app.diff_view() {
-                    DiffView::Commit(..) => diff.file_lines(),
-                    _ => diff.hunk_lines(),
-                };
-                let total = diff.text.lines().count();
-                let focus = anchors.iter().position(|&l| l == scroll).map(|i| {
-                    let end = anchors.get(i + 1).copied().unwrap_or(total);
-                    scroll..end
-                });
-                (theme::render_diff(diff, focus.as_ref()), total, diff.stat())
-            },
-            #[expect(
-                clippy::unreachable,
-                reason = "the enclosing `matches!` guard admits only Files/Commit"
-            )]
-            _ => unreachable!("guarded by the matches! above"),
-        };
         let inner = block.inner(area);
-        frame.render_widget(block, area);
         let [stat_row, diff_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+        let (anchors, total) = match app.diff_view() {
+            DiffView::Files(diff) => (diff.hunk_lines(), diff.text.lines().count()),
+            DiffView::Commit(_, diff) => (diff.file_lines(), diff.text.lines().count()),
+            _ => return,
+        };
+        let focus = anchors.iter().position(|&l| l == scroll).map(|i| {
+            let end = anchors.get(i + 1).copied().unwrap_or(total);
+            scroll..end
+        });
+        let Some((text, total, stat)) =
+            app.rendered_diff(focus.as_ref(), diff_area.width as usize)
+        else {
+            return;
+        };
+        frame.render_widget(block, area);
         frame.render_widget(Paragraph::new(theme::stat_line(stat)), stat_row);
 
-        let panel =
-            Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
+        let panel = Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, diff_area);
         let viewport = diff_area.height as usize;
         if total > viewport {

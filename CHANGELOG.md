@@ -9,6 +9,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Diff renderer now matches target lazygit/lazygitrs pager treatment: context
+  lines keep syntax colours on plain background; `+`/`-` lines use flat
+  add/delete colours with a full-width background.
+- Styled diff `Text` now caches in `App`; scroll-only redraws reuse rendered
+  spans. Cache invalidates on diff content, selection, focus anchor, or pane
+  width changes.
 - `docs/TESTS_STRATEGY.md`: maps lazygit's 551-file integration test suite
   onto our phase table as a `.script` behavior backlog, companion to
   `PLAN_SELF_TESTING.md`.

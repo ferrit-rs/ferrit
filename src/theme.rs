@@ -229,15 +229,17 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
 
 /// Render a parsed `Diff` for the right pane: a lazygit-style `old new│`
 /// gutter from `Diff::line_numbers` in front of every line (blank on
-/// headers, one-sided on an addition/deletion); a code line (not a
-/// file/commit header, hunk marker, or binary/no-newline notice) is
-/// tokenized by `syntect` for its per-language foreground colour, and a `+`/
-/// `-` line additionally gets a full-line `ADD_LINE_BG`/`DEL_LINE_BG` pastel
-/// background under that text, gitu/delta style; everything else falls back
-/// to the flat `diff_line_style` colour. When `focus` is set, a `FOCUS_BOX`
+/// headers, one-sided on an addition/deletion). Syntax colour and the
+/// full-line add/delete background are mutually exclusive, lazygit/lazygitrs
+/// pager style: a context line (not a file/commit header, hunk marker, or
+/// binary/no-newline notice) is tokenized by `syntect` for its per-language
+/// foreground colour on a plain background; a `+`/`-` line instead gets flat
+/// `ADD`/`DEL` foreground plus a full-line `ADD_LINE_BG`/`DEL_LINE_BG`
+/// pastel background, no per-token colour. Everything else falls back to
+/// the flat `diff_line_style` colour. When `focus` is set, a `FOCUS_BOX`
 /// background boxes every line of the hunk (or file, in a commit) a `]` /
 /// `[` jump last landed on, its header reversed.
-pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
+pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize) -> Text<'static> {
     let numbers = diff.line_numbers();
     let extensions = diff.line_extensions();
     let width = numbers
@@ -274,54 +276,79 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
         );
         let mut spans = vec![Span::styled(gutter, gutter_style)];
 
-        let line_bg = if line.starts_with('+') {
+        let changed = if line.starts_with('+') && !line.starts_with("+++") {
             Some(ADD_LINE_BG)
-        } else if line.starts_with('-') {
+        } else if line.starts_with('-') && !line.starts_with("---") {
             Some(DEL_LINE_BG)
         } else {
             None
         };
-        let ext = extensions.get(i).cloned().flatten();
-        let syntax = is_code_line(line)
-            .then_some(ext.as_deref())
-            .flatten()
-            .and_then(|ext| set.find_syntax_by_extension(ext));
 
-        match syntax {
-            Some(syntax) => {
-                let marker_len = usize::from(line.starts_with(['+', '-', ' ']));
-                let marker = line.get(..marker_len).unwrap_or_default();
-                let body = line.get(marker_len..).unwrap_or_default();
-                let base = line_bg.map_or_else(Style::new, |bg| Style::new().bg(bg));
-                if !marker.is_empty() {
-                    let marker_fg = if marker == "+" {
-                        Some(ADD)
-                    } else if marker == "-" {
-                        Some(DEL)
-                    } else {
-                        None
-                    };
-                    let marker_style = marker_fg.map_or(base, |c| base.fg(c));
-                    spans.push(Span::styled(marker.to_owned(), overlay(marker_style)));
-                }
-                let mut hl = HighlightLines::new(syntax, theme);
-                let tokens = hl
-                    .highlight_line(body, set)
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>();
-                if tokens.is_empty() {
-                    spans.push(Span::styled(body.to_owned(), overlay(base)));
-                }
-                for (style, text) in tokens {
-                    let span_style = base.fg(to_color(style.foreground));
-                    spans.push(Span::styled(text.to_owned(), overlay(span_style)));
-                }
-            },
-            None => spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line)))),
+        if let Some(bg) = changed {
+            // `+`/`-` line: flat marker/body colour on the full-line
+            // background, no syntax tokenizing.
+            let base = Style::new().bg(bg);
+            let text_fg = if line.starts_with('+') { ADD } else { DEL };
+            spans.push(Span::styled(line.to_owned(), overlay(base.fg(text_fg))));
+        } else {
+            // Context (or header/hunk-marker/binary line): syntax colour
+            // when eligible, flat `diff_line_style` otherwise.
+            let ext = extensions.get(i).cloned().flatten();
+            let syntax = is_code_line(line)
+                .then_some(ext.as_deref())
+                .flatten()
+                .and_then(|ext| set.find_syntax_by_extension(ext));
+            match syntax {
+                Some(syntax) => {
+                    let marker_len = usize::from(line.starts_with(' '));
+                    let marker = line.get(..marker_len).unwrap_or_default();
+                    let body = line.get(marker_len..).unwrap_or_default();
+                    if !marker.is_empty() {
+                        spans.push(Span::styled(marker.to_owned(), overlay(Style::new())));
+                    }
+                    let mut hl = HighlightLines::new(syntax, theme);
+                    let tokens = hl
+                        .highlight_line(body, set)
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    if tokens.is_empty() {
+                        spans.push(Span::styled(body.to_owned(), overlay(Style::new())));
+                    }
+                    for (style, text) in tokens {
+                        let span_style = fg(to_color(style.foreground));
+                        spans.push(Span::styled(text.to_owned(), overlay(span_style)));
+                    }
+                },
+                None => {
+                    spans.push(Span::styled(
+                        line.to_owned(),
+                        overlay(diff_line_style(line)),
+                    ));
+                },
+            }
         }
 
-        out.push(Line::from(spans));
+        let mut rendered = Line::from(spans);
+        if changed.is_some() || boxed {
+            let fill_style = if changed.is_some() {
+                let bg = if line.starts_with('+') {
+                    ADD_LINE_BG
+                } else {
+                    DEL_LINE_BG
+                };
+                overlay(Style::new().bg(bg))
+            } else {
+                overlay(Style::new())
+            };
+            let padding = panel_width.saturating_sub(rendered.width());
+            if padding > 0 {
+                rendered
+                    .spans
+                    .push(Span::styled(" ".repeat(padding), fill_style));
+            }
+        }
+        out.push(rendered);
     }
     Text::from(out)
 }

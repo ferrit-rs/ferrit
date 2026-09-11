@@ -2,15 +2,14 @@
 
 ## Goal
 
-Right pane's diff/commit view, delta-pager look: syntax colour and the
-full-line add/delete background are mutually exclusive, never both on the
-same line, and the render stays cheap on a large diff.
+Right pane's diff/commit view, lazygit/lazygitrs pager look: syntax colour and
+full-line add/delete background are mutually exclusive, never both on same
+line, with full-width changed-line bars and cached rendering.
 
 ## Target rendering
 
-Context lines keep per-token syntax colour on a plain background. A `+`/`-`
-line gets the full-line background with flat/plain text, no per-token colour
-underneath:
+Context lines keep per-token syntax colour on plain background. A `+`/`-` line
+gets full-width background with flat/plain text, no per-token colour:
 
 ```
   444:450    self.left_areas[pane] = area;                 <- context: syntax colour, no bg
@@ -30,18 +29,14 @@ highlight (from earlier work) are unaffected by this change.
 
 - `src/theme.rs`, `render_diff`: a `+`/`-` line stops calling
   `HighlightLines` and instead gets flat `ADD`/`DEL` foreground plus the
-  full-line `ADD_LINE_BG`/`DEL_LINE_BG` background. Only context lines stay
-  `syntect`-tokenized. `is_code_line` still gates which lines are eligible
-  for syntax colour at all (headers, hunk markers, binary/no-newline notices
-  stay flat).
+  full-width `ADD_LINE_BG`/`DEL_LINE_BG` background. Only context lines stay
+  `syntect`-tokenized. `is_code_line` still gates syntax colour (headers,
+  hunk markers, binary/no-newline notices stay flat).
 - Render performance: `render_diff` currently re-tokenizes every code line of
   the *entire* diff on every redraw (any keypress, tick, resize), not just
   the visible viewport, with no cache. Cache the built `Text` (in `App`,
-  alongside `DiffView`), keyed on the diff's identity (`right_key` + the
-  `text` already compared for the refresh-staleness check) and the current
-  `focus` range. Rebuild only when the diff text changes (new selection, or
-  content changed on disk) or `focus` changes (`]`/`[` jump); a pure scroll
-  must not rebuild.
+  alongside `DiffView`), keyed on `right_key`, diff `text`, focus range, and
+  pane width. Rebuild only when one changes; pure scroll must not rebuild.
 
 ## Out of scope
 
