@@ -20,3 +20,11 @@ first "yes":
 
 Adding a new dependency, a new module, or an abstraction with a single caller
 needs a reason stated in the commit message.
+
+
+
+
+
+### Self improving 
+
+- When I correct a behavior/pattern/preference (not a one-off fact) and you judge it will recur, append one bullet under `## Inbox` in `__SKILLS_LEARNINGS/LEARNINGS.md` (`YYYY-MM-DD [domain] avoid X, do Y, because Z`) and mirror it to auto-memory as `feedback`. You decide, no keyword. Then print: `📝 learning saved: "<one-line>" (say "drop it" to undo)`. Skip: project trivia, anything already enforced by lint/tsconfig/biome/CI, low-confidence guesses. `learn this` forces it.
