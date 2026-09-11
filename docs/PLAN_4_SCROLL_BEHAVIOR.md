@@ -115,11 +115,21 @@ screen below it.
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 
 // after render_widget(paragraph, area), same arm:
-let total = diff.text.lines().count();
-if total > inner.height as usize {
-    let mut sb = ScrollbarState::new(total).position(scroll);
+let viewport = inner.height as usize;
+if total > viewport {
+    // `ScrollbarState::content_length` is the count of distinct scroll
+    // positions (`total - viewport + 1`), not the raw line count: sizing
+    // the thumb against the raw total leaves it one cell short of the
+    // track's end at max scroll. `viewport_content_length` must also be
+    // set, or the thumb is sized against `area.height` instead.
+    let max_scroll = total - viewport;
+    let mut sb = ScrollbarState::new(max_scroll + 1)
+        .position(scroll.min(max_scroll))
+        .viewport_content_length(viewport);
     frame.render_stateful_widget(
-        Scrollbar::new(ScrollbarOrientation::VerticalRight),
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None),
         area.inner(Margin { vertical: 1, horizontal: 0 }),
         &mut sb,
     );
@@ -127,10 +137,16 @@ if total > inner.height as usize {
 ```
 
 `area.inner(Margin { vertical: 1, .. })` keeps the track between the border
-corners. Drawn only on overflow, like lazyjj and lazygit. The `Note` / mock
-bodies do not get one (they do not overflow in practice; revisit if that
-changes). No theming knob yet, default `Scrollbar` glyphs; a palette entry
-is phase 12.
+corners. Drawn only on overflow, like lazyjj and lazygit. `begin_symbol(None)`
+/ `end_symbol(None)` drop the arrow glyphs (and the track space they'd
+reserve) for a plain track + thumb, lazygit style. The `Note` / mock bodies
+do not get one (they do not overflow in practice; revisit if that changes).
+The same `content_length = max_scroll + 1` shape and arrow-less symbols are
+reused for the left-column list scrollbars (Status, Files, Branches,
+Commits, Stash), coloured like the pane's own border (green when focused,
+grey otherwise) — a phase-4 follow-up beyond this plan's original left-pane
+scope, but the same overflow-only scrollbar mechanism. No theming knob
+beyond that border colour; a fuller palette entry is phase 12.
 
 ## Mouse wheel
 
@@ -210,9 +226,12 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   `App` needs a test seam for the viewport (`set_right_viewport`) and for
   feeding a synthetic `MouseEvent` (`on_mouse` is already `pub(crate)` via
   the test module, like `on_key`).
-- `tests/render.rs`: one `TestBackend` frame with a diff taller than the
-  pane asserts a vertical scrollbar glyph column at the right edge of
-  `right_area`; one frame with a short diff asserts none.
+- `tests/scrollbar.rs` (own file, not `diff_app.rs`): one `TestBackend`
+  frame with a diff taller than the pane asserts a solid thumb glyph column
+  at the right edge of `right_area` and that it reaches the track's exact
+  top/bottom at min/max scroll; one frame with a short diff asserts none.
+  Same coverage for each left-column pane, plus a green-vs-grey thumb
+  colour check for focused vs. unfocused.
 - Existing `tests/render.rs` cases (`right_pane_follows_focus`,
   `image_selection_takes_over_the_right_pane`) must stay green: the mock
   bodies and the image path draw no scrollbar and ignore the scroll keys.
@@ -223,9 +242,13 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   `draw_right_pane`. Viewport-aware clamp (`max_right_scroll`). `J` / `K`,
   `<pgup>` / `<pgdn>`, `<` / `>`; `Ctrl-d` / `Ctrl-u` re-expressed in terms
   of the viewport; `RIGHT_HALF_PAGE` deleted. `tests/diff_app.rs` key cases.
-- **S1** `Scrollbar` on the `DiffView::Files` / `::Commit` arm, overflow only.
-  `mock::KEYBAR` / `mock::HELP` updated. `tests/render.rs` scrollbar
-  assertion (present on overflow, absent when it fits).
+- **S1** `Scrollbar` on the `DiffView::Files` / `::Commit` arm, overflow only,
+  arrow-less (`begin_symbol(None)` / `end_symbol(None)`), thumb reaching the
+  track's exact ends via `content_length = max_scroll + 1`. Same scrollbar on
+  every left-column pane, coloured by the pane's border style. `mock::KEYBAR`
+  / `mock::HELP` updated. `tests/scrollbar.rs` assertions (present on
+  overflow, absent when it fits, thumb touches both track ends, green when
+  focused).
 - **S2** `EnableMouseCapture` / `DisableMouseCapture` in `tui`. `App::run`
   handles `Event::Mouse`; `App::on_mouse` routes wheel by column
   (`App::right_area`). `tests/diff_app.rs` wheel cases.
@@ -240,13 +263,15 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   left-pane selection.
 - Scrolling stops with the last line at the bottom of the pane, never past
   it; an empty or one-line diff is a no-op, never a panic.
-- A scrollbar shows on the right pane exactly when the diff overflows, and
-  its thumb tracks `right_scroll`.
+- A scrollbar shows on the right pane exactly when the diff overflows, its
+  thumb tracks `right_scroll` and touches both track ends at min/max scroll,
+  and it draws no arrow glyphs. Every left-column pane gets the same
+  treatment when its list overflows, thumb green while focused.
 - The scroll keys and the wheel are inert over an image, a `Note`, and the
   mock bodies.
 - `mock::KEYBAR` / `mock::HELP` list the new keys.
-- `cargo clippy --all-targets` clean; `tests/diff_app.rs` and
-  `tests/render.rs` pass.
+- `cargo clippy --all-targets` clean; `tests/diff_app.rs`, `tests/scrollbar.rs`
+  and `tests/render.rs` pass.
 
 ## After phase 4
 
