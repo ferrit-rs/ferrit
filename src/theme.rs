@@ -178,10 +178,39 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
     Text::from(lines.collect::<Vec<_>>())
 }
 
-/// Render a parsed `Diff` for the right pane. Thin wrapper over `diff_lines`
-/// over `diff.text`; the parse drives navigation, not colour.
+/// Render a parsed `Diff` for the right pane: `diff_lines` colouring, plus a
+/// lazygit-style `old new│` gutter from `Diff::line_numbers` in front of every
+/// line (blank on headers, one-sided on an addition/deletion).
 pub fn render_diff(diff: &Diff, focus: Option<usize>) -> Text<'static> {
-    diff_lines(&diff.text, focus)
+    let numbers = diff.line_numbers();
+    let width = numbers
+        .iter()
+        .flat_map(|&pair| <[_; 2]>::from(pair))
+        .flatten()
+        .max()
+        .map_or(3, |n| n.to_string().len());
+
+    let lines = diff.text.lines().enumerate().map(|(i, line)| {
+        let focused = focus == Some(i);
+        let mut content_style = diff_line_style(line);
+        let mut gutter_style = Style::new().fg(IDLE).add_modifier(Modifier::DIM);
+        if focused {
+            content_style = content_style.add_modifier(Modifier::REVERSED);
+            gutter_style = gutter_style.add_modifier(Modifier::REVERSED);
+        }
+        let (old, new) = numbers.get(i).copied().unwrap_or((None, None));
+        let gutter = format!(
+            "{:>w$} {:>w$}│",
+            old.map_or_else(String::new, |n| n.to_string()),
+            new.map_or_else(String::new, |n| n.to_string()),
+            w = width
+        );
+        Line::from(vec![
+            Span::styled(gutter, gutter_style),
+            Span::styled(line.to_owned(), content_style),
+        ])
+    });
+    Text::from(lines.collect::<Vec<_>>())
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.

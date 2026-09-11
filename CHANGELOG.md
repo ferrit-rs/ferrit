@@ -9,6 +9,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Diff and commit view: a lazygit-style `old new│` line-number gutter in front
+  of every line, derived from the hunk header counters already parsed
+  (`Diff::line_numbers`). Blank on headers, one-sided on an addition or
+  deletion, both columns on context.
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.

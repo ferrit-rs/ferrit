@@ -93,6 +93,24 @@ fn no_newline_marker_stays_in_the_hunk_body() {
 }
 
 #[test]
+fn line_numbers_derive_old_and_new_columns() {
+    let diff = parse_diff(SAMPLE);
+    let numbers = diff.line_numbers();
+
+    assert_eq!(numbers[4], (None, None), "hunk header carries no number");
+    assert_eq!(numbers[5], (Some(1), Some(1)), "context counts both sides");
+    assert_eq!(numbers[6], (Some(2), None), "deletion has no new-side number");
+    assert_eq!(numbers[7], (None, Some(2)), "addition has no old-side number");
+    assert_eq!(numbers[8], (None, Some(3)), "second addition keeps counting new");
+    assert_eq!(numbers[9], (Some(3), Some(4)), "context resumes both counters");
+    assert_eq!(
+        numbers[13],
+        (None, None),
+        "`\\ No newline` marker carries no number"
+    );
+}
+
+#[test]
 fn hunk_and_file_line_indices_are_in_order() {
     let diff = parse_diff(SAMPLE);
     let files = diff.file_lines();

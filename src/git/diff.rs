@@ -81,6 +81,47 @@ impl Diff {
             .map(|f| line_of(&self.text, f.header.start))
             .collect()
     }
+
+    /// Old/new line number for every line of `text`; `None` on a line that has
+    /// no number of its own (file/hunk headers, `\ No newline at end of file`).
+    /// An addition carries only a new number, a deletion only an old one,
+    /// context carries both. Same derivation as lazygit's patch line-number
+    /// gutter (`commands/patch/parse.go`), from the counters each hunk header
+    /// already gives us (`HunkMeta::old_start`/`new_start`).
+    pub fn line_numbers(&self) -> Vec<(Option<u32>, Option<u32>)> {
+        let mut out = vec![(None, None); self.text.lines().count()];
+        for hunk in self.files.iter().flat_map(|f| &f.hunks) {
+            let mut old = hunk.old_start;
+            let mut new = hunk.new_start;
+            let start_line = line_of(&self.text, hunk.body.start);
+            let body = self.text.get(hunk.body.clone()).unwrap_or_default();
+            for (i, line) in body.lines().enumerate() {
+                let Some(slot) = out.get_mut(start_line + i) else {
+                    continue;
+                };
+                *slot = match line.as_bytes().first() {
+                    Some(b'+') => {
+                        let n = new;
+                        new += 1;
+                        (None, Some(n))
+                    },
+                    Some(b'-') => {
+                        let n = old;
+                        old += 1;
+                        (Some(n), None)
+                    },
+                    Some(b'\\') => (None, None),
+                    _ => {
+                        let n = (old, new);
+                        old += 1;
+                        new += 1;
+                        (Some(n.0), Some(n.1))
+                    },
+                };
+            }
+        }
+        out
+    }
 }
 
 fn line_of(text: &str, byte: usize) -> usize {
