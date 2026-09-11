@@ -2,6 +2,7 @@
 
 - Rapid iteration: commit and push straight to `main`, no branches, no PRs.
 - Every visible change adds a line under `## [Unreleased]` in `CHANGELOG.md`.
+- If you change something related to `PLAN_N`, make sure to also change the content of the file.
 
 ## Before writing code
 
