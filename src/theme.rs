@@ -6,7 +6,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 
-use crate::git::{BranchEntry, CommitEntry, Diff, FileEntry, StashEntry};
+use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, StashEntry};
 
 /// Border and title of the focused left pane (lazygit `activeBorderColor`).
 pub const FOCUS: Color = Color::Green;
@@ -211,6 +211,40 @@ pub fn render_diff(diff: &Diff, focus: Option<usize>) -> Text<'static> {
         ])
     });
     Text::from(lines.collect::<Vec<_>>())
+}
+
+/// `git --shortstat` style summary shown above a diff: `N file(s) changed, X
+/// insertion(s)(+), Y deletion(s)(-)`, insertions in green, deletions in red.
+/// A part is skipped when its count is zero, matching real `git` output.
+pub fn stat_line(stat: DiffStat) -> Line<'static> {
+    let mut spans = vec![Span::raw(format!(
+        "{} file{} changed",
+        stat.files,
+        if stat.files == 1 { "" } else { "s" }
+    ))];
+    if stat.insertions > 0 {
+        spans.push(Span::raw(", "));
+        spans.push(Span::styled(
+            format!(
+                "{} insertion{}(+)",
+                stat.insertions,
+                if stat.insertions == 1 { "" } else { "s" }
+            ),
+            fg(ADD),
+        ));
+    }
+    if stat.deletions > 0 {
+        spans.push(Span::raw(", "));
+        spans.push(Span::styled(
+            format!(
+                "{} deletion{}(-)",
+                stat.deletions,
+                if stat.deletions == 1 { "" } else { "s" }
+            ),
+            fg(DEL),
+        ));
+    }
+    Line::from(spans)
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.

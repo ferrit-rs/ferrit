@@ -13,6 +13,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   of every line, derived from the hunk header counters already parsed
   (`Diff::line_numbers`). Blank on headers, one-sided on an addition or
   deletion, both columns on context.
+- Diff and commit view: a `git --shortstat` style summary line (`N file(s)
+  changed, X insertion(s)(+), Y deletion(s)(-)`) above the scrollable diff,
+  derived from `Diff::stat`. Rendered as its own row so it does not shift the
+  line-index alignment scroll and hunk/file focus rely on.
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.

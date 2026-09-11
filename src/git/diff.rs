@@ -122,6 +122,35 @@ impl Diff {
         }
         out
     }
+
+    /// Files changed, insertions and deletions, lazygit/git-shortstat style.
+    /// Derived from `line_numbers()`: a line with only a new number is an
+    /// insertion, a line with only an old number is a deletion.
+    pub fn stat(&self) -> DiffStat {
+        let mut insertions = 0;
+        let mut deletions = 0;
+        for (old, new) in self.line_numbers() {
+            match (old, new) {
+                (None, Some(_)) => insertions += 1,
+                (Some(_), None) => deletions += 1,
+                _ => {},
+            }
+        }
+        DiffStat {
+            files: self.files.len(),
+            insertions,
+            deletions,
+        }
+    }
+}
+
+/// Shortstat summary for the stat line above a diff: `N file(s) changed, X
+/// insertion(s)(+), Y deletion(s)(-)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiffStat {
+    pub files: usize,
+    pub insertions: usize,
+    pub deletions: usize,
 }
 
 fn line_of(text: &str, byte: usize) -> usize {

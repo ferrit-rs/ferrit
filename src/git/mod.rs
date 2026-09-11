@@ -17,7 +17,7 @@ use std::path::Path;
 use git2::Repository;
 
 pub use blob::Rev;
-pub use diff::{Diff, DiffOpts, DiffSide, FileMeta, FileStatus, HunkMeta, parse_diff};
+pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
 pub use model::{BranchEntry, CommitEntry, StashEntry};
 pub use status::{Change, FileEntry, StatusHeader};

@@ -92,6 +92,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             block = block.title_bottom(theme::counter_line(cur, total));
         }
 
+        let inner_height = block.inner(row).height as usize;
         let list = List::new(pane_lines(app, pane))
             .block(block)
             .highlight_style(theme::selection_style(focused));
@@ -106,6 +107,20 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         // Ratatui may have moved the offset to keep the selection on screen;
         // copy it back so a click in a scrolled list maps to the right row.
         app.set_list_offset(pane, state.offset());
+
+        if row_ct > inner_height {
+            let mut sb_state = ScrollbarState::new(row_ct)
+                .position(state.offset())
+                .viewport_content_length(inner_height);
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight).style(border),
+                row.inner(Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut sb_state,
+            );
+        }
     }
 }
 
@@ -168,14 +183,18 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // header a `]` / `[` jump last landed on, and a scrollbar when it overflows.
     let scroll = app.right_scroll();
     if matches!(app.diff_view(), DiffView::Files(_) | DiffView::Commit(..)) {
-        let (text, total) = match app.diff_view() {
+        let (text, total, stat) = match app.diff_view() {
             DiffView::Files(diff) | DiffView::Commit(_, diff) => {
                 let anchors = match app.diff_view() {
                     DiffView::Commit(..) => diff.file_lines(),
                     _ => diff.hunk_lines(),
                 };
                 let focus = anchors.iter().position(|&l| l == scroll);
-                (theme::render_diff(diff, focus), diff.text.lines().count())
+                (
+                    theme::render_diff(diff, focus),
+                    diff.text.lines().count(),
+                    diff.stat(),
+                )
             },
             #[expect(
                 clippy::unreachable,
@@ -184,22 +203,25 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             _ => unreachable!("guarded by the matches! above"),
         };
         let inner = block.inner(area);
-        let panel = Paragraph::new(text)
-            .block(block)
-            .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
-        frame.render_widget(panel, area);
-        if total > inner.height as usize {
-            let mut state = ScrollbarState::new(total).position(scroll);
+        frame.render_widget(block, area);
+        let [stat_row, diff_area] =
+            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+        frame.render_widget(Paragraph::new(theme::stat_line(stat)), stat_row);
+
+        let panel =
+            Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
+        frame.render_widget(panel, diff_area);
+        if total > diff_area.height as usize {
+            let mut state = ScrollbarState::new(total)
+                .position(scroll)
+                .viewport_content_length(diff_area.height as usize);
             frame.render_stateful_widget(
                 Scrollbar::new(ScrollbarOrientation::VerticalRight),
-                area.inner(Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
+                diff_area,
                 &mut state,
             );
         }
-        app.set_right_viewport(inner.height as usize);
+        app.set_right_viewport(diff_area.height as usize);
         return;
     }
 
