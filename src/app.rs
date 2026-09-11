@@ -119,7 +119,7 @@ impl Pane {
             Self::Status => " Status ",
             Self::Files => " Unstaged changes ",
             Self::Branches => " Log ",
-            Self::Commits => " Commit ",
+            Self::Commits => " Patch ",
             Self::Stash => " Stash ",
         }
     }
@@ -451,7 +451,10 @@ impl App {
                         && cached.width == width
                 });
                 if !cache_hit {
-                    let text = theme::render_diff(diff, focus, width);
+                    let text = diff.delta_output(width).map_or_else(
+                        || theme::render_diff(diff, focus, width),
+                        |formatted| theme::render_delta(&formatted, width),
+                    );
                     *cache = Some(RenderedDiff {
                         key: key.clone(),
                         source: diff.text.clone(),
@@ -462,7 +465,7 @@ impl App {
                 }
                 cache
                     .as_ref()
-                    .map(|cached| (cached.text.clone(), diff.text.lines().count(), diff.stat()))
+                    .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
             },
             DiffView::None | DiffView::Note(_) => None,
         }

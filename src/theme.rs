@@ -227,6 +227,160 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
     Text::from(lines.collect::<Vec<_>>())
 }
 
+/// Convert delta's ANSI pager output into ratatui lines. Delta owns structural
+/// formatting and word-level highlighting; this small SGR reader preserves its
+/// foreground/background styles without sending escape sequences to terminal.
+pub fn render_delta(raw: &str, panel_width: usize) -> Text<'static> {
+    let mut lines = Vec::new();
+    for raw_line in raw.split_inclusive('\n') {
+        let line = raw_line.strip_suffix('\n').unwrap_or(raw_line);
+        lines.push(parse_ansi_line(line.strip_suffix('\r').unwrap_or(line), panel_width));
+    }
+    Text::from(lines)
+}
+
+fn parse_ansi_line(raw: &str, panel_width: usize) -> Line<'static> {
+    let mut spans = Vec::new();
+    let mut style = Style::new();
+    let mut background = None;
+    let mut text_start = 0;
+    let mut i = 0;
+    while i < raw.len() {
+        if raw.as_bytes().get(i) != Some(&0x1b) {
+            i += 1;
+            continue;
+        }
+        if text_start < i {
+            spans.push(Span::styled(raw[text_start..i].to_owned(), style));
+        }
+        let Some(rest) = raw.get(i + 1..) else { break };
+        if let Some(sequence) = rest.strip_prefix('[') {
+            let Some(end) = sequence.find(|c: char| c.is_ascii_alphabetic()) else {
+                break;
+            };
+            let Some(&final_byte) = sequence.as_bytes().get(end) else {
+                break;
+            };
+            if final_byte == b'm' {
+                let params = &sequence[..end];
+                apply_sgr(params, &mut style, &mut background);
+            }
+            i += 2 + end + 1;
+        } else {
+            i += 2;
+        }
+        text_start = i;
+    }
+    if text_start < raw.len() {
+        spans.push(Span::styled(raw[text_start..].to_owned(), style));
+    }
+    let mut line = Line::from(spans);
+    if background.is_some() {
+        let padding = panel_width.saturating_sub(line.width());
+        if padding > 0 {
+            line.spans.push(Span::styled(" ".repeat(padding), style));
+        }
+    }
+    line
+}
+
+fn apply_sgr(params: &str, style: &mut Style, background: &mut Option<Color>) {
+    let values: Vec<u16> = if params.is_empty() {
+        vec![0]
+    } else {
+        params
+            .split(';')
+            .filter_map(|p| p.parse::<u16>().ok())
+            .collect()
+    };
+    let mut i = 0;
+    while let Some(&code) = values.get(i) {
+        match code {
+            0 => {
+                *style = Style::new();
+                *background = None;
+            },
+            1 => *style = style.add_modifier(Modifier::BOLD),
+            22 => *style = style.remove_modifier(Modifier::BOLD),
+            7 => *style = style.add_modifier(Modifier::REVERSED),
+            27 => *style = style.remove_modifier(Modifier::REVERSED),
+            30..=37 => *style = style.fg(ansi_basic_color(code - 30, false)),
+            90..=97 => *style = style.fg(ansi_basic_color(code - 90, true)),
+            40..=47 => {
+                let color = ansi_basic_color(code - 40, false);
+                *background = Some(color);
+                *style = style.bg(color);
+            },
+            100..=107 => {
+                let color = ansi_basic_color(code - 100, true);
+                *background = Some(color);
+                *style = style.bg(color);
+            },
+            38 | 48 => {
+                let is_background = code == 48;
+                let Some(&mode) = values.get(i + 1) else { break };
+                let Some((color, consumed)) = (match mode {
+                    5 => values
+                        .get(i + 2)
+                        .map(|&n| (Color::Indexed(to_u8(n)), 3)),
+                    2 => match (values.get(i + 2), values.get(i + 3), values.get(i + 4)) {
+                        (Some(&r), Some(&g), Some(&b)) => {
+                            Some((Color::Rgb(to_u8(r), to_u8(g), to_u8(b)), 5))
+                        },
+                        _ => None,
+                    },
+                    _ => None,
+                }) else {
+                    break;
+                };
+                if is_background {
+                    *background = Some(color);
+                    *style = style.bg(color);
+                } else {
+                    *style = style.fg(color);
+                }
+                i += consumed - 1;
+            },
+            _ => {},
+        }
+        i += 1;
+    }
+}
+
+fn to_u8(value: u16) -> u8 {
+    u8::try_from(value.min(u16::from(u8::MAX))).unwrap_or(u8::MAX)
+}
+
+fn ansi_basic_color(index: u16, bright: bool) -> Color {
+    let colors = if bright {
+        [
+            Color::Gray,
+            Color::Red,
+            Color::Green,
+            Color::Yellow,
+            Color::Blue,
+            Color::Magenta,
+            Color::Cyan,
+            Color::White,
+        ]
+    } else {
+        [
+            Color::Black,
+            Color::Red,
+            Color::Green,
+            Color::Yellow,
+            Color::Blue,
+            Color::Magenta,
+            Color::Cyan,
+            Color::Gray,
+        ]
+    };
+    colors
+        .get(usize::from(index.min(7)))
+        .copied()
+        .unwrap_or(Color::White)
+}
+
 /// Render a parsed `Diff` for the right pane: a lazygit-style `old new│`
 /// gutter from `Diff::line_numbers` in front of every line (blank on
 /// headers, one-sided on an addition/deletion). Syntax colour and the

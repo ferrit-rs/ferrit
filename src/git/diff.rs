@@ -8,7 +8,8 @@
 //! `Range`s over one owned `String`, exactly like gitu's public `Diff`.
 
 use std::path::Path;
-use std::process::{Command, Output};
+use std::io::Write as _;
+use std::process::{Command, Output, Stdio};
 
 use git2::Repository;
 
@@ -172,6 +173,30 @@ impl Diff {
             insertions,
             deletions,
         }
+    }
+
+    /// Render raw diff through delta's pager-compatible formatter. This keeps
+    /// ferrit's parser read-only while matching lazygit's configured diff
+    /// appearance: file markers, line gutters, word highlights, and blocks.
+    /// Missing delta is normal; callers fall back to ferrit's native renderer.
+    pub fn delta_output(&self, width: usize) -> Option<String> {
+        let mut child = Command::new("delta")
+            .args([
+                "--paging=never".to_owned(),
+                "--line-numbers".to_owned(),
+                format!("--width={width}"),
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()?;
+        child.stdin.take()?.write_all(self.text.as_bytes()).ok()?;
+        let output = child.wait_with_output().ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
     }
 }
 

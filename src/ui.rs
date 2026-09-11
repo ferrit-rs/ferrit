@@ -227,15 +227,21 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let scroll = app.right_scroll();
     if matches!(app.diff_view(), DiffView::Files(_) | DiffView::Commit(..)) {
         let inner = block.inner(area);
-        let [stat_row, diff_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
-        let (anchors, total) = match app.diff_view() {
+        let is_commit = matches!(app.diff_view(), DiffView::Commit(..));
+        let (stat_row, diff_area) = if is_commit {
+            (None, inner)
+        } else {
+            let [stat_row, diff_area] =
+                Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+            (Some(stat_row), diff_area)
+        };
+        let (anchors, raw_total) = match app.diff_view() {
             DiffView::Files(diff) => (diff.hunk_lines(), diff.text.lines().count()),
             DiffView::Commit(_, diff) => (diff.file_lines(), diff.text.lines().count()),
             _ => return,
         };
         let focus = anchors.iter().position(|&l| l == scroll).map(|i| {
-            let end = anchors.get(i + 1).copied().unwrap_or(total);
+            let end = anchors.get(i + 1).copied().unwrap_or(raw_total);
             scroll..end
         });
         let Some((text, total, stat)) =
@@ -244,18 +250,29 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             return;
         };
         frame.render_widget(block, area);
-        frame.render_widget(Paragraph::new(theme::stat_line(stat)), stat_row);
+        if let Some(stat_row) = stat_row {
+            frame.render_widget(Paragraph::new(theme::stat_line(stat)), stat_row);
+        }
 
-        let panel = Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
+        let raw_max = raw_total.saturating_sub(diff_area.height as usize);
+        let display_max = total.saturating_sub(diff_area.height as usize);
+        let display_scroll = if raw_max == 0 {
+            0
+        } else {
+            scroll
+                .min(raw_max)
+                .saturating_mul(display_max)
+                .checked_div(raw_max)
+                .unwrap_or_default()
+        };
+        let panel =
+            Paragraph::new(text).scroll((u16::try_from(display_scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, diff_area);
         let viewport = diff_area.height as usize;
         if total > viewport {
-            // `content_length` is the count of distinct scroll positions (not
-            // the raw line count), so the thumb's travel matches the scroll
-            // range exactly and reaches the track's end at max scroll.
             let max_scroll = total - viewport;
             let mut state = ScrollbarState::new(max_scroll + 1)
-                .position(scroll.min(max_scroll))
+                .position(display_scroll.min(max_scroll))
                 .viewport_content_length(viewport);
             frame.render_stateful_widget(
                 Scrollbar::new(ScrollbarOrientation::VerticalRight)

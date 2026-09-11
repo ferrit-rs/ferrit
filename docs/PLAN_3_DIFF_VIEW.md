@@ -2,10 +2,10 @@
 
 ## Goal
 
-Right pane must reproduce lazygit's Patch pager structure: commit header,
-commit subject, file stat bars, aggregate shortstat, file marker, separator,
-then unified diff body. Changed-line background and syntax colour remain
-mutually exclusive.
+Right pane must reproduce lazygit's configured delta pager: commit header,
+commit subject, file stat bars, aggregate shortstat, `Δ` file marker, blue
+separator, line-number gutter, word-level changed spans, and unified diff
+body. Changed-line background and syntax colour remain mutually exclusive.
 
 ## Target rendering
 
@@ -198,25 +198,28 @@ metadata.
 
 ## In scope
 
-- `src/theme.rs`, `render_diff`: a `+`/`-` line stops calling
-  `HighlightLines` and instead gets flat `ADD`/`DEL` foreground plus the
-  full-width `ADD_LINE_BG`/`DEL_LINE_BG` background. Only context lines stay
-  `syntect`-tokenized. `is_code_line` still gates syntax colour (headers,
-  hunk markers, binary/no-newline notices stay flat).
-- Commit rendering splits metadata, subject, stat rows, aggregate shortstat,
-  file markers, separators, and hunk bodies into separate render sections.
-  Diff keeps raw ranges for future patch operations.
-- Render performance: `render_diff` currently re-tokenizes every code line of
-  the *entire* diff on every redraw (any keypress, tick, resize), not just
-  the visible viewport, with no cache. Cache the built `Text` (in `App`,
-  alongside `DiffView`), keyed on `right_key`, diff `text`, focus range, and
-  pane width. Rebuild only when one changes; pure scroll must not rebuild.
+- `Diff::delta_output(width)`: pipe plain `git diff`/`git show` output to
+  `delta --paging=never --line-numbers --width=<pane width>`. Delta owns
+  commit metadata, stat rows, `Δ` file markers, separators, line-number
+  gutters, word-level highlights, and changed-block backgrounds.
+- `theme::render_delta`: parse delta SGR output into ratatui `Text`, preserve
+  foreground/background styles, and pad styled rows to pane width so changed
+  backgrounds fill the full row. If delta is unavailable or fails, use the
+  native renderer fallback.
+- Commit right-pane title is `Patch`; commit output gets full pane height so
+  delta metadata/stat output is not duplicated by ferrit's own summary row.
+- Scroll conversion maps raw Git line offsets to delta's rendered line count;
+  scrolling and scrollbar endpoints remain correct when delta adds/removes
+  display rows.
+- Cache final styled `Text` in `App`, keyed on `right_key`, diff `text`, focus
+  range, and pane width. Rebuild only when one changes; pure scroll reuses
+  spans.
+- Keep `Diff` raw text/ranges unchanged for future patch operations.
 
 ## Out of scope
 
 - Staging / unstaging (phase 6).
-- External diff renderer config (`delta`, `difftastic`) as a user-facing
-  option; the `DiffCmd` builder already leaves room for it.
+- User-facing renderer configuration (`delta`, `difftastic`, custom themes).
 - Side-by-side layout, combined merge-commit diff, horizontal scroll of
   un-wrapped lines.
 - Branches' "Log" body, a stash entry's diff, Status's right side: still mock.

@@ -13,7 +13,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - Diff renderer now matches target lazygit/lazygitrs pager treatment: context
   lines keep syntax colours on plain background; `+`/`-` lines use flat
-  add/delete colours with a full-width background.
+  add/delete colours with a full-width background; when available, delta now
+  supplies the Patch layout, line-number gutter, word highlights, file
+  markers, separators, and stat block.
 - Styled diff `Text` now caches in `App`; scroll-only redraws reuse rendered
   spans. Cache invalidates on diff content, selection, focus anchor, or pane
   width changes.
