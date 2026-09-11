@@ -9,6 +9,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- `docs/TESTS_STRATEGY.md`: maps lazygit's 551-file integration test suite
+  onto our phase table as a `.script` behavior backlog, companion to
+  `PLAN_SELF_TESTING.md`.
 - Every left-column pane (Status, Files, Branches, Commits, Stash) now draws a
   vertical scrollbar when its list overflows the pane, matching the right
   pane's diff scrollbar; the thumb is green while the pane is focused and grey
