@@ -4,9 +4,13 @@
 //! yellow keys. No config, no theme switching yet (that is phase 10).
 
 use std::ops::Range;
+use std::sync::OnceLock;
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
+use syntect::parsing::SyntaxSet;
 
 use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, StashEntry};
 
@@ -59,12 +63,12 @@ pub const KEY: Color = Color::Yellow;
 /// Background tint boxing the hunk (or file, in a commit) a `]` / `[` jump
 /// last landed on.
 pub const FOCUS_BOX: Color = Color::DarkGray;
-/// Background tint under the exact changed span of a modified `+` line's
-/// word/char diff (`Diff::word_diff_ranges`), lazygit-style.
-pub const ADD_WORD_BG: Color = Color::Rgb(20, 60, 20);
-/// Background tint under the exact changed span of a modified `-` line's
-/// word/char diff.
-pub const DEL_WORD_BG: Color = Color::Rgb(70, 20, 20);
+/// Full-line pastel background tint on a `+` line, under its syntax-coloured
+/// text (`render_diff`).
+pub const ADD_LINE_BG: Color = Color::Rgb(20, 45, 20);
+/// Full-line pastel background tint on a `-` line, under its syntax-coloured
+/// text.
+pub const DEL_LINE_BG: Color = Color::Rgb(55, 20, 20);
 
 fn fg(color: Color) -> Style {
     Style::new().fg(color)
@@ -158,6 +162,38 @@ pub fn stash_line(entry: &StashEntry) -> Line<'static> {
     ])
 }
 
+/// Bundled syntax definitions, loaded once. `_newlines` variant: its patterns
+/// expect the trailing `\n` syntect's own examples use, which we don't have
+/// per line here, but it also has the widest built-in language coverage.
+fn syntax_set() -> &'static SyntaxSet {
+    static SET: OnceLock<SyntaxSet> = OnceLock::new();
+    SET.get_or_init(SyntaxSet::load_defaults_newlines)
+}
+
+/// A single bundled dark theme, close to lazygit's own dark default.
+fn syntax_theme() -> &'static SynTheme {
+    static THEME: OnceLock<SynTheme> = OnceLock::new();
+    THEME.get_or_init(|| {
+        ThemeSet::load_defaults()
+            .themes
+            .remove("base16-ocean.dark")
+            .unwrap_or_default()
+    })
+}
+
+fn to_color(c: SynColor) -> Color {
+    Color::Rgb(c.r, c.g, c.b)
+}
+
+/// Is `line` source code a syntax highlighter should tokenize, rather than
+/// diff metadata (headers, hunk markers, binary/no-newline notices)?
+fn is_code_line(line: &str) -> bool {
+    !line.starts_with("@@")
+        && !line.starts_with("Binary files")
+        && !line.starts_with('\\')
+        && !META.iter().any(|p| line.starts_with(p))
+}
+
 /// Colour of one diff line, by its leading bytes. Matches what `git --color`
 /// paints: hunk header cyan, `+`/`-` green/red, file/commit metadata bold,
 /// `\ No newline` and `Binary files` dim, everything else (context, message
@@ -193,21 +229,26 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
 
 /// Render a parsed `Diff` for the right pane: a lazygit-style `old new│`
 /// gutter from `Diff::line_numbers` in front of every line (blank on
-/// headers, one-sided on an addition/deletion), a lazygit-style word/char
-/// diff highlight on a paired `+`/`-` line (`Diff::word_diff_ranges`: common
-/// prefix/suffix dimmed, the actually-changed span drawn full-colour over an
-/// `ADD_WORD_BG`/`DEL_WORD_BG` background), and, when `focus` is set, a
-/// `FOCUS_BOX` background boxing every line of the hunk (or file, in a
-/// commit) a `]` / `[` jump last landed on, its header reversed.
+/// headers, one-sided on an addition/deletion); a code line (not a
+/// file/commit header, hunk marker, or binary/no-newline notice) is
+/// tokenized by `syntect` for its per-language foreground colour, and a `+`/
+/// `-` line additionally gets a full-line `ADD_LINE_BG`/`DEL_LINE_BG` pastel
+/// background under that text, gitu/delta style; everything else falls back
+/// to the flat `diff_line_style` colour. When `focus` is set, a `FOCUS_BOX`
+/// background boxes every line of the hunk (or file, in a commit) a `]` /
+/// `[` jump last landed on, its header reversed.
 pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
     let numbers = diff.line_numbers();
-    let word_diffs = diff.word_diff_ranges();
+    let extensions = diff.line_extensions();
     let width = numbers
         .iter()
         .flat_map(|&pair| <[_; 2]>::from(pair))
         .flatten()
         .max()
         .map_or(3, |n| n.to_string().len());
+
+    let set = syntax_set();
+    let theme = syntax_theme();
 
     let mut out = Vec::with_capacity(diff.text.lines().count());
     for (i, line) in diff.text.lines().enumerate() {
@@ -233,35 +274,51 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
         );
         let mut spans = vec![Span::styled(gutter, gutter_style)];
 
-        let changed = word_diffs.get(i).cloned().flatten();
-        match changed {
-            Some(range) if line.starts_with('+') || line.starts_with('-') => {
-                let (base_fg, word_bg) = if line.starts_with('+') {
-                    (ADD, ADD_WORD_BG)
-                } else {
-                    (DEL, DEL_WORD_BG)
-                };
-                let marker = line.get(..1).unwrap_or_default();
-                let body = line.get(1..).unwrap_or_default();
-                let dim = overlay(Style::new().fg(base_fg).add_modifier(Modifier::DIM));
-                let bright = overlay(Style::new().fg(base_fg).bg(word_bg));
-                let start = range.start.min(body.len());
-                let end = range.end.clamp(start, body.len());
-                let prefix = body.get(..start).unwrap_or_default();
-                let middle = body.get(start..end).unwrap_or_default();
-                let suffix = body.get(end..).unwrap_or_default();
-                spans.push(Span::styled(marker.to_owned(), dim));
-                if !prefix.is_empty() {
-                    spans.push(Span::styled(prefix.to_owned(), dim));
+        let line_bg = if line.starts_with('+') {
+            Some(ADD_LINE_BG)
+        } else if line.starts_with('-') {
+            Some(DEL_LINE_BG)
+        } else {
+            None
+        };
+        let ext = extensions.get(i).cloned().flatten();
+        let syntax = is_code_line(line)
+            .then_some(ext.as_deref())
+            .flatten()
+            .and_then(|ext| set.find_syntax_by_extension(ext));
+
+        match syntax {
+            Some(syntax) => {
+                let marker_len = usize::from(line.starts_with(['+', '-', ' ']));
+                let marker = line.get(..marker_len).unwrap_or_default();
+                let body = line.get(marker_len..).unwrap_or_default();
+                let base = line_bg.map_or_else(Style::new, |bg| Style::new().bg(bg));
+                if !marker.is_empty() {
+                    let marker_fg = if marker == "+" {
+                        Some(ADD)
+                    } else if marker == "-" {
+                        Some(DEL)
+                    } else {
+                        None
+                    };
+                    let marker_style = marker_fg.map_or(base, |c| base.fg(c));
+                    spans.push(Span::styled(marker.to_owned(), overlay(marker_style)));
                 }
-                if !middle.is_empty() {
-                    spans.push(Span::styled(middle.to_owned(), bright));
+                let mut hl = HighlightLines::new(syntax, theme);
+                let tokens = hl
+                    .highlight_line(body, set)
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
+                if tokens.is_empty() {
+                    spans.push(Span::styled(body.to_owned(), overlay(base)));
                 }
-                if !suffix.is_empty() {
-                    spans.push(Span::styled(suffix.to_owned(), dim));
+                for (style, text) in tokens {
+                    let span_style = base.fg(to_color(style.foreground));
+                    spans.push(Span::styled(text.to_owned(), overlay(span_style)));
                 }
             },
-            _ => spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line)))),
+            None => spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line)))),
         }
 
         out.push(Line::from(spans));

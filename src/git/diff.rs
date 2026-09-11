@@ -7,7 +7,6 @@
 //! Nothing here imports `ratatui`. The parser (`parse.rs`) hands back byte
 //! `Range`s over one owned `String`, exactly like gitu's public `Diff`.
 
-use std::ops::Range;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -124,52 +123,33 @@ impl Diff {
         out
     }
 
-    /// Byte range, within a line's content *after* its leading `+`/`-`, that
-    /// actually changed, for a line that pairs with a corresponding line on
-    /// the other side of a modification. `None` for context lines, headers,
-    /// and an unpaired excess line in an unequal-count add/remove block.
-    ///
-    /// Pairing follows lazygit / diff-highlight: a contiguous run of `-`
-    /// lines directly followed by a contiguous run of `+` lines is one
-    /// "change block"; the i-th removed line pairs with the i-th added line
-    /// (extra lines on the longer side are left unpaired). Each pair is then
-    /// trimmed of its common prefix and suffix (by `char`, not byte, to stay
-    /// on UTF-8 boundaries) to isolate what changed, the same technique a
-    /// word-diff highlight needs, without pulling in a diff library.
-    pub fn word_diff_ranges(&self) -> Vec<Option<Range<usize>>> {
-        let lines: Vec<&str> = self.text.lines().collect();
-        let mut out = vec![None; lines.len()];
-        let mut i = 0;
-        while i < lines.len() {
-            if !lines.get(i).is_some_and(|l| l.starts_with('-')) {
-                i += 1;
+    /// File extension (no dot) covering each line of `text`, for a
+    /// per-language syntax highlighter. `None` on a line outside any file
+    /// section, or whose file has no extension. Deletions read the extension
+    /// off `old_path` (`new_path` is `/dev/null`); everything else reads it
+    /// off `new_path`.
+    pub fn line_extensions(&self) -> Vec<Option<String>> {
+        let total = self.text.lines().count();
+        let mut out = vec![None; total];
+        for (i, file) in self.files.iter().enumerate() {
+            let new_path = self.text.get(file.new_path.clone()).unwrap_or_default();
+            let old_path = self.text.get(file.old_path.clone()).unwrap_or_default();
+            let path = if new_path == "/dev/null" {
+                old_path
+            } else {
+                new_path
+            };
+            let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) else {
                 continue;
+            };
+            let start = line_of(&self.text, file.header.start);
+            let end = self
+                .files
+                .get(i + 1)
+                .map_or(total, |f| line_of(&self.text, f.header.start));
+            for slot in out.get_mut(start..end).into_iter().flatten() {
+                *slot = Some(ext.to_owned());
             }
-            let mut del_end = i;
-            while lines.get(del_end).is_some_and(|l| l.starts_with('-')) {
-                del_end += 1;
-            }
-            let add_start = del_end;
-            let mut add_end = add_start;
-            while lines.get(add_end).is_some_and(|l| l.starts_with('+')) {
-                add_end += 1;
-            }
-            let pairs = (del_end - i).min(add_end - add_start);
-            for p in 0..pairs {
-                let old_body = lines.get(i + p).and_then(|l| l.get(1..)).unwrap_or_default();
-                let new_body = lines
-                    .get(add_start + p)
-                    .and_then(|l| l.get(1..))
-                    .unwrap_or_default();
-                let (prefix, suffix) = common_affixes(old_body, new_body);
-                if let Some(slot) = out.get_mut(i + p) {
-                    *slot = Some(prefix..old_body.len() - suffix);
-                }
-                if let Some(slot) = out.get_mut(add_start + p) {
-                    *slot = Some(prefix..new_body.len() - suffix);
-                }
-            }
-            i = add_end.max(del_end);
         }
         out
     }
@@ -202,32 +182,6 @@ pub struct DiffStat {
     pub files: usize,
     pub insertions: usize,
     pub deletions: usize,
-}
-
-/// Length, in bytes, of the common prefix and (non-overlapping) common
-/// suffix of `a` and `b`, split on `char` boundaries. `a.len() - suffix` and
-/// `b.len() - suffix` are always `>= prefix`, so `prefix..len - suffix` is
-/// always a valid range into either string.
-fn common_affixes(a: &str, b: &str) -> (usize, usize) {
-    let prefix = a
-        .char_indices()
-        .zip(b.chars())
-        .take_while(|&((_, ca), cb)| ca == cb)
-        .last()
-        .map_or(0, |((i, ca), _)| i + ca.len_utf8());
-
-    let a_rest = a.get(prefix..).unwrap_or_default();
-    let b_rest = b.get(prefix..).unwrap_or_default();
-
-    let suffix = a_rest
-        .chars()
-        .rev()
-        .zip(b_rest.chars().rev())
-        .take_while(|(ca, cb)| ca == cb)
-        .map(|(ca, _)| ca.len_utf8())
-        .sum();
-
-    (prefix, suffix)
 }
 
 fn line_of(text: &str, byte: usize) -> usize {

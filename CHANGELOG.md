@@ -33,14 +33,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   a commit) in a dim background tint, not just its header line, so the
   boundary a jump landed on stays visible even after scrolling the header out
   of view.
-- Diff and commit view: lazygit-style word/char-level diff highlight. A `-`
-  line immediately paired with its replacement `+` line (same position in a
-  contiguous run of removals followed by additions) has its common
-  prefix/suffix dimmed and only the actually-changed span drawn in full
-  colour with a background tint (`Diff::word_diff_ranges`); an unpaired
-  addition/deletion is unaffected. Supersedes an earlier `syntect`-based
-  per-language syntax highlighting attempt, dropped in favour of this closer
-  match to lazygit's own diff view (no dependency added).
+- Diff and commit view: per-language syntax highlighting on every code line
+  (`syntect`, syntax picked from the file's extension via `Diff::line_extensions`),
+  plus a full-line pastel green/red background tint (`ADD_LINE_BG`/
+  `DEL_LINE_BG`) on `+`/`-` lines so an addition or deletion still reads at a
+  glance under the syntax colours. Metadata lines (headers, hunk markers,
+  binary/no-newline notices) keep the flat `diff_line_style` colouring.
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.

@@ -34,18 +34,13 @@ Consequences ferrit takes on deliberately:
   don't page), `diff.noprefix`, and anything else the user set applies,
   because it is their `git` running. `git2::Patch` would have ignored all of
   it.
-- **`syntect` tried, then dropped again.** The plan originally matched
-  lazygit (git's own +/-/@@ colouring only, no language highlighting,
-  `syntect` dropped). That held through D0-D5. A follow-up phase D briefly
-  added real per-language syntax highlighting on top of it, closer to
-  gitu/delta than lazygit. Closer inspection of lazygit's actual diff/patch
-  screens (full-line background tint, no per-token hue, plus a word/char-level
-  highlight on the changed span within a paired removed/added line)
-  contradicted that: the per-token colouring and the word-diff dim/bright
-  layering fight each other visually, and lazygit's diff view has neither
-  language highlighting nor a hue per token. Phase D was redone to drop
-  `syntect` again and add the word-diff highlight instead, matching lazygit.
-  See "Dependencies" and "Out of scope".
+- **Per-language syntax highlighting, gitu/delta style, not lazygit's.**
+  Every code line gets `syntect` per-token foreground colour, and a `+`/`-`
+  line additionally gets a full-line pastel green/red background
+  (`ADD_LINE_BG`/`DEL_LINE_BG`) under that text. lazygit's own diff view has
+  neither (git's flat +/-/@@ colouring only): this phase deliberately favours
+  the gitu/delta look over lazygit parity here. See "Rendering" and
+  "Dependencies".
 - **Phase 6 staging gets easier, not harder.** A stageable patch is a byte
   slice of the diff text (`file header + one hunk`, or `file header + hunk
   header + selected lines`), fed to `git apply --cached`. Same technique as
@@ -382,12 +377,14 @@ range, not just the header line. Walk `diff.files` / `hunks` and slice
 
 - file separator `diff --git a/… b/…`: `IDLE` + `BOLD`.
 - hunk header `@@ … @@ ctx`: `HUNK` (cyan), as the mock already did.
-- body line by first byte: `+` -> `ADD` (green), `-` -> `DEL` (red),
-  ` ` -> `IDLE`, `\` (`\ No newline…`) -> `IDLE` + dim. Post-phase-D, a `+`/
-  `-` line that pairs with its replacement on the other side
-  (`Diff::word_diff_ranges`) instead dims its common prefix/suffix and draws
-  only the changed span at full brightness over an `ADD_WORD_BG`/
-  `DEL_WORD_BG` tint; an unpaired line keeps flat add/delete colour.
+- a code line (not a header, hunk marker, or binary/no-newline notice) is
+  tokenized by `syntect`, syntax picked from the file's extension
+  (`Diff::line_extensions`), for per-token foreground colour; a `+`/`-` line
+  additionally draws a full-line `ADD_LINE_BG`/`DEL_LINE_BG` pastel
+  background under that text. A line with no resolvable syntax (unknown
+  extension, or the syntax set has no match) falls back to flat colour by
+  first byte: `+` -> `ADD` (green), `-` -> `DEL` (red), ` ` -> `IDLE`, `\`
+  (`\ No newline…`) -> `IDLE` + dim.
 - `focus`: every line in the range gets a `FOCUS_BOX` background, and the
   range's first line (the hunk/file header) also gets `REVERSED`, so a `]`
   / `[` jump lands visibly on the whole block, not just one line.
@@ -449,11 +446,10 @@ D0-D5: none added. `std::process::Command` runs `git`. `git2` (in the tree
 since phase 2) still backs Status / Files / Branches / Commits / Stash and
 the commit metadata; it is just not used for diff text.
 
-Post-D5: `syntect = "5"` was added for a per-language syntax highlighter,
-then removed again in the same phase D once the word-diff highlight
-replaced it (see "Approach" above). Phase D's shipped dependency count is
-therefore back to zero: `Diff::word_diff_ranges` and its `common_affixes`
-helper are plain `std`, no library.
+Post-D5: `syntect = "5"` (default-fancy features), for the per-language
+syntax highlighter in `theme::render_diff`. Bundled `SyntaxSet` /
+`ThemeSet` defaults only, loaded once behind a `OnceLock` each; no external
+syntax/theme files.
 
 ## Out of scope
 
@@ -463,13 +459,9 @@ helper are plain `std`, no library.
   a ferrit config key. lazygit supports it; ferrit's `DiffCmd` builder
   leaves room for one `--ext-diff` + `-c diff.external=…` addition later.
   Named follow-up, not phase 3.
-- Language syntax highlighting beyond git's own colouring. Tried
-  (`syntect`) and dropped again in phase D: lazygit's own diff/patch view has
-  no per-token hue, only full-line add/delete colour plus the word-diff
-  highlight now shipped, so matching lazygit meant not doing this. A
-  `syntect`/`chroma`-style per-language highlighter for a *non-diff* raw
-  file preview (lazygit has one, a separate code path from its diff view)
-  is a distinct, unscoped feature, not part of phase 3.
+- A *non-diff* raw file preview with its own syntax highlighting (viewing an
+  untracked file's content outside the diff pane). Distinct, unscoped
+  feature, not part of phase 3.
 - Horizontal scroll of un-wrapped diff lines (phase 3 soft-wraps instead).
 - Side-by-side layout, combined merge-commit diff.
 - Branches' "Log" body: stays mock `RIGHT_LOG`; `theme::commit_line`'s graph
@@ -537,14 +529,11 @@ Post-D5 additions, same `render_diff` pipeline, each its own commit:
   (`Diff::stat` / `DiffStat`, `theme::stat_line`).
 - **phase C** boxed hunk/file focus highlight (`FOCUS_BOX` background over
   the whole focused block, not just a reversed header line).
-- **phase D** briefly added real per-language syntax highlighting via
-  `syntect` (`Diff::line_extensions`, `theme::render_diff`'s
-  `HighlightLines` cache, an `is_code_line` gate), then dropped it again in
-  favour of a lazygit-style word/char-level diff highlight
-  (`Diff::word_diff_ranges`, `common_affixes`, `theme::ADD_WORD_BG` /
-  `DEL_WORD_BG`) once screenshot comparison showed lazygit's diff view has
-  no per-token colouring at all. See "Approach", "Dependencies" and "Out of
-  scope" above.
+- **phase D** per-language syntax highlighting via `syntect`
+  (`Diff::line_extensions`, `theme::render_diff`'s `HighlightLines` cache, an
+  `is_code_line` gate) plus a full-line `ADD_LINE_BG`/`DEL_LINE_BG` pastel
+  background on `+`/`-` lines under that text. See "Approach", "Rendering"
+  and "Dependencies" above.
 
 ## Definition of done (phase 3)
 
