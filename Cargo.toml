@@ -16,6 +16,17 @@ categories = ["command-line-utilities", "development-tools"]
 name = "ferrit"
 path = "src/main.rs"
 
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+color-eyre = "0.6"
+enum-map = "2"
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
+notify-debouncer-full = "0.7"
+ratatui = "0.30"
+ratatui-image = { version = "11", default-features = false, features = ["crossterm", "image-defaults"] }
+thiserror = "2"
+
 # See also clippy.toml and rust-toolchain.toml.
 #
 # Layout: lint GROUPS first at negative priority (single-lint overrides below
@@ -163,15 +174,3 @@ unescaped_backticks = "warn"
 # The doc build always passes `--document-private-items`, so links into
 # module-private config types (`Host`, `Plan`, `Override`) always resolve.
 private_intra_doc_links = "allow"
-
-[dependencies]
-clap = { version = "4", features = ["derive"] }
-color-eyre = "0.6"
-enum-map = "2"
-git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
-notify-debouncer-full = "0.7"
-ratatui = "0.30"
-ratatui-image = { version = "11", default-features = false, features = ["crossterm", "image-defaults"] }
-syntect = "5"
-thiserror = "2"

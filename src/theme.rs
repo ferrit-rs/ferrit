@@ -4,18 +4,13 @@
 //! yellow keys. No config, no theme switching yet (that is phase 10).
 
 use std::ops::Range;
-use std::sync::OnceLock;
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use syntect::easy::HighlightLines;
-use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
-use syntect::parsing::SyntaxSet;
 
 use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, StashEntry};
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
-/// Shared by `diff_line_style` (colouring) and `is_code_line` (highlight gate).
 const META: &[&str] = &[
     "diff --git",
     "index ",
@@ -64,6 +59,12 @@ pub const KEY: Color = Color::Yellow;
 /// Background tint boxing the hunk (or file, in a commit) a `]` / `[` jump
 /// last landed on.
 pub const FOCUS_BOX: Color = Color::DarkGray;
+/// Background tint under the exact changed span of a modified `+` line's
+/// word/char diff (`Diff::word_diff_ranges`), lazygit-style.
+pub const ADD_WORD_BG: Color = Color::Rgb(20, 60, 20);
+/// Background tint under the exact changed span of a modified `-` line's
+/// word/char diff.
+pub const DEL_WORD_BG: Color = Color::Rgb(70, 20, 20);
 
 fn fg(color: Color) -> Style {
     Style::new().fg(color)
@@ -190,60 +191,23 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
     Text::from(lines.collect::<Vec<_>>())
 }
 
-/// A diff content line (context, addition or deletion): the only kind fed to
-/// the syntax highlighter. File/commit metadata, hunk headers, `Binary
-/// files` and `\ No newline` stay plain-coloured via `diff_line_style`.
-fn is_code_line(line: &str) -> bool {
-    if line.starts_with("@@") || line.starts_with("Binary files") || line.starts_with('\\') {
-        return false;
-    }
-    if META.iter().any(|p| line.starts_with(p)) {
-        return false;
-    }
-    line.starts_with('+') || line.starts_with('-') || line.starts_with(' ')
-}
-
-/// Bundled syntax definitions (`default-fancy`'s `SyntaxSet`), loaded once.
-fn syntax_set() -> &'static SyntaxSet {
-    static SET: OnceLock<SyntaxSet> = OnceLock::new();
-    SET.get_or_init(SyntaxSet::load_defaults_newlines)
-}
-
-/// Bundled colour theme for diff code content, loaded once. `None` (no
-/// highlighting, plain colours only) if the theme name is ever missing,
-/// rather than panicking.
-fn syntax_theme() -> Option<&'static SynTheme> {
-    static THEME: OnceLock<Option<SynTheme>> = OnceLock::new();
-    THEME
-        .get_or_init(|| ThemeSet::load_defaults().themes.remove("base16-ocean.dark"))
-        .as_ref()
-}
-
-fn to_color(c: SynColor) -> Color {
-    Color::Rgb(c.r, c.g, c.b)
-}
-
 /// Render a parsed `Diff` for the right pane: a lazygit-style `old new│`
 /// gutter from `Diff::line_numbers` in front of every line (blank on
-/// headers, one-sided on an addition/deletion), per-language syntax
-/// highlighting of code content (`Diff::line_extensions` picks the syntax,
-/// `+`/`-`/` ` prefixes keep their add/delete/idle colour), and, when
-/// `focus` is set, a `FOCUS_BOX` background boxing every line of the hunk
-/// (or file, in a commit) a `]` / `[` jump last landed on, its header
-/// reversed.
+/// headers, one-sided on an addition/deletion), a lazygit-style word/char
+/// diff highlight on a paired `+`/`-` line (`Diff::word_diff_ranges`: common
+/// prefix/suffix dimmed, the actually-changed span drawn full-colour over an
+/// `ADD_WORD_BG`/`DEL_WORD_BG` background), and, when `focus` is set, a
+/// `FOCUS_BOX` background boxing every line of the hunk (or file, in a
+/// commit) a `]` / `[` jump last landed on, its header reversed.
 pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
     let numbers = diff.line_numbers();
-    let extensions = diff.line_extensions();
+    let word_diffs = diff.word_diff_ranges();
     let width = numbers
         .iter()
         .flat_map(|&pair| <[_; 2]>::from(pair))
         .flatten()
         .max()
         .map_or(3, |n| n.to_string().len());
-
-    let theme = syntax_theme();
-    let set = syntax_set();
-    let mut highlighter: Option<(Option<String>, HighlightLines<'static>)> = None;
 
     let mut out = Vec::with_capacity(diff.text.lines().count());
     for (i, line) in diff.text.lines().enumerate() {
@@ -269,40 +233,35 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
         );
         let mut spans = vec![Span::styled(gutter, gutter_style)];
 
-        let ext = extensions.get(i).cloned().flatten();
-        let mut highlighted = false;
-        if let Some(theme) = theme {
-            if is_code_line(line) {
-                let need_new = !matches!(&highlighter, Some((cur, _)) if *cur == ext);
-                if need_new {
-                    let syntax = ext
-                        .as_deref()
-                        .and_then(|e| set.find_syntax_by_extension(e))
-                        .unwrap_or_else(|| set.find_syntax_plain_text());
-                    highlighter = Some((ext.clone(), HighlightLines::new(syntax, theme)));
+        let changed = word_diffs.get(i).cloned().flatten();
+        match changed {
+            Some(range) if line.starts_with('+') || line.starts_with('-') => {
+                let (base_fg, word_bg) = if line.starts_with('+') {
+                    (ADD, ADD_WORD_BG)
+                } else {
+                    (DEL, DEL_WORD_BG)
+                };
+                let marker = line.get(..1).unwrap_or_default();
+                let body = line.get(1..).unwrap_or_default();
+                let dim = overlay(Style::new().fg(base_fg).add_modifier(Modifier::DIM));
+                let bright = overlay(Style::new().fg(base_fg).bg(word_bg));
+                let start = range.start.min(body.len());
+                let end = range.end.clamp(start, body.len());
+                let prefix = body.get(..start).unwrap_or_default();
+                let middle = body.get(start..end).unwrap_or_default();
+                let suffix = body.get(end..).unwrap_or_default();
+                spans.push(Span::styled(marker.to_owned(), dim));
+                if !prefix.is_empty() {
+                    spans.push(Span::styled(prefix.to_owned(), dim));
                 }
-                if let Some((_, hl)) = highlighter.as_mut() {
-                    let prefix = line.get(..1).unwrap_or_default();
-                    let rest = line.get(1..).unwrap_or_default();
-                    let prefix_color = match prefix {
-                        "+" => ADD,
-                        "-" => DEL,
-                        _ => IDLE,
-                    };
-                    spans.push(Span::styled(prefix.to_owned(), overlay(fg(prefix_color))));
-                    for (style, text) in hl.highlight_line(rest, set).unwrap_or_default() {
-                        spans.push(Span::styled(
-                            text.to_owned(),
-                            overlay(Style::new().fg(to_color(style.foreground))),
-                        ));
-                    }
-                    highlighted = true;
+                if !middle.is_empty() {
+                    spans.push(Span::styled(middle.to_owned(), bright));
                 }
-            }
-        }
-
-        if !highlighted {
-            spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line))));
+                if !suffix.is_empty() {
+                    spans.push(Span::styled(suffix.to_owned(), dim));
+                }
+            },
+            _ => spans.push(Span::styled(line.to_owned(), overlay(diff_line_style(line)))),
         }
 
         out.push(Line::from(spans));
