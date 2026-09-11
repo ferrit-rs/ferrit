@@ -58,14 +58,52 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
 }
 
 fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
-    let rows: [Rect; 5] = Layout::vertical([
-        Constraint::Length(4), // Status: header only
-        Constraint::Min(3),    // Files
-        Constraint::Min(3),    // Branches
-        Constraint::Min(3),    // Commits
-        Constraint::Length(4), // Stash
-    ])
-    .areas(area);
+    let [status_row, accordion_area] =
+        Layout::vertical([Constraint::Length(4), Constraint::Min(0)]).areas(area);
+
+    // lazygit's `expandFocusedSidePanel` accordion: the focused pane claims
+    // the leftover space, the rest keep a 3-row floor (border + one row).
+    // When the focus is Status (outside this group), there is no boosted
+    // pane, so the leftover is shared evenly instead of left blank.
+    // Ratatui's `Fill`/`Min` mix is order-sensitive at small heights (it can
+    // starve the boosted pane below its neighbours' floor), so the split is
+    // computed by hand rather than left to the `Layout` solver.
+    const DYNAMIC: [Pane; 4] = [Pane::Files, Pane::Branches, Pane::Commits, Pane::Stash];
+    const FLOOR: u16 = 3;
+    let focus_index = DYNAMIC.iter().position(|&p| p == app.focus);
+
+    let mut heights = [FLOOR; 4];
+    let leftover = accordion_area.height.saturating_sub(FLOOR * 4);
+    if accordion_area.height <= FLOOR * 4 {
+        // Not even room for every pane's floor: split what there is evenly.
+        let share = accordion_area.height / 4;
+        let extra = accordion_area.height % 4;
+        for (i, h) in heights.iter_mut().enumerate() {
+            *h = share + u16::from(i < usize::from(extra));
+        }
+    } else if let Some(h) = focus_index.and_then(|i| heights.get_mut(i)) {
+        *h += leftover;
+    } else {
+        let share = leftover / 4;
+        let extra = leftover % 4;
+        for (i, h) in heights.iter_mut().enumerate() {
+            *h += share + u16::from(i < usize::from(extra));
+        }
+    }
+
+    let mut rows = [status_row, Rect::default(), Rect::default(), Rect::default(), Rect::default()];
+    let mut y = accordion_area.y;
+    for (i, &h) in heights.iter().enumerate() {
+        if let Some(row) = rows.get_mut(i + 1) {
+            *row = Rect {
+                x: accordion_area.x,
+                y,
+                width: accordion_area.width,
+                height: h,
+            };
+        }
+        y += h;
+    }
 
     for (&pane, &row) in PANES.iter().zip(&rows) {
         // Remembered for click routing: written before the list body is

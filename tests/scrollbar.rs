@@ -147,8 +147,12 @@ fn a_short_diff_has_no_scrollbar() {
     let mut app = App::mock();
     app.focus = Pane::Files;
     let buf = render_buffer(&mut app, 120, 40);
+    // Right pane only (`side = (120 / 3).max(24) == 40`): with Files focused
+    // the accordion squashes Branches/Commits/Stash to their 3-row floor, so
+    // their few mock rows legitimately overflow and draw their own left-column
+    // scrollbars; this test is about the right-pane diff, not that.
     assert!(
-        cells_with(&buf, THUMB, 0..buf.area.width).is_empty(),
+        cells_with(&buf, THUMB, 40..buf.area.width).is_empty(),
         "the mock diff fits, no scrollbar expected\n{buf:?}"
     );
 }

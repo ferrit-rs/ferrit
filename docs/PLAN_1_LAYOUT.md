@@ -175,15 +175,31 @@ content
 
 left column
 └── Layout::vertical
-    ├── Length(4)     [1] Status     ── header, always small
-    ├── Min(3)        [2] Files
-    ├── Min(3)        [3] Local branches
-    ├── Min(3)        [4] Commits
-    └── Length(4)     [5] Stash
+    ├── Length(4)     [1] Status         ── header, always small, never accordions
+    └── Min(0)        accordion_area     ── [2]..[5], split by hand below
+
+accordion_area (lazygit-style `expandFocusedSidePanel`, hand-computed, not a
+Layout constraint solve: mixing Min/Fill in one `Layout::vertical` call is
+order-sensitive and can starve the boosted pane below its neighbours' floor
+at small heights)
+    FLOOR = 3 rows (border + one content row) per pane
+    focused pane   = FLOOR + leftover   ── leftover = area.height - FLOOR*4
+    other 3 panes  = FLOOR
+    if focus is Status (outside [2]..[5]): leftover split evenly over the 4
+    if area.height <= FLOOR*4: no floor fits, split area.height evenly over the 4
 ```
 
-Later enhancement (not phase 1): accordion behaviour, where the focused left
-pane grows and the others shrink to their title line, like lazygit.
+Example at area.height = 30, Commits focused:
+
+```
+┌ [1] Status ───────────┐  4  (fixed)
+├ [2] Files ─────────────┤  3  (floor)
+├ [3] Local branches ────┤  3  (floor)
+├ [4] Commits ───────────┤ 17  (floor 3 + leftover 14)
+└ [5] Stash ─────────────┘  3  (floor)
+```
+
+Implemented (not deferred): `draw_left_column` in `src/ui.rs`.
 
 ## State model
 

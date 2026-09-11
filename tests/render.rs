@@ -145,13 +145,24 @@ fn click_moves_focus_and_selection_on_screen() {
         1,
         "the click selected the clicked commit"
     );
+
+    // Focus moved to Commits, so the accordion now gives it most of the
+    // column: the pane reflows and the clicked commit can land on a
+    // different row than before, so re-find it rather than reusing `row`.
+    let out = frame(&mut app, 120, 40);
+    let new_row = u16::try_from(
+        out.lines()
+            .position(|l| l.contains(hash.as_str()))
+            .unwrap_or_else(|| panic!("commit {hash} not found after the click\n{out}")),
+    )
+    .unwrap();
     assert_eq!(
         selection_bar_rows(&mut app),
-        BTreeSet::from([row]),
-        "the highlight moved to the exact row that was clicked"
+        BTreeSet::from([new_row]),
+        "the highlight sits on the clicked commit's row"
     );
     assert!(
-        focused_border_rows(&mut app).contains(&row),
+        focused_border_rows(&mut app).contains(&new_row),
         "the focused border now covers the clicked row"
     );
 }

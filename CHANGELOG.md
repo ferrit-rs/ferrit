@@ -13,6 +13,11 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   vertical scrollbar when its list overflows the pane, matching the right
   pane's diff scrollbar; the thumb is green while the pane is focused and grey
   otherwise, following the pane's own border colour.
+- Left column accordion: the focused pane among Files/Branches/Commits/Stash
+  now grows to claim the leftover vertical space, the other three collapse to
+  a 3-row floor (border + one row), lazygit-style. Status stays fixed height
+  regardless of focus. Computed by hand rather than via `ratatui::Layout`,
+  which mixes `Min`/`Fill` in an order-sensitive way at small heights.
 - Diff and commit view: a lazygit-style `old new│` line-number gutter in front
   of every line, derived from the hunk header counters already parsed
   (`Diff::line_numbers`). Blank on headers, one-sided on an addition or
@@ -25,14 +30,14 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   a commit) in a dim background tint, not just its header line, so the
   boundary a jump landed on stays visible even after scrolling the header out
   of view.
-- Diff and commit view: real per-language syntax highlighting of code content
-  (the `+`/`-`/` ` prefix keeps its add/delete/idle colour, the rest is
-  tokenised and coloured by `syntect`), with the language picked from the
-  changed file's extension (`Diff::line_extensions`) and falling back to
-  plain-text tokenising when the extension is unknown. Adds the `syntect`
-  dependency (bundled `default-fancy` syntaxes and colour themes, so no
-  external files or config are needed) instead of the cheaper plain-color
-  scheme it replaces, matching lazygit's real highlighted diff content.
+- Diff and commit view: lazygit-style word/char-level diff highlight. A `-`
+  line immediately paired with its replacement `+` line (same position in a
+  contiguous run of removals followed by additions) has its common
+  prefix/suffix dimmed and only the actually-changed span drawn in full
+  colour with a background tint (`Diff::word_diff_ranges`); an unpaired
+  addition/deletion is unaffected. Supersedes an earlier `syntect`-based
+  per-language syntax highlighting attempt, dropped in favour of this closer
+  match to lazygit's own diff view (no dependency added).
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.
