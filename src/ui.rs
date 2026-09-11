@@ -117,6 +117,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(theme::IDLE);
     let right_title = app.focus.right_title();
+    let border = if app.right_focused() { focused } else { idle };
 
     // An image selection takes over the right pane; otherwise it is mock text.
     match app.preview_mut() {
@@ -126,7 +127,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             // `&mut StatefulProtocol` so it resizes + re-encodes to fit.
             let block = Block::bordered()
                 .title(Line::styled(" Preview ", focused))
-                .border_style(idle);
+                .border_style(border);
             let inner = block.inner(area);
             frame.render_widget(block, area);
             frame.render_stateful_widget(
@@ -145,7 +146,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
                 .block(
                     Block::bordered()
                         .title(Line::styled(right_title, focused))
-                        .border_style(idle),
+                        .border_style(border),
                 )
                 .wrap(Wrap { trim: false });
             frame.render_widget(panel, area);
@@ -160,7 +161,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
     let block = Block::bordered()
         .title(Line::styled(right_title, focused))
-        .border_style(Style::new().fg(theme::IDLE));
+        .border_style(border);
 
     // Real `git diff` / `git show` output: git-native colouring, vertical
     // scroll from `app.right_scroll()`, a reverse-highlight on the hunk / file

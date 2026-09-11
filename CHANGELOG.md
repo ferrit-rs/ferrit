@@ -9,6 +9,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Left click on the right pane focuses it (border lights up like a left
+  pane's); `Esc` returns focus to the left column. Click still routes
+  scrolling exactly as before.
 - Left click on a left-pane row focuses that pane and moves its selection
   cursor to the clicked row (lazygit style), rebuilding the right pane the
   same way a `j` / `k` move would. Clicking a pane's border or title focuses

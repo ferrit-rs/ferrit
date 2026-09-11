@@ -167,6 +167,11 @@ pub struct App {
     /// keep the selection on screen. Lets a click in a scrolled list map to
     /// the right row. Only valid post-render; 0 before the first draw.
     list_offset: EnumMap<Pane, usize>,
+    /// A click landed on the right pane. Purely a border-highlight flag for
+    /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
+    /// left-pane navigation and selection are untouched. Cleared by `Esc` or
+    /// a click back on a left pane.
+    right_focused: bool,
 }
 
 impl App {
@@ -196,6 +201,7 @@ impl App {
             right_area: Rect::ZERO,
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
+            right_focused: false,
         }
     }
 
@@ -442,6 +448,12 @@ impl App {
     /// frame so a click can be routed to the pane it landed in.
     pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
         self.left_areas[pane] = area;
+    }
+
+    /// Whether the right pane was last clicked, for `ui::draw_right_pane`'s
+    /// border highlight.
+    pub fn right_focused(&self) -> bool {
+        self.right_focused
     }
 
     /// A left pane's list scroll offset, read by `ui::draw_left_column`
@@ -692,6 +704,7 @@ impl App {
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
+            KeyCode::Esc => self.right_focused = false,
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
@@ -729,11 +742,13 @@ impl App {
         }
 
         if let Some(pane) = self.pane_at(ev.column, ev.row) {
+            self.right_focused = false; // a left click always returns focus left
             self.click_pane(pane, ev.row);
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
+        } else if self.right_area.contains(Position::new(ev.column, ev.row)) {
+            self.right_focused = true;
         }
-        // else: right pane / command log / keybar / gap. no-op for now
-        // (right pane: hook for the right-pane-focus plan).
+        // else: command log / keybar / gap. no-op.
     }
 
     /// Which left pane a screen cell is in, `None` for the right pane, the
