@@ -9,6 +9,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Every left-column pane (Status, Files, Branches, Commits, Stash) now draws a
+  vertical scrollbar when its list overflows the pane, matching the right
+  pane's diff scrollbar; the thumb is green while the pane is focused and grey
+  otherwise, following the pane's own border colour.
 - Diff and commit view: a lazygit-style `old new│` line-number gutter in front
   of every line, derived from the hunk header counters already parsed
   (`Diff::line_numbers`). Blank on headers, one-sided on an addition or
@@ -51,6 +55,17 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   --all-features -- -D warnings`, `RUSTDOCFLAGS=-D warnings cargo doc`,
   `cargo machete`, `cargo deny check` and `cargo nextest run` on every push to
   `main` and every pull request.
+
+### Fixed
+
+- Right-pane diff scrollbar: the thumb now reaches the track's bottom at max
+  scroll instead of stopping one cell short. `ScrollbarState`'s
+  `content_length` is the count of distinct scroll positions
+  (`total - viewport + 1`), not the raw line count, so a thumb sized against
+  the raw total never spanned the full track.
+- Both scrollbars drop their begin/end arrow glyphs (`.begin_symbol(None)`,
+  `.end_symbol(None)`): a plain track + thumb, lazygit style, instead of
+  arrows eating a row at each end.
 
 ### Changed
 

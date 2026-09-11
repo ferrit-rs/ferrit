@@ -109,11 +109,16 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         app.set_list_offset(pane, state.offset());
 
         if row_ct > inner_height {
-            let mut sb_state = ScrollbarState::new(row_ct)
-                .position(state.offset())
+            // Same `max_scroll + 1` trick as the right pane: see its comment.
+            let max_scroll = row_ct - inner_height;
+            let mut sb_state = ScrollbarState::new(max_scroll + 1)
+                .position(state.offset().min(max_scroll))
                 .viewport_content_length(inner_height);
             frame.render_stateful_widget(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight).style(border),
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .style(border)
+                    .begin_symbol(None)
+                    .end_symbol(None),
                 row.inner(Margin {
                     vertical: 1,
                     horizontal: 0,
@@ -211,12 +216,19 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let panel =
             Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, diff_area);
-        if total > diff_area.height as usize {
-            let mut state = ScrollbarState::new(total)
-                .position(scroll)
-                .viewport_content_length(diff_area.height as usize);
+        let viewport = diff_area.height as usize;
+        if total > viewport {
+            // `content_length` is the count of distinct scroll positions (not
+            // the raw line count), so the thumb's travel matches the scroll
+            // range exactly and reaches the track's end at max scroll.
+            let max_scroll = total - viewport;
+            let mut state = ScrollbarState::new(max_scroll + 1)
+                .position(scroll.min(max_scroll))
+                .viewport_content_length(viewport);
             frame.render_stateful_widget(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight),
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(None)
+                    .end_symbol(None),
                 diff_area,
                 &mut state,
             );
