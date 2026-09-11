@@ -17,6 +17,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changed, X insertion(s)(+), Y deletion(s)(-)`) above the scrollable diff,
   derived from `Diff::stat`. Rendered as its own row so it does not shift the
   line-index alignment scroll and hunk/file focus rely on.
+- Diff and commit view: a `]` / `[` jump now boxes the whole hunk (or file, in
+  a commit) in a dim background tint, not just its header line, so the
+  boundary a jump landed on stays visible even after scrolling the header out
+  of view.
 - Left click on the right pane focuses it (border lights up like a left
   pane's); `Esc` returns focus to the left column. Click still routes
   scrolling exactly as before.

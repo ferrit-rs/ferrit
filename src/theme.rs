@@ -3,6 +3,8 @@
 //! theme: green for the focused pane, a solid blue selection bar, green hashes,
 //! yellow keys. No config, no theme switching yet (that is phase 10).
 
+use std::ops::Range;
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 
@@ -31,6 +33,9 @@ pub const AUTHOR: Color = Color::Magenta;
 pub const WARN: Color = Color::Yellow;
 /// Key names in the keybind bar.
 pub const KEY: Color = Color::Yellow;
+/// Background tint boxing the hunk (or file, in a commit) a `]` / `[` jump
+/// last landed on.
+pub const FOCUS_BOX: Color = Color::DarkGray;
 
 fn fg(color: Color) -> Style {
     Style::new().fg(color)
@@ -178,10 +183,12 @@ pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
     Text::from(lines.collect::<Vec<_>>())
 }
 
-/// Render a parsed `Diff` for the right pane: `diff_lines` colouring, plus a
+/// Render a parsed `Diff` for the right pane: `diff_lines` colouring, a
 /// lazygit-style `old new│` gutter from `Diff::line_numbers` in front of every
-/// line (blank on headers, one-sided on an addition/deletion).
-pub fn render_diff(diff: &Diff, focus: Option<usize>) -> Text<'static> {
+/// line (blank on headers, one-sided on an addition/deletion), and, when
+/// `focus` is set, a `FOCUS_BOX` background boxing every line of the hunk (or
+/// file, in a commit) a `]` / `[` jump last landed on, its header reversed.
+pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>) -> Text<'static> {
     let numbers = diff.line_numbers();
     let width = numbers
         .iter()
@@ -191,10 +198,15 @@ pub fn render_diff(diff: &Diff, focus: Option<usize>) -> Text<'static> {
         .map_or(3, |n| n.to_string().len());
 
     let lines = diff.text.lines().enumerate().map(|(i, line)| {
-        let focused = focus == Some(i);
+        let boxed = focus.is_some_and(|r| r.contains(&i));
+        let header = focus.is_some_and(|r| r.start == i);
         let mut content_style = diff_line_style(line);
         let mut gutter_style = Style::new().fg(IDLE).add_modifier(Modifier::DIM);
-        if focused {
+        if boxed {
+            content_style = content_style.bg(FOCUS_BOX);
+            gutter_style = gutter_style.bg(FOCUS_BOX);
+        }
+        if header {
             content_style = content_style.add_modifier(Modifier::REVERSED);
             gutter_style = gutter_style.add_modifier(Modifier::REVERSED);
         }

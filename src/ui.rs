@@ -189,12 +189,12 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
                     DiffView::Commit(..) => diff.file_lines(),
                     _ => diff.hunk_lines(),
                 };
-                let focus = anchors.iter().position(|&l| l == scroll);
-                (
-                    theme::render_diff(diff, focus),
-                    diff.text.lines().count(),
-                    diff.stat(),
-                )
+                let total = diff.text.lines().count();
+                let focus = anchors.iter().position(|&l| l == scroll).map(|i| {
+                    let end = anchors.get(i + 1).copied().unwrap_or(total);
+                    scroll..end
+                });
+                (theme::render_diff(diff, focus.as_ref()), total, diff.stat())
             },
             #[expect(
                 clippy::unreachable,
