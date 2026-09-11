@@ -84,6 +84,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Selection bar, lazygit style: the solid blue row highlight now shows only in
   the focused left pane. Unfocused panes keep their cursor position but draw no
   bar, so the three panes no longer look selected at once.
+- Right pane with a real repo and nothing selected (fresh repo, no commits, no
+  changes) showed `App::mock()`'s hardcoded sample diff instead of staying
+  blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
 [Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.1.0

@@ -218,6 +218,11 @@ impl App {
         app
     }
 
+    /// Repo-free (`App::mock()`): the right pane's mock sample text applies.
+    pub fn is_mock(&self) -> bool {
+        self.repo.is_none()
+    }
+
     /// Query the real terminal for a graphics protocol and, if it has one,
     /// swap it in for the half-block fallback. Call once, before `run`. See
     /// `image::detect` for hosts that lie about support.

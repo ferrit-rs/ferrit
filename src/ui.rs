@@ -213,7 +213,13 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         return;
     }
 
-    // No repo (mock) or a pane with no diff: the sample text.
+    // `App::mock()`: the sample text. A real repo with nothing selected (no
+    // files, no commits) just leaves the pane blank.
+    if !app.is_mock() {
+        frame.render_widget(Paragraph::new("").block(block), area);
+        return;
+    }
+
     let body = match app.focus {
         Pane::Status => mock::RIGHT_STATUS,
         Pane::Files => mock::RIGHT_DIFF,
