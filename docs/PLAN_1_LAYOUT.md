@@ -175,28 +175,41 @@ content
 
 left column
 └── Layout::vertical
-    ├── Length(4)     [1] Status         ── header, always small, never accordions
+    ├── Length(status_lines().len() + 2)   [1] Status ── 3 normally, 4 with
+    │                                        a conflict line; never accordions
     └── Min(0)        accordion_area     ── [2]..[5], split by hand below
 
 accordion_area (lazygit-style `expandFocusedSidePanel`, hand-computed, not a
 Layout constraint solve: mixing Min/Fill in one `Layout::vertical` call is
-order-sensitive and can starve the boosted pane below its neighbours' floor
-at small heights)
-    FLOOR = 3 rows (border + one content row) per pane
-    focused pane   = FLOOR + leftover   ── leftover = area.height - FLOOR*4
-    other 3 panes  = FLOOR
-    if focus is Status (outside [2]..[5]): leftover split evenly over the 4
-    if area.height <= FLOOR*4: no floor fits, split area.height evenly over the 4
+order-sensitive and can starve the boosted pane below its neighbours at small
+heights)
+    FOCUS_WEIGHT = 4 shares to the focused pane, 1 share to each other pane
+    each pane's height = accordion_area.height * its_weight / total_weight,
+      floored at MIN_HEIGHT = 2 (a collapsed but still-bordered box: no room
+      for a content row, but still recognisable, unlike a 1-row sliver)
+    if focus is Status (outside [2]..[5]): every pane gets 1 share (an even
+      split, not left blank)
+    a round-robin correction pass afterwards fixes the rounding so the four
+      heights always sum to exactly accordion_area.height
+
+    Revision: an earlier version gave unfocused panes a fixed FLOOR (3) and
+    100% of the leftover to focus, which fell back to "split area.height
+    evenly over the 4" whenever there wasn't room for every pane's floor —
+    erasing the accordion in exactly the short-terminal case where showing
+    one pane clearly matters most (confirmed against a real lazygit
+    screenshot at a comparable terminal height: lazygit's focused pane still
+    dominated, ferrit's four panes came out nearly equal). The weighted
+    scheme degrades gracefully at any height instead of falling off a cliff.
 ```
 
-Example at area.height = 30, Commits focused:
+Example at a typical 80x24 terminal, Commits focused:
 
 ```
-┌ [1] Status ───────────┐  4  (fixed)
-├ [2] Files ─────────────┤  3  (floor)
-├ [3] Local branches ────┤  3  (floor)
-├ [4] Commits ───────────┤ 17  (floor 3 + leftover 14)
-└ [5] Stash ─────────────┘  3  (floor)
+┌ [1] Status ───────────┐  3  (dynamic: no conflict line)
+├ [2] Files ─────────────┤  3  (1 share)
+├ [3] Local branches ────┤  2  (1 share, MIN_HEIGHT floor)
+├ [4] Commits ───────────┤  9  (4 shares)
+└ [5] Stash ─────────────┘  2  (1 share, MIN_HEIGHT floor)
 ```
 
 Implemented (not deferred): `draw_left_column` in `src/ui.rs`.

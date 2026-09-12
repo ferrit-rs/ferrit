@@ -58,37 +58,57 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
 }
 
 fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    // Status only ever shows 1 line, or 2 when there's a conflict to report
+    // (`App::status_lines`): sized to that instead of a flat 4, so a short
+    // terminal doesn't pay for a conflict line that (almost always) isn't
+    // there.
+    let status_height = u16::try_from(app.status_lines().len() + 2).unwrap_or(4);
     let [status_row, accordion_area] =
-        Layout::vertical([Constraint::Length(4), Constraint::Min(0)]).areas(area);
+        Layout::vertical([Constraint::Length(status_height), Constraint::Min(0)]).areas(area);
 
-    // lazygit's `expandFocusedSidePanel` accordion: the focused pane claims
-    // the leftover space, the rest keep a 3-row floor (border + one row).
-    // When the focus is Status (outside this group), there is no boosted
-    // pane, so the leftover is shared evenly instead of left blank.
+    // lazygit's `expandFocusedSidePanel` accordion: the focused pane claims a
+    // weighted majority of the space, everyone else shares what's left.
+    // Weighted rather than "a fixed floor each, 100% of the leftover to
+    // focus": that scheme gave a dramatic boost in a roomy terminal but fell
+    // back to a perfectly even split — no accordion at all — the moment
+    // there wasn't room for every pane's floor, which is exactly the short
+    // terminal where showing one pane clearly, lazygit-style, matters most.
+    // `FOCUS_WEIGHT` shares go to the focused pane, 1 share to each other;
+    // when the focus is Status (outside this group), there is no pane to
+    // boost, so every pane gets 1 share (an even split, not left blank).
     // Ratatui's `Fill`/`Min` mix is order-sensitive at small heights (it can
-    // starve the boosted pane below its neighbours' floor), so the split is
+    // starve the boosted pane below its neighbours), so the split is
     // computed by hand rather than left to the `Layout` solver.
     const DYNAMIC: [Pane; 4] = [Pane::Files, Pane::Branches, Pane::Commits, Pane::Stash];
-    const FLOOR: u16 = 3;
+    const FOCUS_WEIGHT: u16 = 4;
+    const MIN_HEIGHT: u16 = 2; // a collapsed but still-bordered box: no room for a content row
     let focus_index = DYNAMIC.iter().position(|&p| p == app.focus);
 
-    let mut heights = [FLOOR; 4];
-    let leftover = accordion_area.height.saturating_sub(FLOOR * 4);
-    if accordion_area.height <= FLOOR * 4 {
-        // Not even room for every pane's floor: split what there is evenly.
-        let share = accordion_area.height / 4;
-        let extra = accordion_area.height % 4;
-        for (i, h) in heights.iter_mut().enumerate() {
-            *h = share + u16::from(i < usize::from(extra));
+    let weights: [u16; 4] = focus_index.map_or([1; 4], |idx| {
+        std::array::from_fn(|i| if i == idx { FOCUS_WEIGHT } else { 1 })
+    });
+    let total_weight: u16 = weights.iter().sum();
+    let mut heights: [u16; 4] = std::array::from_fn(|i| {
+        let weight = weights.get(i).copied().unwrap_or(1);
+        (accordion_area.height * weight / total_weight).max(MIN_HEIGHT)
+    });
+
+    // The weighted shares rarely sum to exactly `accordion_area.height`,
+    // especially once every pane is floored to `MIN_HEIGHT`. Round-robin the
+    // remainder (or the overshoot) so the total always matches exactly,
+    // never taking a pane below 0.
+    let mut diff = i32::from(accordion_area.height) - i32::from(heights.iter().sum::<u16>());
+    let mut i = 0;
+    while diff != 0 {
+        let Some(h) = heights.get_mut(i) else { break };
+        if diff > 0 {
+            *h += 1;
+            diff -= 1;
+        } else if *h > 0 {
+            *h -= 1;
+            diff += 1;
         }
-    } else if let Some(h) = focus_index.and_then(|i| heights.get_mut(i)) {
-        *h += leftover;
-    } else {
-        let share = leftover / 4;
-        let extra = leftover % 4;
-        for (i, h) in heights.iter_mut().enumerate() {
-            *h += share + u16::from(i < usize::from(extra));
-        }
+        i = (i + 1) % heights.len();
     }
 
     let mut rows = [status_row, Rect::default(), Rect::default(), Rect::default(), Rect::default()];

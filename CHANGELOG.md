@@ -19,6 +19,17 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   selecting a commit there shows its diff the same way the Commits pane
   always has. `Esc` backs out to the branch list.
 
+### Fixed
+
+- Left column accordion: the focused pane now claims a weighted majority of
+  the space (4 shares vs. 1 for each other pane) instead of a fixed floor
+  each with 100% of the leftover to focus. The old scheme fell back to a
+  perfectly even split — no accordion at all — whenever the terminal was too
+  short for every pane's floor, which is exactly when a clear size
+  difference matters most; the new one degrades gracefully at any height.
+  Status is also sized to its actual line count (3 normally, 4 with a
+  conflict to report) instead of a flat 4, freeing a row for the others.
+
 ## [0.2.0] - 2026-09-11
 
 ### Added
