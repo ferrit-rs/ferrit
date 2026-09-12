@@ -80,6 +80,7 @@ pub fn mock_branches() -> Vec<BranchEntry> {
             upstream: Some("origin/main".to_owned()),
             ahead: 2,
             behind: 0,
+            tip_time: 1_725_000_000,
         },
         BranchEntry {
             name: "feat/tui-skeleton".to_owned(),
@@ -87,6 +88,7 @@ pub fn mock_branches() -> Vec<BranchEntry> {
             upstream: None,
             ahead: 0,
             behind: 0,
+            tip_time: 1_724_740_000,
         },
         BranchEntry {
             name: "fix/parse-args".to_owned(),
@@ -94,6 +96,7 @@ pub fn mock_branches() -> Vec<BranchEntry> {
             upstream: None,
             ahead: 0,
             behind: 0,
+            tip_time: 1_724_400_000,
         },
     ]
 }

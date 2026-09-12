@@ -104,4 +104,11 @@ impl Repo {
     pub fn commit_diff(&self, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
         diff::commit_diff(&self.inner, hash, opts)
     }
+
+    /// One local branch's own commit history, newest first, bounded by
+    /// `COMMITS_LIMIT`. Feeds the Branches pane's Enter-to-drill-down log
+    /// (`docs/PLAN_2_GIT_BACKEND.md`, G7).
+    pub fn branch_log(&self, branch: &str) -> GitResult<Vec<CommitEntry>> {
+        log::commits_for(&self.inner, branch, COMMITS_LIMIT)
+    }
 }

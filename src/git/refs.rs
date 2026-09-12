@@ -35,12 +35,19 @@ pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
                 Err(_) => (None, 0, 0),
             };
 
+            let tip_time = branch
+                .get()
+                .target()
+                .and_then(|oid| repo.find_commit(oid).ok())
+                .map_or(0, |commit| commit.time().seconds());
+
             Ok(BranchEntry {
                 name,
                 is_head,
                 upstream,
                 ahead,
                 behind,
+                tip_time,
             })
         })
         .collect::<GitResult<Vec<_>>>()?;

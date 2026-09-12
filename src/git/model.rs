@@ -48,6 +48,9 @@ pub struct BranchEntry {
     pub upstream: Option<String>,
     pub ahead: usize,
     pub behind: usize,
+    /// Tip commit time, seconds since the epoch. Feeds the `1d` / `3d`
+    /// recency column, lazygit-style. 0 for an unborn branch.
+    pub tip_time: i64,
 }
 
 /// One row of the Stash pane.

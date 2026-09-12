@@ -154,6 +154,49 @@ fn branches_lists_head_first_then_alphabetical() {
     let rest: Vec<&str> = snap.branches[1..].iter().map(|b| b.name.as_str()).collect();
     assert_eq!(rest, ["alpha", "zeta"]);
     assert!(!snap.branches[1].is_head);
+    assert!(
+        snap.branches[0].tip_time > 0,
+        "tip_time reads the tip commit's date"
+    );
+}
+
+#[test]
+fn branch_log_reads_that_branch_only_not_head() {
+    let dir = TempDir::new("branch-log");
+    let repo = Repository::init(dir.path()).unwrap();
+    std::fs::write(dir.path().join("f.txt"), b"0\n").unwrap();
+    commit_all(&repo, "on main");
+    let base_oid = repo.head().unwrap().target().unwrap();
+    let base_commit = repo.find_commit(base_oid).unwrap();
+    let head_name = repo.head().unwrap().shorthand().unwrap().to_owned();
+    repo.branch("feature", &base_commit, false).unwrap();
+
+    // Advance the checked-out branch past the branch point; `feature` stays behind.
+    std::fs::write(dir.path().join("f.txt"), b"1\n").unwrap();
+    commit_all(&repo, "only on head");
+
+    let opened = Repo::open(dir.path()).unwrap();
+    let feature_log = opened.branch_log("feature").unwrap();
+    assert_eq!(feature_log.len(), 1);
+    assert_eq!(feature_log[0].summary, "on main");
+
+    let head_log = opened.branch_log(&head_name).unwrap();
+    assert_eq!(head_log.len(), 2);
+    assert_eq!(head_log[0].summary, "only on head");
+}
+
+#[test]
+fn branch_log_on_an_unknown_branch_is_empty_not_an_error() {
+    let dir = TempDir::new("branch-log-missing");
+    let repo = Repository::init(dir.path()).unwrap();
+    std::fs::write(dir.path().join("f.txt"), b"0\n").unwrap();
+    commit_all(&repo, "initial commit");
+
+    let log = Repo::open(dir.path())
+        .unwrap()
+        .branch_log("does-not-exist")
+        .unwrap();
+    assert!(log.is_empty());
 }
 
 #[test]
