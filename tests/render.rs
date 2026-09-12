@@ -66,7 +66,10 @@ fn right_pane_follows_focus() {
     assert!(frame(&mut app, 120, 40).contains("diff --git a/src/main.rs"));
 
     app.focus = Pane::Branches;
-    assert!(frame(&mut app, 120, 40).contains("HEAD -> main"));
+    assert!(
+        !frame(&mut app, 120, 40).contains("diff --git"),
+        "Branches has no mock body since G7: Enter drills into a real branch log instead"
+    );
 
     app.focus = Pane::Stash;
     assert!(frame(&mut app, 120, 40).contains("(no stash entries)"));

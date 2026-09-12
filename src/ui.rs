@@ -116,8 +116,13 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         } else {
             Style::new().fg(theme::IDLE)
         };
+        let title_text = if pane == Pane::Branches {
+            app.branches_title()
+        } else {
+            pane.title().to_owned()
+        };
         let title = Line::styled(
-            format!(" {} ", pane.title()),
+            format!(" {title_text} "),
             if focused {
                 Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
             } else {
@@ -174,7 +179,15 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(theme::IDLE);
-    let right_title = app.focus.right_title();
+    // Branches normally previews nothing (" Log "); once drilled into a
+    // branch's commit list, a selected row shows a real diff, so the title
+    // matches what the Commits pane calls the same view: " Patch ".
+    let right_title =
+        if app.focus == Pane::Branches && matches!(app.diff_view(), DiffView::Commit(..)) {
+            " Patch "
+        } else {
+            app.focus.right_title()
+        };
     let border = if app.right_focused() { focused } else { idle };
 
     // An image selection takes over the right pane; otherwise it is mock text.
@@ -297,6 +310,50 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         return;
     }
 
+    // Branches focused, not drilled in: the selected branch's own commits,
+    // shown passively (lazygit's live branch -> log preview, no Enter
+    // needed) as multi-line `git log`-style blocks (`theme::branch_log_block`)
+    // rather than the compact one-line rows the Commits pane uses — there is
+    // a whole pane's width to spend here. No gutter/stat/hunk-jump, that
+    // treatment is for an actual diff once Enter drills into a specific
+    // commit, but it does scroll like one (`right_is_diff`), so J/K,
+    // PageUp/Down and the wheel move this list instead of leaking through to
+    // the Branches selection.
+    if let DiffView::BranchLog(log) = app.diff_view() {
+        let inner = block.inner(area);
+        let lines: Vec<Line<'static>> = if log.commits.is_empty() {
+            vec![Line::raw("no commits yet")]
+        } else {
+            log.commits
+                .iter()
+                .flat_map(theme::branch_log_block)
+                .collect()
+        };
+        let total = lines.len();
+        let scroll = app.right_scroll();
+        frame.render_widget(block, area);
+        let panel = Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
+        frame.render_widget(panel, inner);
+        let viewport = inner.height as usize;
+        if total > viewport {
+            let max_scroll = total - viewport;
+            let mut state = ScrollbarState::new(max_scroll + 1)
+                .position(scroll.min(max_scroll))
+                .viewport_content_length(viewport);
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(None)
+                    .end_symbol(None),
+                inner,
+                &mut state,
+            );
+        }
+        app.set_right_viewport(viewport);
+        return;
+    }
+
     // `App::mock()`: the sample text. A real repo with nothing selected (no
     // files, no commits) just leaves the pane blank.
     if !app.is_mock() {
@@ -304,16 +361,19 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         return;
     }
 
+    // Branches has no mock body: `App::mock()` has no repo, so there is
+    // nothing to preview or drill into (G7); the mock path matches that by
+    // leaving it blank rather than showing a fake sample.
     let body = match app.focus {
         Pane::Status => mock::RIGHT_STATUS,
         Pane::Files => mock::RIGHT_DIFF,
-        Pane::Branches => mock::RIGHT_LOG,
+        Pane::Branches => "",
         Pane::Commits => mock::RIGHT_COMMIT,
         Pane::Stash => mock::RIGHT_STASH,
     };
 
     let text: Text<'_> = match app.focus {
-        Pane::Files | Pane::Branches | Pane::Commits => theme::diff_lines(body, None),
+        Pane::Files | Pane::Commits => theme::diff_lines(body, None),
         _ => body.into(),
     };
 

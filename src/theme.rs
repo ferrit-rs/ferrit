@@ -113,9 +113,19 @@ pub fn file_line(entry: &FileEntry) -> Line<'static> {
     ])
 }
 
-/// lazygit branch row: `* main ↑2` for the checked-out branch (green, bold),
-/// `  feat/x` for the rest. Ahead/behind arrows in yellow when there is an
-/// upstream to compare against.
+/// Day-granularity age, lazygit's branch-list recency column: `0d`, `1d`,
+/// `3d`, ... No date crate: whole days since `tip_time`, floored, clamped to
+/// 0 for a clock skew or a branch newer than "now".
+fn days_ago(tip_time: i64) -> i64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(tip_time, |d| i64::try_from(d.as_secs()).unwrap_or(tip_time));
+    ((now - tip_time) / 86_400).max(0)
+}
+
+/// lazygit branch row: `1d * main ↑2` for the checked-out branch (green,
+/// bold), `3d   feat/x` for the rest. Ahead/behind arrows in yellow when
+/// there is an upstream to compare against.
 pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
     let marker = if entry.is_head { "* " } else { "  " };
     let name_style = if entry.is_head {
@@ -124,6 +134,10 @@ pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
         Style::new()
     };
     let mut spans = vec![
+        Span::styled(
+            format!("{:<3}", format!("{}d", days_ago(entry.tip_time))),
+            fg(HUNK),
+        ),
         Span::styled(marker, fg(ADD)),
         Span::styled(entry.name.clone(), name_style),
     ];
@@ -151,6 +165,44 @@ pub fn commit_line(entry: &CommitEntry) -> Line<'static> {
         Span::raw(" "),
         Span::raw(entry.summary.clone()),
     ])
+}
+
+/// Line count of one `branch_log_block` entry. Kept in sync with it so the
+/// scroll clamp knows the real height without re-building the styled lines.
+pub const BRANCH_LOG_BLOCK_LINES: usize = 6;
+
+/// One commit as a multi-line, git-log-style block: hash, author, relative
+/// date, and the summary indented under a `|` continuation — closer to
+/// lazygit's Log panel than the compact `commit_line` row `Commits` uses.
+/// There is room for it since this is the passive Branches-pane preview
+/// (`DiffView::BranchLog`), which fills the whole right pane rather than a
+/// narrow list column.
+pub fn branch_log_block(entry: &CommitEntry) -> Vec<Line<'static>> {
+    let graph = fg(HUNK);
+    let label = fg(IDLE);
+    vec![
+        Line::from(vec![
+            Span::styled("* ", graph),
+            Span::styled("commit ", label),
+            Span::styled(entry.short_hash.clone(), fg(HASH)),
+        ]),
+        Line::from(vec![
+            Span::styled("| ", graph),
+            Span::styled("Author: ", label),
+            Span::raw(entry.author.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled("| ", graph),
+            Span::styled("Date:   ", label),
+            Span::raw(format!("{}d ago", days_ago(entry.time))),
+        ]),
+        Line::from(Span::styled("|", graph)),
+        Line::from(vec![
+            Span::styled("| ", graph),
+            Span::raw(format!("    {}", entry.summary)),
+        ]),
+        Line::from(Span::styled("|", graph)),
+    ]
 }
 
 /// lazygit stash row: `stash@{0}: message`.

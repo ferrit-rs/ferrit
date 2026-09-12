@@ -304,3 +304,150 @@ fn moving_to_another_file_resets_the_scroll() {
     assert_eq!(app.right_scroll(), 0, "new selection starts at the top");
     assert!(diff_text(&app).contains("+bbb changed"));
 }
+
+/// Scrolling the right pane while it passively previews a branch's log (G7)
+/// must move that log, not the Branches selection — a regression once
+/// caused by `right_is_diff` excluding `DiffView::BranchLog`, which let J/K
+/// and the mouse wheel leak through to `select_down`/`select_up` instead.
+#[test]
+fn branch_log_preview_scrolls_instead_of_moving_the_branch_selection() {
+    let dir = TempDir::new("app-branch-log-scroll");
+    let repo = Repository::init(dir.path()).unwrap();
+    for i in 0..15 {
+        fs::write(dir.path().join("f.txt"), format!("{i}\n")).unwrap();
+        commit_all(&repo, &format!("commit {i}"));
+    }
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.select(Pane::Branches, 0);
+    app.set_right_viewport(5);
+    assert_eq!(app.row_count(Pane::Branches), 1, "only one branch exists");
+
+    app.feed_key(KeyEvent::from(KeyCode::Char('J')));
+    app.feed_key(KeyEvent::from(KeyCode::Char('J')));
+
+    assert_eq!(
+        app.right_scroll(),
+        2,
+        "uppercase J scrolled the log preview"
+    );
+    assert_eq!(
+        app.selected(Pane::Branches),
+        0,
+        "the (only) branch is still selected, not moved by J"
+    );
+
+    app.set_right_area(Rect {
+        x: 40,
+        y: 0,
+        width: 80,
+        height: 5,
+    });
+    app.feed_mouse(MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column: 60,
+        row: 3,
+        modifiers: KeyModifiers::NONE,
+    });
+
+    assert!(
+        app.right_scroll() > 2,
+        "the wheel over the right pane scrolled the log preview too"
+    );
+    assert_eq!(
+        app.selected(Pane::Branches),
+        0,
+        "still the only branch selected, not moved by the wheel"
+    );
+}
+
+/// Just focusing/selecting in the Branches pane, no Enter (lazygit's live
+/// branch -> log preview, `docs/PLAN_2_GIT_BACKEND.md` G7): the right pane
+/// already shows the selected branch's own log, and the branch list itself
+/// is untouched (that's the Enter drill-down's job, tested separately).
+#[test]
+fn branches_passively_previews_the_selected_branchs_log() {
+    let dir = TempDir::new("app-branch-preview");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("f.txt"), "0\n").unwrap();
+    commit_all(&repo, "on the branch point");
+    let base_oid = repo.head().unwrap().target().unwrap();
+    let base_commit = repo.find_commit(base_oid).unwrap();
+    repo.branch("zzz-feature", &base_commit, false).unwrap();
+
+    fs::write(dir.path().join("f.txt"), "1\n").unwrap();
+    commit_all(&repo, "only on head");
+
+    let mut app = App::open(dir.path()).unwrap();
+    let branch_count = app.row_count(Pane::Branches);
+    assert_eq!(branch_count, 2);
+
+    // HEAD sorts first, "zzz-feature" is the only other branch: index 1.
+    app.select(Pane::Branches, 1);
+
+    match app.diff_view() {
+        DiffView::BranchLog(log) => {
+            assert_eq!(log.branch, "zzz-feature");
+            assert_eq!(log.commits.len(), 1, "the branch's own log, not HEAD's");
+        },
+        other => panic!("expected a passive branch log preview, got {other:?}"),
+    }
+    assert_eq!(
+        app.row_count(Pane::Branches),
+        branch_count,
+        "no Enter: the branch list itself is untouched"
+    );
+}
+
+/// Enter on a branch in the Branches pane (lazygit's branch -> log
+/// drill-down, `docs/PLAN_2_GIT_BACKEND.md` G7): swaps that pane's own
+/// branch list for the branch's commit list, in place — focus never leaves
+/// Branches, and the separate Commits pane is untouched throughout.
+/// Selecting a commit in the drilled list shows its diff; `Esc` backs out.
+#[test]
+fn enter_on_branches_drills_into_that_branchs_log() {
+    let dir = TempDir::new("app-branch-log");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("f.txt"), "0\n").unwrap();
+    commit_all(&repo, "on the branch point");
+    let base_oid = repo.head().unwrap().target().unwrap();
+    let base_commit = repo.find_commit(base_oid).unwrap();
+    repo.branch("zzz-feature", &base_commit, false).unwrap();
+
+    fs::write(dir.path().join("f.txt"), "1\n").unwrap();
+    commit_all(&repo, "only on head");
+
+    let mut app = App::open(dir.path()).unwrap();
+    let head_commit_count = app.row_count(Pane::Commits);
+    assert_eq!(head_commit_count, 2);
+
+    // HEAD sorts first, "zzz-feature" is the only other branch: index 1.
+    app.select(Pane::Branches, 1);
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    assert_eq!(app.focus, Pane::Branches, "Enter stays in the same panel");
+    assert_eq!(
+        app.row_count(Pane::Branches),
+        1,
+        "the branch's own log, not HEAD's, replaces the branch list"
+    );
+    assert!(app.branches_title().contains("zzz-feature"));
+    assert_eq!(
+        app.row_count(Pane::Commits),
+        head_commit_count,
+        "the separate Commits pane is untouched by the drill-down"
+    );
+    assert!(
+        matches!(app.diff_view(), DiffView::Commit(..)),
+        "selecting the (only) row in the drilled log shows its diff"
+    );
+
+    app.feed_key(KeyEvent::from(KeyCode::Esc));
+    assert_eq!(app.focus, Pane::Branches);
+    assert_eq!(
+        app.selected(Pane::Branches),
+        1,
+        "Esc restores the branch-list cursor"
+    );
+    assert_eq!(app.branches_title(), "[3] Local branches - Remotes - Tags");
+}

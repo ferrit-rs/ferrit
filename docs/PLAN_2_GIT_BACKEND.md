@@ -74,6 +74,7 @@ pub struct BranchEntry {
     pub upstream: Option<String>,
     pub ahead: usize,
     pub behind: usize,
+    pub tip_time: i64,             // tip commit time, seconds since epoch (G7)
 }
 
 pub struct CommitEntry {
@@ -155,7 +156,9 @@ and the `mod mock;`.
   by `theme::file_line` (already meaning-aware).
 - Empty states: "working tree clean", "no local branches" (won't happen),
   "no commits yet" (fresh repo), "(no stash entries)".
-- Right pane stays mock text in phase 2; real diffs are phase 3.
+- Right pane stays mock text in phase 2; real diffs are phase 3. Exception:
+  once Enter drills the Branches pane into a branch's own log (G7, see
+  Milestones), selecting a commit there shows a real diff, same as Commits.
 
 ## Image preview (ratatui-image)
 
@@ -264,12 +267,74 @@ Lands in the same commits as the features:
   answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
   exercise the path with no repo. Richer graphics polish stays phase 3.
 
-`mock.rs` now only feeds `App::mock()` (the repo-free render-test path); every
-pane reads from `git::Repo` when a real repo is open.
+- **G7** done. `git::log::commits` always revwalked from HEAD (G4), which
+  is fine for the left `Commits` pane but left the right-pane `Log` view
+  stuck on `mock::RIGHT_LOG` whenever the Branches pane was focused —
+  `PLAN_1_LAYOUT.md` flagged this as "hardcoded strings in phase 1", never
+  picked back up. Four lazygit behaviours, all read only:
+  1. **Passive per-branch preview.** `git::log::commits_for(repo, branch,
+     max)` walks history from an arbitrary branch tip instead of HEAD
+     (`Repo::branch_log` wraps it). Just focusing or moving the cursor in the
+     Branches pane — no key press — previews the *selected* branch's own log
+     in the right pane, same as Files already live-previews a diff:
+     `right_key_for`'s `Pane::Branches` arm (not drilled, see next point)
+     returns `RightKey::BranchLog { branch }`, and `build_diff` turns that
+     into `DiffView::BranchLog { branch, commits, .. }`, rendered as
+     multi-line `git log`-style blocks (`theme::branch_log_block`, `commit
+     <hash>` / `Author:` / `Date:` / summary under a `|` continuation,
+     `BRANCH_LOG_BLOCK_LINES` lines each) rather than the compact one-line
+     `theme::commit_line` row `Commits` uses — there is a whole pane's width
+     to spend here, first shipped compact and then widened once the compact
+     version read as visually thin next to lazygit's own Log panel. No
+     gutter/stat/hunk-jump, that treatment is for an actual diff. It does
+     scroll like one, though: `right_is_diff` (`src/app.rs`) originally
+     listed only `Files`/`Commit`, so J/K, PageUp/Down and the mouse wheel
+     over this view fell through to the Branches selection instead of
+     scrolling the log — fixed by adding `BranchLog` there and giving it a
+     real line count (`diff_line_count`, `commits.len() *
+     BRANCH_LOG_BLOCK_LINES`) and a scrollbar in `ui.rs`, same as a diff's.
+     Matches lazygit's right-hand `Log` panel's shape; decorations (`HEAD ->`,
+     branch/remote refs) and the full multi-line commit body are not
+     reproduced — `CommitEntry` does not carry them, and adding them is
+     backend work, not a rendering tweak.
+  2. **Enter drill-down.** Pressing **Enter** on the selected branch swaps
+     the Branches pane's *own* branch list for that branch's commit list, in
+     place — `App.branch_drill: Option<BranchDrill>` (`{ branch, commits,
+     return_index }`) — rather than moving focus to the separate Commits
+     pane: a first attempt at this drilled into `Pane::Commits` instead, but
+     that does not match lazygit, which keeps the same physical panel slot
+     (`[3]`) and only relabels its title to `Commits (<branch>)`
+     (`App::branches_title`) while drilled. `Esc` pops `branch_drill` and
+     restores the branch-list cursor (`return_index`); the separate Commits
+     pane (`self.commits`, HEAD's log) is untouched throughout. A background
+     `refresh()` keeps a drilled log live rather than letting it go stale; a
+     branch that disappears backs out of the drill-down instead of erroring.
+     Drops `mock::RIGHT_LOG` (Branches pane's mock body is now blank,
+     matching the real-repo path); Files keeps its diff mock until phase 3.
+  3. **Branch recency.** `BranchEntry` gained `tip_time` (see Data model):
+     the tip commit's timestamp, read alongside `graph_ahead_behind` in
+     `refs::branches()`. `theme::branch_line` renders it as a day-granularity
+     relative age (`0d`, `1d`, `3d`, ...) before each branch name, coloured
+     with `theme::HUNK` (cyan) so it reads as its own column rather than
+     blending into the branch name, like lazygit's branch list — plain
+     arithmetic on `tip_time` vs `SystemTime::now()`, no `time`/`jiff` crate.
+  4. **Diff from the drilled log.** `right_key_for`/`build_diff`
+     (`src/app.rs`) route a selected row in `branch_drill` to
+     `RightKey::Commit`, same as Commits; `build_diff`'s commit lookup checks
+     both `self.commits` and `branch_drill`'s list, so a row in a drilled log
+     shows its `Patch` through the exact same rendering path the Commits
+     pane always has — no new diff code. The right pane's title switches
+     from `Log` to `Patch` once a row's diff is actually showing, matching
+     what the Commits pane calls the same view.
 
-Phase 2 as scheduled now = **G0..G1 + G3..G6 done, G2 partial** (the `r`-key
-refresh and `last_error` path are wired; the replay-harness script test
-still waits on `PLAN_SELF_TESTING.md`).
+`mock.rs` now only feeds `App::mock()` (the repo-free render-test path); every
+pane reads from `git::Repo` when a real repo is open, Branches included
+(there is simply nothing to preview or drill into in mock mode, so the pane
+shows blank, same as a real repo with no repo-backed data).
+
+Phase 2 as scheduled now = **G0..G1 + G3..G7 done, G2 partial**
+(the `r`-key refresh and `last_error` path are wired; the replay-harness
+script test still waits on `PLAN_SELF_TESTING.md`).
 
 ## Definition of done (phase 2)
 
@@ -285,6 +350,13 @@ still waits on `PLAN_SELF_TESTING.md`).
 - No panic on an empty repo, a bare repo, or a detached HEAD.
 - Selecting an image file in Files shows it in the right pane (half-blocks
   at minimum); a non-decodable or missing blob shows a note, not a panic.
+- Focusing or moving the cursor in the Branches pane, no key press, previews
+  the selected branch's own commit log in the right pane (G7). Pressing
+  Enter drills that same pane into the branch's real commit log — focus
+  stays put, title becomes `Commits (<branch>)`; `Esc` backs out to the
+  branch list. Each branch row shows a relative age (`1d`, `3d`, ...) in its
+  own colour. Selecting a commit in a drilled log shows its diff via the
+  same `Patch` rendering the Commits pane always has.
 
 ## After phase 2
 

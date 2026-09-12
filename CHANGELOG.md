@@ -7,6 +7,18 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Added
+
+- Branches pane: each row now shows the tip commit's age (`1d`, `3d`, ...) in
+  its own colour, lazygit-style. Just selecting a branch (no key press)
+  previews its own commit log in the right pane as spaced-out `git log`-style
+  blocks (hash, author, date, summary), not a cramped one-liner — scrollable
+  with J/K, PageUp/Down and the mouse wheel, with its own scrollbar when it
+  overflows; pressing Enter drills that same pane into that log (title
+  becomes `Commits (<branch>)`) instead of the generic HEAD-based one, and
+  selecting a commit there shows its diff the same way the Commits pane
+  always has. `Esc` backs out to the branch list.
+
 ## [0.2.0] - 2026-09-11
 
 ### Added

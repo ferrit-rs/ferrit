@@ -30,15 +30,29 @@ use crate::{mock, theme, ui};
 /// selection still wins. See `docs/PLAN_3_DIFF_VIEW.md`.
 #[derive(Debug, Clone, Default)]
 pub enum DiffView {
-    /// Status / Branches / Stash focused: no real diff, the mock text shows.
+    /// Status / Stash focused: no real diff, the mock text shows.
     #[default]
     None,
     /// Read failed, or nothing to show. A dim single line, never a panic.
     Note(String),
     /// Files pane: one file's `git diff`.
     Files(git::Diff),
-    /// Commits pane: one commit's metadata and `git show` diff.
+    /// Commits pane, or a drilled branch's log: one commit's metadata and
+    /// `git show` diff.
     Commit(git::CommitEntry, git::Diff),
+    /// Branches pane, not drilled in: the selected branch's own log, shown
+    /// passively (no Enter needed), lazygit's live branch -> log preview.
+    BranchLog(BranchLog),
+}
+
+/// A branch's own commit log for the passive `DiffView::BranchLog` preview.
+#[derive(Debug, Clone)]
+pub struct BranchLog {
+    pub branch: String,
+    pub commits: Vec<git::CommitEntry>,
+    /// Cheap content signature for `view_sig`'s "did this actually change"
+    /// check: there is no single diff `text` to compare here.
+    sig: String,
 }
 
 /// Identity of what `DiffView` describes. `update_right_pane` resets the scroll
@@ -48,6 +62,7 @@ pub enum DiffView {
 enum RightKey {
     File { path: PathBuf, side: DiffSide },
     Commit { full_hash: String },
+    BranchLog { branch: String },
 }
 
 struct RenderedDiff {
@@ -56,6 +71,17 @@ struct RenderedDiff {
     focus: Option<Range<usize>>,
     width: usize,
     text: Text<'static>,
+}
+
+/// State for the Branches pane's Enter-to-drill-down (lazygit's branch ->
+/// log): the pane itself swaps its branch list for one branch's commit list,
+/// in place, rather than moving focus elsewhere. Distinct from the passive
+/// `DiffView::BranchLog` preview, which needs no Enter at all.
+struct BranchDrill {
+    branch: String,
+    commits: Vec<git::CommitEntry>,
+    /// The branch-list cursor to restore when `Esc` backs out.
+    return_index: usize,
 }
 
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default
@@ -70,6 +96,7 @@ fn view_sig(v: &DiffView) -> (u8, &str) {
         DiffView::Note(m) => (1, m.as_str()),
         DiffView::Files(d) => (2, d.text.as_str()),
         DiffView::Commit(_, d) => (3, d.text.as_str()),
+        DiffView::BranchLog(log) => (4, log.sig.as_str()),
     }
 }
 
@@ -141,6 +168,9 @@ pub struct App {
     header: git::StatusHeader,
     files: Vec<git::FileEntry>,
     branches: Vec<git::BranchEntry>,
+    /// `Some` while the Branches pane is drilled into one branch's own log
+    /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
+    branch_drill: Option<BranchDrill>,
     commits: Vec<git::CommitEntry>,
     stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
@@ -201,6 +231,7 @@ impl App {
             header: git::StatusHeader::default(),
             files: Vec::new(),
             branches: Vec::new(),
+            branch_drill: None,
             commits: Vec::new(),
             stashes: Vec::new(),
             last_error: None,
@@ -270,6 +301,22 @@ impl App {
             },
             Err(e) => self.last_error = Some(e.to_string()),
         }
+
+        // A drilled branch log (Enter on Branches) stays live across a
+        // background refresh instead of going stale; a branch that vanished
+        // (deleted, renamed) backs out of the drill-down instead of erroring
+        // the whole refresh.
+        if let Some(branch) = self.branch_drill.as_ref().map(|d| d.branch.clone()) {
+            match self.repo.as_ref().map(|r| r.branch_log(&branch)) {
+                Some(Ok(commits)) => {
+                    if let Some(drill) = &mut self.branch_drill {
+                        drill.commits = commits;
+                    }
+                },
+                _ => self.branch_drill = None,
+            }
+        }
+
         for pane in PANES {
             let last = self.row_count(pane).saturating_sub(1);
             let cursor = &mut self.selection[pane];
@@ -338,6 +385,22 @@ impl App {
                     full_hash: entry.full_hash.clone(),
                 })
             },
+            // Drilled: the selected row is a commit, same as Commits. Not
+            // drilled: no Enter yet, so preview the selected branch's own
+            // log passively (lazygit's live branch -> log, no key needed).
+            Pane::Branches => {
+                if let Some(drill) = &self.branch_drill {
+                    let entry = drill.commits.get(self.selected(Pane::Branches))?;
+                    Some(RightKey::Commit {
+                        full_hash: entry.full_hash.clone(),
+                    })
+                } else {
+                    let entry = self.branches.get(self.selected(Pane::Branches))?;
+                    Some(RightKey::BranchLog {
+                        branch: entry.name.clone(),
+                    })
+                }
+            },
             _ => None,
         }
     }
@@ -357,9 +420,28 @@ impl App {
                 Err(e) => DiffView::Note(e.to_string()),
             },
             RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, opts) {
-                Ok(diff) => match self.commits.iter().find(|c| &c.full_hash == full_hash) {
-                    Some(entry) => DiffView::Commit(entry.clone(), diff),
-                    None => DiffView::Note("commit not in the list".into()),
+                Ok(diff) => {
+                    let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
+                    match self
+                        .commits
+                        .iter()
+                        .chain(drill_commits)
+                        .find(|c| &c.full_hash == full_hash)
+                    {
+                        Some(entry) => DiffView::Commit(entry.clone(), diff),
+                        None => DiffView::Note("commit not in the list".into()),
+                    }
+                },
+                Err(e) => DiffView::Note(e.to_string()),
+            },
+            RightKey::BranchLog { branch } => match repo.branch_log(branch) {
+                Ok(commits) => {
+                    let sig = commits.iter().map(|c| c.full_hash.as_str()).collect();
+                    DiffView::BranchLog(BranchLog {
+                        branch: branch.clone(),
+                        commits,
+                        sig,
+                    })
                 },
                 Err(e) => DiffView::Note(e.to_string()),
             },
@@ -370,6 +452,7 @@ impl App {
     fn diff_line_count(&self) -> usize {
         match &self.diff {
             DiffView::Files(d) | DiffView::Commit(_, d) => d.text.lines().count(),
+            DiffView::BranchLog(log) => log.commits.len() * theme::BRANCH_LOG_BLOCK_LINES,
             DiffView::None | DiffView::Note(_) => 0,
         }
     }
@@ -401,10 +484,15 @@ impl App {
         };
     }
 
-    /// Is the right pane a scrollable real diff right now? The scroll keys and
-    /// the wheel are inert over an image, a `Note`, and the mock bodies.
+    /// Is the right pane scrollable right now — a real diff, or a branch's
+    /// log preview? The scroll keys and the wheel are inert over an image, a
+    /// `Note`, and the mock bodies; without this, they leak through to the
+    /// left pane's own selection instead (moving the wrong thing).
     fn right_is_diff(&self) -> bool {
-        matches!(self.diff, DiffView::Files(_) | DiffView::Commit(..))
+        matches!(
+            self.diff,
+            DiffView::Files(_) | DiffView::Commit(..) | DiffView::BranchLog(_)
+        )
     }
 
     /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
@@ -414,7 +502,7 @@ impl App {
         let anchors = match &self.diff {
             DiffView::Files(d) => d.hunk_lines(),
             DiffView::Commit(_, d) => d.file_lines(),
-            DiffView::None | DiffView::Note(_) => return,
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) => return,
         };
         let cur = self.right_scroll;
         let target = if dir > 0 {
@@ -467,7 +555,7 @@ impl App {
                     .as_ref()
                     .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
             },
-            DiffView::None | DiffView::Note(_) => None,
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) => None,
         }
     }
 
@@ -596,7 +684,10 @@ impl App {
         match pane {
             Pane::Status => 0,
             Pane::Files => self.files.len(),
-            Pane::Branches => self.branches.len(),
+            Pane::Branches => self
+                .branch_drill
+                .as_ref()
+                .map_or(self.branches.len(), |drill| drill.commits.len()),
             Pane::Commits => self.commits.len(),
             Pane::Stash => self.stashes.len(),
         }
@@ -633,12 +724,30 @@ impl App {
         out
     }
 
-    /// Branches pane rows, or the empty-state line.
+    /// Branches pane rows: the branch list, or one branch's own commit log
+    /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
+    /// own empty-state line.
     pub fn branch_lines(&self) -> Vec<Line<'static>> {
+        if let Some(drill) = &self.branch_drill {
+            if drill.commits.is_empty() {
+                return vec![Line::raw("no commits yet")];
+            }
+            return drill.commits.iter().map(theme::commit_line).collect();
+        }
         if self.branches.is_empty() {
             return vec![Line::raw("no local branches")];
         }
         self.branches.iter().map(theme::branch_line).collect()
+    }
+
+    /// `[3] Local branches - Remotes - Tags`, or `[3] Commits (<branch>)`
+    /// while drilled into a branch's log (Enter on a branch, `Esc` to back
+    /// out; see `enter_branch_log`).
+    pub fn branches_title(&self) -> String {
+        match &self.branch_drill {
+            Some(drill) => format!("[3] Commits ({})", drill.branch),
+            None => Pane::Branches.title().to_owned(),
+        }
     }
 
     /// Commits pane rows, or the empty-state line (fresh repo).
@@ -755,7 +864,13 @@ impl App {
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
-            KeyCode::Esc => self.right_focused = false,
+            KeyCode::Esc => {
+                self.right_focused = false;
+                if let Some(drill) = self.branch_drill.take() {
+                    self.selection[Pane::Branches] = drill.return_index;
+                }
+            },
+            KeyCode::Enter => self.enter_branch_log(),
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
@@ -864,6 +979,33 @@ impl App {
     fn select_up(&mut self) {
         let cursor = &mut self.selection[self.focus];
         *cursor = cursor.saturating_sub(1);
+    }
+
+    /// Enter on the Branches pane: lazygit's branch -> log drill-down. Swaps
+    /// the pane's own branch list for the selected branch's commit history,
+    /// in place — focus stays on Branches, only its rows and title change
+    /// (`branches_title`). Read only, no checkout. `Esc` backs out (`on_key`).
+    fn enter_branch_log(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        let Some(repo) = &self.repo else { return };
+        let return_index = self.selected(Pane::Branches);
+        let Some(branch) = self.branches.get(return_index) else {
+            return;
+        };
+        let name = branch.name.clone();
+        match repo.branch_log(&name) {
+            Ok(commits) => {
+                self.branch_drill = Some(BranchDrill {
+                    branch: name,
+                    commits,
+                    return_index,
+                });
+                self.selection[Pane::Branches] = 0;
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
     }
 }
 
