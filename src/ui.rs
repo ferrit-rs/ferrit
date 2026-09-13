@@ -9,13 +9,20 @@ use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{
-    Block, Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+    Block, BorderType, Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
+    ScrollbarState, Wrap,
 };
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, DiffView, PANES, Pane};
 use crate::image::preview::Preview;
 use crate::{mock, theme};
+
+/// Every box in the UI, lazygit style: rounded corners (`╭╮╰╯`) rather than
+/// square ones (`┌┐└┘`).
+fn bordered() -> Block<'static> {
+    Block::bordered().border_type(BorderType::Rounded)
+}
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -150,7 +157,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             },
         );
 
-        let mut block = Block::bordered().title(title).border_style(border);
+        let mut block = bordered().title(title).border_style(border);
         if let Some((cur, total)) = app.counter(pane) {
             block = block.title_bottom(theme::counter_line(cur, total));
         }
@@ -216,7 +223,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             // Same shape as `render_resized_image` in the ratatui-image demo:
             // draw the border, then hand `StatefulImage` the inner area and a
             // `&mut StatefulProtocol` so it resizes + re-encodes to fit.
-            let block = Block::bordered()
+            let block = bordered()
                 .title(Line::styled(" Preview ", focused))
                 .border_style(border);
             let inner = block.inner(area);
@@ -235,7 +242,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             frame.render_widget(Clear, area);
             let panel = Paragraph::new(msg.as_str())
                 .block(
-                    Block::bordered()
+                    bordered()
                         .title(Line::styled(right_title, focused))
                         .border_style(border),
                 )
@@ -250,7 +257,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // from a previous image frame before drawing the (often short) text pane.
     frame.render_widget(Clear, area);
 
-    let block = Block::bordered()
+    let block = bordered()
         .title(Line::styled(right_title, focused))
         .border_style(border);
 
@@ -407,7 +414,7 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
         .map(|s| theme::log_line(s))
         .collect();
     let panel = Paragraph::new(lines).block(
-        Block::bordered()
+        bordered()
             .title(Line::styled(" command log ", Style::new().fg(theme::IDLE)))
             .border_style(Style::new().fg(theme::IDLE)),
     );
@@ -429,7 +436,7 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
     };
 
     let overlay = Paragraph::new(mock::HELP).block(
-        Block::bordered()
+        bordered()
             .title(Line::styled(
                 " keybindings ",
                 Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD),

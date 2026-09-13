@@ -19,6 +19,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   selecting a commit there shows its diff the same way the Commits pane
   always has. `Esc` backs out to the branch list.
 
+### Changed
+
+- Every bordered box (left panes, right pane, command log, help overlay,
+  image preview) now uses rounded corners (`╭╮╰╯`), matching lazygit's own
+  look, instead of ratatui's square-corner default (`┌┐└┘`).
+
 ### Fixed
 
 - Left column accordion: the focused pane now claims a weighted majority of
