@@ -36,14 +36,24 @@ pub enum DiffView {
     None,
     /// Read failed, or nothing to show. A dim single line, never a panic.
     Note(String),
-    /// Files pane: one file's `git diff`.
-    Files(git::Diff),
+    /// Files pane: one file's `git diff`, both sides at once (lazygit's own
+    /// Unstaged Changes / Staged Changes split).
+    Files(FilesDiff),
     /// Commits pane, or a drilled branch's log: one commit's metadata and
     /// `git show` diff.
     Commit(git::CommitEntry, git::Diff),
     /// Branches pane, not drilled in: the selected branch's own log, shown
     /// passively (no Enter needed), lazygit's live branch -> log preview.
     BranchLog(BranchLog),
+}
+
+/// A Files-pane selection's two sides at once, lazygit's own Unstaged
+/// Changes / Staged Changes split: a file half-staged shows real content in
+/// both, a file entirely on one side shows an empty diff on the other.
+#[derive(Debug, Clone)]
+pub struct FilesDiff {
+    pub unstaged: git::Diff,
+    pub staged: git::Diff,
 }
 
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
@@ -61,7 +71,7 @@ pub struct BranchLog {
 /// keeps its viewport.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RightKey {
-    File { path: PathBuf, side: DiffSide },
+    File { path: PathBuf },
     Commit { full_hash: String },
     BranchLog { branch: String },
 }
@@ -175,13 +185,13 @@ const WHEEL_LINES: isize = 3;
 
 /// `(discriminant, diff text)` for cheap "did the right pane actually change"
 /// checks: `String` equality on a few KB, no hashing.
-fn view_sig(v: &DiffView) -> (u8, &str) {
+fn view_sig(v: &DiffView) -> (u8, &str, &str) {
     match v {
-        DiffView::None => (0, ""),
-        DiffView::Note(m) => (1, m.as_str()),
-        DiffView::Files(d) => (2, d.text.as_str()),
-        DiffView::Commit(_, d) => (3, d.text.as_str()),
-        DiffView::BranchLog(log) => (4, log.sig.as_str()),
+        DiffView::None => (0, "", ""),
+        DiffView::Note(m) => (1, m.as_str(), ""),
+        DiffView::Files(f) => (2, f.unstaged.text.as_str(), f.staged.text.as_str()),
+        DiffView::Commit(_, d) => (3, d.text.as_str(), ""),
+        DiffView::BranchLog(log) => (4, log.sig.as_str(), ""),
     }
 }
 
@@ -495,14 +505,8 @@ impl App {
                     return None;
                 };
                 let entry = self.files.get(*index)?;
-                let side = if entry.worktree == git::Change::None {
-                    DiffSide::Staged
-                } else {
-                    DiffSide::Worktree
-                };
                 Some(RightKey::File {
                     path: entry.path.clone(),
-                    side,
                 })
             },
             Pane::Commits => {
@@ -540,10 +544,19 @@ impl App {
         };
         let opts = DiffOpts::default();
         match key {
-            RightKey::File { path, side } => match repo.file_diff(path, *side, opts) {
-                Ok(diff) if diff.files.is_empty() => DiffView::Note("no changes to show".into()),
-                Ok(diff) => DiffView::Files(diff),
-                Err(e) => DiffView::Note(e.to_string()),
+            RightKey::File { path } => {
+                match (
+                    repo.file_diff(path, DiffSide::Worktree, opts),
+                    repo.file_diff(path, DiffSide::Staged, opts),
+                ) {
+                    (Ok(unstaged), Ok(staged))
+                        if unstaged.files.is_empty() && staged.files.is_empty() =>
+                    {
+                        DiffView::Note("no changes to show".into())
+                    },
+                    (Ok(unstaged), Ok(staged)) => DiffView::Files(FilesDiff { unstaged, staged }),
+                    (Err(e), _) | (_, Err(e)) => DiffView::Note(e.to_string()),
+                }
             },
             RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, opts) {
                 Ok(diff) => {
@@ -577,7 +590,14 @@ impl App {
     /// Line count of the current diff text, 0 for `None` / `Note`.
     fn diff_line_count(&self) -> usize {
         match &self.diff {
-            DiffView::Files(d) | DiffView::Commit(_, d) => d.text.lines().count(),
+            // Both columns share one scroll; the taller sets how far it goes.
+            DiffView::Files(f) => f
+                .unstaged
+                .text
+                .lines()
+                .count()
+                .max(f.staged.text.lines().count()),
+            DiffView::Commit(_, d) => d.text.lines().count(),
             DiffView::BranchLog(log) => log.commits.len() * theme::BRANCH_LOG_BLOCK_LINES,
             DiffView::None | DiffView::Note(_) => 0,
         }
@@ -622,13 +642,15 @@ impl App {
     }
 
     /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
-    /// header, lazygit's `]` / `[`. Hunk headers for a file diff, `diff --git`
-    /// headers for a commit diff.
+    /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
+    /// a no-op on the Files split, which has two diffs and no single anchor
+    /// list to jump through.
     fn jump_diff_anchor(&mut self, dir: isize) {
         let anchors = match &self.diff {
-            DiffView::Files(d) => d.hunk_lines(),
             DiffView::Commit(_, d) => d.file_lines(),
-            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) => return,
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                return;
+            },
         };
         let cur = self.right_scroll;
         let target = if dir > 0 {
@@ -648,7 +670,10 @@ impl App {
     }
 
     /// Return cached styled diff. Cache invalidates on selection, diff text,
-    /// focus range, or pane width; pure scrolling reuses `Text`.
+    /// focus range, or pane width; pure scrolling reuses `Text`. Only a
+    /// commit diff goes through this cache: it is keyed for one `Diff` at a
+    /// time, and the Files split renders its two sides directly instead
+    /// (`ui::draw_files_columns`).
     pub fn rendered_diff(
         &mut self,
         focus: Option<&Range<usize>>,
@@ -657,7 +682,7 @@ impl App {
         let key = &self.right_key;
         let cache = &mut self.rendered_diff;
         match &self.diff {
-            DiffView::Files(diff) | DiffView::Commit(_, diff) => {
+            DiffView::Commit(_, diff) => {
                 let cache_hit = cache.as_ref().is_some_and(|cached| {
                     cached.key.as_ref() == key.as_ref()
                         && cached.source == diff.text
@@ -681,7 +706,9 @@ impl App {
                     .as_ref()
                     .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
             },
-            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) => None,
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                None
+            },
         }
     }
 

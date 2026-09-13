@@ -16,7 +16,7 @@ use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, DiffView, PANES, Pane};
 use crate::image::preview::Preview;
-use crate::{mock, theme};
+use crate::{git, mock, theme};
 
 /// Every box in the UI, lazygit style: rounded corners (`╭╮╰╯`) rather than
 /// square ones (`┌┐└┘`).
@@ -35,15 +35,28 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     ])
     .areas(area);
 
+    // Files with a real diff selected gets lazygit's own two-column split
+    // (Unstaged Changes beside Staged Changes) instead of the single right
+    // pane, so the left column narrows to leave both room to breathe.
+    let files_split = app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_));
+
     // lazygit's default `sidePanelWidth: 0.3333`: the left column takes a third
     // of the width, floored so it stays usable on a narrow terminal.
-    let side = (area.width / 3).max(24);
+    let side = if files_split {
+        (area.width / 8).max(14)
+    } else {
+        (area.width / 3).max(24)
+    };
     let [left, right] =
         Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
 
     let show_help = app.show_help;
     draw_left_column(frame, app, left);
-    draw_right_pane(frame, app, right);
+    if files_split {
+        draw_files_columns(frame, app, right);
+    } else {
+        draw_right_pane(frame, app, right);
+    }
     draw_command_log(frame, log);
     draw_keybar(frame, keybar);
 
@@ -377,38 +390,27 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         .title(Line::styled(right_title, focused))
         .border_style(border);
 
-    // Real `git diff` / `git show` output: git-native colouring, vertical
-    // scroll from `app.right_scroll()`, a reverse-highlight on the hunk / file
-    // header a `]` / `[` jump last landed on, and a scrollbar when it overflows.
+    // Real `git show` output (a commit, or a drilled branch's commit): git-
+    // native colouring, vertical scroll from `app.right_scroll()`, a reverse-
+    // highlight on the file header a `]` / `[` jump last landed on, and a
+    // scrollbar when it overflows. A Files selection never reaches here: it
+    // gets its own two-column split (`draw_files_columns`) before this
+    // function is even called.
     let scroll = app.right_scroll();
-    if matches!(app.diff_view(), DiffView::Files(_) | DiffView::Commit(..)) {
-        let inner = block.inner(area);
-        let is_commit = matches!(app.diff_view(), DiffView::Commit(..));
-        let (stat_row, diff_area) = if is_commit {
-            (None, inner)
-        } else {
-            let [stat_row, diff_area] =
-                Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
-            (Some(stat_row), diff_area)
-        };
-        let (anchors, raw_total) = match app.diff_view() {
-            DiffView::Files(diff) => (diff.hunk_lines(), diff.text.lines().count()),
-            DiffView::Commit(_, diff) => (diff.file_lines(), diff.text.lines().count()),
-            _ => return,
-        };
+    if let DiffView::Commit(_, diff) = app.diff_view() {
+        let diff_area = block.inner(area);
+        let anchors = diff.file_lines();
+        let raw_total = diff.text.lines().count();
         let focus = anchors.iter().position(|&l| l == scroll).map(|i| {
             let end = anchors.get(i + 1).copied().unwrap_or(raw_total);
             scroll..end
         });
-        let Some((text, total, stat)) =
+        let Some((text, total, _stat)) =
             app.rendered_diff(focus.as_ref(), diff_area.width as usize)
         else {
             return;
         };
         frame.render_widget(block, area);
-        if let Some(stat_row) = stat_row {
-            frame.render_widget(Paragraph::new(theme::stat_line(stat)), stat_row);
-        }
 
         let raw_max = raw_total.saturating_sub(diff_area.height as usize);
         let display_max = total.saturating_sub(diff_area.height as usize);
@@ -532,6 +534,80 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
     let panel = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
     frame.render_widget(panel, area);
+}
+
+/// Files pane with a real diff selected: lazygit's own two-column split,
+/// Unstaged Changes beside Staged Changes, in place of the single right
+/// pane every other selection uses (`draw_right_pane`). Deliberately
+/// simplified against that path: each side renders directly through
+/// `theme::render_diff` / `render_delta`, bypassing `App::rendered_diff`'s
+/// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
+/// hunk-focus highlight — the two columns just scroll together on the one
+/// `app.right_scroll()`.
+fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    app.set_right_area(area);
+
+    let DiffView::Files(files) = app.diff_view() else {
+        return;
+    };
+    let unstaged = files.unstaged.clone();
+    let staged = files.staged.clone();
+
+    let [left, right] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
+
+    let scroll = app.right_scroll();
+    draw_diff_column(frame, left, " Unstaged Changes ", &unstaged, scroll);
+    let viewport = draw_diff_column(frame, right, " Staged Changes ", &staged, scroll);
+    app.set_right_viewport(viewport);
+}
+
+/// One column of the Files split (`draw_files_columns`): border, stat line,
+/// diff body scrolled to the shared `scroll` line, and a scrollbar when it
+/// overflows. Returns the diff body's own height for the caller's shared
+/// viewport. An empty side (nothing staged, or nothing left unstaged) just
+/// shows a `0 files changed` stat and a blank body — the common half-staged
+/// case is the one this exists for, not worth a special case.
+fn draw_diff_column(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &'static str,
+    diff: &git::Diff,
+    scroll: usize,
+) -> usize {
+    let block = bordered()
+        .title(Line::styled(title, Style::new().fg(theme::IDLE)))
+        .border_style(Style::new().fg(theme::IDLE));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let [stat_row, diff_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+    frame.render_widget(Paragraph::new(theme::stat_line(diff.stat())), stat_row);
+
+    let text = diff.delta_output(diff_area.width as usize).map_or_else(
+        || theme::render_diff(diff, None, diff_area.width as usize),
+        |formatted| theme::render_delta(&formatted, diff_area.width as usize),
+    );
+    let total = text.lines.len();
+    let panel = Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
+    frame.render_widget(panel, diff_area);
+
+    let viewport = diff_area.height as usize;
+    if total > viewport {
+        let max_scroll = total - viewport;
+        let mut state = ScrollbarState::new(max_scroll + 1)
+            .position(scroll.min(max_scroll))
+            .viewport_content_length(viewport);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None),
+            diff_area,
+            &mut state,
+        );
+    }
+    viewport
 }
 
 fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {

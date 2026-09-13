@@ -476,3 +476,48 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   single flat temp repo (`tests/{diff_app,mouse,scrollbar}.rs`'s other
   fixtures) needed no changes at all — confirms the "stays flat" case
   really did stay compatible.
+
+## Files pane: Unstaged / Staged split — done
+
+lazygit's Files pane, with a real diff selected, splits the right side into
+two panels side by side — Unstaged Changes, Staged Changes — instead of one.
+ferrit showed a single `git diff` (worktree side, falling back to staged
+only when a file was fully staged). Now both sides always show, lazygit
+style, and the left column narrows while this split is up so both panels
+stay readable.
+
+- **`DiffView::Files` now holds `FilesDiff { unstaged, staged }`** (two
+  `git::Diff`s) instead of one plain `git::Diff`. `RightKey::File` drops its
+  `side: DiffSide` field — a Files selection's identity is just the path
+  now, since both sides are always fetched. `build_diff`'s `RightKey::File`
+  arm runs `repo.file_diff` twice (`DiffSide::Worktree` and
+  `DiffSide::Staged`) and only falls back to the "no changes to show" `Note`
+  when both come back empty; a half-staged file — or one entirely on one
+  side — just shows an empty diff on the other, no special case.
+- **Left column narrows to make room.** `ui::draw`'s `side` (the left
+  column's width) drops from `area.width / 3` down to `area.width / 8`
+  (floor 14, versus the normal floor of 24) whenever Files is focused on a
+  real `DiffView::Files` selection (`files_split`) — lazygit shrinks its own
+  side panel to little more than the pane numbers and truncated titles once
+  both diff columns are up, and ferrit now matches that ratio rather than
+  the gentler one first tried; every other selection (Status, Branches,
+  Commits, Stash, or Files with nothing/an image selected) keeps the usual
+  third.
+- **New render path, not a `draw_right_pane` branch.** `ui::draw_files_columns`
+  replaces `draw_right_pane` outright for the split case: two bordered
+  columns (`ui::draw_diff_column`, one call per side) each with its own stat
+  line and scrollable diff body. Deliberately simpler than the single-pane
+  path it replaces: it renders through `theme::render_diff` /
+  `render_delta` directly rather than `App::rendered_diff`'s cache (that
+  cache is keyed for one diff at a time, and re-styling on every frame is
+  cheap enough not to be worth doubling the cache's key space for), and it
+  skips the `]` / `[` hunk-focus highlight box entirely — both columns
+  simply scroll together on the one `app.right_scroll()`
+  (`App::diff_line_count`'s `Files` arm takes the taller side's line count,
+  so scrolling runs until the taller column bottoms out). `]` / `[` itself
+  is a no-op on a Files selection now (`jump_diff_anchor`) — two diffs, no
+  single anchor list to jump through.
+- **Tests**: `tests/diff_app.rs`'s `diff_text` helper (used by most of the
+  file's assertions) now reads `FilesDiff::unstaged` for a Files selection;
+  audited every caller first — none of them ever staged a file mid-test, so
+  every one keeps asserting against the same worktree diff it always did.

@@ -69,7 +69,8 @@ fn commit_all(repo: &Repository, message: &str) {
 
 fn diff_text(app: &App) -> String {
     match app.diff_view() {
-        DiffView::Files(d) | DiffView::Commit(_, d) => d.text.clone(),
+        DiffView::Files(f) => f.unstaged.text.clone(),
+        DiffView::Commit(_, d) => d.text.clone(),
         other => panic!("expected a real diff, got {other:?}"),
     }
 }

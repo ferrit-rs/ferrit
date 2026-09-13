@@ -34,6 +34,11 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   exactly the previous flat list — no root row, no headers — when every
   changed file is directly at the repo root, which is most working trees
   most of the time.
+- Files pane: selecting a changed file now shows both sides at once,
+  lazygit-style — an "Unstaged Changes" column beside a "Staged Changes"
+  one — instead of a single diff that guessed which side to show. The left
+  column narrows while this split is up so both stay readable. A file with
+  changes on only one side just shows an empty diff on the other.
 
 ### Changed
 
