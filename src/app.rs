@@ -5,6 +5,7 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -82,6 +83,90 @@ struct BranchDrill {
     commits: Vec<git::CommitEntry>,
     /// The branch-list cursor to restore when `Esc` backs out.
     return_index: usize,
+}
+
+/// One visible row of the Files pane's directory tree (lazygit style).
+/// `App::files_tree_rows` builds these fresh from `self.files` and
+/// `self.collapsed_dirs` on every call — cheap at working-tree sizes, same
+/// "no cache" choice `branch_lines`/`commit_lines` already make.
+enum FileRow {
+    /// A directory header, including the always-present root ("/", the
+    /// repo's own worktree). `path` is empty for the root.
+    Dir {
+        path: PathBuf,
+        name: String,
+        depth: usize,
+        expanded: bool,
+    },
+    /// A changed file. `index` into `App.files`.
+    File { index: usize, depth: usize },
+}
+
+/// One level of the Files tree, name -> child. `BTreeMap` for free
+/// alphabetical iteration (matches lazygit: siblings sorted by name,
+/// directories and files interleaved, not directories-first).
+enum TreeNode {
+    Dir(BTreeMap<String, Self>),
+    File(usize),
+}
+
+/// Group `files` by directory into a tree keyed by path component. A path
+/// component that collides with an existing file entry (pathological: git
+/// cannot really produce this) drops that one file rather than panicking.
+fn build_file_tree(files: &[git::FileEntry]) -> BTreeMap<String, TreeNode> {
+    let mut root: BTreeMap<String, TreeNode> = BTreeMap::new();
+    'entries: for (index, entry) in files.iter().enumerate() {
+        let mut components: Vec<_> = entry.path.components().collect();
+        let Some(file_name) = components.pop() else {
+            continue;
+        };
+        let mut dir = &mut root;
+        for component in &components {
+            let name = component.as_os_str().to_string_lossy().into_owned();
+            let child = dir
+                .entry(name)
+                .or_insert_with(|| TreeNode::Dir(BTreeMap::new()));
+            dir = match child {
+                TreeNode::Dir(children) => children,
+                TreeNode::File(_) => continue 'entries,
+            };
+        }
+        let name = file_name.as_os_str().to_string_lossy().into_owned();
+        dir.insert(name, TreeNode::File(index));
+    }
+    root
+}
+
+/// Depth-first flatten of `nodes` (a `build_file_tree` level) into visible
+/// rows, skipping the children of any directory in `collapsed`.
+fn flatten_file_tree(
+    nodes: &BTreeMap<String, TreeNode>,
+    dir_path: &Path,
+    depth: usize,
+    collapsed: &HashSet<PathBuf>,
+    rows: &mut Vec<FileRow>,
+) {
+    for (name, node) in nodes {
+        match node {
+            TreeNode::Dir(children) => {
+                let path = dir_path.join(name);
+                let expanded = !collapsed.contains(&path);
+                rows.push(FileRow::Dir {
+                    path: path.clone(),
+                    name: name.clone(),
+                    depth,
+                    expanded,
+                });
+                if expanded {
+                    flatten_file_tree(children, &path, depth + 1, collapsed, rows);
+                }
+            },
+            TreeNode::File(index) => rows.push(FileRow::File {
+                index: *index,
+                depth,
+            }),
+        }
+    }
 }
 
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default
@@ -167,6 +252,11 @@ pub struct App {
     repo_name: String,
     header: git::StatusHeader,
     files: Vec<git::FileEntry>,
+    /// Directories collapsed in the Files pane's tree view (`FileRow`,
+    /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
+    /// default; paths persist across `refresh()`, only `Enter` on a
+    /// directory row changes this.
+    collapsed_dirs: HashSet<PathBuf>,
     branches: Vec<git::BranchEntry>,
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
@@ -230,6 +320,7 @@ impl App {
             repo_name,
             header: git::StatusHeader::default(),
             files: Vec::new(),
+            collapsed_dirs: HashSet::new(),
             branches: Vec::new(),
             branch_drill: None,
             commits: Vec::new(),
@@ -363,12 +454,47 @@ impl App {
         }
     }
 
+    /// Files pane rows, lazygit-style directory tree: a flat list when every
+    /// changed file sits directly at the repo root (nothing to nest — most
+    /// working trees most of the time), otherwise grouped under directory
+    /// header rows plus an always-present root ("/"). Built fresh from
+    /// `self.files` and `self.collapsed_dirs` on every call; cheap at
+    /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
+    fn files_tree_rows(&self) -> Vec<FileRow> {
+        let nested = self
+            .files
+            .iter()
+            .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
+        if !nested {
+            return (0..self.files.len())
+                .map(|index| FileRow::File { index, depth: 0 })
+                .collect();
+        }
+
+        let tree = build_file_tree(&self.files);
+        let root_expanded = !self.collapsed_dirs.contains(Path::new(""));
+        let mut rows = vec![FileRow::Dir {
+            path: PathBuf::new(),
+            name: "/".to_owned(),
+            depth: 0,
+            expanded: root_expanded,
+        }];
+        if root_expanded {
+            flatten_file_tree(&tree, Path::new(""), 1, &self.collapsed_dirs, &mut rows);
+        }
+        rows
+    }
+
     /// The diff identity for the current focus and selection: a worktree /
     /// staged file for Files, a commit for Commits, nothing elsewhere.
     fn right_key_for(&self) -> Option<RightKey> {
         match self.focus {
             Pane::Files => {
-                let entry = self.files.get(self.selected(Pane::Files))?;
+                let rows = self.files_tree_rows();
+                let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
+                    return None;
+                };
+                let entry = self.files.get(*index)?;
                 let side = if entry.worktree == git::Change::None {
                     DiffSide::Staged
                 } else {
@@ -633,7 +759,11 @@ impl App {
         if self.focus != Pane::Files {
             return Preview::None;
         }
-        let Some(entry) = self.files.get(self.selected(Pane::Files)) else {
+        let rows = self.files_tree_rows();
+        let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Files)) else {
+            return Preview::None;
+        };
+        let Some(entry) = self.files.get(*index) else {
             return Preview::None;
         };
         if !preview::is_image_path(&entry.path) {
@@ -683,7 +813,7 @@ impl App {
     pub fn row_count(&self, pane: Pane) -> usize {
         match pane {
             Pane::Status => 0,
-            Pane::Files => self.files.len(),
+            Pane::Files => self.files_tree_rows().len(),
             Pane::Branches => self
                 .branch_drill
                 .as_ref()
@@ -766,20 +896,43 @@ impl App {
         self.stashes.iter().map(theme::stash_line).collect()
     }
 
-    /// Porcelain-style `XY path` text for one Files row. Debug/probe helper.
+    /// Porcelain-style `XY path` text for one Files tree row, or an empty
+    /// string for a directory row. Debug/probe helper; keyed by the same
+    /// row index `file_lines`/`row_count` use, not a flat index into
+    /// `self.files`.
     pub fn file_display(&self, i: usize) -> String {
-        self.files
-            .get(i)
-            .map(git::FileEntry::display)
-            .unwrap_or_default()
+        match self.files_tree_rows().get(i) {
+            Some(&FileRow::File { index, .. }) => self
+                .files
+                .get(index)
+                .map(git::FileEntry::display)
+                .unwrap_or_default(),
+            _ => String::new(),
+        }
     }
 
-    /// Files pane rows, or a single "working tree clean" line.
+    /// Files pane rows, or a single "working tree clean" line: a flat list,
+    /// or lazygit's directory tree once any changed file sits below the
+    /// repo root (`files_tree_rows`).
     pub fn file_lines(&self) -> Vec<Line<'static>> {
         if self.files.is_empty() {
             return vec![Line::raw("working tree clean")];
         }
-        self.files.iter().map(theme::file_line).collect()
+        self.files_tree_rows()
+            .iter()
+            .filter_map(|row| match row {
+                FileRow::Dir {
+                    name,
+                    depth,
+                    expanded,
+                    ..
+                } => Some(theme::dir_line(name, *depth, *expanded)),
+                FileRow::File { index, depth } => self
+                    .files
+                    .get(*index)
+                    .map(|entry| theme::file_line(entry, *depth)),
+            })
+            .collect()
     }
 
     /// Worktree root to hand the filesystem watcher, or `None` for a bare
@@ -870,7 +1023,10 @@ impl App {
                     self.selection[Pane::Branches] = drill.return_index;
                 }
             },
-            KeyCode::Enter => self.enter_branch_log(),
+            KeyCode::Enter => {
+                self.enter_branch_log();
+                self.toggle_files_dir();
+            },
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
@@ -890,9 +1046,10 @@ impl App {
 
     /// A left click focuses the pane it lands in and, when it lands on a
     /// list row, moves that pane's selection cursor there too (lazygit's
-    /// `HandleClick`, steps 3 / 4 / 5 / 7). Any click dismisses the help
-    /// overlay first. Right click, middle click, drag and move are no-ops
-    /// for now.
+    /// `HandleClick`, steps 3 / 4 / 5 / 7); on a Files directory row, it
+    /// also toggles it collapsed/expanded, same as `Enter`. Any click
+    /// dismisses the help overlay first. Right click, middle click, drag
+    /// and move are no-ops for now.
     fn on_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::ScrollDown => return self.wheel(ev, 1),
@@ -909,7 +1066,13 @@ impl App {
 
         if let Some(pane) = self.pane_at(ev.column, ev.row) {
             self.right_focused = false; // a left click always returns focus left
-            self.click_pane(pane, ev.row);
+            let landed = self.click_pane(pane, ev.row);
+            // lazygit toggles a Files directory row on click, not just on
+            // Enter — the whole row is the target, not just its arrow
+            // glyph, same as it already is for plain selection.
+            if landed && pane == Pane::Files {
+                self.toggle_files_dir();
+            }
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
         } else if self.right_area.contains(Position::new(ev.column, ev.row)) {
             self.right_focused = true;
@@ -1007,6 +1170,24 @@ impl App {
             Err(e) => self.last_error = Some(e.to_string()),
         }
     }
+
+    /// Enter on a directory row in the Files pane: toggle it collapsed or
+    /// expanded (lazygit's tree). A no-op on a file row — reserved for
+    /// future staging (`docs/PLAN_6_STAGING.md`), not this.
+    fn toggle_files_dir(&mut self) {
+        if self.focus != Pane::Files {
+            return;
+        }
+        let rows = self.files_tree_rows();
+        let Some(FileRow::Dir { path, .. }) = rows.get(self.selected(Pane::Files)) else {
+            return;
+        };
+        if !self.collapsed_dirs.remove(path) {
+            self.collapsed_dirs.insert(path.clone());
+        }
+        let last = self.row_count(Pane::Files).saturating_sub(1);
+        self.selection[Pane::Files] = self.selection[Pane::Files].min(last);
+    }
 }
 
 #[cfg(test)]
@@ -1038,7 +1219,10 @@ mod tests {
     #[test]
     fn selection_clamps_at_both_ends() {
         let mut app = App::mock();
-        let last = mock::mock_files().len() - 1;
+        // Not `mock_files().len() - 1`: the mock fixture spans several
+        // directories, so the Files pane is a tree (root + dir headers +
+        // files), more rows than files.
+        let last = app.row_count(Pane::Files) - 1;
         press(&mut app, KeyCode::Char('2')); // focus Files
         for _ in 0..20 {
             press(&mut app, KeyCode::Down);
@@ -1053,9 +1237,15 @@ mod tests {
     #[test]
     fn image_selection_builds_an_image_preview() {
         let mut app = App::mock();
-        let png = mock::mock_files()
-            .iter()
-            .position(|f| f.path.extension().is_some_and(|e| e == "png"))
+        // Row index in the tree, not a flat index into `mock_files()`: the
+        // fixture spans several directories, so a directory header row can
+        // sit ahead of the file this test is after.
+        let png = (0..app.row_count(Pane::Files))
+            .find(|&i| {
+                Path::new(&app.file_display(i))
+                    .extension()
+                    .is_some_and(|e| e == "png")
+            })
             .expect("mock has a .png entry");
 
         press(&mut app, KeyCode::Char('2')); // focus Files
@@ -1093,6 +1283,5 @@ mod tests {
         let before = app.file_lines().len();
         app.refresh();
         assert_eq!(app.file_lines().len(), before);
-        assert_eq!(before, mock::mock_files().len());
     }
 }

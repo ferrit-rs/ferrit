@@ -451,3 +451,83 @@ fn enter_on_branches_drills_into_that_branchs_log() {
     );
     assert_eq!(app.branches_title(), "[3] Local branches - Remotes - Tags");
 }
+
+/// Files pane, lazygit-style directory tree: once a changed file sits below
+/// the repo root, the pane grows a root ("/") row and one directory header
+/// per level, and selecting a nested file's row still resolves to its own
+/// diff (not the directory's, not a sibling's).
+#[test]
+fn files_pane_groups_nested_files_into_a_tree() {
+    let dir = TempDir::new("app-files-tree");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("src/main.rs"), "fn main() { real() }\n").unwrap();
+    fs::write(dir.path().join("top.txt"), "a\n").unwrap(); // untracked, stays a changed file
+
+    let mut app = App::open(dir.path()).unwrap();
+    // root + "src" header + src/main.rs + top.txt: more rows than files (2).
+    assert_eq!(app.row_count(Pane::Files), 4);
+
+    let main_row = files_row(&app, "main.rs");
+    app.select(Pane::Files, main_row);
+    assert!(
+        diff_text(&app).contains("real()"),
+        "the nested file's own diff shows, not blank or a sibling's"
+    );
+}
+
+/// The common case (every changed file directly at the repo root, no
+/// subdirectory) stays a flat list — no root row, no directory headers —
+/// same as before the tree view existed.
+#[test]
+fn files_pane_stays_flat_with_no_nesting() {
+    let dir = TempDir::new("app-files-flat");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("a.txt"), "a\n").unwrap();
+    fs::write(dir.path().join("b.txt"), "b\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "a changed\n").unwrap();
+    fs::write(dir.path().join("b.txt"), "b changed\n").unwrap();
+
+    let app = App::open(dir.path()).unwrap();
+    assert_eq!(
+        app.row_count(Pane::Files),
+        2,
+        "one row per file, no root or directory rows"
+    );
+}
+
+/// Enter on a directory row collapses it (hides its files, shrinks
+/// `row_count`); Enter again expands it back. Enter on a file row does
+/// nothing yet (reserved for staging, `docs/PLAN_6_STAGING.md`).
+#[test]
+fn enter_on_a_files_directory_row_toggles_it() {
+    let dir = TempDir::new("app-files-toggle");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("src/main.rs"), "fn main() { real() }\n").unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    let before = app.row_count(Pane::Files);
+    assert_eq!(before, 3, "root, \"src\", src/main.rs");
+    // Row 0 is the root ("/"), row 1 is "src" (the only directory), row 2
+    // is main.rs — `file_display` is empty for both directory rows, so
+    // index them directly rather than searching for one by name.
+    app.select(Pane::Files, 1);
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert!(
+        app.row_count(Pane::Files) < before,
+        "collapsing \"src\" hides main.rs"
+    );
+
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert_eq!(
+        app.row_count(Pane::Files),
+        before,
+        "Enter again expands it back"
+    );
+}

@@ -415,3 +415,64 @@ tier.
   `Pane::Status` mock-body case merged into `Pane::Branches`'s existing `""`
   (both routes return earlier now, before that match is ever reached for
   either pane).
+
+## Files pane: directory tree — done
+
+lazygit's Files pane groups changed paths under their directories (an
+always-present root `/`, one header row per directory, files nested and
+shown by their own name rather than the full path), not a flat list of
+full paths. ferrit's had a flat list since phase 1 (`theme::file_line`,
+one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
+
+- **Flat when there's nothing to nest.** The common case — every changed
+  file directly at the repo root — stays exactly the flat list it always
+  was: no root row, no directory headers, `row_count(Pane::Files) ==
+  self.files.len()`. The tree only appears once at least one changed file
+  has a parent directory (`App::files_tree_rows`, `src/app.rs`) — matches
+  lazygit's own behaviour and keeps the previous, simpler rendering (and
+  every test built around it) valid for the case most working trees are in
+  most of the time.
+- **Building the tree.** `build_file_tree` (`src/app.rs`) groups
+  `self.files` (already a flat, path-sorted `Vec<FileEntry>` from
+  `git::status::files`) into nested `BTreeMap<String, TreeNode>` levels —
+  `BTreeMap` for free alphabetical iteration per level, directories and
+  files interleaved by name rather than directories-first, matching
+  lazygit. `flatten_file_tree` walks it depth-first into `Vec<FileRow>`
+  (`Dir { path, name, depth, expanded }` or `File { index, depth }`),
+  skipping the children of any directory in `self.collapsed_dirs`.
+- **New `App` state**: `collapsed_dirs: HashSet<PathBuf>` — empty means
+  "everything expanded" (lazygit's own default), so no pre-population
+  needed. Persists across `refresh()`; changed by `toggle_files_dir`, wired
+  to both `Enter` on a directory row and a left click landing on one
+  (`on_mouse`, same as lazygit — the click still moves the selection there
+  too, exactly like clicking any other row already did). Either on a file
+  row is a no-op, reserved for staging (`docs/PLAN_6_STAGING.md`), not this.
+- **Every read path re-derives the tree.** `row_count`, `file_lines`,
+  `file_display`, `right_key_for`'s `Pane::Files` arm, and `build_preview`
+  all call `files_tree_rows()` fresh rather than caching it — cheap at
+  working-tree sizes, the same choice `branch_lines`/`commit_lines` already
+  make. A selected row resolves to a `FileEntry` (for a diff or an image
+  preview) only when it's a `File` row; a `Dir` row (or the root) means no
+  diff, same "nothing selected" precedent every other pane already has.
+- **Rendering**: `theme::file_line` gained a `depth: usize` parameter —
+  two spaces of indent per level, and past depth 0 it shows just the file's
+  own name (`Path::file_name`) instead of the full path, since the
+  directory rows above it already say where it lives. `theme::dir_line` is
+  new: the same indent, then `▼`/`▶` (lazygit's own glyphs) and the
+  directory's bold name, no status code (a directory's would mean
+  aggregating several files', and lazygit doesn't bother either).
+- **Tests**: `tests/diff_app.rs` — `files_pane_groups_nested_files_into_a_tree`
+  (root + directory header + nested file, and the nested file's own diff
+  still resolves correctly by row), `files_pane_stays_flat_with_no_nesting`
+  (the common case is unaffected), `enter_on_a_files_directory_row_toggles_it`
+  (`row_count` shrinks and grows back around one `Enter`). `tests/mouse.rs`
+  — `click_on_a_files_directory_row_toggles_it`, the same shrink/grow check
+  but through a real `feed_mouse` click. Existing tests keyed off
+  `mock::mock_files()` (which spans several directories, so it does
+  trigger the tree) — `src/app.rs`'s own unit tests and
+  `tests/render.rs`'s image-preview test — moved off hardcoded flat indices
+  onto `row_count`/`file_display`-based lookups, the same pattern
+  `tests/diff_app.rs`'s `files_row` helper already used. Tests built on a
+  single flat temp repo (`tests/{diff_app,mouse,scrollbar}.rs`'s other
+  fixtures) needed no changes at all — confirms the "stays flat" case
+  really did stay compatible.

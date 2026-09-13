@@ -94,9 +94,17 @@ pub fn counter_line(current: usize, total: usize) -> Line<'static> {
     Line::styled(format!(" {current} of {total} "), fg(IDLE)).right_aligned()
 }
 
+/// Two spaces per tree depth, lazygit's own indent width.
+fn indent(depth: usize) -> String {
+    "  ".repeat(depth)
+}
+
 /// Files row, porcelain layout `XY path` (X = staged, Y = worktree): colour the
-/// two-char code by what it means, leave the path plain.
-pub fn file_line(entry: &FileEntry) -> Line<'static> {
+/// two-char code by what it means, leave the path plain. `depth` indents
+/// under the row's parent directory in the tree view (`App::file_lines`);
+/// when nested (`depth > 0`), only the file's own name shows, not the full
+/// path — the parent directory rows above it already say where it lives.
+pub fn file_line(entry: &FileEntry, depth: usize) -> Line<'static> {
     let code = format!("{}{}", entry.staged.code(), entry.worktree.code());
     let color = if code.contains('D') {
         DEL
@@ -107,9 +115,31 @@ pub fn file_line(entry: &FileEntry) -> Line<'static> {
     } else {
         WARN
     };
+    let name = if depth == 0 {
+        entry.path.display().to_string()
+    } else {
+        entry.path.file_name().map_or_else(
+            || entry.path.display().to_string(),
+            |n| n.to_string_lossy().into_owned(),
+        )
+    };
     Line::from(vec![
+        Span::raw(indent(depth)),
         Span::styled(code, fg(color)),
-        Span::raw(format!(" {}", entry.path.display())),
+        Span::raw(format!(" {name}")),
+    ])
+}
+
+/// Directory row in the Files tree: an expand/collapse arrow (`▼`/`▶`, like
+/// lazygit) then the directory's own name, indented to its depth. No status
+/// code — files carry their own, a directory's would need aggregating
+/// several and lazygit doesn't bother either.
+pub fn dir_line(name: &str, depth: usize, expanded: bool) -> Line<'static> {
+    let arrow = if expanded { "\u{25bc} " } else { "\u{25b6} " };
+    Line::from(vec![
+        Span::raw(indent(depth)),
+        Span::styled(arrow, fg(IDLE)),
+        Span::styled(name.to_owned(), Style::new().add_modifier(Modifier::BOLD)),
     ])
 }
 

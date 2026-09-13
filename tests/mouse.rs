@@ -208,3 +208,36 @@ fn extreme_coordinates_and_offsets_never_panic() {
     // those clicks landed on a real row, so nothing should have moved.
     assert_eq!(app.selected(Pane::Files), 0);
 }
+
+#[test]
+fn click_on_a_files_directory_row_toggles_it() {
+    let mut app = App::mock();
+    let before = app.row_count(Pane::Files);
+    let files = Rect {
+        x: 0,
+        y: 0,
+        width: 24,
+        height: 10,
+    };
+    app.set_left_area(Pane::Files, files);
+    app.set_list_offset(Pane::Files, 0);
+
+    // `mock_files()` spans several directories, so this is a tree; find a
+    // directory row (empty `file_display`) rather than assuming one. Row 0
+    // (the root "/") is always one when nested, so it's a sound fallback.
+    let dir_row = (0..before)
+        .find(|&i| app.file_display(i).is_empty())
+        .unwrap_or(0);
+    // row = area.y + 1 (border) + dir_row (no scroll offset)
+    app.feed_mouse(left_click(
+        5,
+        u16::try_from(dir_row).unwrap_or(u16::MAX) + 1,
+    ));
+
+    assert_eq!(app.focus, Pane::Files, "the click also focused Files");
+    assert_eq!(app.selected(Pane::Files), dir_row);
+    assert!(
+        app.row_count(Pane::Files) < before,
+        "clicking a directory row collapses it, same as Enter"
+    );
+}

@@ -213,8 +213,11 @@ fn an_overflowing_list_gets_a_scrollbar() {
 
 #[test]
 fn a_short_list_has_no_scrollbar() {
-    // The mock fixtures (a handful of rows each) fit comfortably at height 40.
-    let buf = render_buffer(&mut App::mock(), 120, 40);
+    // The mock fixtures (a handful of rows each) fit comfortably at height
+    // 50: `mock_files()` spans several directories, so the Files pane is a
+    // tree (root + dir headers + files) — 8 rows, not 4 — needing a little
+    // more room than the other, still-flat panes.
+    let buf = render_buffer(&mut App::mock(), 120, 50);
     assert!(
         cells_with(&buf, THUMB, 0..40).is_empty(),
         "short mock lists should draw no scrollbar\n{buf:?}"

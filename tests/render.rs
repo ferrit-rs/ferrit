@@ -9,6 +9,7 @@
 //! `TestBackend` and assert on frame text. No terminal, no timing.
 
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use ferrit::app::{App, Pane};
 use ferrit::{mock, ui};
@@ -246,9 +247,15 @@ fn click_on_the_command_log_or_keybar_is_a_no_op() {
 #[test]
 fn image_selection_takes_over_the_right_pane() {
     let mut app = App::mock();
-    let png = mock::mock_files()
-        .iter()
-        .position(|f| f.path.extension().is_some_and(|e| e == "png"))
+    // Row index in the tree, not a flat index into `mock_files()`: the
+    // fixture spans several directories, so a directory header row can sit
+    // ahead of the file this test is after.
+    let png = (0..app.row_count(Pane::Files))
+        .find(|&i| {
+            Path::new(&app.file_display(i))
+                .extension()
+                .is_some_and(|e| e == "png")
+        })
         .expect("mock has a .png entry");
 
     app.select(Pane::Files, png);

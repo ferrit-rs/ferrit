@@ -26,6 +26,14 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   `ferrit` label rather than wrapping a wordmark into noise below all three.
   Identical in `App::mock()` and against a real repo — it's app chrome, not
   repo data.
+- Files pane: changed paths below the repo root now group into a lazygit-
+  style directory tree (a root `/` row, one header per directory, files
+  shown by their own name once nested) instead of a flat list of full
+  paths. Directories toggle collapsed/expanded with Enter or a left click
+  on the row (lazygit's own click-to-toggle, not just a keybinding). Stays
+  exactly the previous flat list — no root row, no headers — when every
+  changed file is directly at the repo root, which is most working trees
+  most of the time.
 
 ### Changed
 
