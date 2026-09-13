@@ -9,8 +9,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
-- Branches pane: each row now shows the tip commit's age (`1d`, `3d`, ...) in
-  its own colour, lazygit-style. Just selecting a branch (no key press)
+- Branches pane: each row now shows the tip commit's age (`5h`, `1d`, `3d`,
+  ...) in its own colour, lazygit-style. Just selecting a branch (no key press)
   previews its own commit log in the right pane as spaced-out `git log`-style
   blocks (hash, author, date, summary), not a cramped one-liner — scrollable
   with J/K, PageUp/Down and the mouse wheel, with its own scrollbar when it
@@ -56,6 +56,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   difference matters most; the new one degrades gracefully at any height.
   Status is also sized to its actual line count (3 normally, 4 with a
   conflict to report) instead of a flat 4, freeing a row for the others.
+- Branch recency and the branch-log preview's `Date:` line always floored to
+  whole days, so anything committed earlier the same day showed a misleading
+  `0d ago` instead of a real age. Both now step down to hours, minutes, or
+  seconds once the elapsed time is under a day (`4h`, `12m`, `9s`).
 
 ## [0.2.0] - 2026-09-11
 

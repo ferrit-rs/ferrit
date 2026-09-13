@@ -313,11 +313,17 @@ Lands in the same commits as the features:
      matching the real-repo path); Files keeps its diff mock until phase 3.
   3. **Branch recency.** `BranchEntry` gained `tip_time` (see Data model):
      the tip commit's timestamp, read alongside `graph_ahead_behind` in
-     `refs::branches()`. `theme::branch_line` renders it as a day-granularity
-     relative age (`0d`, `1d`, `3d`, ...) before each branch name, coloured
-     with `theme::HUNK` (cyan) so it reads as its own column rather than
-     blending into the branch name, like lazygit's branch list — plain
-     arithmetic on `tip_time` vs `SystemTime::now()`, no `time`/`jiff` crate.
+     `refs::branches()`. `theme::branch_line` renders it as a relative age
+     (`9s`, `12m`, `5h`, `3d`, ...) before each branch name, coloured with
+     `theme::HUNK` (cyan) so it reads as its own column rather than blending
+     into the branch name, like lazygit's branch list — plain arithmetic on
+     `tip_time` vs `SystemTime::now()`, no `time`/`jiff` crate.
+     `theme::relative_age` (originally day-only, `days_ago`) steps down to
+     hours/minutes/seconds once the elapsed time is under a day: a commit
+     from a few hours ago used to floor straight to a misleading `0d`; now
+     it reads `4h`, matching what `git log`'s own relative dates (and the
+     branch-log preview's `Date:` line below) already showed for the same
+     commit.
   4. **Diff from the drilled log.** `right_key_for`/`build_diff`
      (`src/app.rs`) route a selected row in `branch_drill` to
      `RightKey::Commit`, same as Commits; `build_diff`'s commit lookup checks

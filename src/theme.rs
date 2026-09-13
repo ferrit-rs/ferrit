@@ -143,14 +143,25 @@ pub fn dir_line(name: &str, depth: usize, expanded: bool) -> Line<'static> {
     ])
 }
 
-/// Day-granularity age, lazygit's branch-list recency column: `0d`, `1d`,
-/// `3d`, ... No date crate: whole days since `tip_time`, floored, clamped to
-/// 0 for a clock skew or a branch newer than "now".
-fn days_ago(tip_time: i64) -> i64 {
+/// Relative age, lazygit's branch-list recency column and Log panel `Date:`
+/// line: the largest whole unit — `3d`, `5h`, `12m`, `9s` — rather than
+/// always flooring to days, which prints a misleading `0d` for anything
+/// committed earlier today. No date crate: plain seconds-since-`tip_time`
+/// division, clamped to 0 for a clock skew or a commit newer than "now".
+fn relative_age(tip_time: i64) -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(tip_time, |d| i64::try_from(d.as_secs()).unwrap_or(tip_time));
-    ((now - tip_time) / 86_400).max(0)
+    let secs = (now - tip_time).max(0);
+    if secs < 60 {
+        format!("{secs}s")
+    } else if secs < 3_600 {
+        format!("{}m", secs / 60)
+    } else if secs < 86_400 {
+        format!("{}h", secs / 3_600)
+    } else {
+        format!("{}d", secs / 86_400)
+    }
 }
 
 /// lazygit branch row: `1d * main ↑2` for the checked-out branch (green,
@@ -164,10 +175,7 @@ pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
         Style::new()
     };
     let mut spans = vec![
-        Span::styled(
-            format!("{:<3}", format!("{}d", days_ago(entry.tip_time))),
-            fg(HUNK),
-        ),
+        Span::styled(format!("{:<3}", relative_age(entry.tip_time)), fg(HUNK)),
         Span::styled(marker, fg(ADD)),
         Span::styled(entry.name.clone(), name_style),
     ];
@@ -224,7 +232,7 @@ pub fn branch_log_block(entry: &CommitEntry) -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("| ", graph),
             Span::styled("Date:   ", label),
-            Span::raw(format!("{}d ago", days_ago(entry.time))),
+            Span::raw(format!("{} ago", relative_age(entry.time))),
         ]),
         Line::from(Span::styled("|", graph)),
         Line::from(vec![
