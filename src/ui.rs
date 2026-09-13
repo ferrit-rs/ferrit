@@ -199,6 +199,122 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     }
 }
 
+/// Three `ferrit` wordmarks, generated with `toilet` rather than
+/// hand-drawn, so the glyphs are guaranteed to line up — lazygit grows its
+/// own banner as the terminal grows rather than showing one fixed size, so
+/// `welcome_lines` picks the biggest of these three that still fits instead
+/// of the single fixed logo the first attempt at this used. Each row is
+/// trimmed of the trailing blank columns `toilet` pads it to (avoids
+/// trailing whitespace in the source); `welcome_lines` re-pads every row to
+/// its tier's width before centering it, since figlet-style fonts rely on
+/// every row spanning the same width — letting each row's own (different)
+/// trimmed length drive `Line::centered()` would shift rows against each
+/// other and break the letterforms.
+struct Wordmark {
+    art: &'static str,
+    width: usize,
+    /// Right-pane `(width, height)` needed to show this tier without
+    /// clipping or crowding the text below it.
+    min_area: (u16, u16),
+}
+
+/// `toilet -f smmono12 ferrit`.
+const WORDMARK_SMALL: Wordmark = Wordmark {
+    art: "\
+  ▄▄                  █
+ ▐▛▀                  ▀   ▐▌
+▐███  ▟█▙  █▟█▌ █▟█▌ ██  ▐███
+ ▐▌  ▐▙▄▟▌ █▘   █▘    █   ▐▌
+ ▐▌  ▐▛▀▀▘ █    █     █   ▐▌
+ ▐▌  ▝█▄▄▌ █    █   ▗▄█▄▖ ▐▙▄
+ ▝▘   ▝▀▀  ▀    ▀   ▝▀▀▀▘  ▀▀",
+    width: 30,
+    min_area: (40, 16),
+};
+/// `toilet -f mono12 ferrit`. Same width as `WORDMARK_LARGE` (both are a
+/// 60-column canvas) — what changes between the two is height, not width.
+const WORDMARK_MEDIUM: Wordmark = Wordmark {
+    art: "\
+    ▄▄▄▄                                    ██
+   ██▀▀▀                                    ▀▀       ██
+ ███████    ▄████▄    ██▄████   ██▄████   ████     ███████
+   ██      ██▄▄▄▄██   ██▀       ██▀         ██       ██
+   ██      ██▀▀▀▀▀▀   ██        ██          ██       ██
+   ██      ▀██▄▄▄▄█   ██        ██       ▄▄▄██▄▄▄    ██▄▄▄
+   ▀▀        ▀▀▀▀▀    ▀▀        ▀▀       ▀▀▀▀▀▀▀▀     ▀▀▀▀",
+    width: 60,
+    min_area: (70, 16),
+};
+/// `toilet -f bigmono12 ferrit`: same canvas width as medium, but almost
+/// twice the rows — denser and bolder rather than wider, so it needs
+/// extra height more than extra width.
+const WORDMARK_LARGE: Wordmark = Wordmark {
+    art: "\
+                                            ██
+   ▒████                                    ██
+   █████                                    ██       ██
+   ██                                                ██
+ ███████    ░████▒    ██░████   ██░████   ████     ███████
+ ███████   ░██████▒   ███████   ███████   ████     ███████
+   ██      ██▒  ▒██   ███░      ███░        ██       ██
+   ██      ████████   ██        ██          ██       ██
+   ██      ████████   ██        ██          ██       ██
+   ██      ██         ██        ██          ██       ██
+   ██      ███░  ▒█   ██        ██          ██       ██░
+   ██      ░███████   ██        ██       ████████    █████
+   ██       ░█████▒   ██        ██       ████████    ░████",
+    width: 60,
+    min_area: (70, 24),
+};
+
+/// Status pane's right side: lazygit's welcome screen, not a repo-status
+/// view (see `docs/PLAN_1_LAYOUT.md`, "Welcome screen"). No repo data, so
+/// this renders identically in `App::mock()` and against a real repo. Below
+/// every tier's minimum area, the wordmark is dropped for a plain `ferrit`
+/// label instead of wrapping into noise.
+fn welcome_lines(width: u16, height: u16) -> Vec<Line<'static>> {
+    let fits = |w: &Wordmark| width >= w.min_area.0 && height >= w.min_area.1;
+    let wordmark = [WORDMARK_LARGE, WORDMARK_MEDIUM, WORDMARK_SMALL]
+        .into_iter()
+        .find(fits);
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    if let Some(wordmark) = wordmark {
+        lines.extend(wordmark.art.lines().map(|line| {
+            let padded = format!("{line:<0$}", wordmark.width);
+            Line::styled(padded, Style::new().fg(theme::FOCUS)).centered()
+        }));
+    } else {
+        lines.push(
+            Line::styled(
+                "ferrit",
+                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD),
+            )
+            .centered(),
+        );
+    }
+    lines.push(Line::raw(""));
+    lines.push(Line::raw(env!("CARGO_PKG_DESCRIPTION")).centered());
+    lines.push(Line::raw(""));
+    let idle = Style::new().fg(theme::IDLE);
+    lines.push(
+        Line::styled(
+            format!(
+                "v{} \u{b7} {} \u{b7} {}",
+                env!("CARGO_PKG_VERSION"),
+                env!("CARGO_PKG_LICENSE"),
+                env!("CARGO_PKG_AUTHORS"),
+            ),
+            idle,
+        )
+        .centered(),
+    );
+    lines.push(Line::styled(env!("CARGO_PKG_REPOSITORY"), idle).centered());
+    lines.push(Line::raw(""));
+    lines.push(Line::styled("Press ? for keybindings", idle).centered());
+    lines
+}
+
 fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
     // the diff, one over the left column moves the selection.
@@ -381,6 +497,16 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         return;
     }
 
+    // Status: lazygit's welcome screen, not repo data — same in mock and on
+    // a real repo, so this comes before the mock/real split below.
+    if app.focus == Pane::Status {
+        let panel = Paragraph::new(welcome_lines(area.width, area.height))
+            .block(block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(panel, area);
+        return;
+    }
+
     // `App::mock()`: the sample text. A real repo with nothing selected (no
     // files, no commits) just leaves the pane blank.
     if !app.is_mock() {
@@ -388,13 +514,13 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         return;
     }
 
-    // Branches has no mock body: `App::mock()` has no repo, so there is
-    // nothing to preview or drill into (G7); the mock path matches that by
-    // leaving it blank rather than showing a fake sample.
+    // Status already returned above (the welcome screen shows in mock too).
+    // Branches has no mock body either: `App::mock()` has no repo, so there
+    // is nothing to preview or drill into (G7); the mock path matches that
+    // by leaving it blank rather than showing a fake sample.
     let body = match app.focus {
-        Pane::Status => mock::RIGHT_STATUS,
+        Pane::Status | Pane::Branches => "",
         Pane::Files => mock::RIGHT_DIFF,
-        Pane::Branches => "",
         Pane::Commits => mock::RIGHT_COMMIT,
         Pane::Stash => mock::RIGHT_STASH,
     };

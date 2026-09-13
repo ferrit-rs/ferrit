@@ -267,7 +267,7 @@ right; those keys do nothing yet.
 
 | Focus | Panel title | Right pane shows |
 | --- | --- | --- |
-| Status | `Status` | short repo summary block (branch, ahead/behind, clean) |
+| Status | `Status` | short repo summary block (branch, ahead/behind, clean) — superseded by the welcome screen below, never built as written here |
 | Files | `Unstaged changes` | a sample `git diff` snippet, or the image preview when the selected path is an image |
 | Branches | `Log` | a sample `git log --oneline --graph` snippet |
 | Commits | `Commit` | a sample commit: header + diff |
@@ -305,3 +305,113 @@ right; those keys do nothing yet.
 Phase 2 replaces `mock.rs` one pane at a time with a real backend, starting
 with Status + Files via `git2` (read-only). See `docs/INSPIRATION.md` for the
 backend options and the "clean split: git backend crate <-> TUI crate" goal.
+
+## Welcome screen (Status, real repo) — done
+
+lazygit's right pane, when Status is focused, is not a status summary at
+all: it's a static welcome screen — a big ASCII wordmark, the tagline,
+version, licence, and a keybindings pointer. ferrit never built this. The
+"Right pane content by focus" table above planned a real `git status`-style
+summary for that slot instead, which was never implemented either — on a
+real repo (`!app.is_mock()`), `draw_right_pane` (`src/ui.rs`) falls straight
+through to a blank `Paragraph::new("")` the moment Status is focused,
+because `right_key_for` has no arm for `Pane::Status` (there is nothing to
+diff). That blank pane is the actual gap this closes; the mock-only status
+summary the table describes was never more than a placeholder for it.
+
+Chosen direction (screenshots compared against lazygit, see the session
+this plan section came out of): a full ASCII wordmark, closer to lazygit's
+own welcome screen than a plain text summary. Generated with `figlet`,
+not hand-drawn, so the glyphs are guaranteed to line up.
+
+lazygit doesn't show one fixed-size banner either — resize its terminal
+wider and its own logo visibly grows to fill the extra room. A single
+fixed wordmark can't do that: sized for a roomy terminal (`toilet -f
+mono12 ferrit`, 58 trimmed / 60 padded columns) it lost to its own
+narrow-terminal fallback far more often than lazygit's does at the same
+size; sized to always fit comfortably (`toilet -f smmono12 ferrit`, 30
+columns) it stayed small even when the terminal had plenty of room to
+spare, unlike lazygit. Landed on three tiers instead, biggest-that-fits:
+
+| Tier | Font | Canvas | Needs (right-pane `width, height`) |
+| --- | --- | --- | --- |
+| Small | `smmono12` | 30x7 | 40, 16 |
+| Medium | `mono12` | 60x7 | 70, 16 |
+| Large | `bigmono12` | 60x13 | 70, 24 |
+| *(none)* | plain `ferrit` label | — | below Small's |
+
+Medium and Large share a canvas width (60) — what Large actually needs
+more of is *height* (13 rows against Medium's 7), so it only kicks in once
+the pane is both wide **and** tall enough, closer to how lazygit's own
+banner reads as "bigger" (bolder, denser) rather than just "wider" once
+the terminal has real room. Large, at a big terminal:
+
+```
+┌ Status ──────────────────────────────────────────────────────┐
+│                                              ██              │
+│     ▒████                                    ██              │
+│     █████                                    ██       ██     │
+│     ██                                                ██     │
+│   ███████    ░████▒    ██░████   ██░████   ████     ███████  │
+│   ███████   ░██████▒   ███████   ███████   ████     ███████  │
+│     ██      ██▒  ▒██   ███░      ███░        ██       ██     │
+│     ██      ████████   ██        ██          ██       ██     │
+│     ██      ████████   ██        ██          ██       ██     │
+│     ██      ██         ██        ██          ██       ██     │
+│     ██      ███░  ▒█   ██        ██          ██       ██░    │
+│     ██      ░███████   ██        ██       ████████    █████  │
+│     ██       ░█████▒   ██        ██       ████████    ░████  │
+│                                                              │
+│     A lazygit-style terminal UI for git, written in Rust     │
+│                                                              │
+│              v0.2.0 · MIT · The ferrit Authors               │
+│             https://github.com/ferrit-rs/ferrit              │
+│                                                              │
+│                   Press ? for keybindings                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+A spaced-letter `F E R R I T` banner (no real glyphs, fits any width, but
+reads as a placeholder rather than a logo) was also sketched and set
+aside — kept in mind for the below-Small fallback, not as an alternative
+tier.
+
+- **Content**: the wordmark; `env!("CARGO_PKG_DESCRIPTION")` as the tagline
+  (already "A lazygit-style terminal UI for git" in `Cargo.toml`);
+  `env!("CARGO_PKG_VERSION")`, `env!("CARGO_PKG_LICENSE")`, and
+  `env!("CARGO_PKG_REPOSITORY")` for the credit line — compile-time
+  constants, not hand-typed strings that go stale. All literal, no git read;
+  this is chrome, not data.
+- **Every wordmark row needs the same width.** `toilet` right-pads every
+  row of a figlet-style font to the widest row, so all rows span the same
+  columns and the letterforms line up down the block; each `Wordmark`
+  constant in `src/ui.rs` stores its rows trimmed of that trailing padding
+  instead (no trailing whitespace sitting in the source), so
+  `welcome_lines` re-pads every row to that tier's own `width` field before
+  centering it. Skipping that re-pad was a real bug during implementation:
+  `Line::centered()` centers each row by its own (then-different) trimmed
+  length, which shifted rows against each other and broke the letterforms
+  — centering only reads as "the same logo, centered" when every row is
+  still the same width first.
+- **Tier selection**: `welcome_lines(width, height)` (`src/ui.rs`) takes
+  the right pane's own `(area.width, area.height)`, tries `WORDMARK_LARGE`,
+  `WORDMARK_MEDIUM`, `WORDMARK_SMALL` in that order against each one's
+  `min_area`, and falls back to a plain bold `ferrit` label below all
+  three rather than wrapping or truncating a wordmark into noise.
+- **Where it hooks**: `draw_right_pane` in `src/ui.rs`, a dedicated
+  `app.focus == Pane::Status` branch placed before the mock/real-repo split
+  (image preview and `Preview::Note` still win first, same precedence as
+  every other pane, since they're handled even earlier in the function).
+  Static content, no new `App` state.
+- **Mock vs real repo**: shown for both, confirmed by
+  `status_shows_the_welcome_screen` in `tests/render.rs` — one case per
+  tier plus the plain-label fallback, each sized so exactly one tier's bar
+  is cleared, checked against a marker glyph unique to that tier's source
+  art (`▐` only in Small, a 4-wide `▄` run only in Medium, `▒` only in
+  Large). All four run against `App::mock()`, which needed no change.
+- **Superseded**: the "Right pane content by focus" table's original Status
+  entry (a `git status`-style summary) never got built; this replaces it,
+  not layers alongside it — `mock::RIGHT_STATUS` is gone, `mock.rs`'s
+  `Pane::Status` mock-body case merged into `Pane::Branches`'s existing `""`
+  (both routes return earlier now, before that match is ever reached for
+  either pane).

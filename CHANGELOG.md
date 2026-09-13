@@ -18,6 +18,14 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   becomes `Commits (<branch>)`) instead of the generic HEAD-based one, and
   selecting a commit there shows its diff the same way the Commits pane
   always has. `Esc` backs out to the branch list.
+- Status pane: the right side now shows a lazygit-style welcome screen (a
+  `ferrit` wordmark, tagline, version, licence, and a keybindings pointer)
+  instead of sitting blank on a real repo. Like lazygit, the wordmark grows
+  with the terminal instead of staying one fixed size: three tiers, biggest
+  that fits the right pane's width and height, falling back to a plain
+  `ferrit` label rather than wrapping a wordmark into noise below all three.
+  Identical in `App::mock()` and against a real repo — it's app chrome, not
+  repo data.
 
 ### Changed
 

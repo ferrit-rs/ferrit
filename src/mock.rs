@@ -134,13 +134,6 @@ pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/m
 /// these do anything yet except `?` and `q`.
 pub const KEYBAR: &str = "Stage: <space> | Commit: c | Push: P | Pull: p | Scroll diff: J/K | Hunk: ]/[ | Keybindings: ? | Quit: q";
 
-/// Right pane when Status is focused.
-pub const RIGHT_STATUS: &str = "On branch main
-Your branch is ahead of 'origin/main' by 2 commits.
-  (use \"git push\" to publish your local commits)
-
-nothing to commit, working tree clean";
-
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
 @@ -1,3 +1,7 @@

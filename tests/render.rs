@@ -75,6 +75,55 @@ fn right_pane_follows_focus() {
     assert!(frame(&mut app, 120, 40).contains("(no stash entries)"));
 }
 
+/// Status's welcome screen (`docs/PLAN_1_LAYOUT.md`, "Welcome screen"): no
+/// repo data, so `App::mock()` shows the same thing a real repo would.
+/// lazygit grows its own banner as the terminal grows rather than showing
+/// one fixed size, so ferrit picks the biggest of three wordmark tiers that
+/// fits the right pane's `(width, height)` instead of one fixed logo.
+/// Markers below are each unique to one tier (checked against the other
+/// two's source art): small alone uses `▐`, only medium has a 4-wide `▄`
+/// run, only large uses `▒`.
+#[test]
+fn status_shows_the_welcome_screen() {
+    let mut app = App::mock();
+    app.focus = Pane::Status;
+    let small = "\u{2590}\u{2588}\u{2588}\u{2588}"; // ▐███
+    let medium = "\u{2584}\u{2584}\u{2584}\u{2584}"; // ▄▄▄▄
+    let large = "\u{2592}\u{2588}\u{2588}\u{2588}\u{2588}"; // ▒████
+
+    // side = (width / 3).max(24); right pane height = total height - 5
+    // (command log + keybar). Large needs (70, 24), medium (70, 16), small
+    // (40, 16); each case below clears exactly one tier's bar.
+    let huge = frame(&mut app, 160, 50); // right (107, 45)
+    assert!(huge.contains(large), "large tier\n{huge}");
+    assert!(huge.contains(env!("CARGO_PKG_VERSION")));
+    assert!(huge.contains("Press ? for keybindings"));
+
+    let wide = frame(&mut app, 110, 25); // right (74, 20): too short for large
+    assert!(
+        !wide.contains(large),
+        "too short for the large tier\n{wide}"
+    );
+    assert!(wide.contains(medium), "medium tier\n{wide}");
+
+    let modest = frame(&mut app, 80, 25); // right (54, 20): too narrow for medium
+    assert!(
+        !modest.contains(medium),
+        "too narrow for the medium tier\n{modest}"
+    );
+    assert!(modest.contains(small), "small tier\n{modest}");
+
+    // Right pane width = area.width - side: at 60 that's 60 - 24 = 36,
+    // under every tier's minimum width (40).
+    let narrow = frame(&mut app, 60, 30);
+    assert!(
+        !narrow.contains(small),
+        "too narrow for any wordmark tier, falls back to a plain label\n{narrow}"
+    );
+    assert!(narrow.contains("ferrit"));
+    assert!(narrow.contains(env!("CARGO_PKG_VERSION")));
+}
+
 #[test]
 fn only_the_focused_pane_shows_the_selection_bar() {
     let mut app = App::mock();
@@ -214,10 +263,13 @@ fn image_selection_takes_over_the_right_pane() {
 #[test]
 fn help_overlay_toggles() {
     let mut app = App::mock();
-    assert!(!frame(&mut app, 120, 40).contains("keybindings"));
+    // Not "keybindings": the welcome screen (Status is the default focus)
+    // legitimately mentions it in its own one-liner ("Press ? for
+    // keybindings"), so check for text unique to the help overlay's body.
+    assert!(!frame(&mut app, 120, 40).contains("toggle this help"));
 
     app.show_help = true;
-    assert!(frame(&mut app, 120, 40).contains("keybindings"));
+    assert!(frame(&mut app, 120, 40).contains("toggle this help"));
 }
 
 #[test]
