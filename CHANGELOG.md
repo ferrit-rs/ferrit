@@ -9,6 +9,16 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- The staged index can now be committed: `c` opens a message popup and
+  creates a normal commit (disabled with nothing staged); `A` amends `HEAD`
+  with the pre-filled message plus whatever is staged; `w` rewords `HEAD`'s
+  message only, leaving the index untouched. `Ctrl-S` commits, `Ctrl-O` /
+  `Ctrl-N` toggle sign-off / no-verify (no-verify shown in red, never a
+  silent skip), `Esc` cancels but keeps the draft for the next `c`. Every
+  commit hook, GPG/SSH signing, and `commit.*` config setting applies,
+  because it's a real `git commit` subprocess; a rejecting hook or any
+  other failure shows its full output in a dismissible note instead of
+  silently doing nothing.
 - Files pane: changes can now be staged, unstaged, and discarded, not just
   viewed. `<space>` on a file row stages or unstages it (direction inferred
   from which side has a change); `a` does the same for every changed file at

@@ -215,16 +215,18 @@ commit. Do not silently sign every commit; make it visible in the footer.
 Phase 6 added `mode: Mode`. Phase 7 adds a `Popup` that, when `Some`, owns all
 input (like `show_help` does today in `on_key`, but richer).
 
+As shipped (`FixupPick` and the discard-confirm reuse are C3, not
+implemented yet; `CommitFailed`/`NothingStaged` both just become a `Note`,
+see the deviation note):
+
 ```rust
 enum Popup {
-    Commit(CommitDraft),      // c / A / w / s
-    FixupPick,                // f: Commits pane is the picker
-    Note(String),             // HookRejected / CommitFailed, dismissible
-    Confirm { .. },           // reused from phase 6's discard confirm
+    Commit(CommitDraft),      // c / A / w
+    Note(String),             // a commit failure, or "empty commit message"
 }
 
 struct CommitDraft {
-    textarea: tui_textarea::TextArea<'static>,
+    text: TextBuffer,         // hand-rolled, not tui_textarea::TextArea — see above
     kind: CommitKind,
     sign_off: bool,
     no_verify: bool,
@@ -383,38 +385,43 @@ ST1..ST3 like phases 3 and 5.
 
 ## Dependencies
 
-```toml
-tui-textarea = { version = "0.7", default-features = false, features = ["crossterm", "ratatui"] }
-```
-
-`tui-textarea` is the multiline editing widget `INSPIRATION.md` already names
-for "commit messages, interactive rebase todo editing". Check crates.io for the
-version that matches the `ratatui 0.30` in the tree; pin it. It is the only
-add: `git commit` is a subprocess, no new git library surface.
+None added. `tui-textarea` was the original plan (see the deviation note at
+the top of this file for why); the message box is `App`'s own `TextBuffer`
+instead. `git commit` is a subprocess either way, no new git library surface.
+Revisit `tui-textarea` if it ships a `ratatui = "0.30"`-compatible release —
+`INSPIRATION.md` still names it as the natural fit for "commit messages,
+interactive rebase todo editing" if the version gap ever closes.
 
 ## Milestones
 
-- **C0** `src/git/commit.rs`: `CommitKind`, `CommitOpts`, `Repo::commit`
-  (Normal + Amend), `head_message`, `staged_count`. `GitError::CommitFailed`
-  / `NothingStaged` / `HookRejected`. `tests/git_commit.rs` Normal + Amend +
-  NothingStaged + hook cases green.
-- **C1** `tui-textarea` dep. `src/ui/popup.rs`, `Popup::Commit`,
-  `CommitDraft`. `c` opens it, `Ctrl-S` commits, `Esc` cancels with draft
-  kept. `on_key` popup branch. `refresh()` + `update_right_pane` after a
-  successful commit. `tests/app_commit.rs` green.
-- **C2** `A` amend (message pre-filled from `head_message`), `w` reword
-  (`--amend --only`, diff pane hidden in the popup). Unborn-branch disables.
-- **C3** `f` fixup-pick on the Commits pane (yellow border theme role,
-  `Enter` / `Esc`), `git commit --fixup=<hash>`. `s` squash from a Commits
-  row with a message box.
-- **C4** `Ctrl-O` sign-off toggle (`-s`, footer state), `Ctrl-N` no-verify
-  toggle (`-n`, red footer state). `Popup::Note` for `HookRejected` /
-  `CommitFailed`, full text, dismissible, scrollable. Keybar + `HELP` +
+- ✅ **C0** `src/git/commit.rs`: `CommitKind`, `CommitOpts`, `Repo::commit`
+  (Normal + Amend + Reword + Fixup + Squash, the backend supports all five
+  even though the UI only opens the first three so far), `head_message`,
+  `staged_count`. `GitError::CommitFailed` / `NothingStaged` (no separate
+  `HookRejected`, see the deviation note up top). `tests/git_commit.rs`
+  green, including a rejecting `pre-commit` hook.
+- ✅ **C1** `Popup::Commit`, `CommitDraft`, and a hand-rolled `TextBuffer`
+  in place of `tui-textarea` (deviation note). `c` opens it, `Ctrl-S`
+  commits, `Esc` cancels with the draft kept. `on_key` popup branch.
+  `refresh()` after a successful commit. `tests/app_commit.rs` green.
+- ✅ **C2** `A` amend (message pre-filled from `head_message`), `w` reword
+  (`--amend --only`). Both disabled (a `last_error` line, not a popup note)
+  with no commit yet to amend/reword.
+- ❌ **C3** not implemented: no fixup-pick on the Commits pane, no `s`
+  squash entry point. The backend (`CommitKind::Fixup`/`Squash`) is ready
+  for it; this is UI work only, left for a follow-up.
+- 🟡 **C4** `Ctrl-O` / `Ctrl-N` toggles and their footer state (no-verify in
+  red when on) are done; `Popup::Note` exists and shows a failure's full
+  text, dismissible, but does not scroll (fine for the message lengths seen
+  so far, a real gap for a very long hook output). Keybar + `HELP` +
   `mock::KEYBAR` updated.
-- **C5** polish: `cargo clippy --all-targets` clean, no warnings; every edge
-  case in the table has a test or an explicit inert path; a commit made from
-  another shell mid-popup does not corrupt state; `tests/render.rs` popup
-  snapshots; `50-commit.script` ready for the harness.
+- 🟡 **C5** polish: `cargo clippy --all-targets` clean; the DoD's core
+  promises hold and have tests, but the edge-case table below is only
+  spot-checked (hook rejection and unborn-branch root commit have tests;
+  detached HEAD, merge-in-progress, and GPG-prompt paths do not); no
+  `tests/render.rs` popup snapshot beyond the inline check in
+  `tests/app_commit.rs`; `50-commit.script` still waits on the replay
+  harness like the rest of `PLAN_SELF_TESTING.md`.
 
 ## Definition of done (phase 7)
 
