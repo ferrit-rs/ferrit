@@ -654,6 +654,22 @@ pub fn log_line(raw: &'static str) -> Line<'static> {
     }
 }
 
+/// A `d` discard confirmation, shown in the keybar region in place of the
+/// normal key hints (`docs/PLAN_6_STAGING.md`'s "asks first", the one-line
+/// fallback — there is no popup primitive yet).
+pub fn confirm_line(message: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(message.to_owned(), fg(WARN).add_modifier(Modifier::BOLD)),
+        Span::raw("   "),
+        Span::styled("y", fg(KEY)),
+        Span::raw(" yes    "),
+        Span::styled("n", fg(KEY)),
+        Span::raw(" / "),
+        Span::styled("Esc", fg(KEY)),
+        Span::raw(" cancel"),
+    ])
+}
+
 /// Keybind bar, lazygit style: `Label: key | Label: key | ...`. The label is
 /// dim, the key (everything after `: ` in a segment) is yellow. A trailing
 /// segment without a colon (like `...`) stays dim.
