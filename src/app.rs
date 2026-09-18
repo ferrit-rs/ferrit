@@ -210,6 +210,19 @@ fn selectable_lines(diff: &git::Diff) -> Vec<usize> {
         .collect()
 }
 
+/// The content id of whichever hunk contains global line `line`, or `None`
+/// if it falls outside every hunk (should not happen for a selectable
+/// line). Used to keep `DiffCursor::hunk_id` pointing at the hunk the
+/// cursor is actually on whenever it moves, so `resync_diff_cursor` (which
+/// runs after *every* key, not just a stage) does not mistake "moved to a
+/// different hunk" for "the old hunk vanished" and snap back to it.
+fn hunk_id_at(diff: &git::Diff, line: usize) -> Option<u64> {
+    let hl = hunk_lines_for(diff)
+        .into_iter()
+        .find(|hl| hl.lines.contains(&line))?;
+    Some(hunk_content_id(diff, hl.hunk_index))
+}
+
 /// Stable id for hunk `hunk_index` of `diff`: a hash of its header + body
 /// text, so a background refresh can re-find the same hunk even once
 /// staging moved a *different* hunk out from under it (gitu's `Item.id`).
@@ -1543,8 +1556,17 @@ impl App {
         } else {
             pos.saturating_sub(1)
         };
-        if let Some(&line) = lines.get(next) {
-            self.cursor.line = line;
+        let Some(&line) = lines.get(next) else {
+            return;
+        };
+        // Crossing into a different hunk: re-tag `hunk_id` right away, or
+        // the very next keystroke's `resync_diff_cursor` (which runs on
+        // every key, not just a stage) reads the stale id, decides the old
+        // hunk "lost" this line, and snaps the cursor straight back to it.
+        let hunk_id = hunk_id_at(diff, line);
+        self.cursor.line = line;
+        if let Some(id) = hunk_id {
+            self.cursor.hunk_id = id;
         }
         self.ensure_cursor_visible();
     }
@@ -1577,7 +1599,11 @@ impl App {
             starts.iter().rev().find(|&&l| l < cur).copied()
         };
         if let Some(line) = target {
+            let hunk_id = hunk_id_at(diff, line);
             self.cursor.line = line;
+            if let Some(id) = hunk_id {
+                self.cursor.hunk_id = id;
+            }
             self.ensure_cursor_visible();
         }
     }

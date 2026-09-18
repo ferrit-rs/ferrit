@@ -141,6 +141,7 @@ fn j_and_k_step_over_context_without_ever_landing_on_it() {
     let start = cursor_line_text(&app);
 
     let mut seen = std::collections::HashSet::new();
+    let mut positions = Vec::new();
     for _ in 0..30 {
         app.feed_key(char_key('j'));
         let line = cursor_line_text(&app);
@@ -149,10 +150,17 @@ fn j_and_k_step_over_context_without_ever_landing_on_it() {
             "j landed on a context line: {line:?}"
         );
         seen.insert(line);
+        let (_, pos, _) = app.diff_cursor().expect("still in Mode::Diff");
+        positions.push(pos);
     }
     assert!(
         seen.len() > 1,
         "j actually moved the cursor across more than one line"
+    );
+    assert!(
+        positions.windows(2).all(|w| w[1] >= w[0]),
+        "repeated j never moves backward, e.g. by snapping back to the \
+         first hunk once the cursor crosses into a later one: {positions:?}"
     );
 
     for _ in 0..30 {
@@ -164,6 +172,34 @@ fn j_and_k_step_over_context_without_ever_landing_on_it() {
         );
     }
     assert_eq!(cursor_line_text(&app), start, "k walked all the way back");
+}
+
+/// Regression: `move_diff_cursor` used to leave `DiffCursor::hunk_id`
+/// pointing at the *old* hunk when the cursor crossed into a new one.
+/// `update_diff` calls `resync_diff_cursor` after every key (not just a
+/// stage), so the very next `j`/`k` saw "this line isn't in the hunk the id
+/// names" and snapped the cursor straight back to the first hunk — from the
+/// user's side, `j` looked stuck after the first change.
+#[test]
+fn the_cursor_settles_in_the_second_hunk_instead_of_snapping_back() {
+    let (_dir, mut app) = two_hunk_repo("app-stage-cross-hunk");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    for _ in 0..10 {
+        app.feed_key(char_key('j'));
+    }
+    let (_, forward_line, _) = app.diff_cursor().expect("still in Mode::Diff");
+
+    for _ in 0..10 {
+        app.feed_key(char_key('k'));
+    }
+    let (_, back_line, _) = app.diff_cursor().expect("still in Mode::Diff");
+
+    assert!(
+        forward_line > back_line,
+        "10 j then 10 k should have made real forward progress before \
+         coming back: forward={forward_line}, back={back_line}"
+    );
 }
 
 #[test]
