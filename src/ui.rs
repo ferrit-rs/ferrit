@@ -16,7 +16,7 @@ use ratatui::widgets::{
 };
 use ratatui_image::{Resize, StatefulImage};
 
-use crate::app::{App, DiffView, PANES, Pane};
+use crate::app::{App, CommitPopupView, DiffView, PANES, Pane};
 use crate::image::preview::Preview;
 use crate::{git, mock, theme};
 
@@ -64,6 +64,11 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     if show_help {
         draw_help(frame, area);
+    }
+    if let Some(view) = app.commit_popup() {
+        draw_commit_popup(frame, area, &view);
+    } else if let Some(msg) = app.note_popup() {
+        draw_note_popup(frame, area, msg);
     }
 }
 
@@ -751,4 +756,141 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
 
     frame.render_widget(Clear, rect);
     frame.render_widget(overlay, rect);
+}
+
+/// A centered box for the commit-message popup: title from
+/// `CommitKind::title`, the draft's lines with the cursor overlaid
+/// (reverse-video on that one character, same trick as the diff cursor),
+/// and a two-line footer with the sign-off / no-verify toggles and the key
+/// hints. `docs/PLAN_7_COMMIT.md`'s popup, minus `tui-textarea` — see that
+/// plan's deviation note.
+fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'_>) {
+    let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
+    let body_height = u16::try_from(view.lines.len().max(1)).unwrap_or(u16::MAX);
+    let height = body_height.saturating_add(4).min(area.height);
+    let rect = Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+
+    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let block = bordered()
+        .title(Line::styled(format!(" {} ", view.title), focused))
+        .border_style(focused);
+    let inner = block.inner(rect);
+    let [body_area, footer_area] =
+        Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).areas(inner);
+
+    frame.render_widget(Clear, rect);
+    frame.render_widget(block, rect);
+
+    let (cursor_row, cursor_col) = view.cursor;
+    let lines: Vec<Line<'static>> = view
+        .lines
+        .iter()
+        .enumerate()
+        .map(|(i, text)| {
+            if i == cursor_row {
+                draft_line_with_cursor(text, cursor_col)
+            } else {
+                Line::raw(text.clone())
+            }
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), body_area);
+
+    let sign_off = if view.sign_off {
+        Span::styled("on", Style::new().fg(theme::ADD))
+    } else {
+        Span::styled("off", Style::new().fg(theme::IDLE))
+    };
+    let verify = if view.no_verify {
+        Span::styled(
+            "off",
+            Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled("on", Style::new().fg(theme::ADD))
+    };
+    let status = Line::from(vec![
+        Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
+        sign_off,
+        Span::raw("   "),
+        Span::styled("verify: ", Style::new().fg(theme::IDLE)),
+        verify,
+    ]);
+    let hints =
+        theme::keybar_line("Commit: Ctrl-S | Sign-off: Ctrl-O | No-verify: Ctrl-N | Cancel: Esc");
+    frame.render_widget(Paragraph::new(vec![status, hints]), footer_area);
+}
+
+/// `text` as a `Line`, with the character at char-index `col` reverse-video
+/// highlighted (a blank cell past the end of the line) — the popup's draft
+/// cursor, drawn the same way `ui::overlay_diff_cursor` marks the diff
+/// cursor rather than moving the real terminal cursor.
+fn draft_line_with_cursor(text: &str, col: usize) -> Line<'static> {
+    let mut chars: Vec<char> = text.chars().collect();
+    if col >= chars.len() {
+        chars.push(' ');
+    }
+    let before: String = chars.get(..col).unwrap_or_default().iter().collect();
+    let cursor_char = chars.get(col).copied().unwrap_or(' ');
+    let after: String = chars
+        .get(col.saturating_add(1)..)
+        .unwrap_or_default()
+        .iter()
+        .collect();
+    Line::from(vec![
+        Span::raw(before),
+        Span::styled(
+            cursor_char.to_string(),
+            Style::new().add_modifier(Modifier::REVERSED),
+        ),
+        Span::raw(after),
+    ])
+}
+
+/// A dismissible note popup: a commit failure (including a rejecting hook's
+/// full output) or "nothing staged" / "empty commit message". `Esc` or
+/// `Enter` dismisses (`App::popup_key`).
+fn draw_note_popup(frame: &mut Frame<'_>, area: Rect, message: &str) {
+    let width = 60.min(area.width);
+    let content_lines = message.lines().count().max(1);
+    let height = u16::try_from(content_lines)
+        .unwrap_or(u16::MAX)
+        .saturating_add(4)
+        .min(area.height);
+    let rect = Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+
+    let warn = Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD);
+    let block = bordered()
+        .title(Line::styled(" commit ", warn))
+        .border_style(warn);
+    let inner = block.inner(rect);
+    let [body_area, footer_area] = Layout::vertical([
+        Constraint::Length(inner.height.saturating_sub(1)),
+        Constraint::Length(1),
+    ])
+    .areas(inner);
+
+    frame.render_widget(Clear, rect);
+    frame.render_widget(block, rect);
+    frame.render_widget(
+        Paragraph::new(message.to_owned()).wrap(Wrap { trim: false }),
+        body_area,
+    );
+    frame.render_widget(
+        Paragraph::new(Line::styled(
+            "Esc / Enter to dismiss",
+            Style::new().fg(theme::IDLE),
+        )),
+        footer_area,
+    );
 }
