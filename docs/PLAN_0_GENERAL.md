@@ -59,8 +59,8 @@ split is a move, not a rewrite.
 | 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | ✅ done |
 | 6 | `PLAN_6_STAGING.md` | stage / unstage at file, hunk, line; refresh after | 📅 planned |
 | 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | 📅 planned |
-| 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | 👉 todo |
-| 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | 👉 todo |
+| 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | 📅 planned |
+| 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | 📅 planned |
 | 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop | 👉 todo |
 | 11 | `PLAN_11_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | 👉 todo |
 | 12 | `PLAN_12_POLISH.md` | config file, themes, keymap customization, real command-log capture, help | 👉 todo |
@@ -81,7 +81,6 @@ Cross-cutting:
 
 - AI commit message generation (see `INSPIRATION.md`: lazygitrs, gmsg)
 - PR / issue panel (see `INSPIRATION.md`: blippy)
-- Mouse support
 - Undo view built on the reflog (see `INSPIRATION.md`: git-time-machine)
 - Worktree management (see `INSPIRATION.md`: gwm)
 
