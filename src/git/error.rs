@@ -28,6 +28,18 @@ pub enum GitError {
     /// worktree exactly as they were. See `docs/PLAN_6_STAGING.md`.
     #[error("git apply failed: {0}")]
     ApplyFailed(String),
+    /// `git commit` had nothing staged to commit. Distinct from
+    /// `CommitFailed` because git's own message is stable and worth a
+    /// dedicated Status-pane line rather than a raw stderr dump.
+    #[error("nothing staged to commit")]
+    NothingStaged,
+    /// A `git commit` subprocess exited non-zero for any other reason,
+    /// including a rejecting hook (`pre-commit` / `commit-msg`): git gives
+    /// no stable way to tell "a hook said no" apart from any other failure
+    /// in the general case, so both surface the same way. Holds stderr.
+    /// See `docs/PLAN_7_COMMIT.md`.
+    #[error("git commit failed: {0}")]
+    CommitFailed(String),
 }
 
 pub type GitResult<T> = Result<T, GitError>;

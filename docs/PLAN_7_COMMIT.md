@@ -1,5 +1,31 @@
 # Plan: phase 7, commit
 
+**Deviation: no `tui-textarea`.** The plan below (Popup UX, App wiring,
+Rendering, Dependencies) was written assuming `tui-textarea` for the
+message box. At implementation time its only published version, 0.7.0, is
+pinned to `ratatui = "0.29"`; ferrit is on `ratatui = "0.30"`. Cargo happily
+resolves both into the dependency tree, but they are two unrelated crates
+as far as the type system is concerned — `tui_textarea::TextArea` would
+implement *0.29's* `ratatui::widgets::Widget`, not 0.30's, so
+`frame.render_widget(textarea.widget(), area)` does not compile against
+ferrit's `Frame` (0.30). Downgrading the whole crate to ratatui 0.29 for one
+popup was rejected as disproportionate (it touches every render module and
+`ratatui-image`'s own compatibility). Revisit `tui-textarea` if/when it ships
+a 0.30-compatible release; until then, the commit-message box is a small
+hand-rolled `TextBuffer` in `src/app.rs` (lines + a char cursor: insert,
+backspace, `Enter`, arrow movement — no wrapping, no selection, which the
+Goal section already said the message box doesn't need). Every "tui-textarea"
+/ "textarea" mention below describes the original intent; `TextBuffer` is
+what actually exists.
+
+`GitError::HookRejected` is also dropped: distinguishing "a hook rejected
+this" from any other non-zero `git commit` exit requires parsing hook output
+that has no standard shape (a hook can print anything). `NothingStaged` stays
+(git's own "nothing to commit" message is stable); everything else, hook
+failures included, is `CommitFailed(stderr)` — same UI treatment either way,
+a dismissible note with the full text and the draft kept, so the DoD's actual
+promise ("the hook's full output shows, no commit is made") still holds.
+
 ## Goal
 
 Commit the staged index from phase 6. A message-input popup, then `git

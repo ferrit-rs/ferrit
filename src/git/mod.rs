@@ -2,13 +2,15 @@
 //!
 //! See `docs/PLAN_2_GIT_BACKEND.md`: Status, Files, Branches, Commits, Stash
 //! and blob reads are all wired to real `git2` reads (G0..G6). Since
-//! `docs/PLAN_6_STAGING.md`, `apply` also writes the index and worktree
-//! (stage / unstage / discard); it is the one submodule that is not
-//! read-only, and even it shells out to `git` rather than writing objects
-//! directly.
+//! `docs/PLAN_6_STAGING.md` and `docs/PLAN_7_COMMIT.md`, `apply` and
+//! `commit` also write the index, worktree and `HEAD` (stage / unstage /
+//! discard, commit / amend / reword / fixup / squash); those are the two
+//! submodules that are not read-only, and both shell out to `git` rather
+//! than writing objects directly.
 
 mod apply;
 mod blob;
+mod commit;
 mod diff;
 mod error;
 mod log;
@@ -23,6 +25,7 @@ use git2::Repository;
 
 pub use apply::{ApplyDir, ApplyTarget, transform_body};
 pub use blob::Rev;
+pub use commit::{CommitKind, CommitOpts};
 pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
 pub use model::{BranchEntry, CommitEntry, StashEntry};
@@ -164,5 +167,21 @@ impl Repo {
             dir,
             target,
         )
+    }
+
+    /// Run `git commit`. See `docs/PLAN_7_COMMIT.md`.
+    pub fn commit(&self, kind: &CommitKind, message: &str, opts: CommitOpts) -> GitResult<String> {
+        commit::commit(&self.inner, kind, message, opts)
+    }
+
+    /// `HEAD`'s current message, for pre-filling the Amend / Reword popup.
+    pub fn head_message(&self) -> GitResult<Option<String>> {
+        commit::head_message(&self.inner)
+    }
+
+    /// Count of paths staged relative to `HEAD`; the commit popup's
+    /// precondition.
+    pub fn staged_count(&self) -> GitResult<usize> {
+        commit::staged_count(&self.inner)
     }
 }
