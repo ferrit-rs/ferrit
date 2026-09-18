@@ -20,6 +20,8 @@ use std::process::Command;
 
 use ferrit::app::{App, DiffView, Pane};
 use git2::{IndexAddOption, Repository, Signature};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 struct TempDir(PathBuf);
@@ -124,7 +126,11 @@ fn c_opens_types_and_ctrl_s_commits() {
 
     assert!(app.commit_popup().is_none(), "popup closed on success");
     assert!(app.note_popup().is_none());
-    assert_eq!(app.row_count(Pane::Commits), before + 1, "the new commit showed up");
+    assert_eq!(
+        app.row_count(Pane::Commits),
+        before + 1,
+        "the new commit showed up"
+    );
     assert_eq!(head_summary(&mut app), "feat: a new line");
 }
 
@@ -152,7 +158,11 @@ fn esc_cancels_but_keeps_the_draft_for_next_time() {
 
     app.feed_key(char_key('c'));
     let view = app.commit_popup().expect("c reopened the popup");
-    assert_eq!(view.lines.join("\n"), "wip: half a thought", "draft came back");
+    assert_eq!(
+        view.lines.join("\n"),
+        "wip: half a thought",
+        "draft came back"
+    );
 }
 
 #[test]
@@ -181,6 +191,35 @@ fn empty_message_is_rejected_with_a_note_and_no_commit() {
 }
 
 #[test]
+fn the_popup_actually_renders_its_title_text_and_footer() {
+    let dir = TempDir::new("app-commit-render");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["add", "a.txt"])
+        .output()
+        .unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    type_text(&mut app, "feat: rendered");
+
+    let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    term.draw(|f| ferrit::ui::draw(f, &mut app)).unwrap();
+    let out = term.backend().to_string();
+
+    assert!(out.contains("Commit"), "popup title shows:\n{out}");
+    assert!(out.contains("feat: rendered"), "typed text shows:\n{out}");
+    assert!(out.contains("Ctrl-S"), "footer hints show:\n{out}");
+    assert!(out.contains("sign-off"), "toggle status shows:\n{out}");
+}
+
+#[test]
 fn c_is_a_noop_with_nothing_staged() {
     let dir = TempDir::new("app-commit-nostage");
     let repo = Repository::init(dir.path()).unwrap();
@@ -190,7 +229,10 @@ fn c_is_a_noop_with_nothing_staged() {
 
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('c'));
-    assert!(app.commit_popup().is_none(), "nothing staged: c does nothing");
+    assert!(
+        app.commit_popup().is_none(),
+        "nothing staged: c does nothing"
+    );
 }
 
 #[test]
@@ -218,5 +260,9 @@ fn amend_prefills_the_current_message_and_keeps_the_parent() {
     app.feed_key(ctrl_key('s'));
 
     assert_eq!(head_summary(&mut app), "feat: the real message");
-    assert_eq!(app.row_count(Pane::Commits), 2, "amend did not add a commit");
+    assert_eq!(
+        app.row_count(Pane::Commits),
+        2,
+        "amend did not add a commit"
+    );
 }

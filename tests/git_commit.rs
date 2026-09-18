@@ -82,7 +82,12 @@ fn commit_all(repo: &Repository, message: &str) {
 }
 
 fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "git {args:?} failed: {}",
@@ -104,11 +109,18 @@ fn commit_normal_creates_a_commit_on_top_of_head() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let hash = backend
-        .commit(&CommitKind::Normal, "feat: add a line", CommitOpts::default())
+        .commit(
+            &CommitKind::Normal,
+            "feat: add a line",
+            CommitOpts::default(),
+        )
         .unwrap();
 
     assert_eq!(hash, git(dir.path(), &["rev-parse", "HEAD"]));
-    assert_eq!(git(dir.path(), &["log", "-1", "--format=%s"]), "feat: add a line");
+    assert_eq!(
+        git(dir.path(), &["log", "-1", "--format=%s"]),
+        "feat: add a line"
+    );
     assert_eq!(git(dir.path(), &["rev-parse", "HEAD^"]), old_head);
 }
 
@@ -140,7 +152,11 @@ fn commit_amend_changes_the_subject_and_keeps_the_parent() {
 
     let backend = Repo::open(dir.path()).unwrap();
     backend
-        .commit(&CommitKind::Amend, "feat: the real message", CommitOpts::default())
+        .commit(
+            &CommitKind::Amend,
+            "feat: the real message",
+            CommitOpts::default(),
+        )
         .unwrap();
 
     assert_eq!(
@@ -169,7 +185,10 @@ fn commit_reword_ignores_a_dirty_index() {
         .commit(&CommitKind::Reword, "wip: reworded", CommitOpts::default())
         .unwrap();
 
-    assert_eq!(git(dir.path(), &["log", "-1", "--format=%s"]), "wip: reworded");
+    assert_eq!(
+        git(dir.path(), &["log", "-1", "--format=%s"]),
+        "wip: reworded"
+    );
     assert!(
         !git(dir.path(), &["show", "--name-only", "--format="]).contains("c.txt"),
         "the staged file did not get folded into the amended commit"
@@ -254,11 +273,19 @@ fn pre_commit_hook_rejection_leaves_head_untouched() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let err = backend
-        .commit(&CommitKind::Normal, "should be rejected", CommitOpts::default())
+        .commit(
+            &CommitKind::Normal,
+            "should be rejected",
+            CommitOpts::default(),
+        )
         .unwrap_err();
 
     assert!(matches!(err, GitError::CommitFailed(_)), "got {err:?}");
-    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), before, "no commit was made");
+    assert_eq!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        before,
+        "no commit was made"
+    );
 }
 
 #[test]
@@ -289,7 +316,10 @@ fn head_message_and_staged_count() {
 
     fs::write(dir.path().join("a.txt"), "one\n").unwrap();
     commit_all(&repo, "feat: first");
-    assert_eq!(backend.head_message().unwrap().as_deref(), Some("feat: first"));
+    assert_eq!(
+        backend.head_message().unwrap().as_deref(),
+        Some("feat: first")
+    );
 
     fs::write(dir.path().join("b.txt"), "two\n").unwrap();
     git(dir.path(), &["add", "b.txt"]);

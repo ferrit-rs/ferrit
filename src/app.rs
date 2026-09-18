@@ -338,10 +338,7 @@ impl TextBuffer {
             let Some(line) = self.lines.get_mut(self.row) else {
                 return;
             };
-            let start = line
-                .char_indices()
-                .nth(self.col - 1)
-                .map_or(0, |(b, _)| b);
+            let start = line.char_indices().nth(self.col - 1).map_or(0, |(b, _)| b);
             line.replace_range(start..end, "");
             self.col -= 1;
         } else if self.row > 0 {
@@ -2114,9 +2111,7 @@ impl App {
         }
 
         let prefill = match &kind {
-            git::CommitKind::Amend | git::CommitKind::Reword => {
-                repo.head_message().ok().flatten()
-            },
+            git::CommitKind::Amend | git::CommitKind::Reword => repo.head_message().ok().flatten(),
             _ => self.commit_draft.take(),
         };
         let text = prefill.map_or_else(TextBuffer::default, |s| TextBuffer::from_text(&s));

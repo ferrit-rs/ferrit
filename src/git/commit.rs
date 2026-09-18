@@ -24,9 +24,13 @@ pub enum CommitKind {
     /// `git commit --fixup=<target>`. `target` is a full commit hash; git
     /// writes the `fixup! <subject>` message itself, so `commit`'s own
     /// `message` argument is ignored for this kind.
-    Fixup { target: String },
+    Fixup {
+        target: String,
+    },
     /// `git commit --squash=<target>`, with a caller-supplied message.
-    Squash { target: String },
+    Squash {
+        target: String,
+    },
 }
 
 impl CommitKind {
@@ -160,5 +164,8 @@ pub(super) fn staged_count(repo: &Repository) -> GitResult<usize> {
         | Status::INDEX_DELETED
         | Status::INDEX_RENAMED
         | Status::INDEX_TYPECHANGE;
-    Ok(statuses.iter().filter(|e| e.status().intersects(staged)).count())
+    Ok(statuses
+        .iter()
+        .filter(|e| e.status().intersects(staged))
+        .count())
 }
