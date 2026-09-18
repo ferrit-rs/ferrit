@@ -501,8 +501,8 @@ fn files_pane_stays_flat_with_no_nesting() {
 }
 
 /// Enter on a directory row collapses it (hides its files, shrinks
-/// `row_count`); Enter again expands it back. Enter on a file row does
-/// nothing yet (reserved for staging, `docs/PLAN_6_STAGING.md`).
+/// `row_count`); Enter again expands it back. Enter on a *file* row instead
+/// focuses the diff for staging (`docs/PLAN_6_STAGING.md`, `tests/app_stage.rs`).
 #[test]
 fn enter_on_a_files_directory_row_toggles_it() {
     let dir = TempDir::new("app-files-toggle");
