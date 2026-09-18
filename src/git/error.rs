@@ -22,6 +22,12 @@ pub enum GitError {
     /// A `git diff` / `git show` subprocess exited non-zero. Holds stderr.
     #[error("git diff failed: {0}")]
     DiffFailed(String),
+    /// A `git apply` / `add` / `restore` / `clean` subprocess exited
+    /// non-zero while staging, unstaging or discarding. Holds stderr. `git
+    /// apply` is atomic per invocation, so this always leaves the index and
+    /// worktree exactly as they were. See `docs/PLAN_6_STAGING.md`.
+    #[error("git apply failed: {0}")]
+    ApplyFailed(String),
 }
 
 pub type GitResult<T> = Result<T, GitError>;

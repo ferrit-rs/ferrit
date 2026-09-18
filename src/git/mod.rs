@@ -1,8 +1,13 @@
-//! Headless, read-only git backend. Nothing under `git::` imports `ratatui`.
+//! Headless git backend. Nothing under `git::` imports `ratatui`.
 //!
 //! See `docs/PLAN_2_GIT_BACKEND.md`: Status, Files, Branches, Commits, Stash
-//! and blob reads are all wired to real `git2` reads (G0..G6).
+//! and blob reads are all wired to real `git2` reads (G0..G6). Since
+//! `docs/PLAN_6_STAGING.md`, `apply` also writes the index and worktree
+//! (stage / unstage / discard); it is the one submodule that is not
+//! read-only, and even it shells out to `git` rather than writing objects
+//! directly.
 
+mod apply;
 mod blob;
 mod diff;
 mod error;
@@ -16,6 +21,7 @@ use std::path::Path;
 
 use git2::Repository;
 
+pub use apply::{ApplyDir, ApplyTarget, transform_body};
 pub use blob::Rev;
 pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
@@ -110,5 +116,53 @@ impl Repo {
     /// (`docs/PLAN_2_GIT_BACKEND.md`, G7).
     pub fn branch_log(&self, branch: &str) -> GitResult<Vec<CommitEntry>> {
         log::commits_for(&self.inner, branch, COMMITS_LIMIT)
+    }
+
+    /// Stage or unstage a whole file. No patch: `git add` / `git restore
+    /// --staged`. See `docs/PLAN_6_STAGING.md`.
+    pub fn stage_file(&self, path: &Path, dir: ApplyDir) -> GitResult<()> {
+        apply::stage_file(&self.inner, path, dir)
+    }
+
+    /// Stage or unstage every changed file (`a`): `git add -A` / `git
+    /// restore --staged .`.
+    pub fn stage_all(&self, dir: ApplyDir) -> GitResult<()> {
+        apply::stage_all(&self.inner, dir)
+    }
+
+    /// Discard a whole file's worktree change, never the index. `untracked`
+    /// picks `git clean` (nothing to restore *to*) over `git restore
+    /// --worktree`.
+    pub fn discard_file(&self, path: &Path, untracked: bool) -> GitResult<()> {
+        apply::discard_file(&self.inner, path, untracked)
+    }
+
+    /// Stage / unstage / discard one hunk. `patch` is `file.header.start
+    /// .. hunk.body.end` over a `Diff::text`; the caller slices it so this
+    /// module never re-runs the diff.
+    pub fn apply_hunk(&self, patch: &str, dir: ApplyDir, target: ApplyTarget) -> GitResult<()> {
+        apply::apply_hunk(&self.inner, patch, dir, target)
+    }
+
+    /// Stage / unstage / discard a set of body lines within one hunk.
+    /// `lines` are 0-based indices into `hunk_body`'s own lines.
+    pub fn apply_lines(
+        &self,
+        file_header: &str,
+        hunk_header: &str,
+        hunk_body: &str,
+        lines: &[usize],
+        dir: ApplyDir,
+        target: ApplyTarget,
+    ) -> GitResult<()> {
+        apply::apply_lines(
+            &self.inner,
+            file_header,
+            hunk_header,
+            hunk_body,
+            lines,
+            dir,
+            target,
+        )
     }
 }

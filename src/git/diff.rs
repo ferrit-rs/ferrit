@@ -7,8 +7,8 @@
 //! Nothing here imports `ratatui`. The parser (`parse.rs`) hands back byte
 //! `Range`s over one owned `String`, exactly like gitu's public `Diff`.
 
-use std::path::Path;
 use std::io::Write as _;
+use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 use git2::Repository;
@@ -21,9 +21,10 @@ pub use parse::{FileMeta, FileStatus, HunkMeta};
 
 /// Which pair of trees `git diff` compares. Deliberately not a reuse of
 /// `blob::Rev`: that names one version of one path, this names a pair of trees.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DiffSide {
     /// `git diff`: working tree vs index.
+    #[default]
     Worktree,
     /// `git diff --cached`: index vs HEAD.
     Staged,
@@ -306,12 +307,15 @@ fn is_untracked(repo: &Repository, path: &Path) -> bool {
         .is_ok_and(|s| s.contains(git2::Status::WT_NEW))
 }
 
-fn workdir(repo: &Repository) -> GitResult<&Path> {
+/// Shared with `apply.rs`, which runs `git apply` / `add` / `restore` /
+/// `clean` against the same worktree.
+pub(super) fn workdir(repo: &Repository) -> GitResult<&Path> {
     repo.workdir()
         .ok_or_else(|| GitError::DiffFailed("bare repository has no working tree".to_owned()))
 }
 
-fn stderr(out: &Output) -> String {
+/// Shared with `apply.rs`.
+pub(super) fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).trim().to_owned()
 }
 
