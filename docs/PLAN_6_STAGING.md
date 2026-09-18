@@ -1,5 +1,11 @@
 # Plan: phase 6, staging
 
+**Status: S0-S4 implemented** (`src/git/apply.rs`, `Mode::Diff` in `App`,
+`tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs`). S5's exhaustive
+edge-case sweep and the `40-stage.script` golden are still open, and three
+deliberate deviations from the plan text below are called out in
+"Implementation notes" before "After phase 6".
+
 ## Goal
 
 Turn the read-only diff from phase 3 into something you act on: stage and
@@ -411,26 +417,30 @@ still pending, so scripts wait.
 
 ## Milestones
 
-- **S0** `src/git/apply.rs`: `ApplyDir`, `ApplyTarget`, `GitError::ApplyFailed`.
+- ✅ **S0** `src/git/apply.rs`: `ApplyDir`, `ApplyTarget`, `GitError::ApplyFailed`.
   `stage_file` (add / restore, incl. untracked). `tests/git_stage.rs`
   file-level cases green.
-- **S1** `apply_hunk` (full-hunk patch = `file.header.start .. hunk.body.end`,
+- ✅ **S1** `apply_hunk` (full-hunk patch = `file.header.start .. hunk.body.end`,
   forward + reverse). `Mode::Diff`, `DiffCursor`, `Enter` / `Esc`, `j` / `k`
   over selectable lines, cursor bar in `render_diff`. `<space>` in
   `Mode::Diff` stages/unstages the cursor's hunk. `<space>` on a Files row
   stages/unstages the file. Post-apply `refresh()` + cursor re-find.
-- **S2** `apply_lines` + the transform, `tests/apply_patch.rs` green. `V`
+- ✅ **S2** `apply_lines` + the transform, `tests/apply_patch.rs` green. `V`
   V-select, `<space>` stages the selection with `--recount`. Reverse for
   unstage.
-- **S3** `d` discard at file / hunk / line, with the confirm modal.
-  `ApplyTarget::Worktree` / `WorktreeAndIndex`. `PLAN_0` "asks first" honoured.
-- **S4** `a` stage-all / unstage-all. Right-pane title granule hint
+- ✅ **S3** `d` discard at file / hunk / line, with the confirm modal (shipped
+  as the keybar one-liner the plan names as the fallback, not a popup — see
+  "Implementation notes"). `ApplyTarget::Worktree` / `WorktreeAndIndex`.
+  `PLAN_0` "asks first" honoured.
+- ✅ **S4** `a` stage-all / unstage-all. Right-pane title granule hint
   (`(hunk 1/3)` / `(lines 41-42)`). Keybar + `HELP` updated, `mock::KEYBAR`
   reflects the now-real bindings.
-- **S5** polish: `cargo clippy --all-targets` clean, no warnings; every edge
-  case in the table has a test or an explicit inert path; staging while a
-  background `refresh()` fires never loses the cursor or double-applies;
-  `tests/render.rs` region snapshot; `40-stage.script` ready for the harness.
+- 🟡 **S5** polish: `cargo clippy --all-targets` is clean and
+  `tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs` all pass, but the
+  edge-case table below is only spot-checked (untracked/binary/context-drift
+  have tests; rename/mode-change/conflicted do not yet), there is no
+  `tests/render.rs` snapshot of the cursor bar, and `40-stage.script` still
+  waits on the replay harness like the rest of `PLAN_SELF_TESTING.md`.
 
 ## Definition of done (phase 6)
 
@@ -450,6 +460,38 @@ still pending, so scripts wait.
   `tests/git_stage.rs`, `tests/app_stage.rs` pass.
 - Untracked, binary, rename, mode-change, and no-newline files each stage
   without a panic (whole-file where line granularity does not apply).
+
+## Implementation notes
+
+Three points where the shipped code reads the plan text above differently
+than written, each because the codebase had already moved since this plan
+was drafted, or because a literal reading left a gap the plan itself doesn't
+resolve:
+
+- **The cursor lives in one of *two* right-pane columns, not one.** This
+  plan's ASCII diagram predates the Unstaged/Staged split
+  (`ui::draw_files_columns`, landed after `PLAN_3_DIFF_VIEW.md`). `DiffCursor`
+  carries a `side: DiffSide` and `Enter`/`l` picks it the same way the
+  file-level toggle infers stage-vs-unstage: the worktree side if there's
+  still something unstaged, else the staged side. `Tab` is not repurposed to
+  swap sides — there was no obvious key left for it this round, so a
+  half-staged file's *other* side is reached by leaving (`h`/`Esc`) and
+  entering again is not yet wired either; revisit if that turns out to
+  matter in practice.
+- **`Enter` and `l` only — not `Right`/`Left`.** `Right`/`Left` already cycle
+  panes (phase 1, still tested by `arrows_cycle_panes_and_wrap`); repurposing
+  them for a Files-only mode would have made them mean two different things
+  depending on focus. `Esc`/`h` leave; there is no `Right`-cycles-panes vs.
+  `Right`-enters-diff conflict to resolve later since `Right` was never bound
+  to entering it.
+- **The cursor re-find never switches sides.** "clamp to nearest hunk, or
+  drop to `Mode::Nav` if the file has no more changes on this side" is
+  implemented literally: `resync_diff_cursor` only ever looks at
+  `cursor.side`'s own diff. Once the Worktree side runs out of hunks, `Mode`
+  drops to `Nav` even though the Staged side (now larger) is sitting right
+  there — switching the user's cursor to the other column on their behalf
+  would silently change what the next `<space>` does (stage vs. unstage),
+  which seemed worse than one extra `l` press.
 
 ## After phase 6
 

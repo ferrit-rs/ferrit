@@ -9,6 +9,19 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Files pane: changes can now be staged, unstaged, and discarded, not just
+  viewed. `<space>` on a file row stages or unstages it (direction inferred
+  from which side has a change); `a` does the same for every changed file at
+  once. `Enter` or `l` on a file row focuses the diff itself — `j`/`k` move a
+  cursor over its `+`/`-` lines (context is skipped), `]`/`[` jump hunks, `V`
+  starts a line selection, and `<space>` there stages/unstages the hunk under
+  the cursor or the selected lines, with `--recount` handling the rewritten
+  hunk header. `h`/`Esc` returns to the file list. `d` discards a worktree
+  change at the same three granularities (file, hunk, or selected lines),
+  always after a one-line confirm in the keybar — nothing destructive
+  happens without asking first. The panes refresh immediately after any of
+  this, and the diff cursor keeps its place across that refresh — even one
+  triggered by a change staged from another shell.
 - Branches pane: each row now shows the tip commit's age (`5h`, `1d`, `3d`,
   ...) in its own colour, lazygit-style. Just selecting a branch (no key press)
   previews its own commit log in the right pane as spaced-out `git log`-style
