@@ -56,6 +56,18 @@ pub struct FilesDiff {
     pub staged: git::Diff,
 }
 
+/// Read-only view of the commit popup for `ui::draw_commit_popup`
+/// (`docs/PLAN_7_COMMIT.md`). Borrows the draft's lines, so it is cheap to
+/// build fresh every frame rather than cached.
+pub struct CommitPopupView<'a> {
+    pub title: &'static str,
+    pub lines: &'a [String],
+    /// `(row, char column)`, `TextBuffer`'s own cursor coordinates.
+    pub cursor: (usize, usize),
+    pub sign_off: bool,
+    pub no_verify: bool,
+}
+
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
 #[derive(Debug, Clone)]
 pub struct BranchLog {
@@ -236,6 +248,160 @@ fn hunk_content_id(diff: &git::Diff, hunk_index: usize) -> u64 {
             .hash(&mut hasher);
     }
     hasher.finish()
+}
+
+/// A hand-rolled multi-line text buffer for the commit-message popup.
+/// Not `tui-textarea`: its only published version needs `ratatui = "0.29"`,
+/// incompatible with the `0.30` in this tree (see the deviation note atop
+/// `docs/PLAN_7_COMMIT.md`). Lines of text plus a `(row, char column)`
+/// cursor — enough for a commit message: printable insert, backspace,
+/// `Enter` for a new line, arrow movement. No wrapping, no selection, no
+/// undo; the Goal section of that plan already scoped the message box to
+/// exactly this.
+#[derive(Debug, Clone)]
+struct TextBuffer {
+    lines: Vec<String>,
+    row: usize,
+    /// Character index into `lines[row]`, not a byte offset — UTF-8 safe
+    /// insert/delete always look this up via `char_indices`.
+    col: usize,
+}
+
+impl Default for TextBuffer {
+    fn default() -> Self {
+        Self {
+            lines: vec![String::new()],
+            row: 0,
+            col: 0,
+        }
+    }
+}
+
+impl TextBuffer {
+    /// Pre-fill from an existing message (Amend / Reword), cursor at the
+    /// very end — the common place to keep typing from.
+    fn from_text(text: &str) -> Self {
+        let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        let row = lines.len() - 1;
+        let col = lines.get(row).map_or(0, |l| l.chars().count());
+        Self { lines, row, col }
+    }
+
+    fn text(&self) -> String {
+        self.lines.join("\n")
+    }
+
+    /// No subject line typed at all (only blank/whitespace lines) — `git
+    /// commit` refuses this, and so does the popup (`do_commit`).
+    fn is_blank(&self) -> bool {
+        self.lines.iter().all(|l| l.trim().is_empty())
+    }
+
+    fn current_line(&self) -> &str {
+        self.lines.get(self.row).map_or("", String::as_str)
+    }
+
+    /// Byte offset of `self.col` (a char count) within the current line.
+    fn byte_col(&self) -> usize {
+        self.current_line()
+            .char_indices()
+            .nth(self.col)
+            .map_or_else(|| self.current_line().len(), |(b, _)| b)
+    }
+
+    fn insert_char(&mut self, c: char) {
+        let byte = self.byte_col();
+        if let Some(line) = self.lines.get_mut(self.row) {
+            line.insert(byte, c);
+            self.col += 1;
+        }
+    }
+
+    fn insert_newline(&mut self) {
+        let byte = self.byte_col();
+        if let Some(line) = self.lines.get_mut(self.row) {
+            let rest = line.split_off(byte);
+            self.lines.insert(self.row + 1, rest);
+        }
+        self.row += 1;
+        self.col = 0;
+    }
+
+    /// Delete the char behind the cursor, or merge with the previous line
+    /// at column 0. A no-op at the very start of the buffer.
+    fn backspace(&mut self) {
+        if self.col > 0 {
+            let end = self.byte_col();
+            let Some(line) = self.lines.get_mut(self.row) else {
+                return;
+            };
+            let start = line
+                .char_indices()
+                .nth(self.col - 1)
+                .map_or(0, |(b, _)| b);
+            line.replace_range(start..end, "");
+            self.col -= 1;
+        } else if self.row > 0 {
+            let current = self.lines.remove(self.row);
+            self.row -= 1;
+            let prev_len = self.lines.get(self.row).map_or(0, |l| l.chars().count());
+            if let Some(line) = self.lines.get_mut(self.row) {
+                line.push_str(&current);
+            }
+            self.col = prev_len;
+        }
+    }
+
+    fn move_left(&mut self) {
+        if self.col > 0 {
+            self.col -= 1;
+        } else if self.row > 0 {
+            self.row -= 1;
+            self.col = self.current_line().chars().count();
+        }
+    }
+
+    fn move_right(&mut self) {
+        let len = self.current_line().chars().count();
+        if self.col < len {
+            self.col += 1;
+        } else if self.row + 1 < self.lines.len() {
+            self.row += 1;
+            self.col = 0;
+        }
+    }
+
+    fn move_up(&mut self) {
+        if self.row > 0 {
+            self.row -= 1;
+            self.col = self.col.min(self.current_line().chars().count());
+        }
+    }
+
+    fn move_down(&mut self) {
+        if self.row + 1 < self.lines.len() {
+            self.row += 1;
+            self.col = self.col.min(self.current_line().chars().count());
+        }
+    }
+}
+
+/// Modal state that owns all input while it is up, the same idea as
+/// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
+enum Popup {
+    Commit(CommitDraft),
+    /// A dismissible message: a commit failure, or "empty commit message".
+    Note(String),
+}
+
+struct CommitDraft {
+    text: TextBuffer,
+    kind: git::CommitKind,
+    sign_off: bool,
+    no_verify: bool,
 }
 
 /// One visible row of the Files pane's directory tree (lazygit style).
@@ -464,6 +630,13 @@ pub struct App {
     cursor: DiffCursor,
     /// A `d` discard confirmation waiting on `y` / `n` / `Esc`.
     pending_discard: Option<DiscardPrompt>,
+    /// A commit popup or dismissible note; owns all input while `Some`
+    /// (`docs/PLAN_7_COMMIT.md`).
+    popup: Option<Popup>,
+    /// The last commit popup's text, kept across an `Esc`-cancel so a
+    /// mistyped keystroke never loses a paragraph. Cleared on a successful
+    /// commit.
+    commit_draft: Option<String>,
 }
 
 impl App {
@@ -500,6 +673,8 @@ impl App {
             mode: Mode::default(),
             cursor: DiffCursor::default(),
             pending_discard: None,
+            popup: None,
+            commit_draft: None,
         }
     }
 
@@ -1220,6 +1395,14 @@ impl App {
             return;
         }
 
+        // A popup (commit message box, or a dismissible note) owns all
+        // input while it is up, same idea as the help overlay below but
+        // richer (`docs/PLAN_7_COMMIT.md`).
+        if self.popup.is_some() {
+            self.popup_key(key);
+            return;
+        }
+
         // A discard confirmation swallows every key but its own answer,
         // same as the help overlay below.
         if self.pending_discard.is_some() {
@@ -1292,6 +1475,9 @@ impl App {
             KeyCode::Char(' ') => self.stage_selected_file(),
             KeyCode::Char('a') => self.stage_all_files(),
             KeyCode::Char('d') => self.discard_prompt(),
+            KeyCode::Char('c') => self.open_commit(git::CommitKind::Normal),
+            KeyCode::Char('A') => self.open_commit(git::CommitKind::Amend),
+            KeyCode::Char('w') => self.open_commit(git::CommitKind::Reword),
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
@@ -1817,6 +2003,30 @@ impl App {
         self.pending_discard.as_ref().map(|p| p.message.as_str())
     }
 
+    /// The commit popup's render data (`ui::draw_commit_popup`), or `None`
+    /// when it is not up.
+    pub fn commit_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Commit(draft)) = &self.popup else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: draft.kind.title(),
+            lines: &draft.text.lines,
+            cursor: (draft.text.row, draft.text.col),
+            sign_off: draft.sign_off,
+            no_verify: draft.no_verify,
+        })
+    }
+
+    /// A dismissible note's message (`ui::draw_note_popup`), or `None` when
+    /// none is up.
+    pub fn note_popup(&self) -> Option<&str> {
+        match &self.popup {
+            Some(Popup::Note(msg)) => Some(msg),
+            _ => None,
+        }
+    }
+
     /// Cursor state for the right-pane render: `(side, cursor line, V-select
     /// range)` while `Mode::Diff` is up, else `None`. The range is
     /// inclusive-exclusive (`a..b`) over `side`'s own `Diff::text` lines.
@@ -1877,6 +2087,129 @@ impl App {
             _ => return false,
         }
         true
+    }
+
+    /// `c` / `A` / `w`: open the commit popup. Amend / Reword pre-fill
+    /// `HEAD`'s current message; a plain commit reuses `commit_draft` if an
+    /// earlier `Esc` left one behind (lazygit's "draft survives a cancel").
+    /// A no-op with a popup already up, without a repo, with nothing staged
+    /// (`c`), or with no commit yet to amend/reword.
+    fn open_commit(&mut self, kind: git::CommitKind) {
+        if self.popup.is_some() {
+            return;
+        }
+        let Some(repo) = &self.repo else { return };
+        match &kind {
+            git::CommitKind::Normal
+                if !self.files.iter().any(|f| f.staged != git::Change::None) =>
+            {
+                self.last_error = Some("nothing staged to commit".to_owned());
+                return;
+            },
+            git::CommitKind::Amend | git::CommitKind::Reword if self.commits.is_empty() => {
+                self.last_error = Some("no commit yet to amend".to_owned());
+                return;
+            },
+            _ => {},
+        }
+
+        let prefill = match &kind {
+            git::CommitKind::Amend | git::CommitKind::Reword => {
+                repo.head_message().ok().flatten()
+            },
+            _ => self.commit_draft.take(),
+        };
+        let text = prefill.map_or_else(TextBuffer::default, |s| TextBuffer::from_text(&s));
+        self.popup = Some(Popup::Commit(CommitDraft {
+            text,
+            kind,
+            sign_off: false,
+            no_verify: false,
+        }));
+    }
+
+    /// Every key while `self.popup` is `Some`: printable/editing keys go to
+    /// the draft's `TextBuffer`, `Ctrl-S` commits, `Ctrl-O` / `Ctrl-N` flip
+    /// the sign-off / no-verify toggles, `Esc` cancels (keeping the draft
+    /// for a commit popup) or dismisses a note.
+    fn popup_key(&mut self, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let mut dismiss = false;
+        let mut cancel = false;
+        let mut commit_now = false;
+
+        match &mut self.popup {
+            None => return,
+            Some(Popup::Note(_)) => {
+                if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
+                    dismiss = true;
+                }
+            },
+            Some(Popup::Commit(draft)) => match key.code {
+                KeyCode::Char('s') if ctrl => commit_now = true,
+                KeyCode::Char('o') if ctrl => draft.sign_off = !draft.sign_off,
+                KeyCode::Char('n') if ctrl => draft.no_verify = !draft.no_verify,
+                KeyCode::Esc => cancel = true,
+                KeyCode::Enter => draft.text.insert_newline(),
+                KeyCode::Backspace => draft.text.backspace(),
+                KeyCode::Left => draft.text.move_left(),
+                KeyCode::Right => draft.text.move_right(),
+                KeyCode::Up => draft.text.move_up(),
+                KeyCode::Down => draft.text.move_down(),
+                KeyCode::Char(c) if !ctrl => draft.text.insert_char(c),
+                _ => {},
+            },
+        }
+
+        if dismiss {
+            self.popup = None;
+        }
+        if cancel {
+            if let Some(Popup::Commit(draft)) = &self.popup {
+                self.commit_draft = Some(draft.text.text());
+            }
+            self.popup = None;
+        }
+        if commit_now {
+            self.do_commit();
+        }
+    }
+
+    /// `Ctrl-S` in the commit popup: run `Repo::commit`, then either close
+    /// the popup and refresh (phase 2's `refresh()` picks up the new
+    /// `HEAD`, phase 3's `update_right_pane` sees the now-empty staged diff)
+    /// or swap the popup for a dismissible `Note` on failure, keeping the
+    /// draft either way except on success.
+    fn do_commit(&mut self) {
+        let Some(Popup::Commit(draft)) = &self.popup else {
+            return;
+        };
+        if !matches!(draft.kind, git::CommitKind::Fixup { .. }) && draft.text.is_blank() {
+            self.popup = Some(Popup::Note("empty commit message".to_owned()));
+            return;
+        }
+        let message = draft.text.text();
+        let opts = git::CommitOpts {
+            sign_off: draft.sign_off,
+            no_verify: draft.no_verify,
+        };
+        let kind = draft.kind.clone();
+        let Some(repo) = &self.repo else { return };
+        let result = repo.commit(&kind, &message, opts);
+
+        match result {
+            Ok(_hash) => {
+                self.commit_draft = None;
+                self.popup = None;
+                self.refresh();
+            },
+            Err(git::GitError::NothingStaged) => {
+                self.popup = Some(Popup::Note("nothing staged to commit".to_owned()));
+            },
+            Err(e) => {
+                self.popup = Some(Popup::Note(e.to_string()));
+            },
+        }
     }
 }
 
