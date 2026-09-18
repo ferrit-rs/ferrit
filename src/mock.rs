@@ -130,11 +130,13 @@ pub fn mock_stashes() -> Vec<StashEntry> {
 /// Bottom box: the commands a real run would have shelled out.
 pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/main.rs"];
 
-/// Bottom line: lazygit-style key hints, `Label: key | ...`. `Commit` is
-/// still an inert placeholder (phase 7); everything else here is real
-/// (`docs/PLAN_6_STAGING.md`). Kept short enough to fit a 120-column
-/// terminal alongside every other segment (`tests/render.rs`).
-pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Diff: l | Commit: c | Scroll: J/K | Hunk: ]/[ | Help: ? | Quit: q";
+/// Bottom line: lazygit-style key hints, `Label: key | ...`. Every segment
+/// here is real (`docs/PLAN_6_STAGING.md`, `docs/PLAN_7_COMMIT.md`). Kept
+/// short enough to fit a 120-column terminal alongside every other segment
+/// (`tests/render.rs`) — `l` (also focuses the diff, alongside `Enter`) is
+/// documented in `HELP` instead of spending a keybar segment on a second
+/// binding for something already listed.
+pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Amend: A | Reword: w | Scroll: J/K | Hunk: ]/[ | Help: ? | Quit: q";
 
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
@@ -184,6 +186,12 @@ Enter / l         focus the diff, to stage within it
 h / Esc           (in the diff) back to the file list
 V                 start / clear a line selection
 d                 discard the change under the cursor (asks first)
+c                 open the commit popup (needs something staged)
+A                 amend HEAD, message pre-filled
+w                 reword HEAD's message only, index untouched
+Ctrl-S            (in the commit popup) create the commit
+Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify
+Esc               (in the commit popup) cancel, keeping the draft
 mouse wheel       scroll the pane under the pointer
 click a row       focus that pane, move the cursor there
 ?                 toggle this help
