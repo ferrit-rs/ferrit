@@ -130,9 +130,11 @@ pub fn mock_stashes() -> Vec<StashEntry> {
 /// Bottom box: the commands a real run would have shelled out.
 pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/main.rs"];
 
-/// Bottom line: inert lazygit-style key hints, `Label: key | ...`. None of
-/// these do anything yet except `?` and `q`.
-pub const KEYBAR: &str = "Stage: <space> | Commit: c | Push: P | Pull: p | Scroll diff: J/K | Hunk: ]/[ | Keybindings: ? | Quit: q";
+/// Bottom line: lazygit-style key hints, `Label: key | ...`. `Commit` is
+/// still an inert placeholder (phase 7); everything else here is real
+/// (`docs/PLAN_6_STAGING.md`). Kept short enough to fit a 120-column
+/// terminal alongside every other segment (`tests/render.rs`).
+pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Diff: l | Commit: c | Scroll: J/K | Hunk: ]/[ | Help: ? | Quit: q";
 
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
@@ -176,6 +178,12 @@ PgUp / PgDn       scroll the diff pane a page
 Ctrl-u / Ctrl-d   scroll the diff pane a half page
 < / >             diff pane to top / bottom
 ] / [             next / previous hunk or file
+<space>           stage / unstage the file, or a hunk/lines in the diff
+a                 stage / unstage every changed file
+Enter / l         focus the diff, to stage within it
+h / Esc           (in the diff) back to the file list
+V                 start / clear a line selection
+d                 discard the change under the cursor (asks first)
 mouse wheel       scroll the pane under the pointer
 click a row       focus that pane, move the cursor there
 ?                 toggle this help
