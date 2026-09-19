@@ -18,6 +18,7 @@ mod error;
 mod log;
 mod model;
 mod refs;
+mod remote;
 mod stash;
 mod status;
 
@@ -32,6 +33,7 @@ pub use commit::{CommitKind, CommitOpts};
 pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
 pub use model::{BranchEntry, CommitEntry, StashEntry};
+pub use remote::RemoteEntry;
 pub use status::{Change, FileEntry, StatusHeader};
 
 /// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
@@ -211,5 +213,28 @@ impl Repo {
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)
+    }
+
+    /// Configured remotes, alphabetical. See `docs/PLAN_9_REMOTE.md`.
+    pub fn remotes(&self) -> GitResult<Vec<RemoteEntry>> {
+        remote::remotes(&self.inner)
+    }
+
+    /// `git fetch <remote>`, or every remote when `remote` is `None`. Slow:
+    /// run off the main thread, see `docs/PLAN_9_REMOTE.md` "Approach part 2".
+    pub fn fetch(&self, remote: Option<&str>) -> GitResult<String> {
+        remote::fetch(&self.inner, remote)
+    }
+
+    /// `git pull`, honouring the user's `pull.rebase`/`pull.ff` config. Slow,
+    /// same as `fetch`.
+    pub fn pull(&self) -> GitResult<String> {
+        remote::pull(&self.inner)
+    }
+
+    /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
+    /// `Some`. Slow, same as `fetch`.
+    pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
+        remote::push(&self.inner, set_upstream)
     }
 }

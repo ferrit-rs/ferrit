@@ -59,6 +59,29 @@ pub enum GitError {
     /// `branch::MergeOutcome`). Holds stderr. See `docs/PLAN_8_BRANCHES.md`.
     #[error("git merge failed: {0}")]
     MergeFailed(String),
+    /// A `git fetch` subprocess exited non-zero: no network, an unknown
+    /// remote, an auth failure git's own credential handling could not
+    /// resolve. Holds stdout+stderr, trimmed and joined. See
+    /// `docs/PLAN_9_REMOTE.md`.
+    #[error("git fetch failed: {0}")]
+    FetchFailed(String),
+    /// A `git pull` subprocess exited non-zero: the same causes as
+    /// `FetchFailed`, plus a dirty worktree the merge/rebase it starts
+    /// would clobber, or a conflict it leaves unresolved (see that plan's
+    /// "Edge cases"). Holds stdout+stderr, trimmed and joined.
+    #[error("git pull failed: {0}")]
+    PullFailed(String),
+    /// A `git push` subprocess exited non-zero for any reason other than
+    /// `NoUpstream` (a rejected non-fast-forward, no network, auth). Holds
+    /// stdout+stderr, trimmed and joined.
+    #[error("git push failed: {0}")]
+    PushFailed(String),
+    /// The current branch has no upstream to push to. Distinct from
+    /// `PushFailed` because git's message for this is stable and ferrit
+    /// acts on it specifically (offers `-u <remote>`), the same shape as
+    /// `NothingStaged` next to the generic `CommitFailed`.
+    #[error("no upstream configured for the current branch")]
+    NoUpstream,
 }
 
 pub type GitResult<T> = Result<T, GitError>;
