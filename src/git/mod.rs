@@ -2,14 +2,16 @@
 //!
 //! See `docs/PLAN_2_GIT_BACKEND.md`: Status, Files, Branches, Commits, Stash
 //! and blob reads are all wired to real `git2` reads (G0..G6). Since
-//! `docs/PLAN_6_STAGING.md` and `docs/PLAN_7_COMMIT.md`, `apply` and
-//! `commit` also write the index, worktree and `HEAD` (stage / unstage /
-//! discard, commit / amend / reword / fixup / squash); those are the two
-//! submodules that are not read-only, and both shell out to `git` rather
-//! than writing objects directly.
+//! `docs/PLAN_6_STAGING.md`, `docs/PLAN_7_COMMIT.md` and
+//! `docs/PLAN_8_BRANCHES.md`, `apply`, `commit` and `branch` also write the
+//! index, worktree and `HEAD` (stage / unstage / discard, commit / amend /
+//! reword / fixup / squash, checkout / create / delete / fast-forward /
+//! merge); those are the three submodules that are not read-only, and all
+//! three shell out to `git` rather than writing objects directly.
 
 mod apply;
 mod blob;
+mod branch;
 mod commit;
 mod diff;
 mod error;
@@ -25,6 +27,7 @@ use git2::Repository;
 
 pub use apply::{ApplyDir, ApplyTarget, transform_body};
 pub use blob::Rev;
+pub use branch::MergeOutcome;
 pub use commit::{CommitKind, CommitOpts};
 pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
 pub use error::{GitError, GitResult};
@@ -183,5 +186,30 @@ impl Repo {
     /// precondition.
     pub fn staged_count(&self) -> GitResult<usize> {
         commit::staged_count(&self.inner)
+    }
+
+    /// `git checkout <name>`. See `docs/PLAN_8_BRANCHES.md`.
+    pub fn checkout(&self, name: &str) -> GitResult<()> {
+        branch::checkout(&self.inner, name)
+    }
+
+    /// `git checkout -b <name>` from the current `HEAD`.
+    pub fn create_branch(&self, name: &str) -> GitResult<()> {
+        branch::create_branch(&self.inner, name)
+    }
+
+    /// `git branch -d <name>` (`-D` when `force`).
+    pub fn delete_branch(&self, name: &str, force: bool) -> GitResult<()> {
+        branch::delete_branch(&self.inner, name, force)
+    }
+
+    /// Fast-forward `name` to its upstream, checked out or not.
+    pub fn fast_forward(&self, name: &str) -> GitResult<()> {
+        branch::fast_forward(&self.inner, name)
+    }
+
+    /// `git merge <name>` into the current branch.
+    pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
+        branch::merge_branch(&self.inner, name)
     }
 }

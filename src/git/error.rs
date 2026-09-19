@@ -40,6 +40,25 @@ pub enum GitError {
     /// See `docs/PLAN_7_COMMIT.md`.
     #[error("git commit failed: {0}")]
     CommitFailed(String),
+    /// A `git checkout` subprocess exited non-zero: a dirty worktree the
+    /// checkout would clobber, an invalid ref, or similar. Holds stderr.
+    /// See `docs/PLAN_8_BRANCHES.md`.
+    #[error("git checkout failed: {0}")]
+    CheckoutFailed(String),
+    /// A `git branch` / `git merge --ff-only` / local `git fetch .`
+    /// subprocess exited non-zero while creating, deleting, or fast-
+    /// forwarding a branch. Holds stderr; the one case ferrit acts on
+    /// specially (delete refused for being unmerged) is detected from this
+    /// by matching git's own stable substring, the same technique
+    /// `commit.rs`'s `NothingStaged` already uses. See
+    /// `docs/PLAN_8_BRANCHES.md`.
+    #[error("git branch failed: {0}")]
+    BranchFailed(String),
+    /// A `git merge` subprocess exited non-zero for a reason other than an
+    /// ordinary conflict (`MergeOutcome::Conflicted` is not an error, see
+    /// `branch::MergeOutcome`). Holds stderr. See `docs/PLAN_8_BRANCHES.md`.
+    #[error("git merge failed: {0}")]
+    MergeFailed(String),
 }
 
 pub type GitResult<T> = Result<T, GitError>;
