@@ -56,16 +56,21 @@ pub struct FilesDiff {
     pub staged: git::Diff,
 }
 
-/// Read-only view of the commit popup for `ui::draw_commit_popup`
-/// (`docs/PLAN_7_COMMIT.md`). Borrows the draft's lines, so it is cheap to
-/// build fresh every frame rather than cached.
+/// Read-only view of a single-`TextBuffer` popup for `ui::draw_commit_popup`
+/// (`docs/PLAN_7_COMMIT.md`), reused as-is for the new-branch popup
+/// (`docs/PLAN_8_BRANCHES.md`) — same shape, different title/footer.
+/// Borrows the draft's lines, so it is cheap to build fresh every frame
+/// rather than cached.
 pub struct CommitPopupView<'a> {
     pub title: &'static str,
     pub lines: &'a [String],
     /// `(row, char column)`, `TextBuffer`'s own cursor coordinates.
     pub cursor: (usize, usize),
-    pub sign_off: bool,
-    pub no_verify: bool,
+    /// `Some((sign_off, no_verify))` for the commit popup's toggle line;
+    /// `None` for the new-branch popup, which has nothing to toggle.
+    pub toggles: Option<(bool, bool)>,
+    /// Footer key hints, e.g. `"Commit: Ctrl-S | ... | Cancel: Esc"`.
+    pub hints: &'static str,
 }
 
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
@@ -160,19 +165,27 @@ struct HunkLines {
     selectable: Vec<usize>,
 }
 
-/// A pending `d` discard confirmation. `PLAN_0_GENERAL.md`: "anything that
-/// loses work asks first". `y` runs `action`, `n` / `Esc` cancels; nothing
-/// else can happen while it is up, same as the help overlay.
-struct DiscardPrompt {
+/// A pending confirmation: a `d` discard (phase 6) or a branch delete
+/// (`docs/PLAN_8_BRANCHES.md`), the first *other* thing that needed a
+/// yes/no gate — generalized from phase 6's `DiscardPrompt`, which was
+/// exactly this shape with `action` fixed to a discard. `PLAN_0_GENERAL.md`:
+/// "anything that loses work asks first". `y` runs `action`, `n` / `Esc`
+/// cancels; nothing else can happen while it is up, same as the help
+/// overlay.
+struct ConfirmPrompt {
     message: String,
-    action: DiscardAction,
+    action: ConfirmAction,
 }
 
-enum DiscardAction {
+enum ConfirmAction {
     /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
-    File(PathBuf),
+    DiscardFile(PathBuf),
     /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).
-    Granule(Granule),
+    DiscardGranule(Granule),
+    /// `d` in `Mode::Nav`, Branches focused: `git branch -d` / `-D`. `force`
+    /// is `false` on the first confirm, `true` on the second one offered
+    /// after an unmerged-branch refusal (`App::run_confirm`).
+    DeleteBranch { name: String, force: bool },
 }
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a
@@ -390,7 +403,12 @@ impl TextBuffer {
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
 enum Popup {
     Commit(CommitDraft),
-    /// A dismissible message: a commit failure, or "empty commit message".
+    /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
+    /// here, unlike the commit popup, where `Enter` inserts a newline —
+    /// the only behavioural difference from reusing `TextBuffer` outright.
+    NewBranch(TextBuffer),
+    /// A dismissible message: a commit failure, "empty commit message", a
+    /// branch-op failure, or a merge conflict.
     Note(String),
 }
 
@@ -625,8 +643,8 @@ pub struct App {
     mode: Mode,
     /// The diff cursor, meaningful only while `mode == Mode::Diff`.
     cursor: DiffCursor,
-    /// A `d` discard confirmation waiting on `y` / `n` / `Esc`.
-    pending_discard: Option<DiscardPrompt>,
+    /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
+    pending_confirm: Option<ConfirmPrompt>,
     /// A commit popup or dismissible note; owns all input while `Some`
     /// (`docs/PLAN_7_COMMIT.md`).
     popup: Option<Popup>,
@@ -669,7 +687,7 @@ impl App {
             right_focused: false,
             mode: Mode::default(),
             cursor: DiffCursor::default(),
-            pending_discard: None,
+            pending_confirm: None,
             popup: None,
             commit_draft: None,
         }
@@ -1292,6 +1310,15 @@ impl App {
         }
     }
 
+    /// Whether the Branches pane is drilled into one branch's own commit
+    /// log right now. `ui::draw_keybar` uses this to fall back to the
+    /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch
+    /// list row, not a commit row, so the Branches-specific hints would be
+    /// misleading while drilled in.
+    pub fn branches_drilled(&self) -> bool {
+        self.branch_drill.is_some()
+    }
+
     /// Commits pane rows, or the empty-state line (fresh repo).
     pub fn commit_lines(&self) -> Vec<Line<'static>> {
         if self.commits.is_empty() {
@@ -1400,12 +1427,12 @@ impl App {
             return;
         }
 
-        // A discard confirmation swallows every key but its own answer,
-        // same as the help overlay below.
-        if self.pending_discard.is_some() {
+        // A discard / branch-delete confirmation swallows every key but its
+        // own answer, same as the help overlay below.
+        if self.pending_confirm.is_some() {
             match key.code {
-                KeyCode::Char('y') => self.confirm_discard(),
-                KeyCode::Char('n') | KeyCode::Esc => self.pending_discard = None,
+                KeyCode::Char('y') => self.run_confirm(),
+                KeyCode::Char('n') | KeyCode::Esc => self.pending_confirm = None,
                 _ => {},
             }
             self.update_right_pane();
@@ -1469,8 +1496,17 @@ impl App {
                 self.enter_diff_mode();
             },
             KeyCode::Char('l') => self.enter_diff_mode(),
+            KeyCode::Char(' ') if self.focus == Pane::Branches => self.checkout_selected_branch(),
             KeyCode::Char(' ') => self.stage_selected_file(),
             KeyCode::Char('a') => self.stage_all_files(),
+            KeyCode::Char('n') if self.focus == Pane::Branches => self.open_new_branch_popup(),
+            KeyCode::Char('u') if self.focus == Pane::Branches => {
+                self.fast_forward_selected_branch();
+            },
+            KeyCode::Char('M') if self.focus == Pane::Branches => self.merge_selected_branch(),
+            KeyCode::Char('d') if self.focus == Pane::Branches && self.mode == Mode::Nav => {
+                self.delete_branch_prompt();
+            },
             KeyCode::Char('d') => self.discard_prompt(),
             KeyCode::Char('c') => self.open_commit(git::CommitKind::Normal),
             KeyCode::Char('A') => self.open_commit(git::CommitKind::Amend),
@@ -1938,9 +1974,9 @@ impl App {
                 if entry.worktree == git::Change::None {
                     return;
                 }
-                self.pending_discard = Some(DiscardPrompt {
+                self.pending_confirm = Some(ConfirmPrompt {
                     message: format!("discard all changes in {}?", entry.path.display()),
-                    action: DiscardAction::File(entry.path.clone()),
+                    action: ConfirmAction::DiscardFile(entry.path.clone()),
                 });
             },
             Mode::Diff if self.cursor.side == DiffSide::Worktree => {
@@ -1960,44 +1996,210 @@ impl App {
                         )
                     },
                 };
-                self.pending_discard = Some(DiscardPrompt {
+                self.pending_confirm = Some(ConfirmPrompt {
                     message: format!("discard {what} in {}?", entry.path.display()),
-                    action: DiscardAction::Granule(granule),
+                    action: ConfirmAction::DiscardGranule(granule),
                 });
             },
             Mode::Nav | Mode::Diff => {},
         }
     }
 
-    /// `y` while a discard confirmation is up: run it.
-    fn confirm_discard(&mut self) {
-        let Some(prompt) = self.pending_discard.take() else {
+    /// Refresh after a branch mutation (checkout / create / delete / fast-
+    /// forward), then surface a failure in the Status pane. Same shape as
+    /// `finish_apply`.
+    fn finish_branch_action(&mut self, result: GitResult<()>) {
+        self.refresh();
+        if let Err(e) = result {
+            self.last_error = Some(e.to_string());
+        }
+    }
+
+    /// `<space>` on the Branches pane (`Mode::Nav`): checkout the selected
+    /// branch. `refresh()` picks up the new `HEAD`, branches, and files (a
+    /// checkout changes the working tree too). No-op while drilled into a
+    /// branch's log, where the selected row is a commit, not a branch.
+    fn checkout_selected_branch(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
-        let result = match prompt.action {
-            DiscardAction::File(path) => {
+        let name = entry.name.clone();
+        let Some(repo) = &self.repo else { return };
+        let result = repo.checkout(&name);
+        self.finish_branch_action(result);
+    }
+
+    /// `n` (Nav, Branches focused): open the new-branch popup, named from
+    /// the current `HEAD` once submitted.
+    fn open_new_branch_popup(&mut self) {
+        if self.focus != Pane::Branches || self.popup.is_some() || self.branch_drill.is_some() {
+            return;
+        }
+        self.popup = Some(Popup::NewBranch(TextBuffer::default()));
+    }
+
+    /// `Enter` in the new-branch popup: `git checkout -b <name>` from
+    /// `HEAD`. Success closes the popup and refreshes; failure (a bad
+    /// name, or one already taken) keeps the popup open with the typed
+    /// text so the user can fix it and retry — the message surfaces in
+    /// the Status pane rather than a second popup layered on this one.
+    fn do_create_branch(&mut self) {
+        let Some(Popup::NewBranch(buf)) = &self.popup else {
+            return;
+        };
+        let name = buf.text();
+        let Some(repo) = &self.repo else { return };
+        match repo.create_branch(&name) {
+            Ok(()) => {
+                self.popup = None;
+                self.refresh();
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+    }
+
+    /// `d` (Nav, Branches focused): ask before deleting the selected
+    /// branch. The currently checked-out branch skips the confirm
+    /// entirely — `git` refuses to delete it either way, so its own
+    /// message goes straight to `last_error`, the same "explain, do
+    /// nothing" path an invalid discard already takes, rather than
+    /// opening a confirm for an outcome that is already certain.
+    fn delete_branch_prompt(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+            return;
+        };
+        let name = entry.name.clone();
+        if entry.is_head {
+            let Some(repo) = &self.repo else { return };
+            let result = repo.delete_branch(&name, false);
+            self.finish_branch_action(result);
+            return;
+        }
+        self.pending_confirm = Some(ConfirmPrompt {
+            message: format!("delete branch {name}?"),
+            action: ConfirmAction::DeleteBranch { name, force: false },
+        });
+    }
+
+    /// `u` (Nav, Branches focused): fast-forward the selected branch to
+    /// its upstream, checked out or not (`Repo::fast_forward` picks the
+    /// mechanism). No confirm: exactly as reversible as any other git
+    /// command, the reflog has your back the same way it does from a
+    /// shell.
+    fn fast_forward_selected_branch(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+            return;
+        };
+        let name = entry.name.clone();
+        let Some(repo) = &self.repo else { return };
+        let result = repo.fast_forward(&name);
+        self.finish_branch_action(result);
+    }
+
+    /// Every changed path currently reported as conflicted (staged or
+    /// worktree side), for the merge-conflict note's message.
+    fn conflicted_paths(&self) -> Vec<String> {
+        self.files
+            .iter()
+            .filter(|f| {
+                f.staged == git::Change::Conflicted || f.worktree == git::Change::Conflicted
+            })
+            .map(|f| f.path.display().to_string())
+            .collect()
+    }
+
+    /// `M` (Nav, Branches focused): merge the selected branch into the
+    /// current one. `refresh()` always runs, even on a conflict — the
+    /// Files pane already renders `Change::Conflicted`, so the conflicted
+    /// paths are visible without a dedicated flow.
+    fn merge_selected_branch(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+            return;
+        };
+        let name = entry.name.clone();
+        let Some(repo) = &self.repo else { return };
+        let result = repo.merge_branch(&name);
+        self.refresh();
+        match result {
+            Ok(git::MergeOutcome::Merged) => {},
+            Ok(git::MergeOutcome::Conflicted) => {
+                let files = self.conflicted_paths().join(", ");
+                self.popup = Some(Popup::Note(format!(
+                    "merge conflict in {files}. Resolve and commit, or `git merge --abort` \
+                     from the shell — conflict resolution UI is phase 11."
+                )));
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+    }
+
+    /// `y` while a confirm prompt is up: run its action. A branch delete
+    /// refused for being unmerged (`"is not fully merged"`, the same
+    /// stable-substring technique `commit.rs`'s `NothingStaged` already
+    /// uses) re-opens the confirm one more time asking to force it,
+    /// rather than reporting the refusal and stopping — `git branch -d`
+    /// is offering a choice, not failing outright.
+    fn run_confirm(&mut self) {
+        let Some(prompt) = self.pending_confirm.take() else {
+            return;
+        };
+        match prompt.action {
+            ConfirmAction::DiscardFile(path) => {
                 let untracked = self
                     .files
                     .iter()
                     .find(|f| f.path == path)
                     .is_some_and(|f| f.worktree == git::Change::Untracked);
-                match &self.repo {
+                let result = match &self.repo {
                     Some(repo) => repo.discard_file(&path, untracked),
                     None => return,
+                };
+                self.cursor.anchor = None;
+                self.finish_apply(result);
+            },
+            ConfirmAction::DiscardGranule(granule) => {
+                let result = self.apply_granule(&granule, ApplyDir::Reverse, ApplyTarget::Worktree);
+                self.cursor.anchor = None;
+                self.finish_apply(result);
+            },
+            ConfirmAction::DeleteBranch { name, force } => {
+                let Some(repo) = &self.repo else { return };
+                match repo.delete_branch(&name, force) {
+                    Ok(()) => self.refresh(),
+                    Err(git::GitError::BranchFailed(msg))
+                        if !force && msg.contains("is not fully merged") =>
+                    {
+                        self.pending_confirm = Some(ConfirmPrompt {
+                            message: format!(
+                                "'{name}' is not fully merged. Force delete? This may lose \
+                                 commits with no other reference to them."
+                            ),
+                            action: ConfirmAction::DeleteBranch { name, force: true },
+                        });
+                    },
+                    Err(e) => self.last_error = Some(e.to_string()),
                 }
             },
-            DiscardAction::Granule(granule) => {
-                self.apply_granule(&granule, ApplyDir::Reverse, ApplyTarget::Worktree)
-            },
-        };
-        self.cursor.anchor = None;
-        self.finish_apply(result);
+        }
     }
 
-    /// The `d` discard confirmation message, for the keybar prompt
-    /// (`ui::draw_keybar`), or `None` when nothing is pending.
-    pub fn discard_prompt_message(&self) -> Option<&str> {
-        self.pending_discard.as_ref().map(|p| p.message.as_str())
+    /// The pending discard / branch-delete confirmation message, for the
+    /// keybar prompt (`ui::draw_keybar`), or `None` when nothing is
+    /// pending.
+    pub fn confirm_message(&self) -> Option<&str> {
+        self.pending_confirm.as_ref().map(|p| p.message.as_str())
     }
 
     /// The commit popup's render data (`ui::draw_commit_popup`), or `None`
@@ -2010,8 +2212,23 @@ impl App {
             title: draft.kind.title(),
             lines: &draft.text.lines,
             cursor: (draft.text.row, draft.text.col),
-            sign_off: draft.sign_off,
-            no_verify: draft.no_verify,
+            toggles: Some((draft.sign_off, draft.no_verify)),
+            hints: "Commit: Ctrl-S | Sign-off: Ctrl-O | No-verify: Ctrl-N | Cancel: Esc",
+        })
+    }
+
+    /// The new-branch popup's render data, reusing `ui::draw_commit_popup`'s
+    /// shape (`docs/PLAN_8_BRANCHES.md`), or `None` when it is not up.
+    pub fn new_branch_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::NewBranch(buf)) = &self.popup else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: "New branch",
+            lines: &buf.lines,
+            cursor: (buf.row, buf.col),
+            toggles: None,
+            hints: "Create: Enter | Cancel: Esc",
         })
     }
 
@@ -2126,12 +2343,16 @@ impl App {
     /// Every key while `self.popup` is `Some`: printable/editing keys go to
     /// the draft's `TextBuffer`, `Ctrl-S` commits, `Ctrl-O` / `Ctrl-N` flip
     /// the sign-off / no-verify toggles, `Esc` cancels (keeping the draft
-    /// for a commit popup) or dismisses a note.
+    /// for a commit popup, dropping it outright for a new-branch one — a
+    /// few retyped characters cost nothing) or dismisses a note. `Enter`
+    /// *submits* the new-branch popup rather than inserting a newline, the
+    /// one behavioural difference from reusing `TextBuffer` as-is.
     fn popup_key(&mut self, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let mut dismiss = false;
         let mut cancel = false;
         let mut commit_now = false;
+        let mut create_branch_now = false;
 
         match &mut self.popup {
             None => return,
@@ -2154,6 +2375,15 @@ impl App {
                 KeyCode::Char(c) if !ctrl => draft.text.insert_char(c),
                 _ => {},
             },
+            Some(Popup::NewBranch(buf)) => match key.code {
+                KeyCode::Esc => dismiss = true,
+                KeyCode::Enter => create_branch_now = true,
+                KeyCode::Backspace => buf.backspace(),
+                KeyCode::Left => buf.move_left(),
+                KeyCode::Right => buf.move_right(),
+                KeyCode::Char(c) if !ctrl => buf.insert_char(c),
+                _ => {},
+            },
         }
 
         if dismiss {
@@ -2167,6 +2397,9 @@ impl App {
         }
         if commit_now {
             self.do_commit();
+        }
+        if create_branch_now {
+            self.do_create_branch();
         }
     }
 

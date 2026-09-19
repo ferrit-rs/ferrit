@@ -313,11 +313,11 @@ fn discard_asks_first_and_only_runs_on_y() {
     app.select(Pane::Files, files_row(&app, "a.txt"));
 
     app.feed_key(char_key('d'));
-    assert!(app.discard_prompt_message().is_some(), "asks first");
+    assert!(app.confirm_message().is_some(), "asks first");
 
     // 'n' cancels: the worktree change is untouched.
     app.feed_key(char_key('n'));
-    assert!(app.discard_prompt_message().is_none());
+    assert!(app.confirm_message().is_none());
     assert_eq!(
         fs::read_to_string(dir.path().join("a.txt")).unwrap(),
         "one\ntwo\n"
@@ -325,7 +325,7 @@ fn discard_asks_first_and_only_runs_on_y() {
 
     app.feed_key(char_key('d'));
     app.feed_key(char_key('y'));
-    assert!(app.discard_prompt_message().is_none());
+    assert!(app.confirm_message().is_none());
     assert_eq!(
         fs::read_to_string(dir.path().join("a.txt")).unwrap(),
         "one\n",

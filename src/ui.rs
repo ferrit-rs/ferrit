@@ -719,13 +719,13 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(panel, area);
 }
 
-/// The bottom key-hint bar, or — while `d` has a discard pending — a
-/// `message  y yes  n / Esc cancel` prompt in its place (the phase 6 "small
-/// popup, or a one-line prompt in the keybar region" fallback, since there
-/// is no popup primitive yet).
+/// The bottom key-hint bar, or — while a discard or branch-delete has a
+/// confirm pending — a `message  y yes  n / Esc cancel` prompt in its place
+/// (the phase 6 "small popup, or a one-line prompt in the keybar region"
+/// fallback, since there is no popup primitive for a plain yes/no yet).
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let line = app
-        .discard_prompt_message()
+        .confirm_message()
         .map_or_else(|| theme::keybar_line(mock::KEYBAR), theme::confirm_line);
     frame.render_widget(Paragraph::new(line), area);
 }
@@ -758,16 +758,21 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(overlay, rect);
 }
 
-/// A centered box for the commit-message popup: title from
-/// `CommitKind::title`, the draft's lines with the cursor overlaid
-/// (reverse-video on that one character, same trick as the diff cursor),
-/// and a two-line footer with the sign-off / no-verify toggles and the key
-/// hints. `docs/PLAN_7_COMMIT.md`'s popup, minus `tui-textarea` — see that
-/// plan's deviation note.
+/// A centered box for a single-`TextBuffer` popup: title, the draft's
+/// lines with the cursor overlaid (reverse-video on that one character,
+/// same trick as the diff cursor), and a footer of key hints — plus, when
+/// `view.toggles` is `Some`, a status line above the hints for the commit
+/// popup's sign-off / no-verify toggles. `docs/PLAN_7_COMMIT.md`'s popup,
+/// minus `tui-textarea` (see that plan's deviation note); reused as-is for
+/// the new-branch popup (`docs/PLAN_8_BRANCHES.md`) via `view.toggles: None`
+/// — same shape, one line of input instead of a paragraph, no toggle row.
 fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'_>) {
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
     let body_height = u16::try_from(view.lines.len().max(1)).unwrap_or(u16::MAX);
-    let height = body_height.saturating_add(4).min(area.height);
+    let footer_height: u16 = if view.toggles.is_some() { 2 } else { 1 };
+    let height = body_height
+        .saturating_add(footer_height + 2)
+        .min(area.height);
     let rect = Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
         y: area.y + area.height.saturating_sub(height) / 2,
@@ -781,7 +786,7 @@ fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'
         .border_style(focused);
     let inner = block.inner(rect);
     let [body_area, footer_area] =
-        Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).areas(inner);
+        Layout::vertical([Constraint::Min(1), Constraint::Length(footer_height)]).areas(inner);
 
     frame.render_widget(Clear, rect);
     frame.render_widget(block, rect);
@@ -801,29 +806,33 @@ fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'
         .collect();
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), body_area);
 
-    let sign_off = if view.sign_off {
-        Span::styled("on", Style::new().fg(theme::ADD))
-    } else {
-        Span::styled("off", Style::new().fg(theme::IDLE))
-    };
-    let verify = if view.no_verify {
-        Span::styled(
-            "off",
-            Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD),
-        )
-    } else {
-        Span::styled("on", Style::new().fg(theme::ADD))
-    };
-    let status = Line::from(vec![
-        Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
-        sign_off,
-        Span::raw("   "),
-        Span::styled("verify: ", Style::new().fg(theme::IDLE)),
-        verify,
-    ]);
-    let hints =
-        theme::keybar_line("Commit: Ctrl-S | Sign-off: Ctrl-O | No-verify: Ctrl-N | Cancel: Esc");
-    frame.render_widget(Paragraph::new(vec![status, hints]), footer_area);
+    let hints = theme::keybar_line(view.hints);
+    match view.toggles {
+        Some((sign_off, no_verify)) => {
+            let sign_off_span = if sign_off {
+                Span::styled("on", Style::new().fg(theme::ADD))
+            } else {
+                Span::styled("off", Style::new().fg(theme::IDLE))
+            };
+            let verify_span = if no_verify {
+                Span::styled(
+                    "off",
+                    Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::styled("on", Style::new().fg(theme::ADD))
+            };
+            let status = Line::from(vec![
+                Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
+                sign_off_span,
+                Span::raw("   "),
+                Span::styled("verify: ", Style::new().fg(theme::IDLE)),
+                verify_span,
+            ]);
+            frame.render_widget(Paragraph::new(vec![status, hints]), footer_area);
+        },
+        None => frame.render_widget(Paragraph::new(hints), footer_area),
+    }
 }
 
 /// `text` as a `Line`, with the character at char-index `col` reverse-video
