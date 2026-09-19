@@ -1,5 +1,29 @@
 # Plan: phase 9, remote
 
+**Deviation: a bare `git fetch` with zero remotes is a silent no-op, not
+an error.** The "Edge cases" table below guessed `git`'s message would be
+something like "no remote repository specified". Checked empirically: with
+no remotes configured, `git fetch` (no arguments) has nothing to do and
+exits 0 with empty output. `git pull` still fails in that case (it needs
+*something* to merge from) with "no tracking information for the current
+branch", so `P`'s existing 0-remotes short-circuit (`repo.remotes()` before
+ever asking git) is the only place this actually mattered; `f` needed no
+special-casing at all.
+
+**Deviation: a conflicting `pull` is a `PullFailed` error, not a dedicated
+outcome.** The plan below asks for pull-conflict to get "the same treatment
+as phase 8's conflicted merge" — a non-error outcome the UI shows as an
+informational note rather than a failure. Shipped simpler: `pull()` has no
+`PullOutcome` mirroring `branch::MergeOutcome`, so a conflicting pull
+(merge- or rebase-based, both exit non-zero on conflict, checked
+empirically the same way phase 8's merge exit code was) surfaces as an
+ordinary `GitError::PullFailed`, git's own conflict message shown verbatim
+in `last_error`. Still satisfies "not resolved, not pretended-resolved" —
+the Files pane already shows `Change::Conflicted` after the follow-up
+`refresh()` regardless — just styled as an error rather than a neutral
+note. Revisit alongside phase 11's real conflict-resolution UI if the
+distinction turns out to matter in practice.
+
 ## Goal
 
 Talk to a remote: fetch, pull, push, and a "Remotes" tab on the Branches
@@ -424,27 +448,41 @@ path) remote URL, no network, no real GitHub involved — the same trick
 
 ## Milestones
 
-- **S0** `src/git/remote.rs`: `RemoteEntry`, `remotes()`,
+- ✅ **S0** `src/git/remote.rs`: `RemoteEntry`, `remotes()`,
   `GitError::FetchFailed`/`PullFailed`/`PushFailed`/`NoUpstream`. Still
   synchronous at this milestone (call it straight from `on_key`, no thread
   yet) so the git-level behaviour can be proven before the threading
   layer goes on top. `tests/git_remote.rs`'s two-repo fixture and the
   `remotes()`/`fetch`/`pull`/`push` cases (including `NoUpstream` and the
   non-fast-forward rejection) green.
-- **S1** `events.rs` gains `AppEvent::RemoteDone`/`RemoteOp`/`Events::sender`.
-  `App` gains `remote_busy`, `status_note`, `start_remote_op`, the
-  `RemoteDone` arm in `run`'s match. `f`/`p`/`P` wired for the common case
-  (0/1 remote, upstream already set or not needed). `tests/app_remote.rs`'s
-  threading tests green.
-- **S2** the no-upstream flow: `Popup::RemotePick` for 2+ remotes, the
-  0-remote and 1-remote short-circuits.
-- **S3** Remotes tab rendering, `Ctrl-Right`/`Ctrl-Left` tab switch on the
-  Branches pane, busy/status-note lines on the Status pane.
-- **S4** polish: keybar + `HELP` + `mock::KEYBAR` updated (`Fetch`/`Pull`/
-  `Push` restored); `cargo clippy --all-targets` clean; every edge case in
-  the table has a test or an explicit inert path; `tests/render.rs`
-  snapshots for the Remotes tab and the busy/note lines; `70-remote.script`
-  ready for the harness (pending its `wait-for` primitive).
+- ✅ **S1** `events.rs` gains `AppEvent::RemoteDone`/`RemoteOp`/
+  `Events::sender`. `App` gains `remote_busy`, `status_note`,
+  `start_remote_op`, the `RemoteDone` arm in `run`'s match. `f`/`p`/`P`
+  wired for the common case (upstream already set or not needed).
+  `tests/app_remote.rs`'s threading tests green. Deviation from the
+  plan's own pseudocode: `on_remote_done` runs `refresh()` *before*
+  applying the op's `Ok`/`Err`, not after — seen up top would have let a
+  routine post-op `refresh()` silently clear the very failure line
+  `RemoteDone` exists to report.
+- ✅ **S2** the no-upstream flow: `push_current_branch` checks
+  `self.header.upstream` before ever calling `Repo::push`;
+  `Popup::RemotePick` for 2+ remotes, the 0-remote and 1-remote
+  short-circuits. `Repo::push`'s own `NoUpstream` detection stays as a
+  defensive fallback for a direct call, not the primary path.
+- ✅ **S3** Remotes tab rendering (`Snapshot`/`App` gain `remotes`,
+  refreshed like every other pane's data), `Ctrl-Right`/`Ctrl-Left` tab
+  switch on the Branches pane, `draw_remote_pick_popup`. Busy/status-note
+  lines needed no `ui.rs` change: `status_lines()` already produces them.
+- ✅ **S4** keybar + `HELP` + `mock::KEYBAR` updated — `Fetch/Pull/Push:
+  f/p/P` restored as one combined segment (three separate ones did not
+  fit the 120-column budget; `Scroll: J/K` / `Hunk: ]/[` trimmed to make
+  room, both stay in `HELP`); `cargo clippy --all-targets -- -D warnings`
+  and `cargo fmt --check` both clean on every file this phase touched;
+  every edge case in the table has a test or an explicit inert path;
+  `tests/render.rs` snapshots for the Remotes tab and the busy/note
+  lines. Not done: `70-remote.script` — still blocked on the replay
+  harness's `wait-for` primitive, exactly as this plan's own
+  "Self-testing" section already expected.
 
 ## Definition of done (phase 9)
 

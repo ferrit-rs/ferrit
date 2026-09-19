@@ -75,6 +75,15 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   Every action shells out to real `git`, so hooks and git's own safety
   messaging (a dirty worktree a checkout would clobber, an unmerged
   delete's refusal) apply exactly as they would from a shell.
+- ferrit can now talk to a remote: `f` fetches, `p` pulls (honouring
+  whatever `pull.rebase`/`pull.ff` config is already set), and `P` pushes —
+  offering to set an upstream via a small remote picker when the current
+  branch has none. All three run on a background thread, so a slow or
+  stalled network never freezes the keyboard; a "Fetching…"-style label
+  shows while one is in flight, a short confirmation line once it's done,
+  a failure with git's own message otherwise. The Branches pane gains a
+  real Remotes tab (`Ctrl-Right`/`Ctrl-Left` to switch to it) listing every
+  configured remote's fetch and push URLs.
 
 ### Changed
 
