@@ -135,8 +135,18 @@ pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/m
 /// short enough to fit a 120-column terminal alongside every other segment
 /// (`tests/render.rs`) — `l` (also focuses the diff, alongside `Enter`) is
 /// documented in `HELP` instead of spending a keybar segment on a second
-/// binding for something already listed.
+/// binding for something already listed. The default keybar, shown for
+/// every pane except Branches, which swaps in `BRANCHES_KEYBAR`
+/// (`ui::draw_keybar`) — its own keys share letters with these (`d` means
+/// something different per pane) and would otherwise be undiscoverable
+/// short of opening `HELP`.
 pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Amend: A | Reword: w | Scroll: J/K | Hunk: ]/[ | Help: ? | Quit: q";
+
+/// Bottom line while the Branches pane is focused (and not drilled into a
+/// branch's own commit log, where the default keybar applies instead —
+/// see `App::branches_drilled`). `docs/PLAN_8_BRANCHES.md`.
+pub const BRANCHES_KEYBAR: &str =
+    "Checkout: <space> | New: n | Delete: d | Fast-forward: u | Merge: M | Help: ? | Quit: q";
 
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
@@ -192,6 +202,15 @@ w                 reword HEAD's message only, index untouched
 Ctrl-S            (in the commit popup) create the commit
 Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify
 Esc               (in the commit popup) cancel, keeping the draft
+<space>           (Branches) checkout the selected branch
+n                 (Branches) new branch from HEAD, named in a popup
+d                 (Branches) delete the selected branch (asks first;
+                  an unmerged one asks a second time, to force it)
+u                 (Branches) fast-forward the selected branch to its
+                  upstream, checked out or not
+M                 (Branches) merge the selected branch into the current one
+Enter             (new-branch popup) create the branch
+Esc               (new-branch popup) cancel, no draft kept
 mouse wheel       scroll the pane under the pointer
 click a row       focus that pane, move the cursor there
 ?                 toggle this help
