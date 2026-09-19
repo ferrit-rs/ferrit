@@ -341,3 +341,16 @@ fn enter_on_the_picker_pushes_to_the_highlighted_remote() {
         "pushed to the highlighted (alphabetically first) remote"
     );
 }
+
+#[test]
+fn app_mock_ignores_fetch_pull_push_with_no_thread_spawned() {
+    let mut app = App::mock();
+    app.feed_key(char_key('f'));
+    app.feed_key(char_key('p'));
+    app.feed_key(char_key('P'));
+    assert!(
+        app.remote_busy_label().is_none(),
+        "no event_sender, no repo to reopen: nothing to be busy about"
+    );
+    assert!(app.remote_pick().is_none());
+}

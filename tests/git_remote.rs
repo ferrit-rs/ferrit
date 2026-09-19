@@ -154,6 +154,28 @@ fn remotes_lists_every_configured_remote() {
 }
 
 #[test]
+fn fetch_with_no_remote_is_a_silent_no_op_pull_is_an_error() {
+    let dir = TempDir::new("remote-none");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+
+    let backend = Repo::open(dir.path()).unwrap();
+    assert!(backend.remotes().unwrap().is_empty());
+    // Checked empirically rather than assumed (the plan's own edge-case
+    // table guessed a "no remote repository specified" error here): a
+    // bare `git fetch` with zero remotes configured has nothing to do and
+    // exits 0. `git pull` still needs *something* to merge from and does
+    // fail ("no tracking information for the current branch").
+    assert_eq!(backend.fetch(None).unwrap(), String::new());
+    assert!(matches!(
+        backend.pull().unwrap_err(),
+        GitError::PullFailed(_)
+    ));
+}
+
+#[test]
 fn fetch_updates_the_remote_tracking_ref_without_touching_local() {
     let (origin, work) = two_repo_fixture("fetch");
     fs::write(origin.path().join("a.txt"), "one\ntwo\n").unwrap();
@@ -258,6 +280,56 @@ fn pull_diverged_with_rebase_config_replays_the_local_commit() {
         git(work.path(), &["rev-parse", "HEAD~1"]),
         git(origin.path(), &["rev-parse", "HEAD"])
     );
+}
+
+#[test]
+fn pull_with_a_dirty_worktree_that_would_be_overwritten_is_an_error() {
+    let (origin, work) = two_repo_fixture("pull-dirty");
+    fs::write(origin.path().join("a.txt"), "one\ntwo\n").unwrap();
+    let origin_repo = Repository::open(origin.path()).unwrap();
+    commit_all(&origin_repo, "origin advances");
+
+    // Uncommitted, conflicting with the incoming change.
+    fs::write(work.path().join("a.txt"), "one\nlocal-dirty\n").unwrap();
+
+    let backend = Repo::open(work.path()).unwrap();
+    let err = backend.pull().unwrap_err();
+    assert!(matches!(err, GitError::PullFailed(_)), "got {err:?}");
+    assert_eq!(
+        fs::read_to_string(work.path().join("a.txt")).unwrap(),
+        "one\nlocal-dirty\n",
+        "worktree untouched"
+    );
+    assert_eq!(
+        git(work.path(), &["rev-parse", "HEAD"]),
+        git(work.path(), &["rev-parse", "refs/heads/base"]),
+        "local branch untouched"
+    );
+}
+
+#[test]
+fn pull_that_conflicts_is_an_error_and_leaves_the_conflict_visible() {
+    let (origin, work) = two_repo_fixture("pull-conflict");
+    // Same "modern git refuses an ambiguous pull outright" reason as
+    // `pull_diverged_with_rebase_false_makes_a_merge_commit`.
+    git(work.path(), &["config", "pull.rebase", "false"]);
+    fs::write(origin.path().join("a.txt"), "one\norigin-change\n").unwrap();
+    let origin_repo = Repository::open(origin.path()).unwrap();
+    commit_all(&origin_repo, "origin edits a.txt");
+
+    fs::write(work.path().join("a.txt"), "one\nlocal-change\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "local edits a.txt too");
+
+    let backend = Repo::open(work.path()).unwrap();
+    let err = backend.pull().unwrap_err();
+    // Not a dedicated "conflicted" outcome, unlike phase 8's
+    // `MergeOutcome::Conflicted` — a conflicting pull is still reported as
+    // a real failure (git's own conflict message, shown verbatim), same
+    // "not resolved, not pretended-resolved" promise, one variant simpler.
+    assert!(matches!(err, GitError::PullFailed(_)), "got {err:?}");
+    let status = git(work.path(), &["status", "--porcelain=v2"]);
+    assert!(status.contains("u "), "a conflict entry shows: {status}");
 }
 
 #[test]

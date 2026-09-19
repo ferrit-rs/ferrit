@@ -142,22 +142,27 @@ pub fn mock_stashes() -> Vec<StashEntry> {
 pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/main.rs"];
 
 /// Bottom line: lazygit-style key hints, `Label: key | ...`. Every segment
-/// here is real (`docs/PLAN_6_STAGING.md`, `docs/PLAN_7_COMMIT.md`). Kept
-/// short enough to fit a 120-column terminal alongside every other segment
-/// (`tests/render.rs`) — `l` (also focuses the diff, alongside `Enter`) is
-/// documented in `HELP` instead of spending a keybar segment on a second
-/// binding for something already listed. The default keybar, shown for
-/// every pane except Branches, which swaps in `BRANCHES_KEYBAR`
-/// (`ui::draw_keybar`) — its own keys share letters with these (`d` means
-/// something different per pane) and would otherwise be undiscoverable
-/// short of opening `HELP`.
-pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Amend: A | Reword: w | Scroll: J/K | Hunk: ]/[ | Help: ? | Quit: q";
+/// here is real (`docs/PLAN_6_STAGING.md`, `docs/PLAN_7_COMMIT.md`,
+/// `docs/PLAN_9_REMOTE.md`). Kept short enough to fit a 120-column
+/// terminal alongside every other segment (`tests/render.rs`) — `l` (also
+/// focuses the diff, alongside `Enter`), `Scroll: J/K` and `Hunk: ]/[` are
+/// documented in `HELP` instead of spending a keybar segment on a binding
+/// already listed there or squeezed out to make room for `f`/`p`/`P`
+/// (`Fetch/Pull/Push: f/p/P`, one combined segment rather than three,
+/// since all three are new in the same phase and none is worth a whole
+/// segment of its own). The default keybar, shown for every pane except
+/// Branches, which swaps in `BRANCHES_KEYBAR` (`ui::draw_keybar`) — its
+/// own keys share letters with these (`d` means something different per
+/// pane) and would otherwise be undiscoverable short of opening `HELP`.
+pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Amend: A | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
 
 /// Bottom line while the Branches pane is focused (and not drilled into a
 /// branch's own commit log, where the default keybar applies instead —
-/// see `App::branches_drilled`). `docs/PLAN_8_BRANCHES.md`.
-pub const BRANCHES_KEYBAR: &str =
-    "Checkout: <space> | New: n | Delete: d | Fast-forward: u | Merge: M | Help: ? | Quit: q";
+/// see `App::branches_drilled`). `docs/PLAN_8_BRANCHES.md`,
+/// `docs/PLAN_9_REMOTE.md`: `f`/`p`/`P` work regardless of focus, so they
+/// belong here too, not just in the default bar.
+pub const BRANCHES_KEYBAR: &str = "Checkout: <space> | New: n | Delete: d | Fast-forward: u | \
+     Merge: M | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
 
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
@@ -222,6 +227,9 @@ u                 (Branches) fast-forward the selected branch to its
 M                 (Branches) merge the selected branch into the current one
 Enter             (new-branch popup) create the branch
 Esc               (new-branch popup) cancel, no draft kept
+f / p / P         fetch / pull / push (P offers -u; 2+ remotes: a picker)
+Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
+Enter / Esc       (remote picker) push to the highlighted one / cancel
 mouse wheel       scroll the pane under the pointer
 click a row       focus that pane, move the cursor there
 ?                 toggle this help
