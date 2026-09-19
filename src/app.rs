@@ -409,9 +409,19 @@ enum Popup {
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextBuffer` outright.
     NewBranch(TextBuffer),
+    /// `P` with no upstream and 2+ remotes configured: pick which one to
+    /// push (and set as upstream) to. `docs/PLAN_9_REMOTE.md`'s "No
+    /// upstream" flow; the 0- and 1-remote cases short-circuit before a
+    /// popup is ever needed.
+    RemotePick(RemotePick),
     /// A dismissible message: a commit failure, "empty commit message", a
     /// branch-op failure, or a merge conflict.
     Note(String),
+}
+
+struct RemotePick {
+    remotes: Vec<git::RemoteEntry>,
+    selected: usize,
 }
 
 struct CommitDraft {
@@ -1199,6 +1209,17 @@ impl App {
         self.on_mouse(ev);
     }
 
+    /// Give the app a way back onto a background remote op's completion
+    /// channel, the same one `run()` gets from its own `Events`
+    /// (`Events::sender`). Integration-test seam: lets a test drive
+    /// `f`/`p`/`P` through `feed_key` and still observe the eventual
+    /// `AppEvent::RemoteDone`, with no `run()` loop (and its real
+    /// terminal) involved.
+    #[doc(hidden)]
+    pub fn set_event_sender(&mut self, sender: mpsc::Sender<AppEvent>) {
+        self.event_sender = Some(sender);
+    }
+
     /// Is the right pane currently a native-graphics image? `run` watches this
     /// across frames: when it flips back to `false` the sixel / iTerm2 / kitty
     /// pixels of the old frame outlive a normal buffer diff and need a full
@@ -1459,15 +1480,58 @@ impl App {
         Ok(())
     }
 
-    /// `f` / `p` / `P`: fetch / pull / push. Global, not Branches-only —
-    /// unlike phase 8's branch actions, these act on the repo and its
-    /// current branch, not a selected row. A no-op with no `event_sender`
-    /// set (`App::mock()`, or a test driving `on_key` without `run()`).
+    /// `f` / `p`: fetch / pull. Global, not Branches-only — unlike phase
+    /// 8's branch actions, these act on the repo and its current branch,
+    /// not a selected row. A no-op with no `event_sender` set
+    /// (`App::mock()`, or a test driving `on_key` without `run()`).
     fn trigger_remote_op(&mut self, op: events::RemoteOp) {
         let Some(sender) = self.event_sender.clone() else {
             return;
         };
-        self.start_remote_op(op, sender);
+        self.start_remote_op(op, None, sender);
+    }
+
+    /// `P`: push. Unlike `f`/`p`, push needs to know *before* running
+    /// whether the current branch has an upstream at all (`self.header
+    /// .upstream`, already read by phase 2 for the ahead/behind count) —
+    /// `Repo::push`'s own `NoUpstream` detection exists as a defensive
+    /// fallback, not the primary path, because ferrit already knows the
+    /// answer without asking git. No upstream: 0 remotes is an immediate
+    /// `last_error`, 1 remote pushes straight there with `-u`, 2+ opens
+    /// `Popup::RemotePick` to choose one.
+    fn push_current_branch(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+        if self.header.upstream.is_some() {
+            self.trigger_remote_op(events::RemoteOp::Push);
+            return;
+        }
+        let Some(repo) = &self.repo else { return };
+        match repo.remotes() {
+            Ok(remotes) if remotes.is_empty() => {
+                self.last_error = Some("no remote configured".to_owned());
+            },
+            Ok(mut remotes) if remotes.len() == 1 => {
+                self.push_with_upstream(remotes.remove(0).name);
+            },
+            Ok(remotes) => {
+                self.popup = Some(Popup::RemotePick(RemotePick {
+                    remotes,
+                    selected: 0,
+                }));
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+    }
+
+    /// `git push -u <remote> <branch>`: the 1-remote short-circuit and
+    /// `Popup::RemotePick`'s `Enter` both land here.
+    fn push_with_upstream(&mut self, remote: String) {
+        let Some(sender) = self.event_sender.clone() else {
+            return;
+        };
+        self.start_remote_op(events::RemoteOp::Push, Some(remote), sender);
     }
 
     /// Spawn `op` on its own thread, `sender` its way back onto the same
@@ -1478,6 +1542,8 @@ impl App {
     /// outright, not queued — two git processes racing over the same
     /// `index.lock` is a real failure mode, not a hypothetical one. A
     /// no-op with no repo to reopen (`App::mock()`, a bare repo).
+    /// `push_upstream` is only ever `Some` for `RemoteOp::Push`, from
+    /// `push_with_upstream`; `f`/`p`/a plain `P` all pass `None`.
     ///
     /// Takes `sender` as a parameter rather than reading `self.event_sender`
     /// directly so a test can call this with its own channel, no `run()`
@@ -1485,7 +1551,12 @@ impl App {
     /// `feed_key`: a test drives the resulting `AppEvent::RemoteDone`
     /// itself, into `on_remote_done`, with no `run()` loop to receive it.
     #[doc(hidden)]
-    pub fn start_remote_op(&mut self, op: events::RemoteOp, sender: mpsc::Sender<AppEvent>) {
+    pub fn start_remote_op(
+        &mut self,
+        op: events::RemoteOp,
+        push_upstream: Option<String>,
+        sender: mpsc::Sender<AppEvent>,
+    ) {
         if self.remote_busy.is_some() {
             return;
         }
@@ -1498,7 +1569,7 @@ impl App {
             let result = match op {
                 events::RemoteOp::Fetch => repo.fetch(None),
                 events::RemoteOp::Pull => repo.pull(),
-                events::RemoteOp::Push => repo.push(None),
+                events::RemoteOp::Push => repo.push(push_upstream.as_deref()),
             };
             let message = result.map_err(|e| e.to_string());
             let _ = sender.send(AppEvent::RemoteDone { op, message });
@@ -1647,7 +1718,7 @@ impl App {
             KeyCode::Char('r') => self.refresh(),
             KeyCode::Char('f') => self.trigger_remote_op(events::RemoteOp::Fetch),
             KeyCode::Char('p') => self.trigger_remote_op(events::RemoteOp::Pull),
-            KeyCode::Char('P') => self.trigger_remote_op(events::RemoteOp::Push),
+            KeyCode::Char('P') => self.push_current_branch(),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
                     self.focus = pane;
@@ -2377,6 +2448,16 @@ impl App {
         }
     }
 
+    /// The remote-pick popup's remotes and highlighted index
+    /// (`docs/PLAN_9_REMOTE.md`'s "No upstream" flow, 2+ remotes), or
+    /// `None` when it is not up.
+    pub fn remote_pick(&self) -> Option<(&[git::RemoteEntry], usize)> {
+        match &self.popup {
+            Some(Popup::RemotePick(pick)) => Some((&pick.remotes, pick.selected)),
+            _ => None,
+        }
+    }
+
     /// Cursor state for the right-pane render: `(side, cursor line, V-select
     /// range)` while `Mode::Diff` is up, else `None`. The range is
     /// inclusive-exclusive (`a..b`) over `side`'s own `Diff::text` lines.
@@ -2489,6 +2570,7 @@ impl App {
         let mut cancel = false;
         let mut commit_now = false;
         let mut create_branch_now = false;
+        let mut pick_remote_now = false;
 
         match &mut self.popup {
             None => return,
@@ -2520,6 +2602,15 @@ impl App {
                 KeyCode::Char(c) if !ctrl => buf.insert_char(c),
                 _ => {},
             },
+            Some(Popup::RemotePick(pick)) => match key.code {
+                KeyCode::Esc => dismiss = true,
+                KeyCode::Enter => pick_remote_now = true,
+                KeyCode::Char('j') | KeyCode::Down => {
+                    pick.selected = (pick.selected + 1).min(pick.remotes.len().saturating_sub(1));
+                },
+                KeyCode::Char('k') | KeyCode::Up => pick.selected = pick.selected.saturating_sub(1),
+                _ => {},
+            },
         }
 
         if dismiss {
@@ -2536,6 +2627,15 @@ impl App {
         }
         if create_branch_now {
             self.do_create_branch();
+        }
+        if pick_remote_now {
+            if let Some(Popup::RemotePick(pick)) = &self.popup {
+                let name = pick.remotes.get(pick.selected).map(|r| r.name.clone());
+                self.popup = None;
+                if let Some(name) = name {
+                    self.push_with_upstream(name);
+                }
+            }
         }
     }
 

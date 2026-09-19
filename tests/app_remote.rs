@@ -10,10 +10,12 @@
     reason = "integration test scaffolding: a failed setup is the assertion, helper ergonomics beat lint-cleanliness here"
 )]
 //! `App`-level threading coverage for `f`/`p`/`P` (`docs/PLAN_9_REMOTE.md`
-//! milestone S1): `start_remote_op` on a real two-repo fixture, drained
+//! milestones S1/S2): `start_remote_op` on a real two-repo fixture, drained
 //! through a channel this test owns and fed back into `on_remote_done` —
 //! no full `App::run()` loop, no real terminal, the one place ferrit's
-//! tests wait on a real background thread.
+//! tests wait on a real background thread. `set_event_sender` lets the
+//! S2 tests drive the same channel through the real `f`/`p`/`P` keys
+//! (`feed_key`) instead of calling `start_remote_op` directly.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,6 +26,11 @@ use std::time::Duration;
 use ferrit::app::App;
 use ferrit::events::{AppEvent, RemoteOp};
 use git2::{IndexAddOption, Repository, Signature};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+fn char_key(c: char) -> KeyEvent {
+    KeyEvent::from(KeyCode::Char(c))
+}
 
 struct TempDir(PathBuf);
 
@@ -145,7 +152,7 @@ fn fetch_clears_busy_and_refreshes_ahead_behind() {
     let mut app = App::open(work.path()).unwrap();
     let (tx, rx) = mpsc::channel();
 
-    app.start_remote_op(RemoteOp::Fetch, tx);
+    app.start_remote_op(RemoteOp::Fetch, None, tx);
     assert_eq!(app.remote_busy_label(), Some("Fetching\u{2026}"));
 
     wait_for_remote_done(&mut app, &rx);
@@ -175,13 +182,13 @@ fn a_second_start_while_one_is_running_is_ignored() {
     let mut app = App::open(work.path()).unwrap();
     let (tx, rx) = mpsc::channel();
 
-    app.start_remote_op(RemoteOp::Fetch, tx.clone());
+    app.start_remote_op(RemoteOp::Fetch, None, tx.clone());
     assert_eq!(app.remote_busy_label(), Some("Fetching\u{2026}"));
 
     // A second, distinct op while the first is in flight: ignored
     // outright, `remote_busy` unchanged, no second thread's result ever
     // arrives on the channel.
-    app.start_remote_op(RemoteOp::Pull, tx);
+    app.start_remote_op(RemoteOp::Pull, None, tx);
     assert_eq!(
         app.remote_busy_label(),
         Some("Fetching\u{2026}"),
@@ -203,7 +210,7 @@ fn a_failure_sets_last_error_not_a_status_note() {
 
     let mut app = App::open(work.path()).unwrap();
     let (tx, rx) = mpsc::channel();
-    app.start_remote_op(RemoteOp::Push, tx);
+    app.start_remote_op(RemoteOp::Push, None, tx);
     wait_for_remote_done(&mut app, &rx);
 
     assert!(app.remote_busy_label().is_none());
@@ -211,5 +218,126 @@ fn a_failure_sets_last_error_not_a_status_note() {
     assert!(
         lines.iter().any(|l| l.to_string().contains("no upstream")),
         "got: {lines:?}"
+    );
+}
+
+#[test]
+fn capital_p_with_no_remotes_shows_last_error() {
+    let dir = TempDir::new("app-remote-p-no-remotes");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('P'));
+
+    let lines = app.status_lines();
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.to_string().contains("no remote configured")),
+        "got: {lines:?}"
+    );
+    assert!(app.remote_pick().is_none());
+}
+
+#[test]
+fn capital_p_with_one_remote_and_no_upstream_pushes_with_dash_u() {
+    let (origin, work) = two_repo_fixture("app-remote-p-one-remote");
+    git(work.path(), &["checkout", "-q", "-b", "feature"]);
+    fs::write(work.path().join("e.txt"), "feature\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "feature work");
+
+    let mut app = App::open(work.path()).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    app.feed_key(char_key('P'));
+    assert_eq!(
+        app.remote_busy_label(),
+        Some("Pushing\u{2026}"),
+        "one remote pushes straight away, no picker"
+    );
+
+    wait_for_remote_done(&mut app, &rx);
+    assert!(app.remote_busy_label().is_none());
+    assert_eq!(
+        git(work.path(), &["rev-parse", "--abbrev-ref", "feature@{u}"]),
+        "origin/feature"
+    );
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "refs/heads/feature"]),
+        git(work.path(), &["rev-parse", "HEAD"])
+    );
+}
+
+#[test]
+fn capital_p_with_two_remotes_and_no_upstream_opens_a_picker() {
+    let dir = TempDir::new("app-remote-p-two-remotes");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    git(
+        dir.path(),
+        &["remote", "add", "origin", "https://example.com/o.git"],
+    );
+    git(
+        dir.path(),
+        &["remote", "add", "upstream", "https://example.com/u.git"],
+    );
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('P'));
+
+    let (remotes, selected) = app.remote_pick().expect("the picker opened");
+    assert_eq!(remotes.len(), 2);
+    assert_eq!(remotes[0].name, "origin");
+    assert_eq!(remotes[1].name, "upstream");
+    assert_eq!(selected, 0);
+
+    app.feed_key(char_key('j'));
+    let (_, selected) = app.remote_pick().expect("still open");
+    assert_eq!(selected, 1);
+
+    app.feed_key(KeyEvent::from(KeyCode::Esc));
+    assert!(app.remote_pick().is_none(), "Esc cancelled, no push");
+}
+
+#[test]
+fn enter_on_the_picker_pushes_to_the_highlighted_remote() {
+    let (origin, work) = two_repo_fixture("app-remote-p-pick-enter");
+    // A second remote that does not exist on disk: never reached, since
+    // the highlighted one (`origin`, first alphabetically) is picked.
+    git(
+        work.path(),
+        &[
+            "remote",
+            "add",
+            "zzz-unreachable",
+            "https://example.invalid/x.git",
+        ],
+    );
+    git(work.path(), &["checkout", "-q", "-b", "feature"]);
+    fs::write(work.path().join("e.txt"), "feature\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "feature work");
+
+    let mut app = App::open(work.path()).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    app.feed_key(char_key('P'));
+    assert!(app.remote_pick().is_some(), "two remotes: the picker opens");
+
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert!(app.remote_pick().is_none(), "picking closed the popup");
+    assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
+
+    wait_for_remote_done(&mut app, &rx);
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "refs/heads/feature"]),
+        git(work.path(), &["rev-parse", "HEAD"]),
+        "pushed to the highlighted (alphabetically first) remote"
     );
 }
