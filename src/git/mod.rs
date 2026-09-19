@@ -53,6 +53,8 @@ pub struct Snapshot {
     pub branches: Vec<BranchEntry>,
     pub commits: Vec<CommitEntry>,
     pub stashes: Vec<StashEntry>,
+    /// Feeds the Branches pane's Remotes tab. `docs/PLAN_9_REMOTE.md`.
+    pub remotes: Vec<RemoteEntry>,
 }
 
 /// Abbreviated hash, the 7 hex chars `git` shows by default. Shared by
@@ -94,6 +96,7 @@ impl Repo {
             branches: refs::branches(&self.inner)?,
             commits: log::commits(&self.inner, COMMITS_LIMIT)?,
             stashes: stash::stashes(&mut self.inner)?,
+            remotes: remote::remotes(&self.inner)?,
         })
     }
 

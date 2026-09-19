@@ -12,7 +12,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
-use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, StashEntry};
+use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, RemoteEntry, StashEntry};
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[
@@ -186,6 +186,25 @@ pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
         if entry.behind > 0 {
             spans.push(Span::styled(format!(" \u{2193}{}", entry.behind), fg(WARN)));
         }
+    }
+    Line::from(spans)
+}
+
+/// Branches pane's Remotes tab row: `name  fetch: <url>  push: <url>`, the
+/// push URL omitted when it is identical to fetch (the common case).
+/// `docs/PLAN_9_REMOTE.md`; no selection styling, this tab has no cursor.
+pub fn remote_line(entry: &RemoteEntry) -> Line<'static> {
+    let mut spans = vec![
+        Span::styled(
+            entry.name.clone(),
+            Style::new().fg(HASH).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("  fetch: ", fg(IDLE)),
+        Span::raw(entry.fetch_url.clone()),
+    ];
+    if entry.push_url != entry.fetch_url {
+        spans.push(Span::styled("  push: ", fg(IDLE)));
+        spans.push(Span::raw(entry.push_url.clone()));
     }
     Line::from(spans)
 }

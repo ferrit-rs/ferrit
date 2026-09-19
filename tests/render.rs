@@ -3,16 +3,22 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::pathbuf_init_then_push,
+    clippy::iter_on_single_items,
     reason = "integration test: a failed setup or a bad slice is the assertion"
 )]
 //! Mechanism 1 from `docs/PLAN_SELF_TESTING.md`: render `ui::draw` into a
 //! `TestBackend` and assert on frame text. No terminal, no timing.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 
 use ferrit::app::{App, Pane};
+use ferrit::events::RemoteOp;
 use ferrit::{mock, ui};
+use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{
@@ -24,6 +30,31 @@ fn frame(app: &mut App, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal.draw(|f| ui::draw(f, app)).unwrap();
     terminal.backend().to_string()
+}
+
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new(tag: &str) -> Self {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let mut path = std::env::temp_dir();
+        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&path).unwrap();
+        Self(path)
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 /// Rows in the left column (x < 40 at width 120) that carry the blue selection
@@ -349,4 +380,74 @@ fn branch_delete_confirm_renders_in_the_keybar() {
     );
     assert!(out.contains("yes"), "y/n hints show:\n{out}");
     assert!(out.contains("cancel"), "y/n hints show:\n{out}");
+}
+
+/// `docs/PLAN_9_REMOTE.md` S3: `Ctrl-Right` switches the Branches pane to
+/// its Remotes tab, a plain list of `name  fetch: <url>` rows (no
+/// selection bar — this tab has no cursor of its own).
+#[test]
+fn remotes_tab_renders_name_and_urls() {
+    let mut app = App::mock();
+    app.select(Pane::Branches, 0);
+    app.feed_key(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
+
+    let out = frame(&mut app, 120, 40);
+    assert!(out.contains("origin"), "remote name shows:\n{out}");
+    assert!(out.contains("fetch:"), "fetch label shows:\n{out}");
+    assert!(out.contains("git@github.com"), "fetch url shows:\n{out}");
+
+    // Ctrl-Left switches back.
+    app.feed_key(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL));
+    assert!(
+        !frame(&mut app, 120, 40).contains("fetch:"),
+        "back to the Local branches list"
+    );
+}
+
+/// `docs/PLAN_9_REMOTE.md` S3: a background op's busy label and a
+/// completed op's success line both render as an extra Status-pane line,
+/// under the main `ferrit -> branch` one, and are mutually exclusive.
+#[test]
+fn busy_and_status_note_render_on_the_status_pane_and_are_exclusive() {
+    let dir = TempDir::new("render-remote-status");
+    let repo = Repository::init(dir.path()).unwrap();
+    for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {
+        let mut config = repo.config().unwrap();
+        config.set_str(key, value).unwrap();
+    }
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    let mut index = repo.index().unwrap();
+    index
+        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
+        .unwrap();
+    index.write().unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let sig = Signature::now("Test", "test@example.com").unwrap();
+    repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+        .unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    let (tx, _rx) = mpsc::channel();
+    app.start_remote_op(RemoteOp::Fetch, None, tx);
+
+    let busy_out = frame(&mut app, 120, 40);
+    assert!(
+        busy_out.contains("Fetching"),
+        "busy label shows:\n{busy_out}"
+    );
+    assert!(
+        !busy_out.contains("Fetched origin"),
+        "no success line while busy:\n{busy_out}"
+    );
+
+    app.on_remote_done(RemoteOp::Fetch, Ok("Fetched origin".to_owned()));
+    let done_out = frame(&mut app, 120, 40);
+    assert!(
+        done_out.contains("Fetched origin"),
+        "success line shows:\n{done_out}"
+    );
+    assert!(
+        !done_out.contains("Fetching"),
+        "busy label cleared:\n{done_out}"
+    );
 }

@@ -6,7 +6,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::git::{BranchEntry, Change, CommitEntry, FileEntry, StashEntry, StatusHeader};
+use crate::git::{
+    BranchEntry, Change, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader,
+};
 
 /// An 8x8 PNG, embedded so `App::mock()` can drive the image-preview path with
 /// no repo and nothing on disk.
@@ -99,6 +101,15 @@ pub fn mock_branches() -> Vec<BranchEntry> {
             tip_time: 1_724_400_000,
         },
     ]
+}
+
+/// Branches pane's Remotes tab, repo-free.
+pub fn mock_remotes() -> Vec<RemoteEntry> {
+    vec![RemoteEntry {
+        name: "origin".to_owned(),
+        fetch_url: "git@github.com:ferrit-rs/ferrit.git".to_owned(),
+        push_url: "git@github.com:ferrit-rs/ferrit.git".to_owned(),
+    }]
 }
 
 /// Left pane 4: recent commits, newest first.

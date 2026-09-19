@@ -542,6 +542,18 @@ pub enum Pane {
     Stash,
 }
 
+/// Which of the Branches pane's own two real tabs is showing (the third,
+/// Tags, is still an inert label — `Pane::title`). `Remotes` has no
+/// selection cursor of its own; it is `Repo::remotes()` rendered plainly,
+/// same as the Local tab's list was for the entirety of phase 2 before
+/// phase 8 made it actionable. `docs/PLAN_9_REMOTE.md`.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+enum BranchesTab {
+    #[default]
+    Local,
+    Remotes,
+}
+
 /// Panes in order. Index into this is also the index into `App::selection`.
 pub const PANES: [Pane; 5] = [
     Pane::Status,
@@ -607,6 +619,12 @@ pub struct App {
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
     branch_drill: Option<BranchDrill>,
+    /// Configured remotes, feeding the Branches pane's Remotes tab.
+    /// `docs/PLAN_9_REMOTE.md`.
+    remotes: Vec<git::RemoteEntry>,
+    /// Which of the Branches pane's own two tabs is showing.
+    /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
+    branches_tab: BranchesTab,
     commits: Vec<git::CommitEntry>,
     stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
@@ -700,6 +718,8 @@ impl App {
             collapsed_dirs: HashSet::new(),
             branches: Vec::new(),
             branch_drill: None,
+            remotes: Vec::new(),
+            branches_tab: BranchesTab::default(),
             commits: Vec::new(),
             stashes: Vec::new(),
             last_error: None,
@@ -738,6 +758,7 @@ impl App {
         app.header = mock::mock_header();
         app.files = mock::mock_files();
         app.branches = mock::mock_branches();
+        app.remotes = mock::mock_remotes();
         app.commits = mock::mock_commits();
         app.stashes = mock::mock_stashes();
         app.update_right_pane();
@@ -771,6 +792,7 @@ impl App {
                 self.header = snap.header;
                 self.files = snap.files;
                 self.branches = snap.branches;
+                self.remotes = snap.remotes;
                 self.commits = snap.commits;
                 self.stashes = snap.stashes;
                 self.last_error = None;
@@ -1287,6 +1309,7 @@ impl App {
         match pane {
             Pane::Status => 0,
             Pane::Files => self.files_tree_rows().len(),
+            Pane::Branches if self.branches_tab == BranchesTab::Remotes => 0,
             Pane::Branches => self
                 .branch_drill
                 .as_ref()
@@ -1341,6 +1364,12 @@ impl App {
                 return vec![Line::raw("no commits yet")];
             }
             return drill.commits.iter().map(theme::commit_line).collect();
+        }
+        if self.branches_tab == BranchesTab::Remotes {
+            if self.remotes.is_empty() {
+                return vec![Line::raw("no remotes configured")];
+            }
+            return self.remotes.iter().map(theme::remote_line).collect();
         }
         if self.branches.is_empty() {
             return vec![Line::raw("no local branches")];
@@ -1724,6 +1753,9 @@ impl App {
                     self.focus = pane;
                 }
             },
+            KeyCode::Right | KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.toggle_branches_tab();
+            },
             KeyCode::Tab | KeyCode::Right => self.focus = self.pane_offset(1),
             KeyCode::BackTab | KeyCode::Left => self.focus = self.pane_offset(PANES.len() - 1),
             KeyCode::Char('j') | KeyCode::Down => self.select_down(),
@@ -1836,12 +1868,28 @@ impl App {
         *cursor = cursor.saturating_sub(1);
     }
 
+    /// `Ctrl-Right` / `Ctrl-Left`, Branches focused: switch its own Local
+    /// branches / Remotes tab. A no-op while drilled into a branch's log —
+    /// there is only one tab's worth of content to show there.
+    fn toggle_branches_tab(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        self.branches_tab = match self.branches_tab {
+            BranchesTab::Local => BranchesTab::Remotes,
+            BranchesTab::Remotes => BranchesTab::Local,
+        };
+    }
+
     /// Enter on the Branches pane: lazygit's branch -> log drill-down. Swaps
     /// the pane's own branch list for the selected branch's commit history,
     /// in place — focus stays on Branches, only its rows and title change
     /// (`branches_title`). Read only, no checkout. `Esc` backs out (`on_key`).
     fn enter_branch_log(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         let Some(repo) = &self.repo else { return };
@@ -2227,7 +2275,10 @@ impl App {
     /// checkout changes the working tree too). No-op while drilled into a
     /// branch's log, where the selected row is a commit, not a branch.
     fn checkout_selected_branch(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
@@ -2242,7 +2293,11 @@ impl App {
     /// `n` (Nav, Branches focused): open the new-branch popup, named from
     /// the current `HEAD` once submitted.
     fn open_new_branch_popup(&mut self) {
-        if self.focus != Pane::Branches || self.popup.is_some() || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.popup.is_some()
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         self.popup = Some(Popup::NewBranch(TextBuffer::default()));
@@ -2275,7 +2330,10 @@ impl App {
     /// nothing" path an invalid discard already takes, rather than
     /// opening a confirm for an outcome that is already certain.
     fn delete_branch_prompt(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
@@ -2300,7 +2358,10 @@ impl App {
     /// command, the reflog has your back the same way it does from a
     /// shell.
     fn fast_forward_selected_branch(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
@@ -2329,7 +2390,10 @@ impl App {
     /// Files pane already renders `Change::Conflicted`, so the conflicted
     /// paths are visible without a dedicated flow.
     fn merge_selected_branch(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+        {
             return;
         }
         let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {

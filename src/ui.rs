@@ -69,6 +69,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         draw_commit_popup(frame, area, &view);
     } else if let Some(view) = app.new_branch_popup() {
         draw_commit_popup(frame, area, &view);
+    } else if let Some((remotes, selected)) = app.remote_pick() {
+        draw_remote_pick_popup(frame, area, remotes, selected);
     } else if let Some(msg) = app.note_popup() {
         draw_note_popup(frame, area, msg);
     }
@@ -871,6 +873,58 @@ fn draft_line_with_cursor(text: &str, col: usize) -> Line<'static> {
         ),
         Span::raw(after),
     ])
+}
+
+/// `P` with no upstream and 2+ remotes: which one to push to.
+/// `docs/PLAN_9_REMOTE.md`'s "No upstream" flow. A plain highlighted list,
+/// not a `TextBuffer` popup — `j`/`k` move `selected` (`App::popup_key`),
+/// `Enter` pushes there, `Esc` cancels.
+fn draw_remote_pick_popup(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    remotes: &[git::RemoteEntry],
+    selected: usize,
+) {
+    let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
+    let body_height = u16::try_from(remotes.len().max(1)).unwrap_or(u16::MAX);
+    let height = body_height.saturating_add(3).min(area.height);
+    let rect = Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+
+    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let block = bordered()
+        .title(Line::styled(" Push to which remote? ", focused))
+        .border_style(focused);
+    let inner = block.inner(rect);
+    let [body_area, footer_area] =
+        Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+
+    frame.render_widget(Clear, rect);
+    frame.render_widget(block, rect);
+
+    let lines: Vec<Line<'static>> = remotes
+        .iter()
+        .enumerate()
+        .map(|(i, remote)| {
+            let mut line = Line::raw(remote.name.clone());
+            if i == selected {
+                pad_line(&mut line, body_area.width as usize);
+                for span in &mut line.spans {
+                    span.style = theme::selection_style(true);
+                }
+            }
+            line
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines), body_area);
+    frame.render_widget(
+        Paragraph::new(theme::keybar_line("Push: Enter | Cancel: Esc")),
+        footer_area,
+    );
 }
 
 /// A dismissible note popup: a commit failure (including a rejecting hook's
