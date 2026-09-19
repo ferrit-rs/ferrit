@@ -67,6 +67,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     }
     if let Some(view) = app.commit_popup() {
         draw_commit_popup(frame, area, &view);
+    } else if let Some(view) = app.new_branch_popup() {
+        draw_commit_popup(frame, area, &view);
     } else if let Some(msg) = app.note_popup() {
         draw_note_popup(frame, area, msg);
     }
@@ -723,10 +725,20 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
 /// confirm pending — a `message  y yes  n / Esc cancel` prompt in its place
 /// (the phase 6 "small popup, or a one-line prompt in the keybar region"
 /// fallback, since there is no popup primitive for a plain yes/no yet).
+/// Context-sensitive per focus (`docs/PLAN_8_BRANCHES.md`): the Branches
+/// pane's own keys share letters with the default bar's (`d` deletes a
+/// branch there, not a file's worktree change), so it swaps in
+/// `mock::BRANCHES_KEYBAR` instead of silently keeping the wrong hints on
+/// screen.
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let text = if app.focus == Pane::Branches && !app.branches_drilled() {
+        mock::BRANCHES_KEYBAR
+    } else {
+        mock::KEYBAR
+    };
     let line = app
         .confirm_message()
-        .map_or_else(|| theme::keybar_line(mock::KEYBAR), theme::confirm_line);
+        .map_or_else(|| theme::keybar_line(text), theme::confirm_line);
     frame.render_widget(Paragraph::new(line), area);
 }
 

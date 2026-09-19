@@ -15,7 +15,9 @@ use ferrit::app::{App, Pane};
 use ferrit::{mock, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::style::Color;
 
 fn frame(app: &mut App, width: u16, height: u16) -> String {
@@ -57,6 +59,32 @@ fn renders_every_region() {
     ] {
         assert!(out.contains(expected), "missing {expected:?}\n{out}");
     }
+}
+
+/// `docs/PLAN_8_BRANCHES.md`: the keybar is context-sensitive on the
+/// Branches pane — its own keys, not the Files-oriented default (`d` there
+/// deletes a branch, not a worktree change), and back to the default while
+/// drilled into a branch's own commit log (`Esc`/`j`/`k` apply there, not
+/// checkout/new/delete).
+#[test]
+fn keybar_swaps_for_the_branches_pane() {
+    let mut app = App::mock();
+    assert!(
+        frame(&mut app, 120, 40).contains("Stage:"),
+        "default by default"
+    );
+
+    app.select(Pane::Branches, 0);
+    let branches_out = frame(&mut app, 120, 40);
+    assert!(branches_out.contains("Checkout:"), "{branches_out}");
+    assert!(branches_out.contains("Merge:"), "{branches_out}");
+    assert!(!branches_out.contains("Stage:"), "{branches_out}");
+
+    app.focus = Pane::Files;
+    assert!(
+        frame(&mut app, 120, 40).contains("Stage:"),
+        "back to default"
+    );
 }
 
 #[test]
@@ -284,4 +312,41 @@ fn survives_extremes_without_panicking() {
     for (w, h) in [(40, 20), (20, 8), (200, 60), (1, 1)] {
         let _ = frame(&mut App::mock(), w, h);
     }
+}
+
+/// `docs/PLAN_8_BRANCHES.md` S4: the new-branch popup reuses
+/// `draw_commit_popup`'s shape — title, one input line, and a plain hints
+/// footer (no sign-off/verify toggle row, unlike the commit popup).
+#[test]
+fn new_branch_popup_renders_title_and_hints() {
+    let mut app = App::mock();
+    app.select(Pane::Branches, 1);
+    app.feed_key(KeyEvent::from(KeyCode::Char('n')));
+
+    let out = frame(&mut app, 120, 40);
+    assert!(out.contains("New branch"), "popup title shows:\n{out}");
+    assert!(out.contains("Create: Enter"), "hints show:\n{out}");
+    assert!(out.contains("Cancel: Esc"), "hints show:\n{out}");
+    assert!(
+        !out.contains("sign-off"),
+        "no toggle row on this popup:\n{out}"
+    );
+}
+
+/// `docs/PLAN_8_BRANCHES.md` S4/S3: `d` on a non-checked-out branch shows
+/// the delete confirm in the keybar, same `confirm_line` rendering the
+/// discard prompt already used.
+#[test]
+fn branch_delete_confirm_renders_in_the_keybar() {
+    let mut app = App::mock();
+    app.select(Pane::Branches, 1); // "feat/tui-skeleton", not the head
+    app.feed_key(KeyEvent::from(KeyCode::Char('d')));
+
+    let out = frame(&mut app, 120, 40);
+    assert!(
+        out.contains("delete branch feat/tui-skeleton?"),
+        "confirm message shows:\n{out}"
+    );
+    assert!(out.contains("yes"), "y/n hints show:\n{out}");
+    assert!(out.contains("cancel"), "y/n hints show:\n{out}");
 }
