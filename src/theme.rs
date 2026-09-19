@@ -324,7 +324,10 @@ pub fn render_delta(raw: &str, panel_width: usize) -> Text<'static> {
     let mut lines = Vec::new();
     for raw_line in raw.split_inclusive('\n') {
         let line = raw_line.strip_suffix('\n').unwrap_or(raw_line);
-        lines.push(parse_ansi_line(line.strip_suffix('\r').unwrap_or(line), panel_width));
+        lines.push(parse_ansi_line(
+            line.strip_suffix('\r').unwrap_or(line),
+            panel_width,
+        ));
     }
     Text::from(lines)
 }
@@ -408,11 +411,11 @@ fn apply_sgr(params: &str, style: &mut Style, background: &mut Option<Color>) {
             },
             38 | 48 => {
                 let is_background = code == 48;
-                let Some(&mode) = values.get(i + 1) else { break };
+                let Some(&mode) = values.get(i + 1) else {
+                    break;
+                };
                 let Some((color, consumed)) = (match mode {
-                    5 => values
-                        .get(i + 2)
-                        .map(|&n| (Color::Indexed(to_u8(n)), 3)),
+                    5 => values.get(i + 2).map(|&n| (Color::Indexed(to_u8(n)), 3)),
                     2 => match (values.get(i + 2), values.get(i + 3), values.get(i + 4)) {
                         (Some(&r), Some(&g), Some(&b)) => {
                             Some((Color::Rgb(to_u8(r), to_u8(g), to_u8(b)), 5))
@@ -644,6 +647,17 @@ pub fn status_line(raw: &str) -> Line<'static> {
 /// A `refresh()` failure, surfaced in the Status pane instead of a panic.
 pub fn error_line(raw: &str) -> Line<'static> {
     Line::styled(raw.to_owned(), fg(DEL))
+}
+
+/// A background fetch/pull/push in flight, shown under the main status
+/// line while `App::remote_busy_label` is `Some`. Dim, matching `Note`
+/// diff view's dim style — not an error, not a success, just "wait".
+/// See `docs/PLAN_9_REMOTE.md`.
+pub fn busy_line(label: &str) -> Line<'static> {
+    Line::styled(
+        label.to_owned(),
+        Style::new().fg(IDLE).add_modifier(Modifier::DIM),
+    )
 }
 
 /// Command-log line: dim the `$` prompt, leave the command bright.

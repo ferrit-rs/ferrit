@@ -16,11 +16,33 @@ use notify_debouncer_full::{DebounceEventResult, new_debouncer};
 use ratatui::crossterm::event::{self, Event};
 
 /// One thing worth waking the render loop for.
+#[derive(Debug)]
 pub enum AppEvent {
     /// A terminal event (key, resize, ...). Redraw, and act on key presses.
     Input(Event),
     /// The repo or worktree changed, or the poll timer fired. Re-snapshot.
     Refresh,
+    /// A background `fetch`/`pull`/`push` finished. `message` is already a
+    /// user-facing string (`Ok` success line or `Err` failure text) — this
+    /// module stays git-agnostic, so the spawned thread converts a
+    /// `GitError` with `.to_string()` before sending, the same boundary
+    /// `App` already draws between itself and `git::`. See
+    /// `docs/PLAN_9_REMOTE.md`.
+    RemoteDone {
+        op: RemoteOp,
+        message: Result<String, String>,
+    },
+}
+
+/// Which of the three network operations finished. Distinct from
+/// `git::GitError`'s own per-operation variants: this is *which action ran*,
+/// not *why it failed* — `App::remote_busy_label` and the eventual result
+/// both need to know which of the three is in flight / just finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoteOp {
+    Fetch,
+    Pull,
+    Push,
 }
 
 /// Debounce window for filesystem bursts. `git` touches a dozen files per
@@ -36,6 +58,11 @@ const POLL_INTERVAL: Duration = Duration::from_secs(10);
 /// Live sources feeding `AppEvent`s. Keep the value alive for the whole run:
 /// dropping it stops the watcher and lets the sender threads wind down.
 pub struct Events {
+    /// Kept so `sender()` can hand out more clones; every earlier phase's
+    /// source thread already gets its own clone at spawn time, this is the
+    /// first thing outside `events.rs` that needs to *send* rather than
+    /// just receive (`docs/PLAN_9_REMOTE.md`'s background fetch/pull/push).
+    tx: Sender<AppEvent>,
     rx: Receiver<AppEvent>,
     /// Held only to keep the filesystem watch alive; never read. Boxed so the
     /// debouncer's concrete type never leaks into this signature.
@@ -52,15 +79,25 @@ impl Events {
         spawn_input(tx.clone());
         spawn_poll(tx.clone());
         let watch = match watch_root {
-            Some(root) => spawn_watch(tx, root)?,
+            Some(root) => spawn_watch(tx.clone(), root)?,
             None => None,
         };
-        Ok(Self { rx, _watch: watch })
+        Ok(Self {
+            tx,
+            rx,
+            _watch: watch,
+        })
     }
 
     /// Block until the next event. `Err` only once every sender is gone.
     pub fn next(&self) -> Result<AppEvent> {
         Ok(self.rx.recv()?)
+    }
+
+    /// A cloneable handle so `App` can hand a background thread a way back
+    /// onto this same channel.
+    pub fn sender(&self) -> Sender<AppEvent> {
+        self.tx.clone()
     }
 }
 

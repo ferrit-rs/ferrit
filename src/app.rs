@@ -9,6 +9,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::thread;
 
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
@@ -19,7 +21,7 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Text};
 use ratatui_image::picker::Picker;
 
-use crate::events::{AppEvent, Events};
+use crate::events::{self, AppEvent, Events};
 use crate::git::{self, ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitResult};
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
@@ -652,6 +654,23 @@ pub struct App {
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
     commit_draft: Option<String>,
+    /// `Some` while a background fetch/pull/push is running. `f`/`p`/`P`
+    /// pressed again while `Some` are ignored outright — not queued —
+    /// sidestepping two git processes racing over the same `index.lock`.
+    /// See `docs/PLAN_9_REMOTE.md`.
+    remote_busy: Option<events::RemoteOp>,
+    /// A background fetch/pull/push's success line ("Fetched origin", "3
+    /// commits pushed"), shown in the Status pane until the next remote op
+    /// or the next `refresh()`. `last_error`'s sibling for the non-error
+    /// case, not a repurposing of that one field with a colour flag.
+    status_note: Option<String>,
+    /// A handle onto `Events`' own channel, so `on_key`'s `f`/`p`/`P` can
+    /// hand a background thread a way back onto it. `None` in `App::mock()`
+    /// and right after `App::open` — only `run()` has an `Events` to ask
+    /// for one, so it sets this once before its own loop starts; a
+    /// `feed_key`-driven test with no `run()` leaves `f`/`p`/`P` inert
+    /// unless it calls `start_remote_op` directly with its own channel.
+    event_sender: Option<mpsc::Sender<AppEvent>>,
 }
 
 impl App {
@@ -690,6 +709,9 @@ impl App {
             pending_confirm: None,
             popup: None,
             commit_draft: None,
+            remote_busy: None,
+            status_note: None,
+            event_sender: None,
         }
     }
 
@@ -1281,6 +1303,11 @@ impl App {
                 h.conflicts
             )));
         }
+        if let Some(label) = self.remote_busy_label() {
+            out.push(theme::busy_line(label));
+        } else if let Some(note) = &self.status_note {
+            out.push(theme::status_line(note));
+        }
         out
     }
 
@@ -1383,6 +1410,18 @@ impl App {
             .map(Path::to_path_buf)
     }
 
+    /// A fresh handle onto the same repository, for a background thread
+    /// that cannot borrow `self.repo` across `thread::spawn`'s `'static`
+    /// bound. `git::Repo::open` is cheap (`git2::Repository::discover`, no
+    /// I/O beyond opening `.git`), so reopening the same path is simpler
+    /// than sharing state — the same call `App::open` already makes once
+    /// at startup. `None` for `App::mock()` and for a bare repo (no
+    /// worktree root to reopen from), same reach as `watch_root` already
+    /// has.
+    fn repo_handle(&self) -> Option<git::Repo> {
+        git::Repo::open(&self.watch_root()?).ok()
+    }
+
     /// Draw, then block for the next event, until `should_quit`. Events come
     /// from three sources multiplexed by `Events`: terminal input, a recursive
     /// filesystem watch on the worktree, and a 10s poll fallback. A change
@@ -1390,6 +1429,12 @@ impl App {
     /// track the repo the way lazygit's do.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
         let events = Events::new(self.watch_root().as_deref())?;
+        // A background fetch/pull/push (`start_remote_op`) needs its own
+        // way back onto this channel; only `run()` has an `Events` to ask
+        // for one, so it hands `on_key` this clone rather than `on_key`
+        // taking `&Events` directly (it is also called from `feed_key`,
+        // which has none).
+        self.event_sender = Some(events.sender());
         let mut prev_was_image = false;
         while !self.should_quit {
             let is_image = self.preview_is_image();
@@ -1408,9 +1453,97 @@ impl App {
                 AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
                 AppEvent::Input(_) => {},
                 AppEvent::Refresh => self.refresh(),
+                AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             }
         }
         Ok(())
+    }
+
+    /// `f` / `p` / `P`: fetch / pull / push. Global, not Branches-only —
+    /// unlike phase 8's branch actions, these act on the repo and its
+    /// current branch, not a selected row. A no-op with no `event_sender`
+    /// set (`App::mock()`, or a test driving `on_key` without `run()`).
+    fn trigger_remote_op(&mut self, op: events::RemoteOp) {
+        let Some(sender) = self.event_sender.clone() else {
+            return;
+        };
+        self.start_remote_op(op, sender);
+    }
+
+    /// Spawn `op` on its own thread, `sender` its way back onto the same
+    /// channel `Events::next()` reads (`docs/PLAN_9_REMOTE.md`, "Approach
+    /// part 2": network calls are the first slow ones in `git::`, and
+    /// running one on this thread would freeze the whole UI). One at a
+    /// time: a second call while one is already running is ignored
+    /// outright, not queued — two git processes racing over the same
+    /// `index.lock` is a real failure mode, not a hypothetical one. A
+    /// no-op with no repo to reopen (`App::mock()`, a bare repo).
+    ///
+    /// Takes `sender` as a parameter rather than reading `self.event_sender`
+    /// directly so a test can call this with its own channel, no `run()`
+    /// (and its `Events`) required. `pub`, integration-test seam like
+    /// `feed_key`: a test drives the resulting `AppEvent::RemoteDone`
+    /// itself, into `on_remote_done`, with no `run()` loop to receive it.
+    #[doc(hidden)]
+    pub fn start_remote_op(&mut self, op: events::RemoteOp, sender: mpsc::Sender<AppEvent>) {
+        if self.remote_busy.is_some() {
+            return;
+        }
+        let Some(repo) = self.repo_handle() else {
+            return;
+        };
+        self.remote_busy = Some(op);
+        self.status_note = None;
+        thread::spawn(move || {
+            let result = match op {
+                events::RemoteOp::Fetch => repo.fetch(None),
+                events::RemoteOp::Pull => repo.pull(),
+                events::RemoteOp::Push => repo.push(None),
+            };
+            let message = result.map_err(|e| e.to_string());
+            let _ = sender.send(AppEvent::RemoteDone { op, message });
+        });
+    }
+
+    /// `AppEvent::RemoteDone` arrived: clear the busy flag, show a success
+    /// line or the failure, then refresh — ahead/behind, branches, commits
+    /// and files may all have moved (`pull` can fast-forward or rebase
+    /// local commits; `push` moves nothing local but the ahead count
+    /// changes). `pub`: `App::run`'s own match arm calls this, and so does
+    /// a test that drove `start_remote_op` with its own channel and has no
+    /// `run()` loop to receive the result for it.
+    pub fn on_remote_done(&mut self, _op: events::RemoteOp, message: Result<String, String>) {
+        self.remote_busy = None;
+        // `refresh()` first, not last: it sets `last_error` on its own
+        // (`None` on a successful snapshot, `Some` on a failed one), and
+        // the remote op's own message is the one that should have the
+        // final word on what the Status pane shows — reversing the order
+        // would let a routine post-op `refresh()` silently clear the
+        // very failure line it is meant to report.
+        self.refresh();
+        match message {
+            Ok(line) => {
+                self.last_error = None;
+                self.status_note = Some(line);
+            },
+            Err(line) => {
+                self.status_note = None;
+                self.last_error = Some(line);
+            },
+        }
+    }
+
+    /// A short label for the Status pane while a fetch/pull/push is in
+    /// flight, or `None` when none is. Not a progress bar: ferrit has no
+    /// way to know fetch/push percentages without parsing git's
+    /// `--progress` stream, which is meant for a terminal's own
+    /// carriage-return redraws, not structured data.
+    pub fn remote_busy_label(&self) -> Option<&'static str> {
+        match self.remote_busy? {
+            events::RemoteOp::Fetch => Some("Fetching\u{2026}"),
+            events::RemoteOp::Pull => Some("Pulling\u{2026}"),
+            events::RemoteOp::Push => Some("Pushing\u{2026}"),
+        }
     }
 
     fn on_key(&mut self, key: KeyEvent) {
@@ -1512,6 +1645,9 @@ impl App {
             KeyCode::Char('A') => self.open_commit(git::CommitKind::Amend),
             KeyCode::Char('w') => self.open_commit(git::CommitKind::Reword),
             KeyCode::Char('r') => self.refresh(),
+            KeyCode::Char('f') => self.trigger_remote_op(events::RemoteOp::Fetch),
+            KeyCode::Char('p') => self.trigger_remote_op(events::RemoteOp::Pull),
+            KeyCode::Char('P') => self.trigger_remote_op(events::RemoteOp::Push),
             KeyCode::Char(c @ '1'..='5') => {
                 if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
                     self.focus = pane;
