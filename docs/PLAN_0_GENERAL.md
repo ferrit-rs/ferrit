@@ -59,7 +59,7 @@ split is a move, not a rewrite.
 | 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | ✅ done |
 | 6 | `PLAN_6_STAGING.md` | stage / unstage at file, hunk, line; refresh after | 📅 planned |
 | 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | 📅 planned |
-| 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | 📅 planned |
+| 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | ✅ done |
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | 📅 planned |
 | 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop | 👉 todo |
 | 11 | `PLAN_11_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | 👉 todo |

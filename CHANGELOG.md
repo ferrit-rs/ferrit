@@ -62,6 +62,19 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   one — instead of a single diff that guessed which side to show. The left
   column narrows while this split is up so both stay readable. A file with
   changes on only one side just shows an empty diff on the other.
+- Branches pane: `HEAD` can now move. `<space>` checks out the selected
+  branch; `n` opens a popup for a new branch's name, always branched from
+  the current `HEAD`; `d` deletes the selected branch after a one-line
+  confirm, asking a second time (to force it) if it turns out to be
+  unmerged, and refuses outright (no confirm) on the branch that is
+  currently checked out; `u` fast-forwards the selected branch to its
+  upstream whether or not it's the one checked out; `M` merges the
+  selected branch into the current one, landing a merge commit, a
+  fast-forward, or a conflicted state git itself would also leave — visible
+  in the Files pane and a dismissible note, not silently pretended away.
+  Every action shells out to real `git`, so hooks and git's own safety
+  messaging (a dirty worktree a checkout would clobber, an unmerged
+  delete's refusal) apply exactly as they would from a shell.
 
 ### Changed
 

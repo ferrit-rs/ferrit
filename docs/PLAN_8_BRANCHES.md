@@ -1,5 +1,23 @@
 # Plan: phase 8, branches
 
+**Deviation: a real merge conflict exits non-zero, not 0.** The "Backend"
+section below assumed `git merge`'s two success shapes (a clean merge and a
+left-conflicted one) both exit 0, distinguished only by whether `MERGE_HEAD`
+got written. Checked empirically at implementation time: a conflicting
+`git merge` exits 1 like any other failure. `merge_branch` tells the two
+apart with `repo.state() == RepositoryState::Merge` on the non-zero path —
+`git2` read, not a subprocess, same split the rest of this module makes —
+rather than trusting the exit code at all. `MergeOutcome`'s two variants and
+everything ferrit does with them are otherwise exactly as planned.
+
+**Deviation: the confirm accessor is `App::confirm_message`, not
+`discard_prompt_message`.** The plan's "App wiring" section renames the
+*state* (`pending_discard` -> `pending_confirm`, `DiscardPrompt` ->
+`ConfirmPrompt`) but says nothing about the public accessor
+`ui::draw_keybar` and the tests read it through. Since it now speaks for a
+branch-delete confirm as much as a discard one, it is renamed too; `d` and
+`n`/`y`/`Esc` behave identically either way.
+
 ## Goal
 
 Turn the read-only Local Branches list from phase 2 (G7: list, live
@@ -382,22 +400,27 @@ pending, so scripts wait.
 
 ## Milestones
 
-- **S0** `src/git/branch.rs`: `checkout`, `create_branch`, `delete_branch`,
-  `GitError::CheckoutFailed`/`BranchFailed`. `tests/git_branch.rs` checkout
-  + create + delete (merged and unmerged) cases green.
-- **S1** `fast_forward`, `merge_branch`, `MergeOutcome`,
+- ✅ **S0** `src/git/branch.rs`: `checkout`, `create_branch`,
+  `delete_branch`, `GitError::CheckoutFailed`/`BranchFailed`.
+  `tests/git_branch.rs` checkout + create + delete (merged and unmerged)
+  cases green.
+- ✅ **S1** `fast_forward`, `merge_branch`, `MergeOutcome`,
   `GitError::MergeFailed`. Merge/conflict cases in `tests/git_branch.rs`
-  green.
-- **S2** `pending_discard` generalizes to `pending_confirm` /
+  green (see the exit-code deviation note up top for how `Conflicted` is
+  actually detected).
+- ✅ **S2** `pending_discard` generalized to `pending_confirm` /
   `ConfirmAction`; `<space>` checkout, `u` fast-forward, `M` merge wired,
   each `refresh()`ing after. `Popup::Note` shows a conflict / failure.
-- **S3** `d` delete with the two-step confirm flow. `n` +
-  `Popup::NewBranch` reusing `TextBuffer`, `Enter` submits. `tests/app_branch.rs`
-  green.
-- **S4** polish: keybar + `HELP` + `mock::KEYBAR` updated; `cargo clippy
-  --all-targets` clean; every edge case in the table has a test or an
-  explicit inert path; `tests/render.rs` snapshots for the new-branch popup
-  and the two-step confirm; `60-branches.script` ready for the harness.
+- ✅ **S3** `d` delete with the two-step confirm flow. `n` +
+  `Popup::NewBranch` reusing `TextBuffer`, `Enter` submits.
+  `tests/app_branch.rs` green.
+- 🟡 **S4** keybar + `HELP` + `mock::KEYBAR` updated; `cargo clippy
+  --all-targets -- -D warnings` and `cargo fmt --check` both clean on
+  every file this phase touched; every edge case in the table has a test
+  or an explicit inert path; `tests/render.rs` snapshots for the
+  new-branch popup and the delete confirm. Not done: `60-branches.script`
+  — still blocked on the replay harness (`xtask fixture`, `--replay`),
+  exactly as this plan's own "Self-testing" section already expected.
 
 ## Definition of done (phase 8)
 
