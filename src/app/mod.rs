@@ -1,0 +1,1403 @@
+//! Application state and the draw / event loop.
+//!
+//! Phase 2 wired every left pane (Status, Files, Branches, Commits, Stash) to
+//! a real read-only `git::Repo`. `App` owns the repo handle, the cached
+//! snapshot, which left pane is focused, and one selection cursor per pane.
+//! `App::mock()` is the repo-free path the render tests use.
+
+use std::collections::HashSet;
+use std::fmt::Write as _;
+use std::ops::Range;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::thread;
+
+use color_eyre::Result;
+use enum_map::{Enum, EnumMap};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+use ratatui::layout::{Position, Rect};
+use ratatui::text::{Line, Text};
+use ratatui_image::picker::Picker;
+
+use crate::events::{self, AppEvent, Events};
+use crate::git::{self, ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitResult};
+use crate::image::detect;
+use crate::image::preview::{self, Preview};
+use crate::tui::Tui;
+use crate::{mock, theme, ui};
+
+/// What the right pane shows behind the image preview. A second cached,
+/// rebuilt-on-nav value alongside `preview`, not a replacement: an image
+/// selection still wins. See `docs/PLAN_3_DIFF_VIEW.md`.
+#[derive(Debug, Clone, Default)]
+pub enum DiffView {
+    /// Status / Stash focused: no real diff, the mock text shows.
+    #[default]
+    None,
+    /// Read failed, or nothing to show. A dim single line, never a panic.
+    Note(String),
+    /// Files pane: one file's `git diff`, both sides at once (lazygit's own
+    /// Unstaged Changes / Staged Changes split).
+    Files(FilesDiff),
+    /// Commits pane, or a drilled branch's log: one commit's metadata and
+    /// `git show` diff.
+    Commit(git::CommitEntry, git::Diff),
+    /// Branches pane, not drilled in: the selected branch's own log, shown
+    /// passively (no Enter needed), lazygit's live branch -> log preview.
+    BranchLog(BranchLog),
+}
+
+/// A Files-pane selection's two sides at once, lazygit's own Unstaged
+/// Changes / Staged Changes split: a file half-staged shows real content in
+/// both, a file entirely on one side shows an empty diff on the other.
+#[derive(Debug, Clone)]
+pub struct FilesDiff {
+    pub unstaged: git::Diff,
+    pub staged: git::Diff,
+}
+
+/// Read-only view of a single-`TextBuffer` popup for `ui::draw_commit_popup`
+/// (`docs/PLAN_7_COMMIT.md`), reused as-is for the new-branch popup
+/// (`docs/PLAN_8_BRANCHES.md`) — same shape, different title/footer.
+/// Borrows the draft's lines, so it is cheap to build fresh every frame
+/// rather than cached.
+pub struct CommitPopupView<'a> {
+    pub title: &'static str,
+    pub lines: &'a [String],
+    /// `(row, char column)`, `TextBuffer`'s own cursor coordinates.
+    pub cursor: (usize, usize),
+    /// `Some((sign_off, no_verify))` for the commit popup's toggle line;
+    /// `None` for the new-branch popup, which has nothing to toggle.
+    pub toggles: Option<(bool, bool)>,
+    /// Footer key hints, e.g. `"Commit: Ctrl-S | ... | Cancel: Esc"`.
+    pub hints: &'static str,
+}
+
+/// A branch's own commit log for the passive `DiffView::BranchLog` preview.
+#[derive(Debug, Clone)]
+pub struct BranchLog {
+    pub branch: String,
+    pub commits: Vec<git::CommitEntry>,
+    /// Cheap content signature for `view_sig`'s "did this actually change"
+    /// check: there is no single diff `text` to compare here.
+    sig: String,
+}
+
+/// Identity of what `DiffView` describes. `update_right_pane` resets the scroll
+/// only when this changes, so a background refresh of an unchanged selection
+/// keeps its viewport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RightKey {
+    File { path: PathBuf },
+    Commit { full_hash: String },
+    BranchLog { branch: String },
+}
+
+struct RenderedDiff {
+    key: Option<RightKey>,
+    source: String,
+    focus: Option<Range<usize>>,
+    width: usize,
+    text: Text<'static>,
+}
+
+/// State for the Branches pane's Enter-to-drill-down (lazygit's branch ->
+/// log): the pane itself swaps its branch list for one branch's commit list,
+/// in place, rather than moving focus elsewhere. Distinct from the passive
+/// `DiffView::BranchLog` preview, which needs no Enter at all.
+struct BranchDrill {
+    branch: String,
+    commits: Vec<git::CommitEntry>,
+    /// The branch-list cursor to restore when `Esc` backs out.
+    return_index: usize,
+}
+
+/// State for the Commits pane's Enter-to-drill-down: the pane swaps its
+/// commit list for that commit's own changed-file tree, in place, the same
+/// shape `BranchDrill` gives the Branches pane one level up. Read only, no
+/// staging; `Esc` backs out.
+struct CommitDrill {
+    hash: String,
+    /// `"<short_hash> <summary>"`, for `App::commits_title`.
+    title: String,
+    /// One synthetic `FileEntry` per file the commit's diff touched, same
+    /// index order as the underlying `git::Diff::files`/`file_lines()` so a
+    /// selected row's scroll target is a plain index lookup.
+    files: Vec<git::FileEntry>,
+    /// The commit-list cursor to restore when `Esc` backs out.
+    return_index: usize,
+}
+
+/// Where keystrokes go while a Files diff is up. `Nav` is phase 1..5
+/// behaviour unchanged; `Diff` is `docs/PLAN_6_STAGING.md`'s "focus the diff
+/// to stage within it", scoped to the Files pane — the only one with
+/// anything to stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Mode {
+    #[default]
+    Nav,
+    Diff,
+}
+
+/// The right-pane diff cursor, meaningful only in `Mode::Diff`. `line` and
+/// `anchor` are indices into `side`'s own `Diff::text` lines: the Files
+/// split always shows at most one file per side, so there is no "flatten
+/// every file's hunks" step, just the diff's own line numbering.
+#[derive(Debug, Clone, Default)]
+struct DiffCursor {
+    side: DiffSide,
+    line: usize,
+    /// V-select anchor. `None` is a single line, `Some(a)` is the range
+    /// `a..=line` (order-independent: whichever end moves).
+    anchor: Option<usize>,
+    /// Content hash of the hunk the cursor sits in (header + body text), so
+    /// a background refresh can re-find the same hunk even if surrounding
+    /// hunks changed line count. gitu hashes the same way for its `Item.id`.
+    hunk_id: u64,
+}
+
+/// What `<space>` / `d` act on in `Mode::Diff`: the whole hunk under the
+/// cursor, or a V-selected subset of its `+`/`-` lines.
+enum Granule {
+    Hunk {
+        patch: String,
+    },
+    Lines {
+        file_header: String,
+        hunk_header: String,
+        hunk_body: String,
+        lines: Vec<usize>,
+    },
+}
+
+/// One hunk's body as global (whole-`Diff::text`) line indices, plus which
+/// of those lines are selectable (`+`/`-`; context is read but never
+/// chosen). Built fresh per diff-mode operation from the current `Diff` —
+/// cheap at working-tree sizes, the same "no cache" choice `files_tree_rows`
+/// already makes.
+struct HunkLines {
+    hunk_index: usize,
+    lines: Range<usize>,
+    selectable: Vec<usize>,
+}
+
+/// A pending confirmation: a `d` discard (phase 6) or a branch delete
+/// (`docs/PLAN_8_BRANCHES.md`), the first *other* thing that needed a
+/// yes/no gate — generalized from phase 6's `DiscardPrompt`, which was
+/// exactly this shape with `action` fixed to a discard. `PLAN_0_GENERAL.md`:
+/// "anything that loses work asks first". `y` runs `action`, `n` / `Esc`
+/// cancels; nothing else can happen while it is up, same as the help
+/// overlay.
+struct ConfirmPrompt {
+    message: String,
+    action: ConfirmAction,
+}
+
+enum ConfirmAction {
+    /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
+    DiscardFile(PathBuf),
+    /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).
+    DiscardGranule(Granule),
+    /// `d` in `Mode::Nav`, Branches focused: `git branch -d` / `-D`. `force`
+    /// is `false` on the first confirm, `true` on the second one offered
+    /// after an unmerged-branch refusal (`App::run_confirm`).
+    DeleteBranch { name: String, force: bool },
+}
+
+/// Body-line ranges (global `diff.text` line indices) for every hunk of a
+/// single-file `Diff`, plus which of those lines are selectable.
+fn hunk_lines_for(diff: &git::Diff) -> Vec<HunkLines> {
+    let Some(file) = diff.files.first() else {
+        return Vec::new();
+    };
+    let lines: Vec<&str> = diff.text.lines().collect();
+    let headers = diff.hunk_lines();
+    file.hunks
+        .iter()
+        .enumerate()
+        .map(|(hunk_index, hunk)| {
+            let body_start = headers.get(hunk_index).map_or(0, |&l| l + 1);
+            let body_len = diff
+                .text
+                .get(hunk.body.clone())
+                .unwrap_or_default()
+                .lines()
+                .count();
+            let range = body_start..body_start + body_len;
+            let selectable = range
+                .clone()
+                .filter(|&l| {
+                    matches!(
+                        lines.get(l).and_then(|s| s.as_bytes().first()),
+                        Some(b'+' | b'-')
+                    )
+                })
+                .collect();
+            HunkLines {
+                hunk_index,
+                lines: range,
+                selectable,
+            }
+        })
+        .collect()
+}
+
+/// Every selectable line across every hunk of `diff`, in order. `j` / `k` in
+/// `Mode::Diff` step through this list, skipping context lines entirely.
+fn selectable_lines(diff: &git::Diff) -> Vec<usize> {
+    hunk_lines_for(diff)
+        .into_iter()
+        .flat_map(|hl| hl.selectable)
+        .collect()
+}
+
+/// The content id of whichever hunk contains global line `line`, or `None`
+/// if it falls outside every hunk (should not happen for a selectable
+/// line). Used to keep `DiffCursor::hunk_id` pointing at the hunk the
+/// cursor is actually on whenever it moves, so `resync_diff_cursor` (which
+/// runs after *every* key, not just a stage) does not mistake "moved to a
+/// different hunk" for "the old hunk vanished" and snap back to it.
+fn hunk_id_at(diff: &git::Diff, line: usize) -> Option<u64> {
+    let hl = hunk_lines_for(diff)
+        .into_iter()
+        .find(|hl| hl.lines.contains(&line))?;
+    Some(hunk_content_id(diff, hl.hunk_index))
+}
+
+/// Stable id for hunk `hunk_index` of `diff`: a hash of its header + body
+/// text, so a background refresh can re-find the same hunk even once
+/// staging moved a *different* hunk out from under it (gitu's `Item.id`).
+fn hunk_content_id(diff: &git::Diff, hunk_index: usize) -> u64 {
+    use std::hash::{Hash as _, Hasher as _};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    if let Some(hunk) = diff.files.first().and_then(|f| f.hunks.get(hunk_index)) {
+        diff.text
+            .get(hunk.header.start..hunk.body.end)
+            .unwrap_or_default()
+            .hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+/// Modal state that owns all input while it is up, the same idea as
+/// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
+enum Popup {
+    Commit(CommitDraft),
+    /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
+    /// here, unlike the commit popup, where `Enter` inserts a newline —
+    /// the only behavioural difference from reusing `TextBuffer` outright.
+    NewBranch(TextBuffer),
+    /// `P` with no upstream and 2+ remotes configured: pick which one to
+    /// push (and set as upstream) to. `docs/PLAN_9_REMOTE.md`'s "No
+    /// upstream" flow; the 0- and 1-remote cases short-circuit before a
+    /// popup is ever needed.
+    RemotePick(RemotePick),
+    /// A dismissible message: a commit failure, "empty commit message", a
+    /// branch-op failure, or a merge conflict.
+    Note(String),
+}
+
+struct RemotePick {
+    remotes: Vec<git::RemoteEntry>,
+    selected: usize,
+}
+
+struct CommitDraft {
+    text: TextBuffer,
+    kind: git::CommitKind,
+    sign_off: bool,
+    no_verify: bool,
+}
+
+/// Mouse-wheel step for the right pane, in lines. Matches gitu's default
+/// `mouse_scroll_lines`.
+const WHEEL_LINES: isize = 3;
+
+/// `(discriminant, diff text)` for cheap "did the right pane actually change"
+/// checks: `String` equality on a few KB, no hashing.
+fn view_sig(v: &DiffView) -> (u8, &str, &str) {
+    match v {
+        DiffView::None => (0, "", ""),
+        DiffView::Note(m) => (1, m.as_str(), ""),
+        DiffView::Files(f) => (2, f.unstaged.text.as_str(), f.staged.text.as_str()),
+        DiffView::Commit(_, d) => (3, d.text.as_str(), ""),
+        DiffView::BranchLog(log) => (4, log.sig.as_str(), ""),
+    }
+}
+
+/// The five left panes, in top-to-bottom screen order.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
+pub enum Pane {
+    #[default]
+    Status,
+    Files,
+    Branches,
+    Commits,
+    Stash,
+}
+
+/// Which of the Branches pane's own two real tabs is showing (the third,
+/// Tags, is still an inert label — `Pane::title`). `Remotes` has no
+/// selection cursor of its own; it is `Repo::remotes()` rendered plainly,
+/// same as the Local tab's list was for the entirety of phase 2 before
+/// phase 8 made it actionable. `docs/PLAN_9_REMOTE.md`.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+enum BranchesTab {
+    #[default]
+    Local,
+    Remotes,
+}
+
+/// Panes in order. Index into this is also the index into `App::selection`.
+pub const PANES: [Pane; 5] = [
+    Pane::Status,
+    Pane::Files,
+    Pane::Branches,
+    Pane::Commits,
+    Pane::Stash,
+];
+
+impl Pane {
+    /// Position in `PANES`, for the focus-cycling arithmetic in `pane_offset`.
+    /// The variant order is the `PANES` order, so the discriminant is it.
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Bordered-box title, lazygit style: `[N] Tab - Tab - Tab`. The extra tab
+    /// names are inert labels for now; only the first is a real view.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Status => "[1] Status",
+            Self::Files => "[2] Files - Worktrees - Submodules",
+            Self::Branches => "[3] Local branches - Remotes - Tags",
+            Self::Commits => "[4] Commits - Reflog",
+            Self::Stash => "[5] Stash",
+        }
+    }
+
+    /// Contextual title for the right pane when this left pane has focus,
+    /// matching what lazygit shows there.
+    pub fn right_title(self) -> &'static str {
+        match self {
+            Self::Status => " Status ",
+            Self::Files => " Unstaged changes ",
+            Self::Branches => " Log ",
+            Self::Commits => " Patch ",
+            Self::Stash => " Stash ",
+        }
+    }
+}
+
+pub struct App {
+    /// Which left pane has focus.
+    pub focus: Pane,
+    /// Selection cursor per pane, keyed by `Pane`.
+    pub selection: EnumMap<Pane, usize>,
+    /// Whether the help overlay is up.
+    pub show_help: bool,
+    should_quit: bool,
+
+    /// `None` in `App::mock()`; otherwise the open repository.
+    repo: Option<git::Repo>,
+    /// Repository directory name, shown in the status header (`ferrit -> main`).
+    repo_name: String,
+    header: git::StatusHeader,
+    files: Vec<git::FileEntry>,
+    /// Directories collapsed in the Files pane's tree view (`FileRow`,
+    /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
+    /// default; paths persist across `refresh()`, only `Enter` on a
+    /// directory row changes this.
+    collapsed_dirs: HashSet<PathBuf>,
+    branches: Vec<git::BranchEntry>,
+    /// `Some` while the Branches pane is drilled into one branch's own log
+    /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
+    branch_drill: Option<BranchDrill>,
+    /// Configured remotes, feeding the Branches pane's Remotes tab.
+    /// `docs/PLAN_9_REMOTE.md`.
+    remotes: Vec<git::RemoteEntry>,
+    /// Which of the Branches pane's own two tabs is showing.
+    /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
+    branches_tab: BranchesTab,
+    commits: Vec<git::CommitEntry>,
+    /// `Some` while the Commits pane is drilled into one commit's own
+    /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
+    /// shows the commit list.
+    commit_drill: Option<CommitDrill>,
+    stashes: Vec<git::StashEntry>,
+    /// Last `refresh()` failure, shown in the Status pane. Never a panic.
+    last_error: Option<String>,
+
+    /// Terminal graphics backend for the image preview. Starts on half-blocks
+    /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
+    /// iterm2 when the real terminal supports one.
+    picker: Picker,
+    /// Right-pane image preview for the current selection, rebuilt on nav.
+    preview: Preview,
+    /// Right-pane diff for the current selection, behind any image preview.
+    /// Rebuilt on nav and on background `Refresh`.
+    diff: DiffView,
+    /// What `diff` currently describes. `None` when no diff applies.
+    right_key: Option<RightKey>,
+    /// Cached styled diff. Scroll changes only Paragraph offset, so it must
+    /// not rerun syntax highlighting or rebuild every line.
+    rendered_diff: Option<RenderedDiff>,
+    /// First visible line of the right-pane diff. Kept across a `Refresh` of
+    /// an unchanged selection; reset to 0 when the selection changes.
+    right_scroll: usize,
+    /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
+    /// each frame. Drives the viewport-aware scroll clamp and the page steps.
+    /// 0 before the first draw: the clamp is then permissive by one screen and
+    /// the next frame corrects it.
+    right_viewport: usize,
+    /// Whole right-pane rect from the last frame, for routing the mouse wheel
+    /// to the diff (over the right column) or the selection (over the left).
+    right_area: Rect,
+    /// Each left pane's bordered rect from the last frame, for routing a
+    /// click to the pane it landed in. `Rect::ZERO` before the first draw.
+    left_areas: EnumMap<Pane, Rect>,
+    /// `ListState::offset` for each left pane, copied back by
+    /// `ui::draw_left_column` after `render_stateful_widget` moves it to
+    /// keep the selection on screen. Lets a click in a scrolled list map to
+    /// the right row. Only valid post-render; 0 before the first draw.
+    list_offset: EnumMap<Pane, usize>,
+    /// A click landed on the right pane. Purely a border-highlight flag for
+    /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
+    /// left-pane navigation and selection are untouched. Cleared by `Esc` or
+    /// a click back on a left pane.
+    right_focused: bool,
+    /// Whether keys go to the left panes or to the Files diff cursor
+    /// (`docs/PLAN_6_STAGING.md`).
+    mode: Mode,
+    /// The diff cursor, meaningful only while `mode == Mode::Diff`.
+    cursor: DiffCursor,
+    /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
+    pending_confirm: Option<ConfirmPrompt>,
+    /// A commit popup or dismissible note; owns all input while `Some`
+    /// (`docs/PLAN_7_COMMIT.md`).
+    popup: Option<Popup>,
+    /// The last commit popup's text, kept across an `Esc`-cancel so a
+    /// mistyped keystroke never loses a paragraph. Cleared on a successful
+    /// commit.
+    commit_draft: Option<String>,
+    /// `Some` while a background fetch/pull/push is running. `f`/`p`/`P`
+    /// pressed again while `Some` are ignored outright — not queued —
+    /// sidestepping two git processes racing over the same `index.lock`.
+    /// See `docs/PLAN_9_REMOTE.md`.
+    remote_busy: Option<events::RemoteOp>,
+    /// A background fetch/pull/push's success line ("Fetched origin", "3
+    /// commits pushed"), shown in the Status pane until the next remote op
+    /// or the next `refresh()`. `last_error`'s sibling for the non-error
+    /// case, not a repurposing of that one field with a colour flag.
+    status_note: Option<String>,
+    /// A handle onto `Events`' own channel, so `on_key`'s `f`/`p`/`P` can
+    /// hand a background thread a way back onto it. `None` in `App::mock()`
+    /// and right after `App::open` — only `run()` has an `Events` to ask
+    /// for one, so it sets this once before its own loop starts; a
+    /// `feed_key`-driven test with no `run()` leaves `f`/`p`/`P` inert
+    /// unless it calls `start_remote_op` directly with its own channel.
+    event_sender: Option<mpsc::Sender<AppEvent>>,
+}
+
+mod text_buffer;
+mod tree;
+
+mod branch_actions;
+mod drill_nav;
+mod input;
+mod popups;
+mod remote;
+mod staging;
+
+#[cfg(test)]
+mod tests;
+
+use text_buffer::TextBuffer;
+use tree::{FileRow, commit_drill_files, tree_rows};
+
+impl App {
+    fn base(repo: Option<git::Repo>) -> Self {
+        let repo_name = repo
+            .as_ref()
+            .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
+        Self {
+            focus: Pane::default(),
+            selection: EnumMap::default(),
+            show_help: false,
+            should_quit: false,
+            repo,
+            repo_name,
+            header: git::StatusHeader::default(),
+            files: Vec::new(),
+            collapsed_dirs: HashSet::new(),
+            branches: Vec::new(),
+            branch_drill: None,
+            remotes: Vec::new(),
+            branches_tab: BranchesTab::default(),
+            commits: Vec::new(),
+            commit_drill: None,
+            stashes: Vec::new(),
+            last_error: None,
+            picker: Picker::halfblocks(),
+            preview: Preview::None,
+            diff: DiffView::None,
+            right_key: None,
+            rendered_diff: None,
+            right_scroll: 0,
+            right_viewport: 0,
+            right_area: Rect::ZERO,
+            left_areas: EnumMap::default(),
+            list_offset: EnumMap::default(),
+            right_focused: false,
+            mode: Mode::default(),
+            cursor: DiffCursor::default(),
+            pending_confirm: None,
+            popup: None,
+            commit_draft: None,
+            remote_busy: None,
+            status_note: None,
+            event_sender: None,
+        }
+    }
+
+    /// Open the repo at or above `path`, then take one snapshot.
+    pub fn open(path: &Path) -> GitResult<Self> {
+        let mut app = Self::base(Some(git::Repo::open(path)?));
+        app.refresh();
+        Ok(app)
+    }
+
+    /// Repo-free instance backed by `mock` data, for the render tests.
+    pub fn mock() -> Self {
+        let mut app = Self::base(None);
+        app.header = mock::mock_header();
+        app.files = mock::mock_files();
+        app.branches = mock::mock_branches();
+        app.remotes = mock::mock_remotes();
+        app.commits = mock::mock_commits();
+        app.stashes = mock::mock_stashes();
+        app.update_right_pane();
+        app
+    }
+
+    /// Repo-free (`App::mock()`): the right pane's mock sample text applies.
+    pub fn is_mock(&self) -> bool {
+        self.repo.is_none()
+    }
+
+    /// Query the real terminal for a graphics protocol and, if it has one,
+    /// swap it in for the half-block fallback. Call once, before `run`. See
+    /// `image::detect` for hosts that lie about support.
+    pub fn detect_graphics(&mut self) {
+        if let Some(found) = detect::pick() {
+            if let Some(line) = found.debug_line() {
+                self.last_error = Some(line);
+            }
+            self.picker = found.picker;
+            self.update_right_pane();
+        }
+    }
+
+    /// Re-read the wired panes. On error keep the old snapshot and stash the
+    /// message; never propagate, never panic. No-op without a repo.
+    pub fn refresh(&mut self) {
+        let Some(repo) = &mut self.repo else { return };
+        match repo.snapshot() {
+            Ok(snap) => {
+                self.header = snap.header;
+                self.files = snap.files;
+                self.branches = snap.branches;
+                self.remotes = snap.remotes;
+                self.commits = snap.commits;
+                self.stashes = snap.stashes;
+                self.last_error = None;
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+
+        // A drilled branch log (Enter on Branches) stays live across a
+        // background refresh instead of going stale; a branch that vanished
+        // (deleted, renamed) backs out of the drill-down instead of erroring
+        // the whole refresh.
+        if let Some(branch) = self.branch_drill.as_ref().map(|d| d.branch.clone()) {
+            match self.repo.as_ref().map(|r| r.branch_log(&branch)) {
+                Some(Ok(commits)) => {
+                    if let Some(drill) = &mut self.branch_drill {
+                        drill.commits = commits;
+                    }
+                },
+                _ => self.branch_drill = None,
+            }
+        }
+
+        // Same treatment for a drilled commit's file tree (Enter on
+        // Commits): re-read the file list so it reflects the diff as of
+        // this refresh; a commit that vanished (e.g. a reword/rebase that
+        // changed its hash) backs out rather than erroring the refresh.
+        if let Some(hash) = self.commit_drill.as_ref().map(|d| d.hash.clone()) {
+            match self
+                .repo
+                .as_ref()
+                .map(|r| r.commit_diff(&hash, DiffOpts::default()))
+            {
+                Some(Ok(diff)) => {
+                    let files = commit_drill_files(&diff);
+                    if let Some(drill) = &mut self.commit_drill {
+                        drill.files = files;
+                    }
+                },
+                _ => self.commit_drill = None,
+            }
+        }
+
+        for pane in PANES {
+            let last = self.row_count(pane).saturating_sub(1);
+            let cursor = &mut self.selection[pane];
+            *cursor = (*cursor).min(last);
+        }
+        self.update_right_pane();
+    }
+
+    /// Rebuild both cached right-pane values (`preview`, then `diff`) for the
+    /// current focus and selection. Cheap when nothing changed.
+    fn update_right_pane(&mut self) {
+        self.preview = self.build_preview();
+        self.update_diff();
+        self.sync_commit_file_scroll();
+    }
+
+    /// While drilled into a commit's file tree, jump the right pane's scroll
+    /// to the selected file's own section (`Diff::file_lines()`), lazygit's
+    /// "the file list drives the main view" behaviour. A no-op off the
+    /// Commits pane, undrilled, or on a directory row.
+    fn sync_commit_file_scroll(&mut self) {
+        if self.focus != Pane::Commits {
+            return;
+        }
+        let Some(drill) = &self.commit_drill else {
+            return;
+        };
+        let rows = tree_rows(&drill.files, &self.collapsed_dirs);
+        let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Commits)) else {
+            return;
+        };
+        let DiffView::Commit(_, diff) = &self.diff else {
+            return;
+        };
+        if let Some(&line) = diff.file_lines().get(*index) {
+            self.right_scroll = line;
+            self.clamp_right_scroll();
+        }
+    }
+
+    /// Rebuild `diff` from the current focus and selection. An image selection
+    /// owns the right pane, so it clears the diff. A `Refresh` of an unchanged
+    /// selection rebuilds the text but keeps `right_scroll`; a changed
+    /// selection resets the scroll to the top.
+    fn update_diff(&mut self) {
+        if matches!(self.preview, Preview::Image(_)) {
+            self.diff = DiffView::None;
+            self.right_key = None;
+            self.mode = Mode::Nav;
+            return;
+        }
+        match self.right_key_for() {
+            None => {
+                self.diff = DiffView::None;
+                self.right_key = None;
+                self.right_scroll = 0;
+                self.mode = Mode::Nav;
+            },
+            Some(key) if self.right_key.as_ref() == Some(&key) => {
+                let rebuilt = self.build_diff(&key);
+                if view_sig(&rebuilt) != view_sig(&self.diff) {
+                    self.diff = rebuilt;
+                }
+                self.clamp_right_scroll();
+                self.resync_diff_cursor();
+            },
+            Some(key) => {
+                self.right_scroll = 0;
+                self.diff = self.build_diff(&key);
+                self.right_key = Some(key);
+                self.mode = Mode::Nav;
+            },
+        }
+    }
+
+    /// Called after *every* key while `Mode::Diff` is up (`update_diff` runs
+    /// on every keystroke, not just after a stage), so a plain `j`/`k` must
+    /// come through untouched: only re-find the cursor when the line it
+    /// names actually stopped being valid — the hunk it was on shrank out
+    /// from under it (a line-level stage) or moved off this side entirely
+    /// (a whole-hunk stage), `docs/PLAN_6_STAGING.md` "After the apply:
+    /// refresh, keep your place". A still-selectable line, hunk unchanged,
+    /// is left exactly where it was.
+    ///
+    /// Gone -> clamp to the nearest remaining hunk on the *same* side, or
+    /// drop to `Mode::Nav` once that side has no more changes to show at
+    /// all — even if the other side now does; switching sides on the user's
+    /// behalf would silently change what the next `<space>` does.
+    fn resync_diff_cursor(&mut self) {
+        if self.mode != Mode::Diff {
+            return;
+        }
+        let DiffView::Files(files) = &self.diff else {
+            self.mode = Mode::Nav;
+            return;
+        };
+        let diff = match self.cursor.side {
+            DiffSide::Worktree => &files.unstaged,
+            DiffSide::Staged => &files.staged,
+        };
+        let hunks = hunk_lines_for(diff);
+
+        if let Some(hl) = hunks
+            .iter()
+            .find(|hl| hunk_content_id(diff, hl.hunk_index) == self.cursor.hunk_id)
+        {
+            if hl.selectable.contains(&self.cursor.line) {
+                self.cursor.anchor = self.cursor.anchor.filter(|a| hl.lines.contains(a));
+                self.ensure_cursor_visible();
+                return;
+            }
+            if let Some(&line) = hl.selectable.first() {
+                self.cursor.line = line;
+                self.cursor.anchor = None;
+                self.ensure_cursor_visible();
+                return;
+            }
+        }
+
+        if let Some(hl) = hunks.iter().find(|hl| !hl.selectable.is_empty())
+            && let Some(&line) = hl.selectable.first()
+        {
+            self.cursor.line = line;
+            self.cursor.anchor = None;
+            self.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
+            self.ensure_cursor_visible();
+        } else {
+            self.mode = Mode::Nav;
+        }
+    }
+
+    /// Files pane rows, lazygit-style directory tree: a flat list when every
+    /// changed file sits directly at the repo root (nothing to nest — most
+    /// working trees most of the time), otherwise grouped under directory
+    /// header rows plus an always-present root ("/"). Built fresh from
+    /// `self.files` and `self.collapsed_dirs` on every call; cheap at
+    /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
+    fn files_tree_rows(&self) -> Vec<FileRow> {
+        tree_rows(&self.files, &self.collapsed_dirs)
+    }
+
+    /// Same tree shape as `files_tree_rows`, over a drilled commit's own
+    /// changed files instead of the worktree's. Empty while not drilled.
+    fn commit_tree_rows(&self) -> Vec<FileRow> {
+        match &self.commit_drill {
+            Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs),
+            None => Vec::new(),
+        }
+    }
+
+    /// The diff identity for the current focus and selection: a worktree /
+    /// staged file for Files, a commit for Commits, nothing elsewhere.
+    fn right_key_for(&self) -> Option<RightKey> {
+        match self.focus {
+            Pane::Files => {
+                let rows = self.files_tree_rows();
+                let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
+                    return None;
+                };
+                let entry = self.files.get(*index)?;
+                Some(RightKey::File {
+                    path: entry.path.clone(),
+                })
+            },
+            // Drilled: the selection indexes the file tree, not `self.commits`
+            // (`commit_tree_rows`), so the diff stays keyed on the drilled
+            // commit's own hash regardless of which file row is highlighted.
+            Pane::Commits => {
+                if let Some(drill) = &self.commit_drill {
+                    Some(RightKey::Commit {
+                        full_hash: drill.hash.clone(),
+                    })
+                } else {
+                    let entry = self.commits.get(self.selected(Pane::Commits))?;
+                    Some(RightKey::Commit {
+                        full_hash: entry.full_hash.clone(),
+                    })
+                }
+            },
+            // Drilled: the selected row is a commit, same as Commits. Not
+            // drilled: no Enter yet, so preview the selected branch's own
+            // log passively (lazygit's live branch -> log, no key needed).
+            Pane::Branches => {
+                if let Some(drill) = &self.branch_drill {
+                    let entry = drill.commits.get(self.selected(Pane::Branches))?;
+                    Some(RightKey::Commit {
+                        full_hash: entry.full_hash.clone(),
+                    })
+                } else {
+                    let entry = self.branches.get(self.selected(Pane::Branches))?;
+                    Some(RightKey::BranchLog {
+                        branch: entry.name.clone(),
+                    })
+                }
+            },
+            _ => None,
+        }
+    }
+
+    /// Run the diff subprocess for `key`. No repo (mock) means no diff, so the
+    /// mock sample text keeps showing. An empty result or an error becomes a
+    /// dim one-line `Note`, never a panic.
+    fn build_diff(&self, key: &RightKey) -> DiffView {
+        let Some(repo) = &self.repo else {
+            return DiffView::None;
+        };
+        let opts = DiffOpts::default();
+        match key {
+            RightKey::File { path } => {
+                match (
+                    repo.file_diff(path, DiffSide::Worktree, opts),
+                    repo.file_diff(path, DiffSide::Staged, opts),
+                ) {
+                    (Ok(unstaged), Ok(staged))
+                        if unstaged.files.is_empty() && staged.files.is_empty() =>
+                    {
+                        DiffView::Note("no changes to show".into())
+                    },
+                    (Ok(unstaged), Ok(staged)) => DiffView::Files(FilesDiff { unstaged, staged }),
+                    (Err(e), _) | (_, Err(e)) => DiffView::Note(e.to_string()),
+                }
+            },
+            RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, opts) {
+                Ok(diff) => {
+                    let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
+                    match self
+                        .commits
+                        .iter()
+                        .chain(drill_commits)
+                        .find(|c| &c.full_hash == full_hash)
+                    {
+                        Some(entry) => DiffView::Commit(entry.clone(), diff),
+                        None => DiffView::Note("commit not in the list".into()),
+                    }
+                },
+                Err(e) => DiffView::Note(e.to_string()),
+            },
+            RightKey::BranchLog { branch } => match repo.branch_log(branch) {
+                Ok(commits) => {
+                    let sig = commits.iter().map(|c| c.full_hash.as_str()).collect();
+                    DiffView::BranchLog(BranchLog {
+                        branch: branch.clone(),
+                        commits,
+                        sig,
+                    })
+                },
+                Err(e) => DiffView::Note(e.to_string()),
+            },
+        }
+    }
+
+    /// Line count of the current diff text, 0 for `None` / `Note`.
+    fn diff_line_count(&self) -> usize {
+        match &self.diff {
+            // Both columns share one scroll; the taller sets how far it goes.
+            DiffView::Files(f) => f
+                .unstaged
+                .text
+                .lines()
+                .count()
+                .max(f.staged.text.lines().count()),
+            DiffView::Commit(_, d) => d.text.lines().count(),
+            DiffView::BranchLog(log) => log.commits.len() * theme::BRANCH_LOG_BLOCK_LINES,
+            DiffView::None | DiffView::Note(_) => 0,
+        }
+    }
+
+    /// Largest first-visible line that still fills the viewport: the last diff
+    /// line lands at the bottom of the pane, never above it. Falls back to
+    /// "line count minus one screen" until the first draw sets a real height.
+    fn max_right_scroll(&self) -> usize {
+        self.diff_line_count()
+            .saturating_sub(self.right_viewport.max(1))
+    }
+
+    /// Clamp `right_scroll` into `0..=max_right_scroll()`.
+    fn clamp_right_scroll(&mut self) {
+        self.right_scroll = self.right_scroll.min(self.max_right_scroll());
+    }
+
+    /// Move the right-pane viewport by `delta` lines, clamped so it stops with
+    /// the last line at the bottom of the pane. `isize::MIN` / `isize::MAX`
+    /// snap to the top / bottom.
+    fn scroll_right(&mut self, delta: isize) {
+        let mag = delta.unsigned_abs();
+        self.right_scroll = if delta >= 0 {
+            self.right_scroll
+                .saturating_add(mag)
+                .min(self.max_right_scroll())
+        } else {
+            self.right_scroll.saturating_sub(mag)
+        };
+    }
+
+    /// Is the right pane scrollable right now — a real diff, or a branch's
+    /// log preview? The scroll keys and the wheel are inert over an image, a
+    /// `Note`, and the mock bodies; without this, they leak through to the
+    /// left pane's own selection instead (moving the wrong thing).
+    fn right_is_diff(&self) -> bool {
+        matches!(
+            self.diff,
+            DiffView::Files(_) | DiffView::Commit(..) | DiffView::BranchLog(_)
+        )
+    }
+
+    /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
+    /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
+    /// a no-op on the Files split, which has two diffs and no single anchor
+    /// list to jump through.
+    fn jump_diff_anchor(&mut self, dir: isize) {
+        let anchors = match &self.diff {
+            DiffView::Commit(_, d) => d.file_lines(),
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                return;
+            },
+        };
+        let cur = self.right_scroll;
+        let target = if dir > 0 {
+            anchors.iter().find(|&&l| l > cur).copied()
+        } else {
+            anchors.iter().rev().find(|&&l| l < cur).copied()
+        };
+        if let Some(line) = target {
+            self.right_scroll = line;
+            self.clamp_right_scroll();
+        }
+    }
+
+    /// Current right-pane diff, for `ui::draw_right_pane`.
+    pub fn diff_view(&self) -> &DiffView {
+        &self.diff
+    }
+
+    /// Return cached styled diff. Cache invalidates on selection, diff text,
+    /// focus range, or pane width; pure scrolling reuses `Text`. Only a
+    /// commit diff goes through this cache: it is keyed for one `Diff` at a
+    /// time, and the Files split renders its two sides directly instead
+    /// (`ui::draw_files_columns`).
+    pub fn rendered_diff(
+        &mut self,
+        focus: Option<&Range<usize>>,
+        width: usize,
+    ) -> Option<(Text<'static>, usize, git::DiffStat)> {
+        let key = &self.right_key;
+        let cache = &mut self.rendered_diff;
+        match &self.diff {
+            DiffView::Commit(_, diff) => {
+                let cache_hit = cache.as_ref().is_some_and(|cached| {
+                    cached.key.as_ref() == key.as_ref()
+                        && cached.source == diff.text
+                        && cached.focus.as_ref() == focus
+                        && cached.width == width
+                });
+                if !cache_hit {
+                    let text = diff.delta_output(width).map_or_else(
+                        || theme::render_diff(diff, focus, width),
+                        |formatted| theme::render_delta(&formatted, width),
+                    );
+                    *cache = Some(RenderedDiff {
+                        key: key.clone(),
+                        source: diff.text.clone(),
+                        focus: focus.cloned(),
+                        width,
+                        text,
+                    });
+                }
+                cache
+                    .as_ref()
+                    .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
+            },
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                None
+            },
+        }
+    }
+
+    /// First visible line of the right-pane diff.
+    pub fn right_scroll(&self) -> usize {
+        self.right_scroll
+    }
+
+    /// Set the right-pane scroll. Test and example helper.
+    pub fn set_right_scroll(&mut self, line: usize) {
+        self.right_scroll = line;
+        self.clamp_right_scroll();
+    }
+
+    /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
+    /// each frame so the scroll clamp and page steps track the real size.
+    pub fn set_right_viewport(&mut self, rows: usize) {
+        self.right_viewport = rows;
+        self.clamp_right_scroll();
+    }
+
+    /// Whole right-pane rect, written by `ui::draw_right_pane` each frame so a
+    /// mouse-wheel event can be routed by its column.
+    pub fn set_right_area(&mut self, area: Rect) {
+        self.right_area = area;
+    }
+
+    /// A left pane's bordered rect, written by `ui::draw_left_column` each
+    /// frame so a click can be routed to the pane it landed in.
+    pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
+        self.left_areas[pane] = area;
+    }
+
+    /// Whether the right pane was last clicked, for `ui::draw_right_pane`'s
+    /// border highlight.
+    pub fn right_focused(&self) -> bool {
+        self.right_focused
+    }
+
+    /// A left pane's list scroll offset, read by `ui::draw_left_column`
+    /// before it builds that pane's `ListState`.
+    pub fn list_offset(&self, pane: Pane) -> usize {
+        self.list_offset[pane]
+    }
+
+    /// A left pane's list scroll offset, written by `ui::draw_left_column`
+    /// after `render_stateful_widget` so a click in a scrolled list maps to
+    /// the right row.
+    pub fn set_list_offset(&mut self, pane: Pane, offset: usize) {
+        self.list_offset[pane] = offset;
+    }
+
+    /// Feed one key to the handler. Integration-test seam; the running app
+    /// calls `on_key` from `run`.
+    #[doc(hidden)]
+    pub fn feed_key(&mut self, key: KeyEvent) {
+        self.on_key(key);
+    }
+
+    /// Feed one mouse event to the handler. Integration-test seam.
+    #[doc(hidden)]
+    pub fn feed_mouse(&mut self, ev: MouseEvent) {
+        self.on_mouse(ev);
+    }
+
+    /// Give the app a way back onto a background remote op's completion
+    /// channel, the same one `run()` gets from its own `Events`
+    /// (`Events::sender`). Integration-test seam: lets a test drive
+    /// `f`/`p`/`P` through `feed_key` and still observe the eventual
+    /// `AppEvent::RemoteDone`, with no `run()` loop (and its real
+    /// terminal) involved.
+    #[doc(hidden)]
+    pub fn set_event_sender(&mut self, sender: mpsc::Sender<AppEvent>) {
+        self.event_sender = Some(sender);
+    }
+
+    /// Is the right pane currently a native-graphics image? `run` watches this
+    /// across frames: when it flips back to `false` the sixel / iTerm2 / kitty
+    /// pixels of the old frame outlive a normal buffer diff and need a full
+    /// `terminal.clear()`.
+    fn preview_is_image(&self) -> bool {
+        matches!(self.preview, Preview::Image(_))
+    }
+
+    fn build_preview(&self) -> Preview {
+        if self.focus != Pane::Files {
+            return Preview::None;
+        }
+        let rows = self.files_tree_rows();
+        let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Files)) else {
+            return Preview::None;
+        };
+        let Some(entry) = self.files.get(*index) else {
+            return Preview::None;
+        };
+        if !preview::is_image_path(&entry.path) {
+            return Preview::None;
+        }
+        let bytes = match &self.repo {
+            Some(repo) => match repo.blob_bytes(&entry.path, git::Rev::Workdir) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    return Preview::Note(format!("[image] {}  ({e})", entry.path.display()));
+                },
+            },
+            None => mock::mock_image_bytes(&entry.path)
+                .map(<[u8]>::to_vec)
+                .unwrap_or_default(),
+        };
+        preview::from_bytes(&self.picker, &entry.path, &bytes)
+    }
+
+    /// The right-pane preview for the current selection.
+    pub fn preview(&self) -> &Preview {
+        &self.preview
+    }
+
+    /// Mutable preview, for `ui::draw`: `StatefulImage` resizes and re-encodes
+    /// the protocol in place at render time (the ratatui-image example pattern).
+    pub fn preview_mut(&mut self) -> &mut Preview {
+        &mut self.preview
+    }
+
+    /// Focus `pane` and move its cursor to `index`, rebuilding the preview.
+    /// Test and example helper; the running app goes through `on_key`.
+    pub fn select(&mut self, pane: Pane, index: usize) {
+        self.focus = pane;
+        let last = self.row_count(pane).saturating_sub(1);
+        self.selection[pane] = index.min(last);
+        self.update_right_pane();
+    }
+
+    /// Selection cursor for a given pane.
+    pub fn selected(&self, pane: Pane) -> usize {
+        self.selection[pane]
+    }
+
+    /// Selectable row count for a pane, for clamping the cursor and deciding
+    /// whether to draw a highlight.
+    pub fn row_count(&self, pane: Pane) -> usize {
+        match pane {
+            Pane::Status => 0,
+            Pane::Files => self.files_tree_rows().len(),
+            Pane::Branches if self.branches_tab == BranchesTab::Remotes => 0,
+            Pane::Branches => self
+                .branch_drill
+                .as_ref()
+                .map_or(self.branches.len(), |drill| drill.commits.len()),
+            Pane::Commits => match &self.commit_drill {
+                Some(_) => self.commit_tree_rows().len(),
+                None => self.commits.len(),
+            },
+            Pane::Stash => self.stashes.len(),
+        }
+    }
+
+    /// `(current, total)` for the pane's `N of M` border counter, or `None`
+    /// when the pane has no selectable rows.
+    pub fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
+        let total = self.row_count(pane);
+        (total > 0).then(|| (self.selected(pane).min(total - 1) + 1, total))
+    }
+
+    /// Status pane: lazygit's one-liner `ferrit -> main ↑2`, plus a conflict
+    /// line only when there are conflicts, or the error when `refresh()` failed.
+    pub fn status_lines(&self) -> Vec<Line<'static>> {
+        if let Some(err) = &self.last_error {
+            return vec![theme::error_line(&format!("error: {err}"))];
+        }
+        let h = &self.header;
+        let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
+        if h.ahead > 0 {
+            let _ = write!(line, " \u{2191}{}", h.ahead);
+        }
+        if h.behind > 0 {
+            let _ = write!(line, " \u{2193}{}", h.behind);
+        }
+        let mut out = vec![theme::status_line(&line)];
+        if h.conflicts > 0 {
+            out.push(theme::error_line(&format!(
+                "\u{2717} {} merge conflict(s)",
+                h.conflicts
+            )));
+        }
+        if let Some(label) = self.remote_busy_label() {
+            out.push(theme::busy_line(label));
+        } else if let Some(note) = &self.status_note {
+            out.push(theme::status_line(note));
+        }
+        out
+    }
+
+    /// Branches pane rows: the branch list, or one branch's own commit log
+    /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
+    /// own empty-state line.
+    pub fn branch_lines(&self) -> Vec<Line<'static>> {
+        if let Some(drill) = &self.branch_drill {
+            if drill.commits.is_empty() {
+                return vec![Line::raw("no commits yet")];
+            }
+            return drill.commits.iter().map(theme::commit_line).collect();
+        }
+        if self.branches_tab == BranchesTab::Remotes {
+            if self.remotes.is_empty() {
+                return vec![Line::raw("no remotes configured")];
+            }
+            return self.remotes.iter().map(theme::remote_line).collect();
+        }
+        if self.branches.is_empty() {
+            return vec![Line::raw("no local branches")];
+        }
+        self.branches.iter().map(theme::branch_line).collect()
+    }
+
+    /// `[3] Local branches - Remotes - Tags`, or `[3] Commits (<branch>)`
+    /// while drilled into a branch's log (Enter on a branch, `Esc` to back
+    /// out; see `enter_branch_log`).
+    pub fn branches_title(&self) -> String {
+        match &self.branch_drill {
+            Some(drill) => format!("[3] Commits ({})", drill.branch),
+            None => Pane::Branches.title().to_owned(),
+        }
+    }
+
+    /// Whether the Branches pane is drilled into one branch's own commit
+    /// log right now. `ui::draw_keybar` uses this to fall back to the
+    /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch
+    /// list row, not a commit row, so the Branches-specific hints would be
+    /// misleading while drilled in.
+    pub fn branches_drilled(&self) -> bool {
+        self.branch_drill.is_some()
+    }
+
+    /// Commits pane rows: the commit list, or one commit's own changed-file
+    /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
+    /// shape `branch_lines` gives the Branches pane.
+    pub fn commit_lines(&self) -> Vec<Line<'static>> {
+        if let Some(drill) = &self.commit_drill {
+            return self
+                .commit_tree_rows()
+                .iter()
+                .filter_map(|row| match row {
+                    FileRow::Dir {
+                        name,
+                        depth,
+                        expanded,
+                        ..
+                    } => Some(theme::dir_line(name, *depth, *expanded)),
+                    FileRow::File { index, depth } => drill
+                        .files
+                        .get(*index)
+                        .map(|entry| theme::file_line(entry, *depth)),
+                })
+                .collect();
+        }
+        if self.commits.is_empty() {
+            return vec![Line::raw("no commits yet")];
+        }
+        self.commits.iter().map(theme::commit_line).collect()
+    }
+
+    /// `[4] Commits - Reflog`, or `[4] Diff files (<hash> <summary>)` while
+    /// drilled into a commit's own changed-file tree (Enter on a commit,
+    /// `Esc` to back out; see `enter_commit_files`).
+    pub fn commits_title(&self) -> String {
+        match &self.commit_drill {
+            Some(drill) => format!("[4] Diff files ({})", drill.title),
+            None => Pane::Commits.title().to_owned(),
+        }
+    }
+
+    /// Stash pane rows, or the empty-state line.
+    pub fn stash_lines(&self) -> Vec<Line<'static>> {
+        if self.stashes.is_empty() {
+            return vec![Line::raw("(no stash entries)")];
+        }
+        self.stashes.iter().map(theme::stash_line).collect()
+    }
+
+    /// Porcelain-style `XY path` text for one Files tree row, or an empty
+    /// string for a directory row. Debug/probe helper; keyed by the same
+    /// row index `file_lines`/`row_count` use, not a flat index into
+    /// `self.files`.
+    pub fn file_display(&self, i: usize) -> String {
+        match self.files_tree_rows().get(i) {
+            Some(&FileRow::File { index, .. }) => self
+                .files
+                .get(index)
+                .map(git::FileEntry::display)
+                .unwrap_or_default(),
+            _ => String::new(),
+        }
+    }
+
+    /// Files pane rows, or a single "working tree clean" line: a flat list,
+    /// or lazygit's directory tree once any changed file sits below the
+    /// repo root (`files_tree_rows`).
+    pub fn file_lines(&self) -> Vec<Line<'static>> {
+        if self.files.is_empty() {
+            return vec![Line::raw("working tree clean")];
+        }
+        self.files_tree_rows()
+            .iter()
+            .filter_map(|row| match row {
+                FileRow::Dir {
+                    name,
+                    depth,
+                    expanded,
+                    ..
+                } => Some(theme::dir_line(name, *depth, *expanded)),
+                FileRow::File { index, depth } => self
+                    .files
+                    .get(*index)
+                    .map(|entry| theme::file_line(entry, *depth)),
+            })
+            .collect()
+    }
+
+    /// Worktree root to hand the filesystem watcher, or `None` for a bare
+    /// repo (and for `App::mock`, which has no repo).
+    fn watch_root(&self) -> Option<PathBuf> {
+        self.repo
+            .as_ref()
+            .and_then(git::Repo::workdir)
+            .map(Path::to_path_buf)
+    }
+
+    /// A fresh handle onto the same repository, for a background thread
+    /// that cannot borrow `self.repo` across `thread::spawn`'s `'static`
+    /// bound. `git::Repo::open` is cheap (`git2::Repository::discover`, no
+    /// I/O beyond opening `.git`), so reopening the same path is simpler
+    /// than sharing state — the same call `App::open` already makes once
+    /// at startup. `None` for `App::mock()` and for a bare repo (no
+    /// worktree root to reopen from), same reach as `watch_root` already
+    /// has.
+    fn repo_handle(&self) -> Option<git::Repo> {
+        git::Repo::open(&self.watch_root()?).ok()
+    }
+
+    /// Draw, then block for the next event, until `should_quit`. Events come
+    /// from three sources multiplexed by `Events`: terminal input, a recursive
+    /// filesystem watch on the worktree, and a 10s poll fallback. A change
+    /// staged from another shell arrives as `AppEvent::Refresh`, so the panes
+    /// track the repo the way lazygit's do.
+    pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
+        let events = Events::new(self.watch_root().as_deref())?;
+        // A background fetch/pull/push (`start_remote_op`) needs its own
+        // way back onto this channel; only `run()` has an `Events` to ask
+        // for one, so it hands `on_key` this clone rather than `on_key`
+        // taking `&Events` directly (it is also called from `feed_key`,
+        // which has none).
+        self.event_sender = Some(events.sender());
+        let mut prev_was_image = false;
+        while !self.should_quit {
+            let is_image = self.preview_is_image();
+            if prev_was_image && !is_image {
+                // Graphics pixels from the last image frame sit outside the
+                // cell buffer; a full clear is the only way to wipe them.
+                terminal.clear()?;
+            }
+            prev_was_image = is_image;
+            terminal.draw(|frame| ui::draw(frame, self))?;
+
+            match events.next()? {
+                AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                    self.on_key(key);
+                },
+                AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
+                AppEvent::Input(_) => {},
+                AppEvent::Refresh => self.refresh(),
+                AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+            }
+        }
+        Ok(())
+    }
+}
