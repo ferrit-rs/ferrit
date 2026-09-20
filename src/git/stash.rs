@@ -11,9 +11,10 @@ use crate::git::model::StashEntry;
 /// this is the one read in `Repo::snapshot()` that borrows mutably.
 pub(super) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
     let mut out = Vec::new();
-    repo.stash_foreach(|index, message, _oid| {
+    repo.stash_foreach(|index, message, oid| {
         out.push(StashEntry {
             index,
+            oid: oid.to_string(),
             message: message.to_owned(),
         });
         true

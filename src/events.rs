@@ -78,6 +78,7 @@ pub struct Events {
     /// Held only to keep the filesystem watch alive; never read. Boxed so the
     /// debouncer's concrete type never leaks into this signature.
     _watch: Option<Box<dyn Any + Send>>,
+    watch_error: Option<String>,
 }
 
 impl Events {
@@ -89,14 +90,18 @@ impl Events {
         let (tx, rx) = mpsc::channel();
         spawn_input(tx.clone());
         spawn_poll(tx.clone());
-        let watch = match watch_root {
-            Some(root) => spawn_watch(tx.clone(), root)?,
-            None => None,
+        let (watch, watch_error) = match watch_root {
+            Some(root) => match spawn_watch(tx.clone(), root) {
+                Ok(watch) => (watch, None),
+                Err(error) => (None, Some(error.to_string())),
+            },
+            None => (None, None),
         };
         Ok(Self {
             tx,
             rx,
             _watch: watch,
+            watch_error,
         })
     }
 
@@ -123,6 +128,11 @@ impl Events {
     /// onto this same channel.
     pub fn sender(&self) -> Sender<AppEvent> {
         self.tx.clone()
+    }
+
+    /// Startup failure for the optional filesystem watch. Polling stays on.
+    pub fn watch_error(&self) -> Option<&str> {
+        self.watch_error.as_deref()
     }
 }
 

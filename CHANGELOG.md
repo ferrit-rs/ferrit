@@ -107,6 +107,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   `PaneList` and `ScrollBar` components.
 - The event loop now handles bounded batches of queued input and worker events,
   avoiding a repaint for every key-repeat while preserving event order.
+- Refresh restores selection by stable file, directory, branch, commit, or
+  stash identity; stash rows now carry their object id for reliable matching.
+- Background refresh, diff, image, and remote workers report panic failures
+  through their normal completion events, releasing their in-flight state.
+- A failed filesystem watcher no longer prevents startup; Ferrit keeps polling
+  and shows the watcher failure in the Status pane.
 - Two-sided Files diff rendering now lives in `src/ui/diff.rs`, separate from
   the screen layout and shared overlays.
 - Component and Git APIs now use explicit module paths; `clippy::pub_use` is

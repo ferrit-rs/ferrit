@@ -1,6 +1,6 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
-use super::{App, AppEvent, Popup, RemotePick, Result, events, mpsc, thread};
+use super::{App, AppEvent, Popup, RemotePick, Result, events, mpsc, run_worker, thread};
 
 impl App {
     /// `f` / `p`: fetch / pull. Global, not Branches-only — unlike phase
@@ -89,12 +89,12 @@ impl App {
         self.remote_busy = Some(op);
         self.status_note = None;
         thread::spawn(move || {
-            let result = match op {
+            let message = run_worker("remote operation", || match op {
                 events::RemoteOp::Fetch => repo.fetch(None),
                 events::RemoteOp::Pull => repo.pull(),
                 events::RemoteOp::Push => repo.push(push_upstream.as_deref()),
-            };
-            let message = result.map_err(|e| e.to_string());
+            })
+            .and_then(|result| result.map_err(|error| error.to_string()));
             let _ = sender.send(AppEvent::RemoteDone { op, message });
         });
     }

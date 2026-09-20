@@ -8,6 +8,7 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::ops::Range;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
@@ -356,6 +357,15 @@ enum BranchesTab {
     Remotes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SelectionKey {
+    File(PathBuf),
+    Directory(PathBuf),
+    Branch(String),
+    Commit(String),
+    Stash(String),
+}
+
 /// Panes in order. Index into this is also the index into `App::selection`.
 pub const PANES: [Pane; 5] = [
     Pane::Status,
@@ -435,6 +445,8 @@ pub struct App {
     stashes: Vec<git::model::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
+    /// Optional worktree watcher failure; polling remains active as fallback.
+    watch_error: Option<String>,
 
     /// Terminal graphics backend for the image preview. Starts on half-blocks
     /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
@@ -556,6 +568,7 @@ impl App {
             commit_drill: None,
             stashes: Vec::new(),
             last_error: None,
+            watch_error: None,
             picker: Picker::halfblocks(),
             preview: Preview::None,
             diff: DiffView::None,
@@ -653,7 +666,7 @@ impl App {
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
         self.refresh_query.in_flight = true;
         thread::spawn(move || {
-            let completion = match git::Repo::open(&path) {
+            let completion = run_worker("refresh", || match git::Repo::open(&path) {
                 Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit),
                 Err(error) => {
                     let message = error.to_string();
@@ -663,7 +676,12 @@ impl App {
                         commit_files: commit.map(|hash| (hash, Err(message))),
                     }
                 },
-            };
+            })
+            .unwrap_or_else(|message| RefreshCompletion {
+                snapshot: Err(message),
+                branch_log: None,
+                commit_files: None,
+            });
             let _ = sender.send(AppEvent::RefreshDone(completion));
         });
     }
@@ -693,6 +711,8 @@ impl App {
     }
 
     fn apply_refresh_result(&mut self, completion: RefreshCompletion) {
+        let old_selection: [(Pane, usize, Option<SelectionKey>); 5] =
+            PANES.map(|pane| (pane, self.selection[pane], self.selection_key(pane)));
         match completion.snapshot {
             Ok(snap) => {
                 self.header = snap.header;
@@ -746,10 +766,13 @@ impl App {
             }
         }
 
-        for pane in PANES {
+        for (pane, old_index, key) in old_selection {
             let last = self.row_count(pane).saturating_sub(1);
-            let cursor = &mut self.selection[pane];
-            *cursor = (*cursor).min(last);
+            let new_index = key
+                .as_ref()
+                .and_then(|key| self.find_selection_key(pane, key))
+                .unwrap_or(old_index);
+            self.selection[pane] = new_index.min(last);
         }
         self.diff_query.refresh_requested = true;
         self.invalidate_image_query();
@@ -764,6 +787,9 @@ impl App {
             self.request_refresh();
         } else if let Some(error) = self.remote_refresh_error.take() {
             self.last_error = Some(error);
+        }
+        if self.last_error.is_none() {
+            self.last_error = self.watch_error.clone();
         }
     }
 
@@ -1124,6 +1150,78 @@ impl App {
         }
     }
 
+    fn selection_key(&self, pane: Pane) -> Option<SelectionKey> {
+        match pane {
+            Pane::Status => None,
+            Pane::Files => selection_key_for_file_rows(
+                &self.files_tree_rows(),
+                &self.files,
+                self.selected(pane),
+            ),
+            Pane::Branches if self.branches_tab == BranchesTab::Remotes => None,
+            Pane::Branches => self.branch_drill.as_ref().map_or_else(
+                || {
+                    self.branches
+                        .get(self.selected(pane))
+                        .map(|entry| SelectionKey::Branch(entry.name.clone()))
+                },
+                |drill| {
+                    drill
+                        .commits
+                        .get(self.selected(pane))
+                        .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
+                },
+            ),
+            Pane::Commits => self.commit_drill.as_ref().map_or_else(
+                || {
+                    self.commits
+                        .get(self.selected(pane))
+                        .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
+                },
+                |drill| {
+                    selection_key_for_file_rows(
+                        &self.commit_tree_rows(),
+                        &drill.files,
+                        self.selected(pane),
+                    )
+                },
+            ),
+            Pane::Stash => self
+                .stashes
+                .get(self.selected(pane))
+                .map(|entry| SelectionKey::Stash(entry.oid.clone())),
+        }
+    }
+
+    fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
+        match (pane, key) {
+            (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
+                find_file_row_key(&self.files_tree_rows(), &self.files, key)
+            },
+            (Pane::Branches, SelectionKey::Branch(name)) if self.branch_drill.is_none() => {
+                self.branches.iter().position(|entry| entry.name == *name)
+            },
+            (Pane::Branches, SelectionKey::Commit(hash)) => self
+                .branch_drill
+                .as_ref()?
+                .commits
+                .iter()
+                .position(|entry| entry.full_hash == *hash),
+            (Pane::Commits, SelectionKey::Commit(hash)) if self.commit_drill.is_none() => self
+                .commits
+                .iter()
+                .position(|entry| entry.full_hash == *hash),
+            (Pane::Commits, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
+                let drill = self.commit_drill.as_ref()?;
+                find_file_row_key(&self.commit_tree_rows(), &drill.files, key)
+            },
+            (Pane::Stash, SelectionKey::Stash(oid)) => {
+                self.stashes.iter().position(|entry| entry.oid == *oid)
+            },
+            _ => None,
+        }
+    }
+
     /// `(current, total)` for the pane's `N of M` border counter, or `None`
     /// when the pane has no selectable rows.
     pub fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
@@ -1313,6 +1411,10 @@ impl App {
     /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
         let events = Events::new(self.watch_root().as_deref())?;
+        self.watch_error = events.watch_error().map(|error| {
+            format!("filesystem watcher unavailable; polling fallback active: {error}")
+        });
+        self.last_error = self.watch_error.clone();
         // A background fetch/pull/push (`start_remote_op`) needs its own
         // way back onto this channel; only `run()` has an `Events` to ask
         // for one, so it hands `on_key` this clone rather than `on_key`
@@ -1350,4 +1452,44 @@ impl App {
         }
         Ok(())
     }
+}
+
+fn selection_key_for_file_rows(
+    rows: &[FileRow],
+    files: &[git::status::FileEntry],
+    selected: usize,
+) -> Option<SelectionKey> {
+    match rows.get(selected)? {
+        FileRow::Dir { path, .. } => Some(SelectionKey::Directory(path.clone())),
+        FileRow::File { index, .. } => files
+            .get(*index)
+            .map(|entry| SelectionKey::File(entry.path.clone())),
+    }
+}
+
+fn find_file_row_key(
+    rows: &[FileRow],
+    files: &[git::status::FileEntry],
+    key: &SelectionKey,
+) -> Option<usize> {
+    rows.iter().position(|row| match (row, key) {
+        (FileRow::Dir { path, .. }, SelectionKey::Directory(wanted)) => path == wanted,
+        (FileRow::File { index, .. }, SelectionKey::File(wanted)) => {
+            files.get(*index).is_some_and(|entry| entry.path == *wanted)
+        },
+        _ => false,
+    })
+}
+
+/// Run worker logic behind a panic boundary so completion events can release
+/// single-flight state even when a repository operation unexpectedly panics.
+pub(super) fn run_worker<T>(label: &str, work: impl FnOnce() -> T) -> Result<T, String> {
+    catch_unwind(AssertUnwindSafe(work)).map_err(|payload| {
+        let detail = payload
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| payload.downcast_ref::<&'static str>().copied())
+            .unwrap_or("non-string panic payload");
+        format!("{label} worker panicked: {detail}")
+    })
 }

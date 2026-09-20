@@ -58,5 +58,7 @@ pub struct BranchEntry {
 pub struct StashEntry {
     /// Stack position: `stash@{index}`.
     pub index: usize,
+    /// Stable stash object id. Stack indices move when newer entries are added.
+    pub oid: String,
     pub message: String,
 }

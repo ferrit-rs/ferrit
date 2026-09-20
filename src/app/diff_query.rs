@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
-use super::{App, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane};
+use super::{App, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane, run_worker};
 
 use crate::git;
 use crate::git::diff::{DiffOpts, DiffSide};
@@ -139,9 +139,12 @@ impl App {
     ) {
         self.diff_query.in_flight = true;
         thread::spawn(move || {
-            let result = git::Repo::open(&path)
-                .map_err(|error| error.to_string())
-                .and_then(|repo| load(&repo, &key));
+            let result = run_worker("diff", || {
+                git::Repo::open(&path)
+                    .map_err(|error| error.to_string())
+                    .and_then(|repo| load(&repo, &key))
+            })
+            .and_then(|result| result);
             let _ = sender.send(AppEvent::DiffDone(DiffCompletion {
                 key,
                 generation,
