@@ -1,6 +1,9 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
-use super::{App, AppEvent, Popup, RemotePick, Result, events, mpsc, run_worker, thread};
+use super::{
+    App, AppEvent, Popup, RemotePick, Result, WorkerKind, events, mpsc, run_worker, thread,
+};
+use std::sync::atomic::Ordering;
 
 impl App {
     /// `f` / `p`: fetch / pull. Global, not Branches-only — unlike phase
@@ -88,15 +91,18 @@ impl App {
         };
         self.remote_busy = Some(op);
         self.status_note = None;
-        thread::spawn(move || {
-            let message = run_worker("remote operation", || match op {
-                events::RemoteOp::Fetch => repo.fetch(None),
-                events::RemoteOp::Pull => repo.pull(),
-                events::RemoteOp::Push => repo.push(push_upstream.as_deref()),
+        self.remote_cancel.store(false, Ordering::Release);
+        let cancel = std::sync::Arc::clone(&self.remote_cancel);
+        self.remote_worker = Some(thread::spawn(move || {
+            let message = run_worker(WorkerKind::RemoteOperation, || match op {
+                events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
+                events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
+                events::RemoteOp::Push => repo.push_cancellable(push_upstream.as_deref(), &cancel),
             })
+            .map_err(|error| error.to_string())
             .and_then(|result| result.map_err(|error| error.to_string()));
             let _ = sender.send(AppEvent::RemoteDone { op, message });
-        });
+        }));
     }
 
     /// `AppEvent::RemoteDone` arrived: clear the busy flag, show a success
@@ -108,6 +114,9 @@ impl App {
     /// `run()` loop to receive the result for it.
     pub fn on_remote_done(&mut self, _op: events::RemoteOp, message: Result<String, String>) {
         self.remote_busy = None;
+        if let Some(worker) = self.remote_worker.take() {
+            let _ = worker.join();
+        }
         // Request refresh before setting the remote result. Async snapshot
         // completion preserves this operation's failure as the final Status
         // line; eventless callers refresh synchronously, then set it here.

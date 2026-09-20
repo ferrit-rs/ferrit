@@ -6,12 +6,13 @@
 //! `App::mock()` is the repo-free path the render tests use.
 
 use std::collections::HashSet;
-use std::fmt::Write as _;
+use std::fmt::{self, Display, Write as _};
 use std::ops::Range;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
-use std::thread;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, mpsc};
+use std::thread::{self, JoinHandle};
 
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
@@ -505,6 +506,8 @@ pub struct App {
     /// sidestepping two git processes racing over the same `index.lock`.
     /// See `docs/PLAN_9_REMOTE.md`.
     remote_busy: Option<events::RemoteOp>,
+    remote_cancel: Arc<AtomicBool>,
+    remote_worker: Option<JoinHandle<()>>,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -586,6 +589,8 @@ impl App {
             popup: None,
             commit_draft: None,
             remote_busy: None,
+            remote_cancel: Arc::new(AtomicBool::new(false)),
+            remote_worker: None,
             status_note: None,
             event_sender: None,
             refresh_query: RefreshQueryState::default(),
@@ -666,7 +671,7 @@ impl App {
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
         self.refresh_query.in_flight = true;
         thread::spawn(move || {
-            let completion = run_worker("refresh", || match git::Repo::open(&path) {
+            let completion = run_worker(WorkerKind::Refresh, || match git::Repo::open(&path) {
                 Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit),
                 Err(error) => {
                     let message = error.to_string();
@@ -677,8 +682,8 @@ impl App {
                     }
                 },
             })
-            .unwrap_or_else(|message| RefreshCompletion {
-                snapshot: Err(message),
+            .unwrap_or_else(|error| RefreshCompletion {
+                snapshot: Err(error.to_string()),
                 branch_log: None,
                 commit_files: None,
             });
@@ -1450,6 +1455,14 @@ impl App {
                 }
             }
         }
+        if self.remote_worker.is_some() {
+            self.remote_cancel
+                .store(true, std::sync::atomic::Ordering::Release);
+            if let Some(worker) = self.remote_worker.take() {
+                let _ = worker.join();
+            }
+            self.remote_busy = None;
+        }
         Ok(())
     }
 }
@@ -1481,15 +1494,51 @@ fn find_file_row_key(
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) enum WorkerKind {
+    Refresh,
+    Diff,
+    ImagePreview,
+    RemoteOperation,
+}
+
+impl Display for WorkerKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Refresh => "refresh",
+            Self::Diff => "diff",
+            Self::ImagePreview => "image preview",
+            Self::RemoteOperation => "remote operation",
+        };
+        f.write_str(label)
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct WorkerError {
+    worker: WorkerKind,
+    detail: String,
+}
+
+impl Display for WorkerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} worker panicked: {}", self.worker, self.detail)
+    }
+}
+
 /// Run worker logic behind a panic boundary so completion events can release
 /// single-flight state even when a repository operation unexpectedly panics.
-pub(super) fn run_worker<T>(label: &str, work: impl FnOnce() -> T) -> Result<T, String> {
+pub(super) fn run_worker<T>(
+    worker: WorkerKind,
+    work: impl FnOnce() -> T,
+) -> std::result::Result<T, WorkerError> {
     catch_unwind(AssertUnwindSafe(work)).map_err(|payload| {
         let detail = payload
             .downcast_ref::<String>()
             .map(String::as_str)
             .or_else(|| payload.downcast_ref::<&'static str>().copied())
-            .unwrap_or("non-string panic payload");
-        format!("{label} worker panicked: {detail}")
+            .unwrap_or("non-string panic payload")
+            .to_owned();
+        WorkerError { worker, detail }
     })
 }

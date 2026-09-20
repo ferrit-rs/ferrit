@@ -11,13 +11,21 @@
 //! the one part of this module that stays a `git2` read (no credentials
 //! or hooks involved), same split the rest of `git::` already makes.
 
+use std::io::{self, Read};
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use git2::Repository;
 
 use crate::git::diff::workdir;
 use crate::git::error::{GitError, GitResult};
+
+const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
+const TERMINATE_GRACE: Duration = Duration::from_secs(2);
+const POLL_INTERVAL: Duration = Duration::from_millis(40);
 
 /// One configured remote, `git remote -v`'s own model (fetch and push URLs
 /// can differ; usually do not).
@@ -78,13 +86,13 @@ fn combined_output(out: &Output) -> String {
 /// `git -C <workdir> <...args>`, run to completion. `Ok`/`Err` both carry
 /// `combined_output`; the caller's `err` only decides which `GitError`
 /// variant wraps a non-zero exit.
-fn run_git(workdir: &Path, args: &[String], err: impl Fn(String) -> GitError) -> GitResult<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(workdir)
-        .args(args)
-        .output()
-        .map_err(|e| err(format!("cannot run git: {e}")))?;
+fn run_git(
+    workdir: &Path,
+    args: &[String],
+    cancel: Option<&AtomicBool>,
+    err: impl Fn(String) -> GitError,
+) -> GitResult<String> {
+    let out = run_command(workdir, args, cancel, &err)?;
     let combined = combined_output(&out);
     if out.status.success() {
         Ok(combined)
@@ -92,6 +100,113 @@ fn run_git(workdir: &Path, args: &[String], err: impl Fn(String) -> GitError) ->
         Err(err(combined))
     }
 }
+
+fn run_command(
+    workdir: &Path,
+    args: &[String],
+    cancel: Option<&AtomicBool>,
+    err: &impl Fn(String) -> GitError,
+) -> GitResult<Output> {
+    let mut command = Command::new("git");
+    command
+        .arg("-C")
+        .arg(workdir)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|e| err(format!("cannot run git: {e}")))?;
+    let pid = child.id();
+    let stdout = child.stdout.take().ok_or_else(|| {
+        stop_process_group(&mut child, pid);
+        err("cannot capture git stdout".to_owned())
+    })?;
+    let stderr = child.stderr.take().ok_or_else(|| {
+        stop_process_group(&mut child, pid);
+        err("cannot capture git stderr".to_owned())
+    })?;
+    let stdout_reader = thread::spawn(move || read_all(stdout));
+    let stderr_reader = thread::spawn(move || read_all(stderr));
+    let deadline = Instant::now() + REMOTE_TIMEOUT;
+
+    let status = loop {
+        if cancel.is_some_and(|flag| flag.load(Ordering::Acquire)) {
+            stop_process_group(&mut child, pid);
+            return Err(err("cancelled during shutdown".to_owned()));
+        }
+        if Instant::now() >= deadline {
+            stop_process_group(&mut child, pid);
+            return Err(err(format!(
+                "timed out after {} seconds",
+                REMOTE_TIMEOUT.as_secs()
+            )));
+        }
+        match child.try_wait() {
+            Err(e) => {
+                stop_process_group(&mut child, pid);
+                return Err(err(format!("cannot wait for git: {e}")));
+            },
+            Ok(Some(status)) => break status,
+            Ok(None) => thread::sleep(POLL_INTERVAL),
+        }
+    };
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| err("git stdout reader panicked".to_owned()))?
+        .map_err(|e| err(format!("cannot read git stdout: {e}")))?;
+    let stderr = stderr_reader
+        .join()
+        .map_err(|_| err("git stderr reader panicked".to_owned()))?
+        .map_err(|e| err(format!("cannot read git stderr: {e}")))?;
+    let out = Output {
+        status,
+        stdout,
+        stderr,
+    };
+    Ok(out)
+}
+
+fn read_all(mut reader: impl Read) -> io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reader.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+fn stop_process_group(child: &mut Child, pid: u32) {
+    signal_process_group(pid, false);
+    let deadline = Instant::now() + TERMINATE_GRACE;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) if Instant::now() < deadline => thread::sleep(POLL_INTERVAL),
+            _ => break,
+        }
+    }
+    signal_process_group(pid, true);
+    #[cfg(not(unix))]
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[cfg(unix)]
+fn signal_process_group(pid: u32, force: bool) {
+    let signal = if force { "-KILL" } else { "-TERM" };
+    // Use the system utility: this crate forbids unsafe code. The negative
+    // pid targets the process group created for the Git command.
+    let _ = Command::new("/bin/kill")
+        .arg(signal)
+        .arg(format!("-{pid}"))
+        .status();
+}
+
+#[cfg(not(unix))]
+fn signal_process_group(_pid: u32, _force: bool) {}
 
 /// `git fetch <remote>`, or plain `git fetch` (every remote, git's own
 /// default) when `remote` is `None`.
@@ -101,14 +216,37 @@ pub(super) fn fetch(repo: &Repository, remote: Option<&str>) -> GitResult<String
     if let Some(name) = remote {
         args.push(name.to_owned());
     }
-    run_git(workdir, &args, GitError::FetchFailed)
+    run_git(workdir, &args, None, GitError::FetchFailed)
+}
+
+pub(crate) fn fetch_cancellable(
+    repo: &Repository,
+    remote: Option<&str>,
+    cancel: &AtomicBool,
+) -> GitResult<String> {
+    let workdir = workdir(repo)?;
+    let mut args = vec!["fetch".to_owned()];
+    if let Some(name) = remote {
+        args.push(name.to_owned());
+    }
+    run_git(workdir, &args, Some(cancel), GitError::FetchFailed)
 }
 
 /// `git pull`. No flags: `pull.rebase` / `pull.ff` decide the shape, same
 /// as any other `git config` this backend already defers to.
 pub(super) fn pull(repo: &Repository) -> GitResult<String> {
     let workdir = workdir(repo)?;
-    run_git(workdir, &["pull".to_owned()], GitError::PullFailed)
+    run_git(workdir, &["pull".to_owned()], None, GitError::PullFailed)
+}
+
+pub(crate) fn pull_cancellable(repo: &Repository, cancel: &AtomicBool) -> GitResult<String> {
+    let workdir = workdir(repo)?;
+    run_git(
+        workdir,
+        &["pull".to_owned()],
+        Some(cancel),
+        GitError::PullFailed,
+    )
 }
 
 /// `HEAD`'s branch name, needed to spell out `git push -u <remote>
@@ -138,12 +276,31 @@ pub(super) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<S
         args.push(branch);
     }
 
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(workdir)
-        .args(&args)
-        .output()
-        .map_err(|e| GitError::PushFailed(format!("cannot run git: {e}")))?;
+    run_push(workdir, &args, None, set_upstream)
+}
+
+pub(crate) fn push_cancellable(
+    repo: &Repository,
+    set_upstream: Option<&str>,
+    cancel: &AtomicBool,
+) -> GitResult<String> {
+    let workdir = workdir(repo)?;
+    let mut args = vec!["push".to_owned()];
+    if let Some(remote) = set_upstream {
+        args.push("-u".to_owned());
+        args.push(remote.to_owned());
+        args.push(current_branch_name(repo)?);
+    }
+    run_push(workdir, &args, Some(cancel), set_upstream)
+}
+
+fn run_push(
+    workdir: &Path,
+    args: &[String],
+    cancel: Option<&AtomicBool>,
+    set_upstream: Option<&str>,
+) -> GitResult<String> {
+    let out = run_command(workdir, args, cancel, &GitError::PushFailed)?;
     let combined = combined_output(&out);
     if out.status.success() {
         return Ok(combined);

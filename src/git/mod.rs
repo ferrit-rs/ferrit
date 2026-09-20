@@ -23,6 +23,7 @@ pub mod stash;
 pub mod status;
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use git2::Repository;
 
@@ -238,15 +239,35 @@ impl Repo {
         remote::fetch(&self.inner, remote)
     }
 
+    pub(crate) fn fetch_cancellable(
+        &self,
+        remote: Option<&str>,
+        cancel: &AtomicBool,
+    ) -> GitResult<String> {
+        remote::fetch_cancellable(&self.inner, remote, cancel)
+    }
+
     /// `git pull`, honouring the user's `pull.rebase`/`pull.ff` config. Slow,
     /// same as `fetch`.
     pub fn pull(&self) -> GitResult<String> {
         remote::pull(&self.inner)
     }
 
+    pub(crate) fn pull_cancellable(&self, cancel: &AtomicBool) -> GitResult<String> {
+        remote::pull_cancellable(&self.inner, cancel)
+    }
+
     /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
     /// `Some`. Slow, same as `fetch`.
     pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
         remote::push(&self.inner, set_upstream)
+    }
+
+    pub(crate) fn push_cancellable(
+        &self,
+        set_upstream: Option<&str>,
+        cancel: &AtomicBool,
+    ) -> GitResult<String> {
+        remote::push_cancellable(&self.inner, set_upstream, cancel)
     }
 }

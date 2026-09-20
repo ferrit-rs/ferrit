@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use super::{App, AppEvent, FileRow, Pane, Preview, git, mock, preview, run_worker, thread};
+use super::{
+    App, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker, thread,
+};
 
 /// Image worker result, applied only if selection and generation still match.
 #[doc(hidden)]
@@ -116,8 +118,9 @@ impl App {
     ) {
         self.image_query.in_flight = true;
         thread::spawn(move || {
-            let result =
-                run_worker("image preview", || load(&repo_path, &path)).and_then(|result| result);
+            let result = run_worker(WorkerKind::ImagePreview, || load(&repo_path, &path))
+                .map_err(|error| error.to_string())
+                .and_then(|result| result);
             let _ = sender.send(AppEvent::ImageDone(ImageCompletion {
                 path,
                 generation,

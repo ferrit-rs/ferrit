@@ -20,20 +20,30 @@ pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 /// wheel scroll of the diff pane), hide the cursor.
 pub fn init() -> io::Result<Tui> {
     enable_raw_mode()?;
-    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture, Hide)?;
+    if let Err(error) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture, Hide) {
+        let _ = restore();
+        return Err(error);
+    }
     set_panic_hook();
-    Terminal::new(CrosstermBackend::new(io::stdout()))
+    match Terminal::new(CrosstermBackend::new(io::stdout())) {
+        Ok(terminal) => Ok(terminal),
+        Err(error) => {
+            let _ = restore();
+            Err(error)
+        },
+    }
 }
 
 /// Exact reverse of `init`. Safe to call more than once.
 pub fn restore() -> io::Result<()> {
-    execute!(
+    let screen = execute!(
         io::stdout(),
         LeaveAlternateScreen,
         DisableMouseCapture,
         Show
-    )?;
-    disable_raw_mode()
+    );
+    let raw = disable_raw_mode();
+    screen.and(raw)
 }
 
 fn set_panic_hook() {

@@ -111,6 +111,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   stash identity; stash rows now carry their object id for reliable matching.
 - Background refresh, diff, image, and remote workers report panic failures
   through their normal completion events, releasing their in-flight state.
+- Remote Git commands now have a five-minute deadline and stop their process
+  group when Ferrit shuts down; typed worker kinds replace string labels.
 - A failed filesystem watcher no longer prevents startup; Ferrit keeps polling
   and shows the watcher failure in the Status pane.
 - Two-sided Files diff rendering now lives in `src/ui/diff.rs`, separate from
@@ -123,6 +125,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Fixed
 
+- Terminal initialization failures now unwind raw mode/alternate-screen changes;
+  restoration always attempts to disable raw mode even if screen cleanup fails.
 - Left column accordion: the focused pane now claims a weighted majority of
   the space (4 shares vs. 1 for each other pane) instead of a fixed floor
   each with 100% of the leftover to focus. The old scheme fell back to a
