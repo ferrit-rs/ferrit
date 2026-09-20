@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-20
+
 ### Added
 
 - Commits pane: `Enter` on a commit row drills into that commit's changed
@@ -279,6 +281,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.4.0
 [0.2.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.1.0
