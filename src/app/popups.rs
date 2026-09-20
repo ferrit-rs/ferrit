@@ -1,7 +1,8 @@
 //! Popup state readers and the commit / new-branch / remote-pick / note popup key handling.
 
 use super::{
-    App, CommitDraft, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextBuffer, git,
+    App, CommitDraft, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
+    TextInputMode, git,
 };
 
 impl App {
@@ -20,8 +21,9 @@ impl App {
         };
         Some(CommitPopupView {
             title: draft.kind.title(),
-            lines: &draft.text.lines,
-            cursor: (draft.text.row, draft.text.col),
+            input: &draft.text,
+            lines: draft.text.lines(),
+            cursor: draft.text.cursor(),
             toggles: Some((draft.sign_off, draft.no_verify)),
             hints: "Commit: Ctrl-S | Sign-off: Ctrl-O | No-verify: Ctrl-N | Cancel: Esc",
         })
@@ -35,8 +37,9 @@ impl App {
         };
         Some(CommitPopupView {
             title: "New branch",
-            lines: &buf.lines,
-            cursor: (buf.row, buf.col),
+            input: buf,
+            lines: buf.lines(),
+            cursor: buf.cursor(),
             toggles: None,
             hints: "Create: Enter | Cancel: Esc",
         })
@@ -89,7 +92,7 @@ impl App {
             git::CommitKind::Amend | git::CommitKind::Reword => repo.head_message().ok().flatten(),
             _ => self.commit_draft.take(),
         };
-        let text = prefill.map_or_else(TextBuffer::default, |s| TextBuffer::from_text(&s));
+        let text = prefill.map_or_else(TextInput::default, |s| TextInput::from_text(&s));
         self.popup = Some(Popup::Commit(CommitDraft {
             text,
             kind,
@@ -99,12 +102,12 @@ impl App {
     }
 
     /// Every key while `self.popup` is `Some`: printable/editing keys go to
-    /// the draft's `TextBuffer`, `Ctrl-S` commits, `Ctrl-O` / `Ctrl-N` flip
+    /// the draft's `TextInput`, `Ctrl-S` commits, `Ctrl-O` / `Ctrl-N` flip
     /// the sign-off / no-verify toggles, `Esc` cancels (keeping the draft
     /// for a commit popup, dropping it outright for a new-branch one — a
     /// few retyped characters cost nothing) or dismisses a note. `Enter`
     /// *submits* the new-branch popup rather than inserting a newline, the
-    /// one behavioural difference from reusing `TextBuffer` as-is.
+    /// one behavioural difference from reusing `TextInput` as-is.
     pub(super) fn popup_key(&mut self, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let mut dismiss = false;
@@ -125,23 +128,16 @@ impl App {
                 KeyCode::Char('o') if ctrl => draft.sign_off = !draft.sign_off,
                 KeyCode::Char('n') if ctrl => draft.no_verify = !draft.no_verify,
                 KeyCode::Esc => cancel = true,
-                KeyCode::Enter => draft.text.insert_newline(),
-                KeyCode::Backspace => draft.text.backspace(),
-                KeyCode::Left => draft.text.move_left(),
-                KeyCode::Right => draft.text.move_right(),
-                KeyCode::Up => draft.text.move_up(),
-                KeyCode::Down => draft.text.move_down(),
-                KeyCode::Char(c) if !ctrl => draft.text.insert_char(c),
-                _ => {},
+                _ => {
+                    draft.text.handle_key_event(key, TextInputMode::MultiLine);
+                },
             },
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => create_branch_now = true,
-                KeyCode::Backspace => buf.backspace(),
-                KeyCode::Left => buf.move_left(),
-                KeyCode::Right => buf.move_right(),
-                KeyCode::Char(c) if !ctrl => buf.insert_char(c),
-                _ => {},
+                _ => {
+                    buf.handle_key_event(key, TextInputMode::SingleLine);
+                },
             },
             Some(Popup::RemotePick(pick)) => match key.code {
                 KeyCode::Esc => dismiss = true,

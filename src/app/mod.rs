@@ -26,6 +26,7 @@ use crate::git::{self, ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitResult};
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
 use crate::tui::Tui;
+use crate::ui::components::{TextInput, TextInputMode};
 use crate::{mock, theme, ui};
 
 /// What the right pane shows behind the image preview. A second cached,
@@ -58,15 +59,17 @@ pub struct FilesDiff {
     pub staged: git::Diff,
 }
 
-/// Read-only view of a single-`TextBuffer` popup for `ui::draw_commit_popup`
+/// Read-only view of an editor popup for `ui::draw_commit_popup`
 /// (`docs/PLAN_7_COMMIT.md`), reused as-is for the new-branch popup
 /// (`docs/PLAN_8_BRANCHES.md`) — same shape, different title/footer.
 /// Borrows the draft's lines, so it is cheap to build fresh every frame
 /// rather than cached.
 pub struct CommitPopupView<'a> {
     pub title: &'static str,
+    pub input: &'a TextInput,
+    /// Compatibility view of the component's text lines.
     pub lines: &'a [String],
-    /// `(row, char column)`, `TextBuffer`'s own cursor coordinates.
+    /// `(row, character column)` cursor position.
     pub cursor: (usize, usize),
     /// `Some((sign_off, no_verify))` for the commit popup's toggle line;
     /// `None` for the new-branch popup, which has nothing to toggle.
@@ -297,8 +300,8 @@ enum Popup {
     Commit(CommitDraft),
     /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
     /// here, unlike the commit popup, where `Enter` inserts a newline —
-    /// the only behavioural difference from reusing `TextBuffer` outright.
-    NewBranch(TextBuffer),
+    /// the only behavioural difference from reusing `TextInput` outright.
+    NewBranch(TextInput),
     /// `P` with no upstream and 2+ remotes configured: pick which one to
     /// push (and set as upstream) to. `docs/PLAN_9_REMOTE.md`'s "No
     /// upstream" flow; the 0- and 1-remote cases short-circuit before a
@@ -315,7 +318,7 @@ struct RemotePick {
 }
 
 struct CommitDraft {
-    text: TextBuffer,
+    text: TextInput,
     kind: git::CommitKind,
     sign_off: bool,
     no_verify: bool,
@@ -510,7 +513,6 @@ pub struct App {
     image_query: ImageQueryState,
 }
 
-mod text_buffer;
 mod tree;
 
 mod branch_actions;
@@ -530,7 +532,6 @@ pub use diff_query::DiffCompletion;
 use diff_query::{DiffQueryState, RightKey};
 #[doc(hidden)]
 pub use image_query::ImageCompletion;
-use text_buffer::TextBuffer;
 use tree::{FileRow, commit_drill_files, tree_rows};
 
 impl App {

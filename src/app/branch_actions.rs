@@ -1,8 +1,8 @@
 //! Branches-pane actions: checkout, create, delete, fast-forward, merge.
 
 use super::{
-    App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup,
-    TextBuffer, git,
+    App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup, TextInput,
+    git,
 };
 
 impl App {
@@ -89,7 +89,7 @@ impl App {
         {
             return;
         }
-        self.popup = Some(Popup::NewBranch(TextBuffer::default()));
+        self.popup = Some(Popup::NewBranch(TextInput::default()));
     }
 
     /// `Enter` in the new-branch popup: `git checkout -b <name>` from

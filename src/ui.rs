@@ -4,6 +4,8 @@
 //! terminal, so `tests/render.rs` can call it against a `TestBackend`.
 //! Colours come from `theme`.
 
+pub mod components;
+
 use std::ops::Range;
 
 use ratatui::Frame;
@@ -18,6 +20,7 @@ use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, CommitPopupView, DiffView, PANES, Pane};
 use crate::image::preview::Preview;
+use crate::ui::components::Dialog;
 use crate::{git, mock, theme};
 
 /// Every box in the UI, lazygit style: rounded corners (`╭╮╰╯`) rather than
@@ -142,7 +145,13 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         i = (i + 1) % heights.len();
     }
 
-    let mut rows = [status_row, Rect::default(), Rect::default(), Rect::default(), Rect::default()];
+    let mut rows = [
+        status_row,
+        Rect::default(),
+        Rect::default(),
+        Rect::default(),
+        Rect::default(),
+    ];
     let mut y = accordion_area.y;
     for (i, &h) in heights.iter().enumerate() {
         if let Some(row) = rows.get_mut(i + 1) {
@@ -754,27 +763,15 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
         .unwrap_or(area.height)
         .saturating_add(2);
     let height = content_height.min(area.height);
-    let rect = Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    };
-
-    let overlay = Paragraph::new(mock::HELP).block(
-        bordered()
-            .title(Line::styled(
-                " keybindings ",
-                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD),
-            ))
-            .border_style(Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)),
-    );
-
-    frame.render_widget(Clear, rect);
-    frame.render_widget(overlay, rect);
+    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let dialog = Dialog::new(Line::styled(" keybindings ", focused))
+        .size(width, height)
+        .border_style(focused)
+        .render(frame, area);
+    frame.render_widget(Paragraph::new(mock::HELP), dialog.body);
 }
 
-/// A centered box for a single-`TextBuffer` popup: title, the draft's
+/// A centered box for a reusable `TextInput`: title, the draft's
 /// lines with the cursor overlaid (reverse-video on that one character,
 /// same trick as the diff cursor), and a footer of key hints — plus, when
 /// `view.toggles` is `Some`, a status line above the hints for the commit
@@ -784,43 +781,19 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
 /// — same shape, one line of input instead of a paragraph, no toggle row.
 fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'_>) {
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
-    let body_height = u16::try_from(view.lines.len().max(1)).unwrap_or(u16::MAX);
+    let body_height = u16::try_from(view.input.lines().len().max(1)).unwrap_or(u16::MAX);
     let footer_height: u16 = if view.toggles.is_some() { 2 } else { 1 };
     let height = body_height
         .saturating_add(footer_height + 2)
         .min(area.height);
-    let rect = Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    };
-
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let block = bordered()
-        .title(Line::styled(format!(" {} ", view.title), focused))
-        .border_style(focused);
-    let inner = block.inner(rect);
-    let [body_area, footer_area] =
-        Layout::vertical([Constraint::Min(1), Constraint::Length(footer_height)]).areas(inner);
-
-    frame.render_widget(Clear, rect);
-    frame.render_widget(block, rect);
-
-    let (cursor_row, cursor_col) = view.cursor;
-    let lines: Vec<Line<'static>> = view
-        .lines
-        .iter()
-        .enumerate()
-        .map(|(i, text)| {
-            if i == cursor_row {
-                draft_line_with_cursor(text, cursor_col)
-            } else {
-                Line::raw(text.clone())
-            }
-        })
-        .collect();
-    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), body_area);
+    let dialog = Dialog::new(Line::styled(format!(" {} ", view.title), focused))
+        .size(width, height)
+        .footer_rows(footer_height)
+        .border_style(focused)
+        .render(frame, area);
+    let footer_area = dialog.footer;
+    view.input.render(frame, dialog.body);
 
     let hints = theme::keybar_line(view.hints);
     match view.toggles {
@@ -851,35 +824,9 @@ fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'
     }
 }
 
-/// `text` as a `Line`, with the character at char-index `col` reverse-video
-/// highlighted (a blank cell past the end of the line) — the popup's draft
-/// cursor, drawn the same way `ui::overlay_diff_cursor` marks the diff
-/// cursor rather than moving the real terminal cursor.
-fn draft_line_with_cursor(text: &str, col: usize) -> Line<'static> {
-    let mut chars: Vec<char> = text.chars().collect();
-    if col >= chars.len() {
-        chars.push(' ');
-    }
-    let before: String = chars.get(..col).unwrap_or_default().iter().collect();
-    let cursor_char = chars.get(col).copied().unwrap_or(' ');
-    let after: String = chars
-        .get(col.saturating_add(1)..)
-        .unwrap_or_default()
-        .iter()
-        .collect();
-    Line::from(vec![
-        Span::raw(before),
-        Span::styled(
-            cursor_char.to_string(),
-            Style::new().add_modifier(Modifier::REVERSED),
-        ),
-        Span::raw(after),
-    ])
-}
-
 /// `P` with no upstream and 2+ remotes: which one to push to.
 /// `docs/PLAN_9_REMOTE.md`'s "No upstream" flow. A plain highlighted list,
-/// not a `TextBuffer` popup — `j`/`k` move `selected` (`App::popup_key`),
+/// not a text-input popup — `j`/`k` move `selected` (`App::popup_key`),
 /// `Enter` pushes there, `Esc` cancels.
 fn draw_remote_pick_popup(
     frame: &mut Frame<'_>,
@@ -890,23 +837,14 @@ fn draw_remote_pick_popup(
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
     let body_height = u16::try_from(remotes.len().max(1)).unwrap_or(u16::MAX);
     let height = body_height.saturating_add(3).min(area.height);
-    let rect = Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    };
-
     let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let block = bordered()
-        .title(Line::styled(" Push to which remote? ", focused))
-        .border_style(focused);
-    let inner = block.inner(rect);
-    let [body_area, footer_area] =
-        Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
-
-    frame.render_widget(Clear, rect);
-    frame.render_widget(block, rect);
+    let dialog = Dialog::new(Line::styled(" Push to which remote? ", focused))
+        .size(width, height)
+        .footer_rows(1)
+        .border_style(focused)
+        .render(frame, area);
+    let body_area = dialog.body;
+    let footer_area = dialog.footer;
 
     let lines: Vec<Line<'static>> = remotes
         .iter()
@@ -939,26 +877,14 @@ fn draw_note_popup(frame: &mut Frame<'_>, area: Rect, message: &str) {
         .unwrap_or(u16::MAX)
         .saturating_add(4)
         .min(area.height);
-    let rect = Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    };
-
     let warn = Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD);
-    let block = bordered()
-        .title(Line::styled(" commit ", warn))
-        .border_style(warn);
-    let inner = block.inner(rect);
-    let [body_area, footer_area] = Layout::vertical([
-        Constraint::Length(inner.height.saturating_sub(1)),
-        Constraint::Length(1),
-    ])
-    .areas(inner);
-
-    frame.render_widget(Clear, rect);
-    frame.render_widget(block, rect);
+    let dialog = Dialog::new(Line::styled(" commit ", warn))
+        .size(width, height)
+        .footer_rows(1)
+        .border_style(warn)
+        .render(frame, area);
+    let body_area = dialog.body;
+    let footer_area = dialog.footer;
     frame.render_widget(
         Paragraph::new(message.to_owned()).wrap(Wrap { trim: false }),
         body_area,

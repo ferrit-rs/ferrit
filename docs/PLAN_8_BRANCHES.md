@@ -200,7 +200,7 @@ that one stable substring, same technique `commit.rs` already uses for
 Phase 7 wrote its own `Popup` sketch (`docs/PLAN_7_COMMIT.md`) with a
 `Confirm { .. }` variant commented "reused from phase 6's discard confirm"
 — foresight that turned out right, but nothing forced the issue yet because
-`c` opened a very different kind of popup (a `TextBuffer`). Deleting a
+`c` opened a very different kind of popup (a `TextInput`). Deleting a
 branch is the first *other* thing that needs a yes/no gate, so this phase
 is where `pending_discard: Option<DiscardPrompt>` actually generalizes:
 
@@ -249,10 +249,10 @@ itself refuses ("error: Cannot delete branch 'main' checked out at ...")
 and that message goes straight to `last_error`, the same "explain, do
 nothing" path an invalid discard already takes.
 
-### `n`: a new-branch popup, reusing phase 7's `TextBuffer`
+### `n`: a new-branch popup, reusing phase 7's `TextInput`
 
 One line of input, not a message body. Rather than a second hand-rolled
-widget, `TextBuffer` (phase 7, `docs/PLAN_7_COMMIT.md`'s deviation note —
+widget, `TextInput` (phase 7, `docs/PLAN_7_COMMIT.md`'s deviation note —
 still no compatible `tui-textarea`, and now proven useful for more than
 commit messages) is reused as-is, with `Enter` reinterpreted:
 
@@ -261,13 +261,13 @@ enum Popup {
     Commit(CommitDraft),
     /// New-branch name input. Enter *submits* here, unlike the commit
     /// popup, where Enter inserts a newline — the only behavioural
-    /// difference from reusing `TextBuffer` outright.
-    NewBranch(TextBuffer),
+    /// difference from reusing `TextInput` outright.
+    NewBranch(TextInput),
     Note(String),
 }
 ```
 
-`n` (Nav, Branches focused) opens `Popup::NewBranch(TextBuffer::default())`.
+`n` (Nav, Branches focused) opens `Popup::NewBranch(TextInput::default())`.
 `popup_key` grows a `Popup::NewBranch` arm: printable keys and
 backspace/arrows go to the buffer exactly like the commit popup; `Enter`
 calls `create_branch(&buf.text())` instead of `insert_newline()`; `Esc`
@@ -412,7 +412,7 @@ pending, so scripts wait.
   `ConfirmAction`; `<space>` checkout, `u` fast-forward, `M` merge wired,
   each `refresh()`ing after. `Popup::Note` shows a conflict / failure.
 - ✅ **S3** `d` delete with the two-step confirm flow. `n` +
-  `Popup::NewBranch` reusing `TextBuffer`, `Enter` submits.
+  `Popup::NewBranch` reusing `TextInput`, `Enter` submits.
   `tests/app_branch.rs` green.
 - 🟡 **S4** keybar + `HELP` + `mock::KEYBAR` updated; `cargo clippy
   --all-targets -- -D warnings` and `cargo fmt --check` both clean on

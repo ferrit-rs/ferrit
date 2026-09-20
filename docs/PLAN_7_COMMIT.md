@@ -11,12 +11,12 @@ implement *0.29's* `ratatui::widgets::Widget`, not 0.30's, so
 ferrit's `Frame` (0.30). Downgrading the whole crate to ratatui 0.29 for one
 popup was rejected as disproportionate (it touches every render module and
 `ratatui-image`'s own compatibility). Revisit `tui-textarea` if/when it ships
-a 0.30-compatible release; until then, the commit-message box is a small
-hand-rolled `TextBuffer` in `src/app.rs` (lines + a char cursor: insert,
-backspace, `Enter`, arrow movement — no wrapping, no selection, which the
-Goal section already said the message box doesn't need). Every "tui-textarea"
-/ "textarea" mention below describes the original intent; `TextBuffer` is
-what actually exists.
+a 0.30-compatible release; until then, the commit-message box uses Ferrit's
+reusable `ui::components::TextInput` in `src/ui/components/text_input.rs`
+(lines + a char cursor: insert, backspace, `Enter`, arrow movement — no
+selection or undo, which the Goal section already said the message box
+doesn't need). Every "tui-textarea" mention below describes the original
+intent; `TextInput` is what actually exists.
 
 `GitError::HookRejected` is also dropped: distinguishing "a hook rejected
 this" from any other non-zero `git commit` exit requires parsing hook output
@@ -226,7 +226,7 @@ enum Popup {
 }
 
 struct CommitDraft {
-    text: TextBuffer,         // hand-rolled, not tui_textarea::TextArea — see above
+    text: TextInput,          // local reusable component, not tui_textarea::TextArea — see above
     kind: CommitKind,
     sign_off: bool,
     no_verify: bool,
@@ -386,8 +386,9 @@ ST1..ST3 like phases 3 and 5.
 ## Dependencies
 
 None added. `tui-textarea` was the original plan (see the deviation note at
-the top of this file for why); the message box is `App`'s own `TextBuffer`
-instead. `git commit` is a subprocess either way, no new git library surface.
+the top of this file for why); the message box uses Ferrit's local
+`ui::components::TextInput` instead. `git commit` is a subprocess either
+way, no new git library surface.
 Revisit `tui-textarea` if it ships a `ratatui = "0.30"`-compatible release —
 `INSPIRATION.md` still names it as the natural fit for "commit messages,
 interactive rebase todo editing" if the version gap ever closes.
@@ -400,7 +401,7 @@ interactive rebase todo editing" if the version gap ever closes.
   `staged_count`. `GitError::CommitFailed` / `NothingStaged` (no separate
   `HookRejected`, see the deviation note up top). `tests/git_commit.rs`
   green, including a rejecting `pre-commit` hook.
-- ✅ **C1** `Popup::Commit`, `CommitDraft`, and a hand-rolled `TextBuffer`
+- ✅ **C1** `Popup::Commit`, `CommitDraft`, and the local `TextInput`
   in place of `tui-textarea` (deviation note). `c` opens it, `Ctrl-S`
   commits, `Esc` cancels with the draft kept. `on_key` popup branch.
   `refresh()` after a successful commit. `tests/app_commit.rs` green.
