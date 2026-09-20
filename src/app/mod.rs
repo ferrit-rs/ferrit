@@ -21,12 +21,12 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Text};
 use ratatui_image::picker::Picker;
 
+use crate::components::ui::{TextInput, TextInputMode};
 use crate::events::{self, AppEvent, Events};
 use crate::git::{self, ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitResult};
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
 use crate::tui::Tui;
-use crate::ui::components::{TextInput, TextInputMode};
 use crate::{mock, theme, ui};
 
 /// What the right pane shows behind the image preview. A second cached,

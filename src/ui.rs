@@ -4,8 +4,6 @@
 //! terminal, so `tests/render.rs` can call it against a `TestBackend`.
 //! Colours come from `theme`.
 
-pub mod components;
-
 use std::ops::Range;
 
 use ratatui::Frame;
@@ -13,21 +11,14 @@ use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{
-    Block, BorderType, Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
-    ScrollbarState, Wrap,
+    Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
 };
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, CommitPopupView, DiffView, PANES, Pane};
+use crate::components::ui::{Dialog, KeyBar, Panel, SelectList};
 use crate::image::preview::Preview;
-use crate::ui::components::Dialog;
 use crate::{git, mock, theme};
-
-/// Every box in the UI, lazygit style: rounded corners (`╭╮╰╯`) rather than
-/// square ones (`┌┐└┘`).
-fn bordered() -> Block<'static> {
-    Block::bordered().border_type(BorderType::Rounded)
-}
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -192,10 +183,11 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             },
         );
 
-        let mut block = bordered().title(title).border_style(border);
+        let mut panel = Panel::new().title(title).border_style(border);
         if let Some((cur, total)) = app.counter(pane) {
-            block = block.title_bottom(theme::counter_line(cur, total));
+            panel = panel.bottom_title(theme::counter_line(cur, total));
         }
+        let block = panel.block();
 
         let inner_height = block.inner(row).height as usize;
         let list = List::new(pane_lines(app, pane))
@@ -374,9 +366,10 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             // Same shape as `render_resized_image` in the ratatui-image demo:
             // draw the border, then hand `StatefulImage` the inner area and a
             // `&mut StatefulProtocol` so it resizes + re-encodes to fit.
-            let block = bordered()
+            let block = Panel::new()
                 .title(Line::styled(" Preview ", focused))
-                .border_style(border);
+                .border_style(border)
+                .block();
             let inner = block.inner(area);
             frame.render_widget(block, area);
             frame.render_stateful_widget(
@@ -393,9 +386,10 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             frame.render_widget(Clear, area);
             let panel = Paragraph::new(msg.as_str())
                 .block(
-                    bordered()
+                    Panel::new()
                         .title(Line::styled(right_title, focused))
-                        .border_style(border),
+                        .border_style(border)
+                        .block(),
                 )
                 .wrap(Wrap { trim: false });
             frame.render_widget(panel, area);
@@ -408,9 +402,10 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // from a previous image frame before drawing the (often short) text pane.
     frame.render_widget(Clear, area);
 
-    let block = bordered()
+    let block = Panel::new()
         .title(Line::styled(right_title, focused))
-        .border_style(border);
+        .border_style(border)
+        .block();
 
     // Real `git show` output (a commit, or a drilled branch's commit): git-
     // native colouring, vertical scroll from `app.right_scroll()`, a reverse-
@@ -645,9 +640,10 @@ fn draw_diff_column(
     scroll: usize,
     cursor: Option<(usize, Option<Range<usize>>)>,
 ) -> usize {
-    let block = bordered()
+    let block = Panel::new()
         .title(Line::styled(title.to_owned(), Style::new().fg(theme::IDLE)))
-        .border_style(Style::new().fg(theme::IDLE));
+        .border_style(Style::new().fg(theme::IDLE))
+        .block();
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -727,9 +723,10 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
         .map(|s| theme::log_line(s))
         .collect();
     let panel = Paragraph::new(lines).block(
-        bordered()
+        Panel::new()
             .title(Line::styled(" command log ", Style::new().fg(theme::IDLE)))
-            .border_style(Style::new().fg(theme::IDLE)),
+            .border_style(Style::new().fg(theme::IDLE))
+            .block(),
     );
     frame.render_widget(panel, area);
 }
@@ -749,10 +746,10 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
     } else {
         mock::KEYBAR
     };
-    let line = app
-        .confirm_message()
-        .map_or_else(|| theme::keybar_line(text), theme::confirm_line);
-    frame.render_widget(Paragraph::new(line), area);
+    match app.confirm_message() {
+        Some(message) => KeyBar::confirm(message).render(frame, area),
+        None => KeyBar::hints(text).render(frame, area),
+    }
 }
 
 fn draw_help(frame: &mut Frame<'_>, area: Rect) {
@@ -795,7 +792,7 @@ fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'
     let footer_area = dialog.footer;
     view.input.render(frame, dialog.body);
 
-    let hints = theme::keybar_line(view.hints);
+    let hints = KeyBar::hints(view.hints).line();
     match view.toggles {
         Some((sign_off, no_verify)) => {
             let sign_off_span = if sign_off {
@@ -848,23 +845,12 @@ fn draw_remote_pick_popup(
 
     let lines: Vec<Line<'static>> = remotes
         .iter()
-        .enumerate()
-        .map(|(i, remote)| {
-            let mut line = Line::raw(remote.name.clone());
-            if i == selected {
-                pad_line(&mut line, body_area.width as usize);
-                for span in &mut line.spans {
-                    span.style = theme::selection_style(true);
-                }
-            }
-            line
-        })
+        .map(|remote| Line::raw(remote.name.clone()))
         .collect();
-    frame.render_widget(Paragraph::new(lines), body_area);
-    frame.render_widget(
-        Paragraph::new(theme::keybar_line("Push: Enter | Cancel: Esc")),
-        footer_area,
-    );
+    SelectList::new(&lines, selected)
+        .selection_style(theme::selection_style(true))
+        .render(frame, body_area);
+    KeyBar::hints("Push: Enter | Cancel: Esc").render(frame, footer_area);
 }
 
 /// A dismissible note popup: a commit failure (including a rejecting hook's

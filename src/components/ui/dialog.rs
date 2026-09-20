@@ -1,8 +1,9 @@
+use super::panel::Panel;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, BorderType, Clear};
+use ratatui::widgets::Clear;
 
 /// Rendered regions inside a dialog shell.
 #[derive(Debug, Clone, Copy)]
@@ -61,10 +62,10 @@ impl<'a> Dialog<'a> {
             width,
             height,
         };
-        let block = Block::bordered()
-            .border_type(BorderType::Rounded)
+        let block = Panel::new()
             .title(self.title)
-            .border_style(self.border_style);
+            .border_style(self.border_style)
+            .block();
         let inner = block.inner(outer);
 
         frame.render_widget(Clear, outer);

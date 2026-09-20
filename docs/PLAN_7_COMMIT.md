@@ -12,7 +12,7 @@ ferrit's `Frame` (0.30). Downgrading the whole crate to ratatui 0.29 for one
 popup was rejected as disproportionate (it touches every render module and
 `ratatui-image`'s own compatibility). Revisit `tui-textarea` if/when it ships
 a 0.30-compatible release; until then, the commit-message box uses Ferrit's
-reusable `ui::components::TextInput` in `src/ui/components/text_input.rs`
+reusable `components::ui::TextInput` in `src/components/ui/text_input.rs`
 (lines + a char cursor: insert, backspace, `Enter`, arrow movement — no
 selection or undo, which the Goal section already said the message box
 doesn't need). Every "tui-textarea" mention below describes the original
@@ -387,7 +387,7 @@ ST1..ST3 like phases 3 and 5.
 
 None added. `tui-textarea` was the original plan (see the deviation note at
 the top of this file for why); the message box uses Ferrit's local
-`ui::components::TextInput` instead. `git commit` is a subprocess either
+`components::ui::TextInput` instead. `git commit` is a subprocess either
 way, no new git library surface.
 Revisit `tui-textarea` if it ships a `ratatui = "0.30"`-compatible release —
 `INSPIRATION.md` still names it as the natural fit for "commit messages,

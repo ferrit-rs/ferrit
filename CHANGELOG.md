@@ -101,6 +101,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   now run off-thread too. Old image results cannot replace a newer selection.
 - Commit and branch popups now share reusable `TextInput` and `Dialog`
   components; remote, note and help overlays reuse the same dialog shell.
+- Panes, remote selection and key-hint rows now use shared `Panel`,
+  `SelectList` and `KeyBar` components with existing styling preserved.
 - Every bordered box (left panes, right pane, command log, help overlay,
   image preview) now uses rounded corners (`╭╮╰╯`), matching lazygit's own
   look, instead of ratatui's square-corner default (`┌┐└┘`).

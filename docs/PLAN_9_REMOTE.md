@@ -268,11 +268,9 @@ P pressed, current branch has no upstream
   -> repo.remotes()
        0 remotes -> last_error "no remote configured"
        1 remote  -> start_remote_op(Push) with set_upstream: Some(that name)
-       2+        -> Popup::RemotePick(remotes, TextBuffer unused here —
-                    Enter on a highlighted remote name, same list-picker
-                    shape as phase 7's deferred fixup-picker: reuse the
-                    Branches pane's Remotes tab in a "pick one" mode rather
-                    than inventing a new list widget for one rare case)
+       2+        -> Popup::RemotePick(remotes, selected index)
+                    Enter on a highlighted remote name, rendered by the
+                    reusable `components::ui::SelectList`.
 ```
 
 The 2+-remotes picker is the one piece of real UI this phase adds beyond
@@ -354,6 +352,9 @@ redraws, not structured data. A static "Fetching…" that disappears when
   yet — nothing is actionable here in phase 9 (see "Out, on purpose");
   it is `Repo::remotes()` rendered plainly, the same "just a list" shape
   the Local Branches tab had for the entirety of phase 2.
+- Shared `Panel`, `SelectList` and `KeyBar` components own rounded panel
+  shells, selected-row fill and key-hint styling. The remote picker uses
+  `SelectList`; other panes and popup footers use the same building blocks.
 - Keybar (`mock::KEYBAR`) regains `Fetch: f | Pull: p | Push: P` (the
   phase-1 placeholders phase 6 trimmed for space, now real); `HELP`
   documents the busy/no-upstream/multi-remote-picker behaviour.
