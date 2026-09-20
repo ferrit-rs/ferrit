@@ -191,8 +191,15 @@ impl Diff {
             .stderr(Stdio::null())
             .spawn()
             .ok()?;
-        child.stdin.take()?.write_all(self.text.as_bytes()).ok()?;
+        let mut stdin = child.stdin.take()?;
+        let text = self.text.clone();
+        // A large diff overflows the pipe buffer (~64KB on macOS): writing
+        // stdin fully before reading stdout deadlocks once delta blocks on
+        // its own full stdout buffer while this thread is still blocked on
+        // stdin. Write from a second thread so both pipes drain at once.
+        let writer = std::thread::spawn(move || stdin.write_all(text.as_bytes()));
         let output = child.wait_with_output().ok()?;
+        let _ = writer.join();
         output
             .status
             .success()
