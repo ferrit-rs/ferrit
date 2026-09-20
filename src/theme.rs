@@ -12,7 +12,10 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
-use crate::git::{BranchEntry, CommitEntry, Diff, DiffStat, FileEntry, RemoteEntry, StashEntry};
+use crate::git::diff::{Diff, DiffStat};
+use crate::git::model::{BranchEntry, CommitEntry, StashEntry};
+use crate::git::remote::RemoteEntry;
+use crate::git::status::FileEntry;
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[

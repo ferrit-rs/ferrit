@@ -21,9 +21,12 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Text};
 use ratatui_image::picker::Picker;
 
-use crate::components::ui::{TextInput, TextInputMode};
+use crate::components::ui::text_input::{TextInput, TextInputMode};
 use crate::events::{self, AppEvent, Events};
-use crate::git::{self, ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitResult};
+use crate::git;
+use crate::git::apply::{ApplyDir, ApplyTarget};
+use crate::git::diff::{DiffOpts, DiffSide};
+use crate::git::error::GitResult;
 use crate::image::detect;
 use crate::image::preview::{self, Preview};
 use crate::tui::Tui;
@@ -44,7 +47,7 @@ pub enum DiffView {
     Files(FilesDiff),
     /// Commits pane, or a drilled branch's log: one commit's metadata and
     /// `git show` diff.
-    Commit(git::CommitEntry, git::Diff),
+    Commit(git::model::CommitEntry, git::diff::Diff),
     /// Branches pane, not drilled in: the selected branch's own log, shown
     /// passively (no Enter needed), lazygit's live branch -> log preview.
     BranchLog(BranchLog),
@@ -55,8 +58,8 @@ pub enum DiffView {
 /// both, a file entirely on one side shows an empty diff on the other.
 #[derive(Debug, Clone)]
 pub struct FilesDiff {
-    pub unstaged: git::Diff,
-    pub staged: git::Diff,
+    pub unstaged: git::diff::Diff,
+    pub staged: git::diff::Diff,
 }
 
 /// Read-only view of an editor popup for `ui::draw_commit_popup`
@@ -82,7 +85,7 @@ pub struct CommitPopupView<'a> {
 #[derive(Debug, Clone)]
 pub struct BranchLog {
     pub branch: String,
-    pub commits: Vec<git::CommitEntry>,
+    pub commits: Vec<git::model::CommitEntry>,
 }
 
 /// Snapshot plus any active drill-down data loaded in the same worker.
@@ -90,8 +93,8 @@ pub struct BranchLog {
 #[derive(Debug)]
 pub struct RefreshCompletion {
     pub(crate) snapshot: Result<git::Snapshot, String>,
-    pub(crate) branch_log: Option<(String, Result<Vec<git::CommitEntry>, String>)>,
-    pub(crate) commit_files: Option<(String, Result<Vec<git::FileEntry>, String>)>,
+    pub(crate) branch_log: Option<(String, Result<Vec<git::model::CommitEntry>, String>)>,
+    pub(crate) commit_files: Option<(String, Result<Vec<git::status::FileEntry>, String>)>,
 }
 
 #[derive(Default)]
@@ -122,7 +125,7 @@ struct RenderedDiff {
 /// `DiffView::BranchLog` preview, which needs no Enter at all.
 struct BranchDrill {
     branch: String,
-    commits: Vec<git::CommitEntry>,
+    commits: Vec<git::model::CommitEntry>,
     /// The branch-list cursor to restore when `Esc` backs out.
     return_index: usize,
 }
@@ -136,9 +139,9 @@ struct CommitDrill {
     /// `"<short_hash> <summary>"`, for `App::commits_title`.
     title: String,
     /// One synthetic `FileEntry` per file the commit's diff touched, same
-    /// index order as the underlying `git::Diff::files`/`file_lines()` so a
+    /// index order as the underlying `git::diff::Diff::files`/`file_lines()` so a
     /// selected row's scroll target is a plain index lookup.
-    files: Vec<git::FileEntry>,
+    files: Vec<git::status::FileEntry>,
     /// The commit-list cursor to restore when `Esc` backs out.
     return_index: usize,
 }
@@ -221,7 +224,7 @@ enum ConfirmAction {
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a
 /// single-file `Diff`, plus which of those lines are selectable.
-fn hunk_lines_for(diff: &git::Diff) -> Vec<HunkLines> {
+fn hunk_lines_for(diff: &git::diff::Diff) -> Vec<HunkLines> {
     let Some(file) = diff.files.first() else {
         return Vec::new();
     };
@@ -259,7 +262,7 @@ fn hunk_lines_for(diff: &git::Diff) -> Vec<HunkLines> {
 
 /// Every selectable line across every hunk of `diff`, in order. `j` / `k` in
 /// `Mode::Diff` step through this list, skipping context lines entirely.
-fn selectable_lines(diff: &git::Diff) -> Vec<usize> {
+fn selectable_lines(diff: &git::diff::Diff) -> Vec<usize> {
     hunk_lines_for(diff)
         .into_iter()
         .flat_map(|hl| hl.selectable)
@@ -272,7 +275,7 @@ fn selectable_lines(diff: &git::Diff) -> Vec<usize> {
 /// cursor is actually on whenever it moves, so `resync_diff_cursor` (which
 /// runs after *every* key, not just a stage) does not mistake "moved to a
 /// different hunk" for "the old hunk vanished" and snap back to it.
-fn hunk_id_at(diff: &git::Diff, line: usize) -> Option<u64> {
+fn hunk_id_at(diff: &git::diff::Diff, line: usize) -> Option<u64> {
     let hl = hunk_lines_for(diff)
         .into_iter()
         .find(|hl| hl.lines.contains(&line))?;
@@ -282,7 +285,7 @@ fn hunk_id_at(diff: &git::Diff, line: usize) -> Option<u64> {
 /// Stable id for hunk `hunk_index` of `diff`: a hash of its header + body
 /// text, so a background refresh can re-find the same hunk even once
 /// staging moved a *different* hunk out from under it (gitu's `Item.id`).
-fn hunk_content_id(diff: &git::Diff, hunk_index: usize) -> u64 {
+fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
     use std::hash::{Hash as _, Hasher as _};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     if let Some(hunk) = diff.files.first().and_then(|f| f.hunks.get(hunk_index)) {
@@ -313,13 +316,13 @@ enum Popup {
 }
 
 struct RemotePick {
-    remotes: Vec<git::RemoteEntry>,
+    remotes: Vec<git::remote::RemoteEntry>,
     selected: usize,
 }
 
 struct CommitDraft {
     text: TextInput,
-    kind: git::CommitKind,
+    kind: git::commit::CommitKind,
     sign_off: bool,
     no_verify: bool,
 }
@@ -407,29 +410,29 @@ pub struct App {
     repo: Option<git::Repo>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     repo_name: String,
-    header: git::StatusHeader,
-    files: Vec<git::FileEntry>,
+    header: git::status::StatusHeader,
+    files: Vec<git::status::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
     /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
     /// default; paths persist across `refresh()`, only `Enter` on a
     /// directory row changes this.
     collapsed_dirs: HashSet<PathBuf>,
-    branches: Vec<git::BranchEntry>,
+    branches: Vec<git::model::BranchEntry>,
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
     branch_drill: Option<BranchDrill>,
     /// Configured remotes, feeding the Branches pane's Remotes tab.
     /// `docs/PLAN_9_REMOTE.md`.
-    remotes: Vec<git::RemoteEntry>,
+    remotes: Vec<git::remote::RemoteEntry>,
     /// Which of the Branches pane's own two tabs is showing.
     /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
     branches_tab: BranchesTab,
-    commits: Vec<git::CommitEntry>,
+    commits: Vec<git::model::CommitEntry>,
     /// `Some` while the Commits pane is drilled into one commit's own
     /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
     /// shows the commit list.
     commit_drill: Option<CommitDrill>,
-    stashes: Vec<git::StashEntry>,
+    stashes: Vec<git::model::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
 
@@ -516,9 +519,9 @@ pub struct App {
 mod tree;
 
 mod branch_actions;
-mod diff_query;
+pub mod diff_query;
 mod drill_nav;
-mod image_query;
+pub mod image_query;
 mod input;
 mod popups;
 mod remote;
@@ -527,11 +530,7 @@ mod staging;
 #[cfg(test)]
 mod tests;
 
-#[doc(hidden)]
-pub use diff_query::DiffCompletion;
 use diff_query::{DiffQueryState, RightKey};
-#[doc(hidden)]
-pub use image_query::ImageCompletion;
 use tree::{FileRow, commit_drill_files, tree_rows};
 
 impl App {
@@ -546,7 +545,7 @@ impl App {
             should_quit: false,
             repo,
             repo_name,
-            header: git::StatusHeader::default(),
+            header: git::status::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
             branches: Vec::new(),
@@ -966,7 +965,7 @@ impl App {
         &mut self,
         focus: Option<&Range<usize>>,
         width: usize,
-    ) -> Option<(Text<'static>, usize, git::DiffStat)> {
+    ) -> Option<(Text<'static>, usize, git::diff::DiffStat)> {
         let key = &self.right_key;
         let cache = &mut self.rendered_diff;
         match &self.diff {
@@ -1257,7 +1256,7 @@ impl App {
             Some(&FileRow::File { index, .. }) => self
                 .files
                 .get(index)
-                .map(git::FileEntry::display)
+                .map(git::status::FileEntry::display)
                 .unwrap_or_default(),
             _ => String::new(),
         }

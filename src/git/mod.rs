@@ -9,32 +9,32 @@
 //! merge); those are the three submodules that are not read-only, and all
 //! three shell out to `git` rather than writing objects directly.
 
-mod apply;
-mod blob;
-mod branch;
-mod commit;
-mod diff;
-mod error;
-mod log;
-mod model;
-mod refs;
-mod remote;
-mod stash;
-mod status;
+pub mod apply;
+pub mod blob;
+pub mod branch;
+pub mod commit;
+pub mod diff;
+pub mod error;
+pub mod log;
+pub mod model;
+pub mod refs;
+pub mod remote;
+pub mod stash;
+pub mod status;
 
 use std::path::Path;
 
 use git2::Repository;
 
-pub use apply::{ApplyDir, ApplyTarget, transform_body};
-pub use blob::Rev;
-pub use branch::MergeOutcome;
-pub use commit::{CommitKind, CommitOpts};
-pub use diff::{Diff, DiffOpts, DiffSide, DiffStat, FileMeta, FileStatus, HunkMeta, parse_diff};
-pub use error::{GitError, GitResult};
-pub use model::{BranchEntry, CommitEntry, StashEntry};
-pub use remote::RemoteEntry;
-pub use status::{Change, FileEntry, StatusHeader};
+use self::apply::{ApplyDir, ApplyTarget};
+use self::blob::Rev;
+use self::branch::MergeOutcome;
+use self::commit::{CommitKind, CommitOpts};
+use self::diff::{Diff, DiffOpts, DiffSide};
+use self::error::{GitError, GitResult};
+use self::model::{BranchEntry, CommitEntry, StashEntry};
+use self::remote::RemoteEntry;
+use self::status::{FileEntry, StatusHeader};
 
 /// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
 /// constant until the pane grows real scrolling/paging.

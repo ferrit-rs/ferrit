@@ -57,7 +57,7 @@ impl App {
     /// The remote-pick popup's remotes and highlighted index
     /// (`docs/PLAN_9_REMOTE.md`'s "No upstream" flow, 2+ remotes), or
     /// `None` when it is not up.
-    pub fn remote_pick(&self) -> Option<(&[git::RemoteEntry], usize)> {
+    pub fn remote_pick(&self) -> Option<(&[git::remote::RemoteEntry], usize)> {
         match &self.popup {
             Some(Popup::RemotePick(pick)) => Some((&pick.remotes, pick.selected)),
             _ => None,
@@ -69,19 +69,24 @@ impl App {
     /// earlier `Esc` left one behind (lazygit's "draft survives a cancel").
     /// A no-op with a popup already up, without a repo, with nothing staged
     /// (`c`), or with no commit yet to amend/reword.
-    pub(super) fn open_commit(&mut self, kind: git::CommitKind) {
+    pub(super) fn open_commit(&mut self, kind: git::commit::CommitKind) {
         if self.popup.is_some() {
             return;
         }
         let Some(repo) = &self.repo else { return };
         match &kind {
-            git::CommitKind::Normal
-                if !self.files.iter().any(|f| f.staged != git::Change::None) =>
+            git::commit::CommitKind::Normal
+                if !self
+                    .files
+                    .iter()
+                    .any(|f| f.staged != git::status::Change::None) =>
             {
                 self.last_error = Some("nothing staged to commit".to_owned());
                 return;
             },
-            git::CommitKind::Amend | git::CommitKind::Reword if self.commits.is_empty() => {
+            git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
+                if self.commits.is_empty() =>
+            {
                 self.last_error = Some("no commit yet to amend".to_owned());
                 return;
             },
@@ -89,7 +94,9 @@ impl App {
         }
 
         let prefill = match &kind {
-            git::CommitKind::Amend | git::CommitKind::Reword => repo.head_message().ok().flatten(),
+            git::commit::CommitKind::Amend | git::commit::CommitKind::Reword => {
+                repo.head_message().ok().flatten()
+            },
             _ => self.commit_draft.take(),
         };
         let text = prefill.map_or_else(TextInput::default, |s| TextInput::from_text(&s));
@@ -185,12 +192,12 @@ impl App {
         let Some(Popup::Commit(draft)) = &self.popup else {
             return;
         };
-        if !matches!(draft.kind, git::CommitKind::Fixup { .. }) && draft.text.is_blank() {
+        if !matches!(draft.kind, git::commit::CommitKind::Fixup { .. }) && draft.text.is_blank() {
             self.popup = Some(Popup::Note("empty commit message".to_owned()));
             return;
         }
         let message = draft.text.text();
-        let opts = git::CommitOpts {
+        let opts = git::commit::CommitOpts {
             sign_off: draft.sign_off,
             no_verify: draft.no_verify,
         };
@@ -204,7 +211,7 @@ impl App {
                 self.popup = None;
                 self.request_refresh();
             },
-            Err(git::GitError::NothingStaged) => {
+            Err(git::error::GitError::NothingStaged) => {
                 self.popup = Some(Popup::Note("nothing staged to commit".to_owned()));
             },
             Err(e) => {

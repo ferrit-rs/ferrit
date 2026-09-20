@@ -168,7 +168,8 @@ impl App {
         self.files
             .iter()
             .filter(|f| {
-                f.staged == git::Change::Conflicted || f.worktree == git::Change::Conflicted
+                f.staged == git::status::Change::Conflicted
+                    || f.worktree == git::status::Change::Conflicted
             })
             .map(|f| f.path.display().to_string())
             .collect()
@@ -193,8 +194,8 @@ impl App {
         let result = repo.merge_branch(&name);
         self.request_refresh();
         match result {
-            Ok(git::MergeOutcome::Merged) => {},
-            Ok(git::MergeOutcome::Conflicted) => {
+            Ok(git::branch::MergeOutcome::Merged) => {},
+            Ok(git::branch::MergeOutcome::Conflicted) => {
                 let files = self.conflicted_paths().join(", ");
                 self.popup = Some(Popup::Note(format!(
                     "merge conflict in {files}. Resolve and commit, or `git merge --abort` \

@@ -17,7 +17,10 @@
 
 use std::path::{Path, PathBuf};
 
-use ferrit::git::{Change, GitError, Repo, Rev};
+use ferrit::git::Repo;
+use ferrit::git::blob::Rev;
+use ferrit::git::error::GitError;
+use ferrit::git::status::Change;
 use git2::{IndexAddOption, Repository, Signature};
 
 /// A temp directory that deletes itself on drop.

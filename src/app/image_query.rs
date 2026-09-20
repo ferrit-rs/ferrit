@@ -17,7 +17,7 @@ pub struct ImageCompletion {
 pub(crate) fn load(repo_path: &Path, image_path: &Path) -> Result<::image::DynamicImage, String> {
     let repo = git::Repo::open(repo_path).map_err(|error| error.to_string())?;
     let bytes = repo
-        .blob_bytes(image_path, git::Rev::Workdir)
+        .blob_bytes(image_path, git::blob::Rev::Workdir)
         .map_err(|error| format!("[image] {}  ({error})", image_path.display()))?;
     if bytes.is_empty() {
         return Err(format!("[image] {}  (no bytes)", image_path.display()));
@@ -71,7 +71,7 @@ impl App {
             self.queue_image_query(sender, repo_path, path, generation);
         } else {
             let bytes = match &self.repo {
-                Some(repo) => match repo.blob_bytes(&path, git::Rev::Workdir) {
+                Some(repo) => match repo.blob_bytes(&path, git::blob::Rev::Workdir) {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         self.preview =

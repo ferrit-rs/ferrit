@@ -9,7 +9,7 @@ use super::{
 impl App {
     /// The `FileEntry` behind the Files pane's current selection, or `None`
     /// on a directory row or an empty pane.
-    pub(super) fn selected_file(&self) -> Option<&git::FileEntry> {
+    pub(super) fn selected_file(&self) -> Option<&git::status::FileEntry> {
         let rows = self.files_tree_rows();
         let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
             return None;
@@ -19,7 +19,7 @@ impl App {
 
     /// The `Diff` the cursor currently lives in (`Mode::Diff`'s active
     /// side), or `None` off the Files pane / without a real Files split.
-    pub(super) fn cursor_diff(&self) -> Option<&git::Diff> {
+    pub(super) fn cursor_diff(&self) -> Option<&git::diff::Diff> {
         let DiffView::Files(files) = &self.diff else {
             return None;
         };
@@ -60,7 +60,7 @@ impl App {
         // Same direction rule as the file-level toggle: worktree changes
         // lead, so a half-staged file's cursor starts where there's still
         // something to stage.
-        let side = if entry.worktree == git::Change::None {
+        let side = if entry.worktree == git::status::Change::None {
             DiffSide::Staged
         } else {
             DiffSide::Worktree
@@ -242,9 +242,9 @@ impl App {
         let Some(entry) = self.selected_file() else {
             return;
         };
-        let dir = if entry.worktree != git::Change::None {
+        let dir = if entry.worktree != git::status::Change::None {
             ApplyDir::Forward
-        } else if entry.staged != git::Change::None {
+        } else if entry.staged != git::status::Change::None {
             ApplyDir::Reverse
         } else {
             return;
@@ -279,9 +279,17 @@ impl App {
         if self.focus != Pane::Files {
             return;
         }
-        let dir = if self.files.iter().any(|f| f.worktree != git::Change::None) {
+        let dir = if self
+            .files
+            .iter()
+            .any(|f| f.worktree != git::status::Change::None)
+        {
             ApplyDir::Forward
-        } else if self.files.iter().any(|f| f.staged != git::Change::None) {
+        } else if self
+            .files
+            .iter()
+            .any(|f| f.staged != git::status::Change::None)
+        {
             ApplyDir::Reverse
         } else {
             return;
@@ -304,7 +312,7 @@ impl App {
                 let Some(entry) = self.selected_file() else {
                     return;
                 };
-                if entry.worktree == git::Change::None {
+                if entry.worktree == git::status::Change::None {
                     return;
                 }
                 self.pending_confirm = Some(ConfirmPrompt {
@@ -354,7 +362,7 @@ impl App {
                     .files
                     .iter()
                     .find(|f| f.path == path)
-                    .is_some_and(|f| f.worktree == git::Change::Untracked);
+                    .is_some_and(|f| f.worktree == git::status::Change::Untracked);
                 let result = match &self.repo {
                     Some(repo) => repo.discard_file(&path, untracked),
                     None => return,
@@ -371,7 +379,7 @@ impl App {
                 let Some(repo) = &self.repo else { return };
                 match repo.delete_branch(&name, force) {
                     Ok(()) => self.request_refresh(),
-                    Err(git::GitError::BranchFailed(msg))
+                    Err(git::error::GitError::BranchFailed(msg))
                         if !force && msg.contains("is not fully merged") =>
                     {
                         self.pending_confirm = Some(ConfirmPrompt {

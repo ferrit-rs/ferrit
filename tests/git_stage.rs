@@ -18,7 +18,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::git::{ApplyDir, ApplyTarget, DiffOpts, DiffSide, GitError, Repo};
+use ferrit::git::Repo;
+use ferrit::git::apply::{ApplyDir, ApplyTarget};
+use ferrit::git::diff::{DiffOpts, DiffSide};
+use ferrit::git::error::GitError;
 use git2::{IndexAddOption, Repository, Signature};
 
 struct TempDir(PathBuf);

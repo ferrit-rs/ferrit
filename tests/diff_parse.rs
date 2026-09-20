@@ -5,11 +5,12 @@
     clippy::indexing_slicing,
     reason = "integration test: a failed setup or a bad slice is the assertion"
 )]
-//! Parser coverage for `ferrit::git::parse_diff`: feed it canned plain-text
+//! Parser coverage for `ferrit::git::diff::parse_diff`: feed it canned plain-text
 //! `git diff` output and check the byte ranges slice back to the right spans,
 //! rename detection fires, and the hunk-header numbers come out.
 
-use ferrit::git::{FileStatus, parse_diff};
+use ferrit::git::diff::parse::FileStatus;
+use ferrit::git::diff::parse_diff;
 
 /// Two files in one diff: a modified source file with two hunks, and a rename
 /// with a small edit. Trailing `\ No newline at end of file` on the first.
@@ -99,10 +100,26 @@ fn line_numbers_derive_old_and_new_columns() {
 
     assert_eq!(numbers[4], (None, None), "hunk header carries no number");
     assert_eq!(numbers[5], (Some(1), Some(1)), "context counts both sides");
-    assert_eq!(numbers[6], (Some(2), None), "deletion has no new-side number");
-    assert_eq!(numbers[7], (None, Some(2)), "addition has no old-side number");
-    assert_eq!(numbers[8], (None, Some(3)), "second addition keeps counting new");
-    assert_eq!(numbers[9], (Some(3), Some(4)), "context resumes both counters");
+    assert_eq!(
+        numbers[6],
+        (Some(2), None),
+        "deletion has no new-side number"
+    );
+    assert_eq!(
+        numbers[7],
+        (None, Some(2)),
+        "addition has no old-side number"
+    );
+    assert_eq!(
+        numbers[8],
+        (None, Some(3)),
+        "second addition keeps counting new"
+    );
+    assert_eq!(
+        numbers[9],
+        (Some(3), Some(4)),
+        "context resumes both counters"
+    );
     assert_eq!(
         numbers[13],
         (None, None),

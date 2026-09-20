@@ -106,9 +106,9 @@ impl App {
                 self.delete_branch_prompt();
             },
             KeyCode::Char('d') => self.discard_prompt(),
-            KeyCode::Char('c') => self.open_commit(git::CommitKind::Normal),
-            KeyCode::Char('A') => self.open_commit(git::CommitKind::Amend),
-            KeyCode::Char('w') => self.open_commit(git::CommitKind::Reword),
+            KeyCode::Char('c') => self.open_commit(git::commit::CommitKind::Normal),
+            KeyCode::Char('A') => self.open_commit(git::commit::CommitKind::Amend),
+            KeyCode::Char('w') => self.open_commit(git::commit::CommitKind::Reword),
             KeyCode::Char('r') => self.request_refresh(),
             KeyCode::Char('f') => self.trigger_remote_op(events::RemoteOp::Fetch),
             KeyCode::Char('p') => self.trigger_remote_op(events::RemoteOp::Pull),

@@ -26,9 +26,9 @@ pub enum AppEvent {
     /// the event boundary carries only owned, sendable application data.
     RefreshDone(crate::app::RefreshCompletion),
     /// Selected diff read finished. Generation and key reject stale results.
-    DiffDone(crate::app::DiffCompletion),
+    DiffDone(crate::app::diff_query::DiffCompletion),
     /// Selected image blob read/decode finished. Stale generations are dropped.
-    ImageDone(crate::app::ImageCompletion),
+    ImageDone(crate::app::image_query::ImageCompletion),
     /// A background `fetch`/`pull`/`push` finished. `message` is already a
     /// user-facing string (`Ok` success line or `Err` failure text) — this
     /// module stays git-agnostic, so the spawned thread converts a
@@ -42,7 +42,7 @@ pub enum AppEvent {
 }
 
 /// Which of the three network operations finished. Distinct from
-/// `git::GitError`'s own per-operation variants: this is *which action ran*,
+/// `git::error::GitError`'s own per-operation variants: this is *which action ran*,
 /// not *why it failed* — `App::remote_busy_label` and the eventual result
 /// both need to know which of the three is in flight / just finished.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

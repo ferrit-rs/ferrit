@@ -1,9 +1,9 @@
-//! Unit coverage for `git::transform_body`, the line-selection patch
+//! Unit coverage for `git::apply::transform_body`, the line-selection patch
 //! transform, in isolation: a known hunk body plus a line-index set in, a
 //! byte-for-byte patch body out. No repo, no `git` subprocess. See
 //! `docs/PLAN_6_STAGING.md` milestone S2.
 
-use ferrit::git::transform_body;
+use ferrit::git::apply::transform_body;
 
 #[test]
 fn selected_addition_is_kept_the_rest_of_the_hunk_is_untouched() {

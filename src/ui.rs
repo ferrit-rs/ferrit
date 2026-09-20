@@ -7,16 +7,19 @@
 use std::ops::Range;
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{
-    Clear, List, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
-};
+use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, CommitPopupView, DiffView, PANES, Pane};
-use crate::components::ui::{Dialog, KeyBar, Panel, SelectList};
+use crate::components::ui::dialog::Dialog;
+use crate::components::ui::key_bar::KeyBar;
+use crate::components::ui::pane_list::PaneList;
+use crate::components::ui::panel::Panel;
+use crate::components::ui::scroll_bar::ScrollBar;
+use crate::components::ui::select_list::SelectList;
 use crate::image::preview::Preview;
 use crate::{git, mock, theme};
 
@@ -189,40 +192,17 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         }
         let block = panel.block();
 
-        let inner_height = block.inner(row).height as usize;
-        let list = List::new(pane_lines(app, pane))
-            .block(block)
-            .highlight_style(theme::selection_style(focused));
-
-        let mut state = ListState::default().with_offset(app.list_offset(pane));
         let row_ct = app.row_count(pane);
-        if row_ct > 0 {
-            state.select(Some(app.selected(pane).min(row_ct - 1)));
-        }
-
-        frame.render_stateful_widget(list, row, &mut state);
+        let lines = pane_lines(app, pane);
+        let offset = PaneList::new(lines, block)
+            .selected((row_ct > 0).then(|| app.selected(pane).min(row_ct - 1)))
+            .offset(app.list_offset(pane))
+            .highlight_style(theme::selection_style(focused))
+            .scrollbar_style(border)
+            .render(frame, row);
         // Ratatui may have moved the offset to keep the selection on screen;
         // copy it back so a click in a scrolled list maps to the right row.
-        app.set_list_offset(pane, state.offset());
-
-        if row_ct > inner_height {
-            // Same `max_scroll + 1` trick as the right pane: see its comment.
-            let max_scroll = row_ct - inner_height;
-            let mut sb_state = ScrollbarState::new(max_scroll + 1)
-                .position(state.offset().min(max_scroll))
-                .viewport_content_length(inner_height);
-            frame.render_stateful_widget(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .style(border)
-                    .begin_symbol(None)
-                    .end_symbol(None),
-                row.inner(Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut sb_state,
-            );
-        }
+        app.set_list_offset(pane, offset);
     }
 }
 
@@ -444,19 +424,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             Paragraph::new(text).scroll((u16::try_from(display_scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, diff_area);
         let viewport = diff_area.height as usize;
-        if total > viewport {
-            let max_scroll = total - viewport;
-            let mut state = ScrollbarState::new(max_scroll + 1)
-                .position(display_scroll.min(max_scroll))
-                .viewport_content_length(viewport);
-            frame.render_stateful_widget(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(None)
-                    .end_symbol(None),
-                diff_area,
-                &mut state,
-            );
-        }
+        ScrollBar::new(total, viewport, display_scroll).render(frame, diff_area);
         app.set_right_viewport(diff_area.height as usize);
         return;
     }
@@ -499,19 +467,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
         frame.render_widget(panel, inner);
         let viewport = inner.height as usize;
-        if total > viewport {
-            let max_scroll = total - viewport;
-            let mut state = ScrollbarState::new(max_scroll + 1)
-                .position(scroll.min(max_scroll))
-                .viewport_content_length(viewport);
-            frame.render_stateful_widget(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(None)
-                    .end_symbol(None),
-                inner,
-                &mut state,
-            );
-        }
+        ScrollBar::new(total, viewport, scroll).render(frame, inner);
         app.set_right_viewport(viewport);
         return;
     }
@@ -576,8 +532,8 @@ fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let scroll = app.right_scroll();
     let cursor = app.diff_cursor();
     let hint = app.diff_granule_hint();
-    let unstaged_cursor = diff_cursor_for(cursor.clone(), git::DiffSide::Worktree);
-    let staged_cursor = diff_cursor_for(cursor, git::DiffSide::Staged);
+    let unstaged_cursor = diff_cursor_for(cursor.clone(), git::diff::DiffSide::Worktree);
+    let staged_cursor = diff_cursor_for(cursor, git::diff::DiffSide::Staged);
 
     draw_diff_column(
         frame,
@@ -605,8 +561,8 @@ fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// `app.diff_cursor()`'s `(line, V-select range)` for `side`, or `None` when
 /// the cursor is on the other side (or `Mode::Diff` isn't up at all).
 fn diff_cursor_for(
-    cursor: Option<(git::DiffSide, usize, Option<Range<usize>>)>,
-    side: git::DiffSide,
+    cursor: Option<(git::diff::DiffSide, usize, Option<Range<usize>>)>,
+    side: git::diff::DiffSide,
 ) -> Option<(usize, Option<Range<usize>>)> {
     let (cursor_side, line, selection) = cursor?;
     (cursor_side == side).then_some((line, selection))
@@ -636,7 +592,7 @@ fn draw_diff_column(
     frame: &mut Frame<'_>,
     area: Rect,
     title: &str,
-    diff: &git::Diff,
+    diff: &git::diff::Diff,
     scroll: usize,
     cursor: Option<(usize, Option<Range<usize>>)>,
 ) -> usize {
@@ -661,19 +617,7 @@ fn draw_diff_column(
     frame.render_widget(panel, diff_area);
 
     let viewport = diff_area.height as usize;
-    if total > viewport {
-        let max_scroll = total - viewport;
-        let mut state = ScrollbarState::new(max_scroll + 1)
-            .position(scroll.min(max_scroll))
-            .viewport_content_length(viewport);
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(None)
-                .end_symbol(None),
-            diff_area,
-            &mut state,
-        );
-    }
+    ScrollBar::new(total, viewport, scroll).render(frame, diff_area);
     viewport
 }
 
@@ -828,7 +772,7 @@ fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'
 fn draw_remote_pick_popup(
     frame: &mut Frame<'_>,
     area: Rect,
-    remotes: &[git::RemoteEntry],
+    remotes: &[git::remote::RemoteEntry],
     selected: usize,
 ) {
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);

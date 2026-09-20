@@ -13,11 +13,10 @@ use std::process::{Command, Output, Stdio};
 
 use git2::Repository;
 
+use self::parse::FileMeta;
 use crate::git::error::{GitError, GitResult};
 
-mod parse;
-
-pub use parse::{FileMeta, FileStatus, HunkMeta};
+pub mod parse;
 
 /// Which pair of trees `git diff` compares. Deliberately not a reuse of
 /// `blob::Rev`: that names one version of one path, this names a pair of trees.

@@ -18,7 +18,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::git::{GitError, MergeOutcome, Repo};
+use ferrit::git::Repo;
+use ferrit::git::branch::MergeOutcome;
+use ferrit::git::error::GitError;
 use git2::{IndexAddOption, Repository, Signature};
 
 struct TempDir(PathBuf);

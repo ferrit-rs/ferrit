@@ -34,7 +34,7 @@ enum TreeNode {
 /// Group `files` by directory into a tree keyed by path component. A path
 /// component that collides with an existing file entry (pathological: git
 /// cannot really produce this) drops that one file rather than panicking.
-fn build_file_tree(files: &[git::FileEntry]) -> BTreeMap<String, TreeNode> {
+fn build_file_tree(files: &[git::status::FileEntry]) -> BTreeMap<String, TreeNode> {
     let mut root: BTreeMap<String, TreeNode> = BTreeMap::new();
     'entries: for (index, entry) in files.iter().enumerate() {
         let mut components: Vec<_> = entry.path.components().collect();
@@ -94,7 +94,10 @@ fn flatten_file_tree(
 /// collapsible root plus one `Dir` row per directory, flat paths skip the
 /// tree and list files directly. Shared by the Files pane (`self.files`) and
 /// a drilled commit's own changed-file list (`CommitDrill::files`).
-pub(super) fn tree_rows(files: &[git::FileEntry], collapsed: &HashSet<PathBuf>) -> Vec<FileRow> {
+pub(super) fn tree_rows(
+    files: &[git::status::FileEntry],
+    collapsed: &HashSet<PathBuf>,
+) -> Vec<FileRow> {
     let nested = files
         .iter()
         .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
@@ -122,7 +125,7 @@ pub(super) fn tree_rows(files: &[git::FileEntry], collapsed: &HashSet<PathBuf>) 
 /// `worktree: <status>` so `theme::file_line` renders the single-letter code
 /// lazygit shows for a commit's file tree (` M`, not the two-sided `MM` a
 /// worktree entry can have). Feeds `CommitDrill::files`.
-pub(super) fn commit_drill_files(diff: &git::Diff) -> Vec<git::FileEntry> {
+pub(super) fn commit_drill_files(diff: &git::diff::Diff) -> Vec<git::status::FileEntry> {
     diff.files
         .iter()
         .map(|meta| {
@@ -134,14 +137,16 @@ pub(super) fn commit_drill_files(diff: &git::Diff) -> Vec<git::FileEntry> {
                 new_path
             };
             let worktree = match meta.status {
-                git::FileStatus::Added => git::Change::Added,
-                git::FileStatus::Deleted => git::Change::Deleted,
-                git::FileStatus::Modified => git::Change::Modified,
-                git::FileStatus::Renamed | git::FileStatus::Copied => git::Change::Renamed,
+                git::diff::parse::FileStatus::Added => git::status::Change::Added,
+                git::diff::parse::FileStatus::Deleted => git::status::Change::Deleted,
+                git::diff::parse::FileStatus::Modified => git::status::Change::Modified,
+                git::diff::parse::FileStatus::Renamed | git::diff::parse::FileStatus::Copied => {
+                    git::status::Change::Renamed
+                },
             };
-            git::FileEntry {
+            git::status::FileEntry {
                 path: PathBuf::from(path),
-                staged: git::Change::None,
+                staged: git::status::Change::None,
                 worktree,
                 binary: meta.binary,
             }

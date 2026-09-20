@@ -6,7 +6,8 @@ use std::thread;
 
 use super::{App, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane};
 
-use crate::git::{self, DiffOpts, DiffSide};
+use crate::git;
+use crate::git::diff::{DiffOpts, DiffSide};
 
 #[derive(Default)]
 pub(super) struct DiffQueryState {
@@ -27,11 +28,11 @@ pub(crate) enum RightKey {
 #[derive(Debug)]
 pub(crate) enum DiffQueryResult {
     File {
-        unstaged: git::Diff,
-        staged: git::Diff,
+        unstaged: git::diff::Diff,
+        staged: git::diff::Diff,
     },
-    Commit(git::Diff),
-    BranchLog(Vec<git::CommitEntry>),
+    Commit(git::diff::Diff),
+    BranchLog(Vec<git::model::CommitEntry>),
 }
 
 /// Hidden event payload for a selected-diff worker completion.
