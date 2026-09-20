@@ -15,7 +15,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use git2::Repository;
@@ -138,14 +138,14 @@ fn run_command(
     let status = loop {
         if cancel.is_some_and(|flag| flag.load(Ordering::Acquire)) {
             stop_process_group(&mut child, pid);
-            return Err(err("cancelled during shutdown".to_owned()));
+            let output = collect_output(stdout_reader, stderr_reader);
+            return Err(err(with_diagnostics("cancelled during shutdown", &output)));
         }
         if Instant::now() >= deadline {
             stop_process_group(&mut child, pid);
-            return Err(err(format!(
-                "timed out after {} seconds",
-                REMOTE_TIMEOUT.as_secs()
-            )));
+            let output = collect_output(stdout_reader, stderr_reader);
+            let reason = format!("timed out after {} seconds", REMOTE_TIMEOUT.as_secs());
+            return Err(err(with_diagnostics(&reason, &output)));
         }
         match child.try_wait() {
             Err(e) => {
@@ -176,6 +176,35 @@ fn read_all(mut reader: impl Read) -> io::Result<Vec<u8>> {
     let mut output = Vec::new();
     reader.read_to_end(&mut output)?;
     Ok(output)
+}
+
+fn collect_output(
+    stdout_reader: JoinHandle<io::Result<Vec<u8>>>,
+    stderr_reader: JoinHandle<io::Result<Vec<u8>>>,
+) -> String {
+    let stdout = read_output(stdout_reader, "stdout");
+    let stderr = read_output(stderr_reader, "stderr");
+    [stdout, stderr]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn read_output(reader: JoinHandle<io::Result<Vec<u8>>>, stream: &str) -> String {
+    match reader.join() {
+        Ok(Ok(bytes)) => String::from_utf8_lossy(&bytes).trim().to_owned(),
+        Ok(Err(error)) => format!("cannot read git {stream}: {error}"),
+        Err(_) => format!("git {stream} reader panicked"),
+    }
+}
+
+fn with_diagnostics(reason: &str, output: &str) -> String {
+    if output.is_empty() {
+        reason.to_owned()
+    } else {
+        format!("{reason}\n{output}")
+    }
 }
 
 fn stop_process_group(child: &mut Child, pid: u32) {

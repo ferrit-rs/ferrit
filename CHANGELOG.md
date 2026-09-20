@@ -112,7 +112,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Background refresh, diff, image, and remote workers report panic failures
   through their normal completion events, releasing their in-flight state.
 - Remote Git commands now have a five-minute deadline and stop their process
-  group when Ferrit shuts down; typed worker kinds replace string labels.
+  group when Ferrit shuts down, keeping captured diagnostics on timeout or
+  cancellation; typed worker kinds replace string labels.
 - A failed filesystem watcher no longer prevents startup; Ferrit keeps polling
   and shows the watcher failure in the Status pane.
 - Two-sided Files diff rendering now lives in `src/ui/diff.rs`, separate from
