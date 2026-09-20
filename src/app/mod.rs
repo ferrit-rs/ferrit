@@ -80,19 +80,6 @@ pub struct CommitPopupView<'a> {
 pub struct BranchLog {
     pub branch: String,
     pub commits: Vec<git::CommitEntry>,
-    /// Cheap content signature for `view_sig`'s "did this actually change"
-    /// check: there is no single diff `text` to compare here.
-    sig: String,
-}
-
-/// Identity of what `DiffView` describes. `update_right_pane` resets the scroll
-/// only when this changes, so a background refresh of an unchanged selection
-/// keeps its viewport.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum RightKey {
-    File { path: PathBuf },
-    Commit { full_hash: String },
-    BranchLog { branch: String },
 }
 
 struct RenderedDiff {
@@ -317,16 +304,6 @@ const WHEEL_LINES: isize = 3;
 
 /// `(discriminant, diff text)` for cheap "did the right pane actually change"
 /// checks: `String` equality on a few KB, no hashing.
-fn view_sig(v: &DiffView) -> (u8, &str, &str) {
-    match v {
-        DiffView::None => (0, "", ""),
-        DiffView::Note(m) => (1, m.as_str(), ""),
-        DiffView::Files(f) => (2, f.unstaged.text.as_str(), f.staged.text.as_str()),
-        DiffView::Commit(_, d) => (3, d.text.as_str(), ""),
-        DiffView::BranchLog(log) => (4, log.sig.as_str(), ""),
-    }
-}
-
 /// The five left panes, in top-to-bottom screen order.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
 pub enum Pane {
@@ -499,12 +476,25 @@ pub struct App {
     /// `feed_key`-driven test with no `run()` leaves `f`/`p`/`P` inert
     /// unless it calls `start_remote_op` directly with its own channel.
     event_sender: Option<mpsc::Sender<AppEvent>>,
+    /// One snapshot worker at a time. Bursty filesystem events collapse into
+    /// one follow-up snapshot instead of queuing stale concurrent reads.
+    refresh_in_flight: bool,
+    refresh_pending: bool,
+    /// Remote failure must outlive snapshot completion that was requested
+    /// immediately after the remote command.
+    remote_refresh_error: Option<String>,
+    /// One selected-diff worker; only latest requested key waits behind it.
+    diff_query_in_flight: bool,
+    pending_diff_query: Option<(RightKey, u64)>,
+    diff_generation: u64,
+    diff_refresh_requested: bool,
 }
 
 mod text_buffer;
 mod tree;
 
 mod branch_actions;
+mod diff_query;
 mod drill_nav;
 mod input;
 mod popups;
@@ -514,6 +504,9 @@ mod staging;
 #[cfg(test)]
 mod tests;
 
+#[doc(hidden)]
+pub use diff_query::DiffCompletion;
+use diff_query::{DiffQueryResult, RightKey};
 use text_buffer::TextBuffer;
 use tree::{FileRow, commit_drill_files, tree_rows};
 
@@ -559,6 +552,13 @@ impl App {
             remote_busy: None,
             status_note: None,
             event_sender: None,
+            refresh_in_flight: false,
+            refresh_pending: false,
+            remote_refresh_error: None,
+            diff_query_in_flight: false,
+            pending_diff_query: None,
+            diff_generation: 0,
+            diff_refresh_requested: false,
         }
     }
 
@@ -604,7 +604,39 @@ impl App {
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
         let Some(repo) = &mut self.repo else { return };
-        match repo.snapshot() {
+        let result = repo.snapshot().map_err(|e| e.to_string());
+        self.apply_refresh_result(result);
+    }
+
+    /// Request refresh without blocking the TUI. Outside `run()` (tests and
+    /// startup helpers), retain synchronous behavior.
+    pub(super) fn request_refresh(&mut self) {
+        let Some(sender) = self.event_sender.clone() else {
+            self.refresh();
+            return;
+        };
+        if self.refresh_in_flight {
+            self.refresh_pending = true;
+            return;
+        }
+        let Some(path) = self
+            .repo
+            .as_ref()
+            .map(|repo| repo.reopen_path().to_path_buf())
+        else {
+            return;
+        };
+        self.refresh_in_flight = true;
+        thread::spawn(move || {
+            let result = git::Repo::open(&path)
+                .and_then(|mut repo| repo.snapshot())
+                .map_err(|error| error.to_string());
+            let _ = sender.send(AppEvent::RefreshDone(result));
+        });
+    }
+
+    fn apply_refresh_result(&mut self, result: Result<git::Snapshot, String>) {
+        match result {
             Ok(snap) => {
                 self.header = snap.header;
                 self.files = snap.files;
@@ -614,7 +646,7 @@ impl App {
                 self.stashes = snap.stashes;
                 self.last_error = None;
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(error) => self.last_error = Some(error),
         }
 
         // A drilled branch log (Enter on Branches) stays live across a
@@ -657,7 +689,19 @@ impl App {
             let cursor = &mut self.selection[pane];
             *cursor = (*cursor).min(last);
         }
+        self.diff_refresh_requested = true;
         self.update_right_pane();
+    }
+
+    fn on_refresh_done(&mut self, result: Result<git::Snapshot, String>) {
+        self.refresh_in_flight = false;
+        let rerun = std::mem::take(&mut self.refresh_pending);
+        self.apply_refresh_result(result);
+        if rerun {
+            self.request_refresh();
+        } else if let Some(error) = self.remote_refresh_error.take() {
+            self.last_error = Some(error);
+        }
     }
 
     /// Rebuild both cached right-pane values (`preview`, then `diff`) for the
@@ -700,6 +744,8 @@ impl App {
         if matches!(self.preview, Preview::Image(_)) {
             self.diff = DiffView::None;
             self.right_key = None;
+            self.diff_generation = self.diff_generation.saturating_add(1);
+            self.pending_diff_query = None;
             self.mode = Mode::Nav;
             return;
         }
@@ -707,23 +753,98 @@ impl App {
             None => {
                 self.diff = DiffView::None;
                 self.right_key = None;
+                self.diff_generation = self.diff_generation.saturating_add(1);
+                self.pending_diff_query = None;
                 self.right_scroll = 0;
                 self.mode = Mode::Nav;
             },
             Some(key) if self.right_key.as_ref() == Some(&key) => {
-                let rebuilt = self.build_diff(&key);
-                if view_sig(&rebuilt) != view_sig(&self.diff) {
-                    self.diff = rebuilt;
+                if std::mem::take(&mut self.diff_refresh_requested) {
+                    self.diff_generation = self.diff_generation.saturating_add(1);
+                    self.diff = DiffView::Note("loading diff...".into());
+                    self.queue_diff_query(key, self.diff_generation);
                 }
                 self.clamp_right_scroll();
                 self.resync_diff_cursor();
             },
             Some(key) => {
                 self.right_scroll = 0;
-                self.diff = self.build_diff(&key);
-                self.right_key = Some(key);
+                self.right_key = Some(key.clone());
+                self.diff_generation = self.diff_generation.saturating_add(1);
+                self.diff = DiffView::Note("loading diff...".into());
+                self.diff_refresh_requested = false;
+                self.queue_diff_query(key, self.diff_generation);
                 self.mode = Mode::Nav;
             },
+        }
+    }
+
+    fn queue_diff_query(&mut self, key: RightKey, generation: u64) {
+        let Some(sender) = self.event_sender.clone() else {
+            self.diff = self.build_diff(&key);
+            return;
+        };
+        let Some(path) = self
+            .repo
+            .as_ref()
+            .map(|repo| repo.reopen_path().to_path_buf())
+        else {
+            self.diff = DiffView::None;
+            return;
+        };
+        if self.diff_query_in_flight {
+            self.pending_diff_query = Some((key, generation));
+            return;
+        }
+        self.start_diff_query(sender, path, key, generation);
+    }
+
+    fn start_diff_query(
+        &mut self,
+        sender: mpsc::Sender<AppEvent>,
+        path: PathBuf,
+        key: RightKey,
+        generation: u64,
+    ) {
+        self.diff_query_in_flight = true;
+        thread::spawn(move || {
+            let result = git::Repo::open(&path)
+                .map_err(|error| error.to_string())
+                .and_then(|repo| diff_query::load(&repo, &key));
+            let _ = sender.send(AppEvent::DiffDone(DiffCompletion {
+                key,
+                generation,
+                result,
+            }));
+        });
+    }
+
+    fn on_diff_done(&mut self, completion: DiffCompletion) {
+        let DiffCompletion {
+            key,
+            generation,
+            result,
+        } = completion;
+        self.diff_query_in_flight = false;
+        if generation == self.diff_generation && self.right_key.as_ref() == Some(&key) {
+            self.diff = match result {
+                Ok(result) => self.diff_view_from_query(&key, result),
+                Err(error) => DiffView::Note(error),
+            };
+            self.clamp_right_scroll();
+            self.resync_diff_cursor();
+        }
+        if let Some((next_key, next_generation)) = self.pending_diff_query.take()
+            && next_generation == self.diff_generation
+            && self.right_key.as_ref() == Some(&next_key)
+            && let (Some(sender), Some(path)) = (
+                self.event_sender.clone(),
+                self.repo
+                    .as_ref()
+                    .map(|repo| repo.reopen_path().to_path_buf()),
+            )
+        {
+            self.start_diff_query(sender, path, next_key, next_generation);
         }
     }
 
@@ -851,55 +972,47 @@ impl App {
         }
     }
 
-    /// Run the diff subprocess for `key`. No repo (mock) means no diff, so the
-    /// mock sample text keeps showing. An empty result or an error becomes a
-    /// dim one-line `Note`, never a panic.
+    /// Run the diff read for `key`; worker and eventless paths share this
+    /// function so Git errors have identical UI treatment.
     fn build_diff(&self, key: &RightKey) -> DiffView {
         let Some(repo) = &self.repo else {
             return DiffView::None;
         };
-        let opts = DiffOpts::default();
-        match key {
-            RightKey::File { path } => {
-                match (
-                    repo.file_diff(path, DiffSide::Worktree, opts),
-                    repo.file_diff(path, DiffSide::Staged, opts),
-                ) {
-                    (Ok(unstaged), Ok(staged))
-                        if unstaged.files.is_empty() && staged.files.is_empty() =>
-                    {
-                        DiffView::Note("no changes to show".into())
-                    },
-                    (Ok(unstaged), Ok(staged)) => DiffView::Files(FilesDiff { unstaged, staged }),
-                    (Err(e), _) | (_, Err(e)) => DiffView::Note(e.to_string()),
+        match diff_query::load(repo, key) {
+            Ok(result) => self.diff_view_from_query(key, result),
+            Err(error) => DiffView::Note(error),
+        }
+    }
+
+    fn diff_view_from_query(&self, key: &RightKey, result: DiffQueryResult) -> DiffView {
+        match (key, result) {
+            (RightKey::File { .. }, DiffQueryResult::File { unstaged, staged })
+                if unstaged.files.is_empty() && staged.files.is_empty() =>
+            {
+                DiffView::Note("no changes to show".into())
+            },
+            (RightKey::File { .. }, DiffQueryResult::File { unstaged, staged }) => {
+                DiffView::Files(FilesDiff { unstaged, staged })
+            },
+            (RightKey::Commit { full_hash }, DiffQueryResult::Commit(diff)) => {
+                let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
+                match self
+                    .commits
+                    .iter()
+                    .chain(drill_commits)
+                    .find(|commit| &commit.full_hash == full_hash)
+                {
+                    Some(entry) => DiffView::Commit(entry.clone(), diff),
+                    None => DiffView::Note("commit not in the list".into()),
                 }
             },
-            RightKey::Commit { full_hash } => match repo.commit_diff(full_hash, opts) {
-                Ok(diff) => {
-                    let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
-                    match self
-                        .commits
-                        .iter()
-                        .chain(drill_commits)
-                        .find(|c| &c.full_hash == full_hash)
-                    {
-                        Some(entry) => DiffView::Commit(entry.clone(), diff),
-                        None => DiffView::Note("commit not in the list".into()),
-                    }
-                },
-                Err(e) => DiffView::Note(e.to_string()),
+            (RightKey::BranchLog { branch }, DiffQueryResult::BranchLog(commits)) => {
+                DiffView::BranchLog(BranchLog {
+                    branch: branch.clone(),
+                    commits,
+                })
             },
-            RightKey::BranchLog { branch } => match repo.branch_log(branch) {
-                Ok(commits) => {
-                    let sig = commits.iter().map(|c| c.full_hash.as_str()).collect();
-                    DiffView::BranchLog(BranchLog {
-                        branch: branch.clone(),
-                        commits,
-                        sig,
-                    })
-                },
-                Err(e) => DiffView::Note(e.to_string()),
-            },
+            _ => DiffView::Note("diff result did not match selection".into()),
         }
     }
 
@@ -1394,7 +1507,9 @@ impl App {
                 },
                 AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
                 AppEvent::Input(_) => {},
-                AppEvent::Refresh => self.refresh(),
+                AppEvent::Refresh => self.request_refresh(),
+                AppEvent::RefreshDone(result) => self.on_refresh_done(result),
+                AppEvent::DiffDone(completion) => self.on_diff_done(completion),
                 AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             }
         }

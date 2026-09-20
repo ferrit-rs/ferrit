@@ -22,6 +22,11 @@ pub enum AppEvent {
     Input(Event),
     /// The repo or worktree changed, or the poll timer fired. Re-snapshot.
     Refresh,
+    /// Repository snapshot finished off-thread. Error is flattened here so
+    /// the event boundary carries only owned, sendable application data.
+    RefreshDone(Result<crate::git::Snapshot, String>),
+    /// Selected diff read finished. Generation and key reject stale results.
+    DiffDone(crate::app::DiffCompletion),
     /// A background `fetch`/`pull`/`push` finished. `message` is already a
     /// user-facing string (`Ok` success line or `Err` failure text) — this
     /// module stays git-agnostic, so the spawned thread converts a

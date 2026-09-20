@@ -108,19 +108,18 @@ impl App {
     /// `run()` loop to receive the result for it.
     pub fn on_remote_done(&mut self, _op: events::RemoteOp, message: Result<String, String>) {
         self.remote_busy = None;
-        // `refresh()` first, not last: it sets `last_error` on its own
-        // (`None` on a successful snapshot, `Some` on a failed one), and
-        // the remote op's own message is the one that should have the
-        // final word on what the Status pane shows — reversing the order
-        // would let a routine post-op `refresh()` silently clear the
-        // very failure line it is meant to report.
-        self.refresh();
+        // Request refresh before setting the remote result. Async snapshot
+        // completion preserves this operation's failure as the final Status
+        // line; eventless callers refresh synchronously, then set it here.
+        self.request_refresh();
         match message {
             Ok(line) => {
+                self.remote_refresh_error = None;
                 self.last_error = None;
                 self.status_note = Some(line);
             },
             Err(line) => {
+                self.remote_refresh_error = self.event_sender.as_ref().map(|_| line.clone());
                 self.status_note = None;
                 self.last_error = Some(line);
             },

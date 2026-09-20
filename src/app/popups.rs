@@ -206,7 +206,7 @@ impl App {
             Ok(_hash) => {
                 self.commit_draft = None;
                 self.popup = None;
-                self.refresh();
+                self.request_refresh();
             },
             Err(git::GitError::NothingStaged) => {
                 self.popup = Some(Popup::Note("nothing staged to commit".to_owned()));

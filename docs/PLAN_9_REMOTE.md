@@ -499,8 +499,9 @@ path) remote URL, no network, no real GitHub involved — the same trick
 - Ahead/behind (Status header, every Branches row) reflects reality
   immediately after a fetch or pull, with no extra keypress.
 - `src/git/` still has no `ratatui` import (`cargo tree` check, unchanged
-  since phase 2); the one background thread this phase adds lives in
-  `app.rs`, not inside `git::`.
+  since phase 2). Remote operations and repository snapshots run on
+  background threads; snapshot results cross into `app.rs`, where refresh
+  events coalesce while one read is in flight.
 - `cargo clippy --all-targets` clean; `tests/git_remote.rs`,
   `tests/app_remote.rs` pass, including the two-repo fixture and the
   threading assertions.

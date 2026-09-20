@@ -53,7 +53,7 @@ impl App {
     /// forward), then surface a failure in the Status pane. Same shape as
     /// `finish_apply`.
     pub(super) fn finish_branch_action(&mut self, result: GitResult<()>) {
-        self.refresh();
+        self.request_refresh();
         if let Err(e) = result {
             self.last_error = Some(e.to_string());
         }
@@ -106,7 +106,7 @@ impl App {
         match repo.create_branch(&name) {
             Ok(()) => {
                 self.popup = None;
-                self.refresh();
+                self.request_refresh();
             },
             Err(e) => self.last_error = Some(e.to_string()),
         }
@@ -191,7 +191,7 @@ impl App {
         let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
         let result = repo.merge_branch(&name);
-        self.refresh();
+        self.request_refresh();
         match result {
             Ok(git::MergeOutcome::Merged) => {},
             Ok(git::MergeOutcome::Conflicted) => {

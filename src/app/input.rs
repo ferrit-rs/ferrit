@@ -109,7 +109,7 @@ impl App {
             KeyCode::Char('c') => self.open_commit(git::CommitKind::Normal),
             KeyCode::Char('A') => self.open_commit(git::CommitKind::Amend),
             KeyCode::Char('w') => self.open_commit(git::CommitKind::Reword),
-            KeyCode::Char('r') => self.refresh(),
+            KeyCode::Char('r') => self.request_refresh(),
             KeyCode::Char('f') => self.trigger_remote_op(events::RemoteOp::Fetch),
             KeyCode::Char('p') => self.trigger_remote_op(events::RemoteOp::Pull),
             KeyCode::Char('P') => self.push_current_branch(),

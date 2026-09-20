@@ -43,6 +43,9 @@ const COMMITS_LIMIT: usize = 200;
 /// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
 pub struct Repo {
     inner: Repository,
+    /// Path used to discover this repository. Lets the TUI reopen an owned
+    /// handle inside a refresh worker; `git2::Repository` itself stays local.
+    reopen_path: std::path::PathBuf,
 }
 
 /// Everything the wired panes need from one refresh.
@@ -66,6 +69,7 @@ pub(crate) fn short_hash(oid: &git2::Oid) -> String {
 impl Repo {
     /// Open the repository at or above `path`. Walks up like `git` does.
     pub fn open(path: &Path) -> GitResult<Self> {
+        let reopen_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let inner = Repository::discover(path).map_err(|e| {
             if e.code() == git2::ErrorCode::NotFound {
                 GitError::NotARepository(path.to_path_buf())
@@ -73,7 +77,12 @@ impl Repo {
                 GitError::Open(e)
             }
         })?;
-        Ok(Self { inner })
+        Ok(Self { inner, reopen_path })
+    }
+
+    /// Path for opening a fresh handle in a background worker.
+    pub fn reopen_path(&self) -> &Path {
+        &self.reopen_path
     }
 
     /// The repository's directory name, e.g. `ferrit`. Used in the status

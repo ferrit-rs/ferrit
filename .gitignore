@@ -9,3 +9,4 @@ Cargo.lock.orig
 !.vscode/settings.json
 *.swp
 .verify-shots/
+__TMP/

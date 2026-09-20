@@ -226,7 +226,7 @@ impl App {
     /// failed attempt (context drift from an external edit) re-reads the
     /// current diff for the retry (`docs/PLAN_6_STAGING.md` "apply fails").
     pub(super) fn finish_apply(&mut self, result: GitResult<()>) {
-        self.refresh();
+        self.request_refresh();
         if let Err(e) = result {
             self.last_error = Some(e.to_string());
         }
@@ -370,7 +370,7 @@ impl App {
             ConfirmAction::DeleteBranch { name, force } => {
                 let Some(repo) = &self.repo else { return };
                 match repo.delete_branch(&name, force) {
-                    Ok(()) => self.refresh(),
+                    Ok(()) => self.request_refresh(),
                     Err(git::GitError::BranchFailed(msg))
                         if !force && msg.contains("is not fully merged") =>
                     {

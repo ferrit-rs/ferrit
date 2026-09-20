@@ -92,6 +92,11 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Changed
 
+- Manual and automatic repository refreshes now read snapshots on a worker
+  while the TUI stays responsive. Bursts coalesce into one follow-up refresh.
+- Selected file diffs, commit diffs and branch logs load off-thread. Fast
+  navigation keeps only one active read and latest pending selection; stale
+  results cannot replace the current preview.
 - Every bordered box (left panes, right pane, command log, help overlay,
   image preview) now uses rounded corners (`╭╮╰╯`), matching lazygit's own
   look, instead of ratatui's square-corner default (`┌┐└┘`).
