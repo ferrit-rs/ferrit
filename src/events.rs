@@ -62,6 +62,10 @@ const FS_DEBOUNCE: Duration = Duration::from_millis(150);
 /// events, editors that swap files in place.
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
+/// Process bursts of keys without repainting after every repeated key, while
+/// keeping redraws frequent enough that a paste/repeat storm cannot starve UI.
+const MAX_EVENT_BATCH: usize = 256;
+
 /// Live sources feeding `AppEvent`s. Keep the value alive for the whole run:
 /// dropping it stops the watcher and lets the sender threads wind down.
 pub struct Events {
@@ -99,6 +103,20 @@ impl Events {
     /// Block until the next event. `Err` only once every sender is gone.
     pub fn next(&self) -> Result<AppEvent> {
         Ok(self.rx.recv()?)
+    }
+
+    /// Block for one event, then collect the already-queued tail up to a fixed
+    /// bound. The app handles the batch in channel order and draws once after
+    /// it, matching the input-batching pattern used by responsive TUIs.
+    pub fn next_batch(&self) -> Result<Vec<AppEvent>> {
+        let mut batch = vec![self.rx.recv()?];
+        while batch.len() < MAX_EVENT_BATCH {
+            match self.rx.try_recv() {
+                Ok(event) => batch.push(event),
+                Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => break,
+            }
+        }
+        Ok(batch)
     }
 
     /// A cloneable handle so `App` can hand a background thread a way back

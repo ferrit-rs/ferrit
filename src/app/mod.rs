@@ -1307,11 +1307,10 @@ impl App {
         git::Repo::open(&self.watch_root()?).ok()
     }
 
-    /// Draw, then block for the next event, until `should_quit`. Events come
-    /// from three sources multiplexed by `Events`: terminal input, a recursive
-    /// filesystem watch on the worktree, and a 10s poll fallback. A change
-    /// staged from another shell arrives as `AppEvent::Refresh`, so the panes
-    /// track the repo the way lazygit's do.
+    /// Draw, then block for the next event batch, until `should_quit`. Events
+    /// come from terminal input, a recursive worktree watch, and a 10s poll.
+    /// Bounded batches avoid repainting for every auto-repeat key while still
+    /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
         let events = Events::new(self.watch_root().as_deref())?;
         // A background fetch/pull/push (`start_remote_op`) needs its own
@@ -1331,17 +1330,22 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw(frame, self))?;
 
-            match events.next()? {
-                AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
-                    self.on_key(key);
-                },
-                AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
-                AppEvent::Input(_) => {},
-                AppEvent::Refresh => self.request_refresh(),
-                AppEvent::RefreshDone(completion) => self.on_refresh_done(completion),
-                AppEvent::DiffDone(completion) => self.on_diff_done(completion),
-                AppEvent::ImageDone(completion) => self.on_image_done(completion),
-                AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+            for event in events.next_batch()? {
+                match event {
+                    AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                        self.on_key(key);
+                    },
+                    AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
+                    AppEvent::Input(_) => {},
+                    AppEvent::Refresh => self.request_refresh(),
+                    AppEvent::RefreshDone(completion) => self.on_refresh_done(completion),
+                    AppEvent::DiffDone(completion) => self.on_diff_done(completion),
+                    AppEvent::ImageDone(completion) => self.on_image_done(completion),
+                    AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+                }
+                if self.should_quit {
+                    break;
+                }
             }
         }
         Ok(())

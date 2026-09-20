@@ -105,6 +105,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   `SelectList` and `KeyBar` components with existing styling preserved.
 - Pane-list state/scroll rendering and preview scrollbars now use shared
   `PaneList` and `ScrollBar` components.
+- The event loop now handles bounded batches of queued input and worker events,
+  avoiding a repaint for every key-repeat while preserving event order.
+- Two-sided Files diff rendering now lives in `src/ui/diff.rs`, separate from
+  the screen layout and shared overlays.
 - Component and Git APIs now use explicit module paths; `clippy::pub_use` is
   denied crate-wide to prevent re-export shortcuts from returning.
 - Every bordered box (left panes, right pane, command log, help overlay,
