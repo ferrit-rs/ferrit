@@ -1,9 +1,10 @@
 # Visual verification of a TUI feature
 
-macOS Screen Recording permission isn't available here, so `screencapture`
-is blocked. This is the workaround: drive ferrit headless under tmux, render
-a real screenshot with headless Chrome, bundle the steps into one HTML
-report, open it.
+Drive ferrit headless under tmux, capture a real screenshot of it with
+macOS `screencapture` on an attached Terminal.app window, bundle the steps
+into one HTML report, open it. Needs Screen Recording permission (System
+Settings -> Privacy & Security -> Screen Recording) granted to whatever app
+hosts this shell (fully quit and restart it after granting).
 
 ## Steps
 
@@ -17,8 +18,10 @@ report, open it.
    .dev-tools/tui-shot.sh <feature>/03_drill Enter
    ```
    The first call starts the tmux session (`FERRIT_NO_GRAPHICS=1`, see
-   Gotcha below); later calls reuse it. Extra args are keys sent via
-   `tmux send-keys`, one per key, in order.
+   Gotcha below) and opens/resizes the Terminal.app window used for
+   capture (cached in `.verify-shots/.terminal_window_id`); later calls
+   reuse both. Extra args are keys sent via `tmux send-keys`, one per key,
+   in order.
 4. For each step, write a one-paragraph `<feature>/<NN_step>.note.txt` next
    to its `.png`: what was pressed, what should change on screen, and why
    that proves the feature works. This is what turns the report into
