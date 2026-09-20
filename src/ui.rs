@@ -7,21 +7,20 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
-use crate::app::{App, CommitPopupView, DiffView, PANES, Pane};
-use crate::components::ui::dialog::Dialog;
+use crate::app::{App, DiffView, PANES, Pane};
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::components::ui::select_list::SelectList;
 use crate::image::preview::Preview;
-use crate::{git, mock, theme};
+use crate::{mock, theme};
 
 mod diff;
+mod popups;
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -60,16 +59,16 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_keybar(frame, keybar, app);
 
     if show_help {
-        draw_help(frame, area);
+        popups::draw_help(frame, area);
     }
     if let Some(view) = app.commit_popup() {
-        draw_commit_popup(frame, area, &view);
+        popups::draw_commit(frame, area, &view);
     } else if let Some(view) = app.new_branch_popup() {
-        draw_commit_popup(frame, area, &view);
+        popups::draw_commit(frame, area, &view);
     } else if let Some((remotes, selected)) = app.remote_pick() {
-        draw_remote_pick_popup(frame, area, remotes, selected);
+        popups::draw_remote_pick(frame, area, remotes, selected);
     } else if let Some(msg) = app.note_popup() {
-        draw_note_popup(frame, area, msg);
+        popups::draw_note(frame, area, msg);
     }
 }
 
@@ -550,136 +549,4 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
         Some(message) => KeyBar::confirm(message).render(frame, area),
         None => KeyBar::hints(text).render(frame, area),
     }
-}
-
-fn draw_help(frame: &mut Frame<'_>, area: Rect) {
-    let width = 55.min(area.width);
-    // Grow to fit every line of `HELP` (plus its two border rows) rather
-    // than clipping the bottom of the list on a short terminal.
-    let content_height = u16::try_from(mock::HELP.lines().count())
-        .unwrap_or(area.height)
-        .saturating_add(2);
-    let height = content_height.min(area.height);
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(" keybindings ", focused))
-        .size(width, height)
-        .border_style(focused)
-        .render(frame, area);
-    frame.render_widget(Paragraph::new(mock::HELP), dialog.body);
-}
-
-/// A centered box for a reusable `TextInput`: title, the draft's
-/// lines with the cursor overlaid (reverse-video on that one character,
-/// same trick as the diff cursor), and a footer of key hints — plus, when
-/// `view.toggles` is `Some`, a status line above the hints for the commit
-/// popup's sign-off / no-verify toggles. `docs/PLAN_7_COMMIT.md`'s popup,
-/// minus `tui-textarea` (see that plan's deviation note); reused as-is for
-/// the new-branch popup (`docs/PLAN_8_BRANCHES.md`) via `view.toggles: None`
-/// — same shape, one line of input instead of a paragraph, no toggle row.
-fn draw_commit_popup(frame: &mut Frame<'_>, area: Rect, view: &CommitPopupView<'_>) {
-    let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
-    let body_height = u16::try_from(view.input.lines().len().max(1)).unwrap_or(u16::MAX);
-    let footer_height: u16 = if view.toggles.is_some() { 2 } else { 1 };
-    let height = body_height
-        .saturating_add(footer_height + 2)
-        .min(area.height);
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(format!(" {} ", view.title), focused))
-        .size(width, height)
-        .footer_rows(footer_height)
-        .border_style(focused)
-        .render(frame, area);
-    let footer_area = dialog.footer;
-    view.input.render(frame, dialog.body);
-
-    let hints = KeyBar::hints(view.hints).line();
-    match view.toggles {
-        Some((sign_off, no_verify)) => {
-            let sign_off_span = if sign_off {
-                Span::styled("on", Style::new().fg(theme::ADD))
-            } else {
-                Span::styled("off", Style::new().fg(theme::IDLE))
-            };
-            let verify_span = if no_verify {
-                Span::styled(
-                    "off",
-                    Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD),
-                )
-            } else {
-                Span::styled("on", Style::new().fg(theme::ADD))
-            };
-            let status = Line::from(vec![
-                Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
-                sign_off_span,
-                Span::raw("   "),
-                Span::styled("verify: ", Style::new().fg(theme::IDLE)),
-                verify_span,
-            ]);
-            frame.render_widget(Paragraph::new(vec![status, hints]), footer_area);
-        },
-        None => frame.render_widget(Paragraph::new(hints), footer_area),
-    }
-}
-
-/// `P` with no upstream and 2+ remotes: which one to push to.
-/// `docs/PLAN_9_REMOTE.md`'s "No upstream" flow. A plain highlighted list,
-/// not a text-input popup — `j`/`k` move `selected` (`App::popup_key`),
-/// `Enter` pushes there, `Esc` cancels.
-fn draw_remote_pick_popup(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    remotes: &[git::remote::RemoteEntry],
-    selected: usize,
-) {
-    let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
-    let body_height = u16::try_from(remotes.len().max(1)).unwrap_or(u16::MAX);
-    let height = body_height.saturating_add(3).min(area.height);
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(" Push to which remote? ", focused))
-        .size(width, height)
-        .footer_rows(1)
-        .border_style(focused)
-        .render(frame, area);
-    let body_area = dialog.body;
-    let footer_area = dialog.footer;
-
-    let lines: Vec<Line<'static>> = remotes
-        .iter()
-        .map(|remote| Line::raw(remote.name.clone()))
-        .collect();
-    SelectList::new(&lines, selected)
-        .selection_style(theme::selection_style(true))
-        .render(frame, body_area);
-    KeyBar::hints("Push: Enter | Cancel: Esc").render(frame, footer_area);
-}
-
-/// A dismissible note popup: a commit failure (including a rejecting hook's
-/// full output) or "nothing staged" / "empty commit message". `Esc` or
-/// `Enter` dismisses (`App::popup_key`).
-fn draw_note_popup(frame: &mut Frame<'_>, area: Rect, message: &str) {
-    let width = 60.min(area.width);
-    let content_lines = message.lines().count().max(1);
-    let height = u16::try_from(content_lines)
-        .unwrap_or(u16::MAX)
-        .saturating_add(4)
-        .min(area.height);
-    let warn = Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(" commit ", warn))
-        .size(width, height)
-        .footer_rows(1)
-        .border_style(warn)
-        .render(frame, area);
-    let body_area = dialog.body;
-    let footer_area = dialog.footer;
-    frame.render_widget(
-        Paragraph::new(message.to_owned()).wrap(Wrap { trim: false }),
-        body_area,
-    );
-    frame.render_widget(
-        Paragraph::new(Line::styled(
-            "Esc / Enter to dismiss",
-            Style::new().fg(theme::IDLE),
-        )),
-        footer_area,
-    );
 }

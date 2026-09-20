@@ -42,6 +42,16 @@ impl<'a> Dialog<'a> {
         self
     }
 
+    /// Size the shell to its content rows plus borders, clamped to the
+    /// available terminal area at render time. `footer_rows == 0` omits the
+    /// footer region. Use this for dialogs whose content determines height.
+    pub fn fit_content(mut self, width: u16, body_rows: u16, footer_rows: u16) -> Self {
+        self.width = width;
+        self.height = body_rows.saturating_add(footer_rows).saturating_add(2);
+        self.footer_rows = (footer_rows > 0).then_some(footer_rows);
+        self
+    }
+
     pub fn footer_rows(mut self, rows: u16) -> Self {
         self.footer_rows = Some(rows);
         self

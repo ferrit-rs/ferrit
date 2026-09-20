@@ -105,6 +105,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   `SelectList` and `KeyBar` components with existing styling preserved.
 - Pane-list state/scroll rendering and preview scrollbars now use shared
   `PaneList` and `ScrollBar` components.
+- Popup rendering is isolated in `src/ui/popups.rs`; shared dialogs support
+  content-sized layouts and compose existing `TextInput`, `SelectList`, and
+  `KeyBar` components.
 - The event loop now handles bounded batches of queued input and worker events,
   avoiding a repaint for every key-repeat while preserving event order.
 - Refresh restores selection by stable file, directory, branch, commit, or
