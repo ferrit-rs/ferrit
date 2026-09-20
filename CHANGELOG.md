@@ -97,6 +97,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Selected file diffs, commit diffs and branch logs load off-thread. Fast
   navigation keeps only one active read and latest pending selection; stale
   results cannot replace the current preview.
+- Image blob reads and decoding, plus refreshes of drilled branch/commit data,
+  now run off-thread too. Old image results cannot replace a newer selection.
 - Every bordered box (left panes, right pane, command log, help overlay,
   image preview) now uses rounded corners (`╭╮╰╯`), matching lazygit's own
   look, instead of ratatui's square-corner default (`┌┐└┘`).

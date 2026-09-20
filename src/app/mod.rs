@@ -82,6 +82,29 @@ pub struct BranchLog {
     pub commits: Vec<git::CommitEntry>,
 }
 
+/// Snapshot plus any active drill-down data loaded in the same worker.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct RefreshCompletion {
+    pub(crate) snapshot: Result<git::Snapshot, String>,
+    pub(crate) branch_log: Option<(String, Result<Vec<git::CommitEntry>, String>)>,
+    pub(crate) commit_files: Option<(String, Result<Vec<git::FileEntry>, String>)>,
+}
+
+#[derive(Default)]
+struct RefreshQueryState {
+    in_flight: bool,
+    pending: bool,
+}
+
+#[derive(Default)]
+struct ImageQueryState {
+    path: Option<PathBuf>,
+    generation: u64,
+    in_flight: bool,
+    pending: Option<(PathBuf, u64)>,
+}
+
 struct RenderedDiff {
     key: Option<RightKey>,
     source: String,
@@ -478,16 +501,13 @@ pub struct App {
     event_sender: Option<mpsc::Sender<AppEvent>>,
     /// One snapshot worker at a time. Bursty filesystem events collapse into
     /// one follow-up snapshot instead of queuing stale concurrent reads.
-    refresh_in_flight: bool,
-    refresh_pending: bool,
+    refresh_query: RefreshQueryState,
     /// Remote failure must outlive snapshot completion that was requested
     /// immediately after the remote command.
     remote_refresh_error: Option<String>,
     /// One selected-diff worker; only latest requested key waits behind it.
-    diff_query_in_flight: bool,
-    pending_diff_query: Option<(RightKey, u64)>,
-    diff_generation: u64,
-    diff_refresh_requested: bool,
+    diff_query: DiffQueryState,
+    image_query: ImageQueryState,
 }
 
 mod text_buffer;
@@ -496,6 +516,7 @@ mod tree;
 mod branch_actions;
 mod diff_query;
 mod drill_nav;
+mod image_query;
 mod input;
 mod popups;
 mod remote;
@@ -506,7 +527,9 @@ mod tests;
 
 #[doc(hidden)]
 pub use diff_query::DiffCompletion;
-use diff_query::{DiffQueryResult, RightKey};
+use diff_query::{DiffQueryState, RightKey};
+#[doc(hidden)]
+pub use image_query::ImageCompletion;
 use text_buffer::TextBuffer;
 use tree::{FileRow, commit_drill_files, tree_rows};
 
@@ -552,13 +575,10 @@ impl App {
             remote_busy: None,
             status_note: None,
             event_sender: None,
-            refresh_in_flight: false,
-            refresh_pending: false,
+            refresh_query: RefreshQueryState::default(),
             remote_refresh_error: None,
-            diff_query_in_flight: false,
-            pending_diff_query: None,
-            diff_generation: 0,
-            diff_refresh_requested: false,
+            diff_query: DiffQueryState::default(),
+            image_query: ImageQueryState::default(),
         }
     }
 
@@ -596,6 +616,7 @@ impl App {
                 self.last_error = Some(line);
             }
             self.picker = found.picker;
+            self.invalidate_image_query();
             self.update_right_pane();
         }
     }
@@ -603,9 +624,11 @@ impl App {
     /// Re-read the wired panes. On error keep the old snapshot and stash the
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
+        let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
+        let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
         let Some(repo) = &mut self.repo else { return };
-        let result = repo.snapshot().map_err(|e| e.to_string());
-        self.apply_refresh_result(result);
+        let completion = Self::load_refresh(repo, branch, commit);
+        self.apply_refresh_result(completion);
     }
 
     /// Request refresh without blocking the TUI. Outside `run()` (tests and
@@ -615,8 +638,8 @@ impl App {
             self.refresh();
             return;
         };
-        if self.refresh_in_flight {
-            self.refresh_pending = true;
+        if self.refresh_query.in_flight {
+            self.refresh_query.pending = true;
             return;
         }
         let Some(path) = self
@@ -626,17 +649,51 @@ impl App {
         else {
             return;
         };
-        self.refresh_in_flight = true;
+        let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
+        let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
+        self.refresh_query.in_flight = true;
         thread::spawn(move || {
-            let result = git::Repo::open(&path)
-                .and_then(|mut repo| repo.snapshot())
-                .map_err(|error| error.to_string());
-            let _ = sender.send(AppEvent::RefreshDone(result));
+            let completion = match git::Repo::open(&path) {
+                Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit),
+                Err(error) => {
+                    let message = error.to_string();
+                    RefreshCompletion {
+                        snapshot: Err(message.clone()),
+                        branch_log: branch.map(|name| (name, Err(message.clone()))),
+                        commit_files: commit.map(|hash| (hash, Err(message))),
+                    }
+                },
+            };
+            let _ = sender.send(AppEvent::RefreshDone(completion));
         });
     }
 
-    fn apply_refresh_result(&mut self, result: Result<git::Snapshot, String>) {
-        match result {
+    fn load_refresh(
+        repo: &mut git::Repo,
+        branch: Option<String>,
+        commit: Option<String>,
+    ) -> RefreshCompletion {
+        let snapshot = repo.snapshot().map_err(|error| error.to_string());
+        let branch_log = branch.map(|name| {
+            let result = repo.branch_log(&name).map_err(|error| error.to_string());
+            (name, result)
+        });
+        let commit_files = commit.map(|hash| {
+            let result = repo
+                .commit_diff(&hash, DiffOpts::default())
+                .map(|diff| commit_drill_files(&diff))
+                .map_err(|error| error.to_string());
+            (hash, result)
+        });
+        RefreshCompletion {
+            snapshot,
+            branch_log,
+            commit_files,
+        }
+    }
+
+    fn apply_refresh_result(&mut self, completion: RefreshCompletion) {
+        match completion.snapshot {
             Ok(snap) => {
                 self.header = snap.header;
                 self.files = snap.files;
@@ -653,14 +710,19 @@ impl App {
         // background refresh instead of going stale; a branch that vanished
         // (deleted, renamed) backs out of the drill-down instead of erroring
         // the whole refresh.
-        if let Some(branch) = self.branch_drill.as_ref().map(|d| d.branch.clone()) {
-            match self.repo.as_ref().map(|r| r.branch_log(&branch)) {
-                Some(Ok(commits)) => {
+        if let Some((branch, result)) = completion.branch_log
+            && self
+                .branch_drill
+                .as_ref()
+                .is_some_and(|drill| drill.branch == branch)
+        {
+            match result {
+                Ok(commits) => {
                     if let Some(drill) = &mut self.branch_drill {
                         drill.commits = commits;
                     }
                 },
-                _ => self.branch_drill = None,
+                Err(_) => self.branch_drill = None,
             }
         }
 
@@ -668,19 +730,19 @@ impl App {
         // Commits): re-read the file list so it reflects the diff as of
         // this refresh; a commit that vanished (e.g. a reword/rebase that
         // changed its hash) backs out rather than erroring the refresh.
-        if let Some(hash) = self.commit_drill.as_ref().map(|d| d.hash.clone()) {
-            match self
-                .repo
+        if let Some((hash, result)) = completion.commit_files
+            && self
+                .commit_drill
                 .as_ref()
-                .map(|r| r.commit_diff(&hash, DiffOpts::default()))
-            {
-                Some(Ok(diff)) => {
-                    let files = commit_drill_files(&diff);
+                .is_some_and(|drill| drill.hash == hash)
+        {
+            match result {
+                Ok(files) => {
                     if let Some(drill) = &mut self.commit_drill {
                         drill.files = files;
                     }
                 },
-                _ => self.commit_drill = None,
+                Err(_) => self.commit_drill = None,
             }
         }
 
@@ -689,14 +751,15 @@ impl App {
             let cursor = &mut self.selection[pane];
             *cursor = (*cursor).min(last);
         }
-        self.diff_refresh_requested = true;
+        self.diff_query.refresh_requested = true;
+        self.invalidate_image_query();
         self.update_right_pane();
     }
 
-    fn on_refresh_done(&mut self, result: Result<git::Snapshot, String>) {
-        self.refresh_in_flight = false;
-        let rerun = std::mem::take(&mut self.refresh_pending);
-        self.apply_refresh_result(result);
+    fn on_refresh_done(&mut self, completion: RefreshCompletion) {
+        self.refresh_query.in_flight = false;
+        let rerun = std::mem::take(&mut self.refresh_query.pending);
+        self.apply_refresh_result(completion);
         if rerun {
             self.request_refresh();
         } else if let Some(error) = self.remote_refresh_error.take() {
@@ -707,7 +770,7 @@ impl App {
     /// Rebuild both cached right-pane values (`preview`, then `diff`) for the
     /// current focus and selection. Cheap when nothing changed.
     fn update_right_pane(&mut self) {
-        self.preview = self.build_preview();
+        self.update_preview();
         self.update_diff();
         self.sync_commit_file_scroll();
     }
@@ -733,118 +796,6 @@ impl App {
         if let Some(&line) = diff.file_lines().get(*index) {
             self.right_scroll = line;
             self.clamp_right_scroll();
-        }
-    }
-
-    /// Rebuild `diff` from the current focus and selection. An image selection
-    /// owns the right pane, so it clears the diff. A `Refresh` of an unchanged
-    /// selection rebuilds the text but keeps `right_scroll`; a changed
-    /// selection resets the scroll to the top.
-    fn update_diff(&mut self) {
-        if matches!(self.preview, Preview::Image(_)) {
-            self.diff = DiffView::None;
-            self.right_key = None;
-            self.diff_generation = self.diff_generation.saturating_add(1);
-            self.pending_diff_query = None;
-            self.mode = Mode::Nav;
-            return;
-        }
-        match self.right_key_for() {
-            None => {
-                self.diff = DiffView::None;
-                self.right_key = None;
-                self.diff_generation = self.diff_generation.saturating_add(1);
-                self.pending_diff_query = None;
-                self.right_scroll = 0;
-                self.mode = Mode::Nav;
-            },
-            Some(key) if self.right_key.as_ref() == Some(&key) => {
-                if std::mem::take(&mut self.diff_refresh_requested) {
-                    self.diff_generation = self.diff_generation.saturating_add(1);
-                    self.diff = DiffView::Note("loading diff...".into());
-                    self.queue_diff_query(key, self.diff_generation);
-                }
-                self.clamp_right_scroll();
-                self.resync_diff_cursor();
-            },
-            Some(key) => {
-                self.right_scroll = 0;
-                self.right_key = Some(key.clone());
-                self.diff_generation = self.diff_generation.saturating_add(1);
-                self.diff = DiffView::Note("loading diff...".into());
-                self.diff_refresh_requested = false;
-                self.queue_diff_query(key, self.diff_generation);
-                self.mode = Mode::Nav;
-            },
-        }
-    }
-
-    fn queue_diff_query(&mut self, key: RightKey, generation: u64) {
-        let Some(sender) = self.event_sender.clone() else {
-            self.diff = self.build_diff(&key);
-            return;
-        };
-        let Some(path) = self
-            .repo
-            .as_ref()
-            .map(|repo| repo.reopen_path().to_path_buf())
-        else {
-            self.diff = DiffView::None;
-            return;
-        };
-        if self.diff_query_in_flight {
-            self.pending_diff_query = Some((key, generation));
-            return;
-        }
-        self.start_diff_query(sender, path, key, generation);
-    }
-
-    fn start_diff_query(
-        &mut self,
-        sender: mpsc::Sender<AppEvent>,
-        path: PathBuf,
-        key: RightKey,
-        generation: u64,
-    ) {
-        self.diff_query_in_flight = true;
-        thread::spawn(move || {
-            let result = git::Repo::open(&path)
-                .map_err(|error| error.to_string())
-                .and_then(|repo| diff_query::load(&repo, &key));
-            let _ = sender.send(AppEvent::DiffDone(DiffCompletion {
-                key,
-                generation,
-                result,
-            }));
-        });
-    }
-
-    fn on_diff_done(&mut self, completion: DiffCompletion) {
-        let DiffCompletion {
-            key,
-            generation,
-            result,
-        } = completion;
-        self.diff_query_in_flight = false;
-        if generation == self.diff_generation && self.right_key.as_ref() == Some(&key) {
-            self.diff = match result {
-                Ok(result) => self.diff_view_from_query(&key, result),
-                Err(error) => DiffView::Note(error),
-            };
-            self.clamp_right_scroll();
-            self.resync_diff_cursor();
-        }
-        if let Some((next_key, next_generation)) = self.pending_diff_query.take()
-            && next_generation == self.diff_generation
-            && self.right_key.as_ref() == Some(&next_key)
-            && let (Some(sender), Some(path)) = (
-                self.event_sender.clone(),
-                self.repo
-                    .as_ref()
-                    .map(|repo| repo.reopen_path().to_path_buf()),
-            )
-        {
-            self.start_diff_query(sender, path, next_key, next_generation);
         }
     }
 
@@ -920,99 +871,6 @@ impl App {
         match &self.commit_drill {
             Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs),
             None => Vec::new(),
-        }
-    }
-
-    /// The diff identity for the current focus and selection: a worktree /
-    /// staged file for Files, a commit for Commits, nothing elsewhere.
-    fn right_key_for(&self) -> Option<RightKey> {
-        match self.focus {
-            Pane::Files => {
-                let rows = self.files_tree_rows();
-                let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
-                    return None;
-                };
-                let entry = self.files.get(*index)?;
-                Some(RightKey::File {
-                    path: entry.path.clone(),
-                })
-            },
-            // Drilled: the selection indexes the file tree, not `self.commits`
-            // (`commit_tree_rows`), so the diff stays keyed on the drilled
-            // commit's own hash regardless of which file row is highlighted.
-            Pane::Commits => {
-                if let Some(drill) = &self.commit_drill {
-                    Some(RightKey::Commit {
-                        full_hash: drill.hash.clone(),
-                    })
-                } else {
-                    let entry = self.commits.get(self.selected(Pane::Commits))?;
-                    Some(RightKey::Commit {
-                        full_hash: entry.full_hash.clone(),
-                    })
-                }
-            },
-            // Drilled: the selected row is a commit, same as Commits. Not
-            // drilled: no Enter yet, so preview the selected branch's own
-            // log passively (lazygit's live branch -> log, no key needed).
-            Pane::Branches => {
-                if let Some(drill) = &self.branch_drill {
-                    let entry = drill.commits.get(self.selected(Pane::Branches))?;
-                    Some(RightKey::Commit {
-                        full_hash: entry.full_hash.clone(),
-                    })
-                } else {
-                    let entry = self.branches.get(self.selected(Pane::Branches))?;
-                    Some(RightKey::BranchLog {
-                        branch: entry.name.clone(),
-                    })
-                }
-            },
-            _ => None,
-        }
-    }
-
-    /// Run the diff read for `key`; worker and eventless paths share this
-    /// function so Git errors have identical UI treatment.
-    fn build_diff(&self, key: &RightKey) -> DiffView {
-        let Some(repo) = &self.repo else {
-            return DiffView::None;
-        };
-        match diff_query::load(repo, key) {
-            Ok(result) => self.diff_view_from_query(key, result),
-            Err(error) => DiffView::Note(error),
-        }
-    }
-
-    fn diff_view_from_query(&self, key: &RightKey, result: DiffQueryResult) -> DiffView {
-        match (key, result) {
-            (RightKey::File { .. }, DiffQueryResult::File { unstaged, staged })
-                if unstaged.files.is_empty() && staged.files.is_empty() =>
-            {
-                DiffView::Note("no changes to show".into())
-            },
-            (RightKey::File { .. }, DiffQueryResult::File { unstaged, staged }) => {
-                DiffView::Files(FilesDiff { unstaged, staged })
-            },
-            (RightKey::Commit { full_hash }, DiffQueryResult::Commit(diff)) => {
-                let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
-                match self
-                    .commits
-                    .iter()
-                    .chain(drill_commits)
-                    .find(|commit| &commit.full_hash == full_hash)
-                {
-                    Some(entry) => DiffView::Commit(entry.clone(), diff),
-                    None => DiffView::Note("commit not in the list".into()),
-                }
-            },
-            (RightKey::BranchLog { branch }, DiffQueryResult::BranchLog(commits)) => {
-                DiffView::BranchLog(BranchLog {
-                    branch: branch.clone(),
-                    commits,
-                })
-            },
-            _ => DiffView::Note("diff result did not match selection".into()),
         }
     }
 
@@ -1220,34 +1078,6 @@ impl App {
     /// `terminal.clear()`.
     fn preview_is_image(&self) -> bool {
         matches!(self.preview, Preview::Image(_))
-    }
-
-    fn build_preview(&self) -> Preview {
-        if self.focus != Pane::Files {
-            return Preview::None;
-        }
-        let rows = self.files_tree_rows();
-        let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Files)) else {
-            return Preview::None;
-        };
-        let Some(entry) = self.files.get(*index) else {
-            return Preview::None;
-        };
-        if !preview::is_image_path(&entry.path) {
-            return Preview::None;
-        }
-        let bytes = match &self.repo {
-            Some(repo) => match repo.blob_bytes(&entry.path, git::Rev::Workdir) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    return Preview::Note(format!("[image] {}  ({e})", entry.path.display()));
-                },
-            },
-            None => mock::mock_image_bytes(&entry.path)
-                .map(<[u8]>::to_vec)
-                .unwrap_or_default(),
-        };
-        preview::from_bytes(&self.picker, &entry.path, &bytes)
     }
 
     /// The right-pane preview for the current selection.
@@ -1508,8 +1338,9 @@ impl App {
                 AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
                 AppEvent::Input(_) => {},
                 AppEvent::Refresh => self.request_refresh(),
-                AppEvent::RefreshDone(result) => self.on_refresh_done(result),
+                AppEvent::RefreshDone(completion) => self.on_refresh_done(completion),
                 AppEvent::DiffDone(completion) => self.on_diff_done(completion),
+                AppEvent::ImageDone(completion) => self.on_image_done(completion),
                 AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             }
         }
