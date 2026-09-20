@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>report template preview</title>
+<style>
+  :root {
+    --bg: #111;
+    --fg: #ddd;
+    --accent: #8f8;
+    --border: #444;
+    --card: #1a1a1a;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafafa;
+    --fg: #222;
+    --accent: #0a7a3d;
+    --border: #ccc;
+    --card: #fff;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: Menlo, "Courier New", monospace;
+    margin: 0;
+    padding: 24px 24px 64px;
+  }
+  h1 {
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  h2 { font-size: 13px; color: var(--accent); margin-top: 32px; }
+  p { max-width: 70ch; line-height: 1.4; }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 12px;
+  }
+  img {
+    max-width: 640px;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: zoom-in;
+  }
+  img.zoomed { max-width: 100%; cursor: zoom-out; }
+  .placeholder {
+    max-width: 640px;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--border);
+    color: var(--fg);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0.6;
+  }
+  button#theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<h1><span>report template preview</span><button id="theme-toggle" onclick="toggleTheme()">toggle theme</button></h1>
+<div class="step"><h2>01_start</h2><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua, exactly the length a real step note tends to run.</p><div class="placeholder">screenshot placeholder</div></div><div class="step"><h2>02_focus</h2><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua, exactly the length a real step note tends to run.</p><div class="placeholder">screenshot placeholder</div></div><div class="step"><h2>03_drill</h2><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua, exactly the length a real step note tends to run.</p><div class="placeholder">screenshot placeholder</div></div>
+<script>
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem("tui-report-theme", t); } catch (e) {}
+  }
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    applyTheme(cur);
+  }
+  (function () {
+    try {
+      const saved = localStorage.getItem("tui-report-theme");
+      if (saved) applyTheme(saved);
+    } catch (e) {}
+  })();
+  document.addEventListener("click", function (e) {
+    if (e.target.tagName === "IMG") e.target.classList.toggle("zoomed");
+  });
+</script>
+</body>
+</html>

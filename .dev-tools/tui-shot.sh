@@ -5,7 +5,9 @@
 # visual feedback without needing macOS Screen Recording permission.
 #
 # Usage: .dev-tools/tui-shot.sh <name> [key...]
-#   name  base filename for the .txt/.html/.png outputs
+#   name  base filename for the .txt/.html/.png outputs; may include a
+#         subfolder (e.g. commit-drill/01_start) to group a feature's steps
+#         for tui-report.sh
 #   key   zero or more tmux send-keys arguments, sent literally (-l) one at a
 #         time, e.g.: .dev-tools/tui-shot.sh pane4 4 Enter
 #
@@ -15,10 +17,10 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 shots="$root/.verify-shots"
-mkdir -p "$shots"
 
 name="$1"
 shift
+mkdir -p "$shots/$(dirname "$name")"
 
 if ! tmux has-session -t ferrit 2>/dev/null; then
   # FERRIT_NO_GRAPHICS: skips the terminal graphics-capability query, which
