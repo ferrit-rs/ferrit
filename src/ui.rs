@@ -169,6 +169,8 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         };
         let title_text = if pane == Pane::Branches {
             app.branches_title()
+        } else if pane == Pane::Commits {
+            app.commits_title()
         } else {
             pane.title().to_owned()
         };

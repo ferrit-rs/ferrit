@@ -114,6 +114,53 @@ struct BranchDrill {
     return_index: usize,
 }
 
+/// State for the Commits pane's Enter-to-drill-down: the pane swaps its
+/// commit list for that commit's own changed-file tree, in place, the same
+/// shape `BranchDrill` gives the Branches pane one level up. Read only, no
+/// staging; `Esc` backs out.
+struct CommitDrill {
+    hash: String,
+    /// `"<short_hash> <summary>"`, for `App::commits_title`.
+    title: String,
+    /// One synthetic `FileEntry` per file the commit's diff touched, same
+    /// index order as the underlying `git::Diff::files`/`file_lines()` so a
+    /// selected row's scroll target is a plain index lookup.
+    files: Vec<git::FileEntry>,
+    /// The commit-list cursor to restore when `Esc` backs out.
+    return_index: usize,
+}
+
+/// One synthetic `FileEntry` per file in a commit's diff, `staged: None` /
+/// `worktree: <status>` so `theme::file_line` renders the single-letter code
+/// lazygit shows for a commit's file tree (` M`, not the two-sided `MM` a
+/// worktree entry can have). Feeds `CommitDrill::files`.
+fn commit_drill_files(diff: &git::Diff) -> Vec<git::FileEntry> {
+    diff.files
+        .iter()
+        .map(|meta| {
+            let new_path = diff.text.get(meta.new_path.clone()).unwrap_or_default();
+            let old_path = diff.text.get(meta.old_path.clone()).unwrap_or_default();
+            let path = if new_path == "/dev/null" {
+                old_path
+            } else {
+                new_path
+            };
+            let worktree = match meta.status {
+                git::FileStatus::Added => git::Change::Added,
+                git::FileStatus::Deleted => git::Change::Deleted,
+                git::FileStatus::Modified => git::Change::Modified,
+                git::FileStatus::Renamed | git::FileStatus::Copied => git::Change::Renamed,
+            };
+            git::FileEntry {
+                path: PathBuf::from(path),
+                staged: git::Change::None,
+                worktree,
+                binary: meta.binary,
+            }
+        })
+        .collect()
+}
+
 /// Where keystrokes go while a Files diff is up. `Nav` is phase 1..5
 /// behaviour unchanged; `Diff` is `docs/PLAN_6_STAGING.md`'s "focus the diff
 /// to stage within it", scoped to the Files pane — the only one with
@@ -515,6 +562,34 @@ fn flatten_file_tree(
     }
 }
 
+/// Lazygit-style directory tree over any file list: nested paths get a
+/// collapsible root plus one `Dir` row per directory, flat paths skip the
+/// tree and list files directly. Shared by the Files pane (`self.files`) and
+/// a drilled commit's own changed-file list (`CommitDrill::files`).
+fn tree_rows(files: &[git::FileEntry], collapsed: &HashSet<PathBuf>) -> Vec<FileRow> {
+    let nested = files
+        .iter()
+        .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
+    if !nested {
+        return (0..files.len())
+            .map(|index| FileRow::File { index, depth: 0 })
+            .collect();
+    }
+
+    let tree = build_file_tree(files);
+    let root_expanded = !collapsed.contains(Path::new(""));
+    let mut rows = vec![FileRow::Dir {
+        path: PathBuf::new(),
+        name: "/".to_owned(),
+        depth: 0,
+        expanded: root_expanded,
+    }];
+    if root_expanded {
+        flatten_file_tree(&tree, Path::new(""), 1, collapsed, &mut rows);
+    }
+    rows
+}
+
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default
 /// `mouse_scroll_lines`.
 const WHEEL_LINES: isize = 3;
@@ -626,6 +701,10 @@ pub struct App {
     /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
     branches_tab: BranchesTab,
     commits: Vec<git::CommitEntry>,
+    /// `Some` while the Commits pane is drilled into one commit's own
+    /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
+    /// shows the commit list.
+    commit_drill: Option<CommitDrill>,
     stashes: Vec<git::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
@@ -721,6 +800,7 @@ impl App {
             remotes: Vec::new(),
             branches_tab: BranchesTab::default(),
             commits: Vec::new(),
+            commit_drill: None,
             stashes: Vec::new(),
             last_error: None,
             picker: Picker::halfblocks(),
@@ -815,6 +895,26 @@ impl App {
             }
         }
 
+        // Same treatment for a drilled commit's file tree (Enter on
+        // Commits): re-read the file list so it reflects the diff as of
+        // this refresh; a commit that vanished (e.g. a reword/rebase that
+        // changed its hash) backs out rather than erroring the refresh.
+        if let Some(hash) = self.commit_drill.as_ref().map(|d| d.hash.clone()) {
+            match self
+                .repo
+                .as_ref()
+                .map(|r| r.commit_diff(&hash, DiffOpts::default()))
+            {
+                Some(Ok(diff)) => {
+                    let files = commit_drill_files(&diff);
+                    if let Some(drill) = &mut self.commit_drill {
+                        drill.files = files;
+                    }
+                },
+                _ => self.commit_drill = None,
+            }
+        }
+
         for pane in PANES {
             let last = self.row_count(pane).saturating_sub(1);
             let cursor = &mut self.selection[pane];
@@ -828,6 +928,31 @@ impl App {
     fn update_right_pane(&mut self) {
         self.preview = self.build_preview();
         self.update_diff();
+        self.sync_commit_file_scroll();
+    }
+
+    /// While drilled into a commit's file tree, jump the right pane's scroll
+    /// to the selected file's own section (`Diff::file_lines()`), lazygit's
+    /// "the file list drives the main view" behaviour. A no-op off the
+    /// Commits pane, undrilled, or on a directory row.
+    fn sync_commit_file_scroll(&mut self) {
+        if self.focus != Pane::Commits {
+            return;
+        }
+        let Some(drill) = &self.commit_drill else {
+            return;
+        };
+        let rows = tree_rows(&drill.files, &self.collapsed_dirs);
+        let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Commits)) else {
+            return;
+        };
+        let DiffView::Commit(_, diff) = &self.diff else {
+            return;
+        };
+        if let Some(&line) = diff.file_lines().get(*index) {
+            self.right_scroll = line;
+            self.clamp_right_scroll();
+        }
     }
 
     /// Rebuild `diff` from the current focus and selection. An image selection
@@ -928,28 +1053,16 @@ impl App {
     /// `self.files` and `self.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
-        let nested = self
-            .files
-            .iter()
-            .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
-        if !nested {
-            return (0..self.files.len())
-                .map(|index| FileRow::File { index, depth: 0 })
-                .collect();
-        }
+        tree_rows(&self.files, &self.collapsed_dirs)
+    }
 
-        let tree = build_file_tree(&self.files);
-        let root_expanded = !self.collapsed_dirs.contains(Path::new(""));
-        let mut rows = vec![FileRow::Dir {
-            path: PathBuf::new(),
-            name: "/".to_owned(),
-            depth: 0,
-            expanded: root_expanded,
-        }];
-        if root_expanded {
-            flatten_file_tree(&tree, Path::new(""), 1, &self.collapsed_dirs, &mut rows);
+    /// Same tree shape as `files_tree_rows`, over a drilled commit's own
+    /// changed files instead of the worktree's. Empty while not drilled.
+    fn commit_tree_rows(&self) -> Vec<FileRow> {
+        match &self.commit_drill {
+            Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs),
+            None => Vec::new(),
         }
-        rows
     }
 
     /// The diff identity for the current focus and selection: a worktree /
@@ -966,11 +1079,20 @@ impl App {
                     path: entry.path.clone(),
                 })
             },
+            // Drilled: the selection indexes the file tree, not `self.commits`
+            // (`commit_tree_rows`), so the diff stays keyed on the drilled
+            // commit's own hash regardless of which file row is highlighted.
             Pane::Commits => {
-                let entry = self.commits.get(self.selected(Pane::Commits))?;
-                Some(RightKey::Commit {
-                    full_hash: entry.full_hash.clone(),
-                })
+                if let Some(drill) = &self.commit_drill {
+                    Some(RightKey::Commit {
+                        full_hash: drill.hash.clone(),
+                    })
+                } else {
+                    let entry = self.commits.get(self.selected(Pane::Commits))?;
+                    Some(RightKey::Commit {
+                        full_hash: entry.full_hash.clone(),
+                    })
+                }
             },
             // Drilled: the selected row is a commit, same as Commits. Not
             // drilled: no Enter yet, so preview the selected branch's own
@@ -1314,7 +1436,10 @@ impl App {
                 .branch_drill
                 .as_ref()
                 .map_or(self.branches.len(), |drill| drill.commits.len()),
-            Pane::Commits => self.commits.len(),
+            Pane::Commits => match &self.commit_drill {
+                Some(_) => self.commit_tree_rows().len(),
+                None => self.commits.len(),
+            },
             Pane::Stash => self.stashes.len(),
         }
     }
@@ -1396,12 +1521,42 @@ impl App {
         self.branch_drill.is_some()
     }
 
-    /// Commits pane rows, or the empty-state line (fresh repo).
+    /// Commits pane rows: the commit list, or one commit's own changed-file
+    /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
+    /// shape `branch_lines` gives the Branches pane.
     pub fn commit_lines(&self) -> Vec<Line<'static>> {
+        if let Some(drill) = &self.commit_drill {
+            return self
+                .commit_tree_rows()
+                .iter()
+                .filter_map(|row| match row {
+                    FileRow::Dir {
+                        name,
+                        depth,
+                        expanded,
+                        ..
+                    } => Some(theme::dir_line(name, *depth, *expanded)),
+                    FileRow::File { index, depth } => drill
+                        .files
+                        .get(*index)
+                        .map(|entry| theme::file_line(entry, *depth)),
+                })
+                .collect();
+        }
         if self.commits.is_empty() {
             return vec![Line::raw("no commits yet")];
         }
         self.commits.iter().map(theme::commit_line).collect()
+    }
+
+    /// `[4] Commits - Reflog`, or `[4] Diff files (<hash> <summary>)` while
+    /// drilled into a commit's own changed-file tree (Enter on a commit,
+    /// `Esc` to back out; see `enter_commit_files`).
+    pub fn commits_title(&self) -> String {
+        match &self.commit_drill {
+            Some(drill) => format!("[4] Diff files ({})", drill.title),
+            None => Pane::Commits.title().to_owned(),
+        }
     }
 
     /// Stash pane rows, or the empty-state line.
@@ -1722,10 +1877,15 @@ impl App {
                 if let Some(drill) = self.branch_drill.take() {
                     self.selection[Pane::Branches] = drill.return_index;
                 }
+                if let Some(drill) = self.commit_drill.take() {
+                    self.selection[Pane::Commits] = drill.return_index;
+                }
             },
             KeyCode::Enter => {
                 self.enter_branch_log();
+                self.enter_commit_files();
                 self.toggle_files_dir();
+                self.toggle_commit_dir();
                 self.enter_diff_mode();
             },
             KeyCode::Char('l') => self.enter_diff_mode(),
@@ -1927,6 +2087,51 @@ impl App {
         }
         let last = self.row_count(Pane::Files).saturating_sub(1);
         self.selection[Pane::Files] = self.selection[Pane::Files].min(last);
+    }
+
+    /// Enter on the Commits pane: swap the commit list for that commit's own
+    /// changed-file tree, in place, `enter_branch_log`'s counterpart one pane
+    /// over. Read only. `Esc` backs out (`on_key`).
+    fn enter_commit_files(&mut self) {
+        if self.focus != Pane::Commits || self.commit_drill.is_some() {
+            return;
+        }
+        let Some(repo) = &self.repo else { return };
+        let return_index = self.selected(Pane::Commits);
+        let Some(entry) = self.commits.get(return_index) else {
+            return;
+        };
+        let hash = entry.full_hash.clone();
+        let title = format!("{} {}", entry.short_hash, entry.summary);
+        match repo.commit_diff(&hash, DiffOpts::default()) {
+            Ok(diff) => {
+                self.commit_drill = Some(CommitDrill {
+                    hash,
+                    title,
+                    files: commit_drill_files(&diff),
+                    return_index,
+                });
+                self.selection[Pane::Commits] = 0;
+            },
+            Err(e) => self.last_error = Some(e.to_string()),
+        }
+    }
+
+    /// Enter on a directory row while drilled into a commit's file tree:
+    /// toggle it collapsed or expanded, `toggle_files_dir`'s counterpart.
+    fn toggle_commit_dir(&mut self) {
+        if self.focus != Pane::Commits || self.commit_drill.is_none() {
+            return;
+        }
+        let rows = self.commit_tree_rows();
+        let Some(FileRow::Dir { path, .. }) = rows.get(self.selected(Pane::Commits)) else {
+            return;
+        };
+        if !self.collapsed_dirs.remove(path) {
+            self.collapsed_dirs.insert(path.clone());
+        }
+        let last = self.row_count(Pane::Commits).saturating_sub(1);
+        self.selection[Pane::Commits] = self.selection[Pane::Commits].min(last);
     }
 
     /// The `FileEntry` behind the Files pane's current selection, or `None`

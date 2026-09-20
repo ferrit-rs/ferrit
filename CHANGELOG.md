@@ -9,6 +9,11 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Commits pane: `Enter` on a commit row drills into that commit's changed
+  files as a lazygit-style tree, replacing the commit list in place (the
+  pane title becomes `[4] Diff files (<hash> <summary>)`); a directory row
+  toggles collapsed with `Enter`, and the Patch pane shows the commit's full
+  diff. `Esc`/`h` backs out to the commit list.
 - The staged index can now be committed: `c` opens a message popup and
   creates a normal commit (disabled with nothing staged); `A` amends `HEAD`
   with the pre-filled message plus whatever is staged; `w` rewords `HEAD`'s

@@ -8,3 +8,4 @@ Cargo.lock.orig
 .vscode/*
 !.vscode/settings.json
 *.swp
+.verify-shots/
