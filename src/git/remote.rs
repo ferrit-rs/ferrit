@@ -323,12 +323,16 @@ pub(crate) fn push_cancellable(
     repo: &Repository,
     set_upstream: Option<&str>,
     force_with_lease: bool,
+    set_upstream_current: bool,
     cancel: &AtomicBool,
 ) -> GitResult<String> {
     let workdir = workdir(repo)?;
     let mut args = vec!["push".to_owned()];
     if force_with_lease {
         args.push("--force-with-lease".to_owned());
+    }
+    if set_upstream_current {
+        args.push("-u".to_owned());
     }
     if let Some(remote) = set_upstream {
         args.push("-u".to_owned());

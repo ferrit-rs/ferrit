@@ -11,6 +11,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Pressing `c` with an empty index now opens a `tui_overlay` backdrop confirmation to stage all changed files before committing.
 - Push progress now appears inline on the checked-out branch with an animated indicator, like lazygit; Status shows it beside any earlier error.
 - Pushing a branch behind its upstream now asks before using `--force-with-lease`, protecting unseen remote updates.
+- `push.default=current` now pushes a new local branch without opening the remote picker and sets its upstream.
 - App errors now retain typed Git/app categories and appear in Status plus a persistent bottom-right toast, dismissible with its `x` button.
 
 - Bottom panel now has an `Infos` heading above its frame; configured Git

@@ -526,6 +526,8 @@ Deferred out of phase 9, revisit with their own follow-up:
   heuristic) turns out to be worth it. Ferrit now confirms when the checked-
   out branch is behind and uses `--force-with-lease`; a stale lease is
   rejected by Git and shown as an error.
+- `push.default=current` is honored for a branch with no upstream: Git picks
+  the configured destination and Ferrit sets upstream on the first push.
 - fetch/push progress reporting beyond a static "Fetching…" label — would
   need parsing git's `--progress` stderr stream, a genuinely different
   (streaming) shape than every other subprocess call in `git::` today.

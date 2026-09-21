@@ -273,6 +273,40 @@ fn capital_p_with_one_remote_and_no_upstream_pushes_with_dash_u() {
 }
 
 #[test]
+fn push_default_current_skips_remote_picker_and_sets_upstream() {
+    let (origin, work) = two_repo_fixture("app-remote-push-default-current");
+    git(
+        work.path(),
+        &["remote", "add", "backup", origin.path().to_str().unwrap()],
+    );
+    git(work.path(), &["config", "push.default", "current"]);
+    git(work.path(), &["checkout", "-q", "-b", "feature"]);
+    fs::write(work.path().join("feature.txt"), "feature\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "feature work");
+
+    let mut app = App::open(work.path()).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    app.feed_key(char_key('P'));
+
+    assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
+    assert!(
+        app.remote_pick().is_none(),
+        "configured current push skips picker"
+    );
+    wait_for_remote_done(&mut app, &rx);
+    assert_eq!(
+        git(work.path(), &["rev-parse", "--abbrev-ref", "feature@{u}"]),
+        "origin/feature"
+    );
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "refs/heads/feature"]),
+        git(work.path(), &["rev-parse", "HEAD"])
+    );
+}
+
+#[test]
 fn push_of_behind_branch_requires_confirm_and_uses_force_with_lease() {
     let (origin, work) = two_repo_fixture("app-remote-force-lease");
     fs::write(work.path().join("local.txt"), "local\n").unwrap();

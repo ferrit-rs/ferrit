@@ -46,6 +46,18 @@ impl App {
             return;
         }
         let Some(repo) = &self.repo else { return };
+        if repo.push_default_current() {
+            if let Some(sender) = self.event_sender.clone() {
+                self.start_remote_op_with_options(
+                    events::RemoteOp::Push,
+                    None,
+                    false,
+                    true,
+                    sender,
+                );
+            }
+            return;
+        }
         match repo.remotes() {
             Ok(remotes) if remotes.is_empty() => {
                 self.report_error(AppError::NoRemoteConfigured);
@@ -105,6 +117,17 @@ impl App {
         force_with_lease: bool,
         sender: mpsc::Sender<AppEvent>,
     ) {
+        self.start_remote_op_with_options(op, push_upstream, force_with_lease, false, sender);
+    }
+
+    fn start_remote_op_with_options(
+        &mut self,
+        op: events::RemoteOp,
+        push_upstream: Option<String>,
+        force_with_lease: bool,
+        set_upstream_current: bool,
+        sender: mpsc::Sender<AppEvent>,
+    ) {
         if self.remote_busy.is_some() {
             return;
         }
@@ -120,9 +143,12 @@ impl App {
             let message = run_worker(WorkerKind::RemoteOperation, || match op {
                 events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
                 events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
-                events::RemoteOp::Push => {
-                    repo.push_cancellable(push_upstream.as_deref(), force_with_lease, &cancel)
-                },
+                events::RemoteOp::Push => repo.push_cancellable(
+                    push_upstream.as_deref(),
+                    force_with_lease,
+                    set_upstream_current,
+                    &cancel,
+                ),
             })
             .map_err(|error| error.to_string())
             .and_then(|result| result.map_err(|error| error.to_string()));

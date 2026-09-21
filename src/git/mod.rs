@@ -303,8 +303,23 @@ impl Repo {
         &self,
         set_upstream: Option<&str>,
         force_with_lease: bool,
+        set_upstream_current: bool,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        remote::push_cancellable(&self.inner, set_upstream, force_with_lease, cancel)
+        remote::push_cancellable(
+            &self.inner,
+            set_upstream,
+            force_with_lease,
+            set_upstream_current,
+            cancel,
+        )
+    }
+
+    pub fn push_default_current(&self) -> bool {
+        self.inner
+            .config()
+            .ok()
+            .and_then(|config| config.get_string("push.default").ok())
+            .is_some_and(|value| value == "current")
     }
 }
