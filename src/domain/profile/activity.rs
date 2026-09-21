@@ -1,6 +1,7 @@
 //! Convert repository commits into a year of daily activity and a recent feed.
 
 use crate::domain::git::model::CommitEntry;
+use std::collections::BTreeMap;
 
 const DAYS_PER_WEEK: usize = 7;
 const WEEKS_PER_YEAR: usize = 52;
@@ -10,7 +11,14 @@ const DAY_SECONDS: i64 = 86_400;
 pub struct Activity {
     pub weeks: Vec<ActivityWeek>,
     pub commit_count: u32,
+    pub(crate) contributors: Vec<Contributor>,
     pub recent_commits: Vec<CommitEntry>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Contributor {
+    pub(crate) name: String,
+    pub(crate) commit_count: u32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -27,7 +35,9 @@ impl Activity {
         let start = today
             .saturating_sub(weekday)
             .saturating_sub(i64::try_from(WEEKS_PER_YEAR - 1).unwrap_or(0) * 7);
+        let range_end = start + i64::try_from(WEEKS_PER_YEAR * DAYS_PER_WEEK).unwrap_or(0);
         let mut weeks = Vec::with_capacity(WEEKS_PER_YEAR);
+        let mut contributor_counts = BTreeMap::<String, u32>::new();
         let mut previous_month = 0;
         for week_index in 0..WEEKS_PER_YEAR {
             let week_offset = i64::try_from(week_index).unwrap_or(0);
@@ -54,12 +64,21 @@ impl Activity {
                     *day_count = day_count.saturating_add(1);
                 }
             }
+            let day = timestamp.div_euclid(DAY_SECONDS);
+            if day >= start && day < range_end {
+                let name = if commit.author.trim().is_empty() {
+                    "Unknown"
+                } else {
+                    &commit.author
+                };
+                let count = contributor_counts.entry(name.to_owned()).or_default();
+                *count = count.saturating_add(1);
+            }
         }
         let commit_count = weeks
             .iter()
             .flat_map(|week| week.days)
             .fold(0_u32, u32::saturating_add);
-        let range_end = start + i64::try_from(WEEKS_PER_YEAR * DAYS_PER_WEEK).unwrap_or(0);
         let recent_commits = commits
             .iter()
             .filter(|commit| {
@@ -69,9 +88,19 @@ impl Activity {
             .take(12)
             .cloned()
             .collect();
+        let mut contributors: Vec<_> = contributor_counts
+            .into_iter()
+            .map(|(name, commit_count)| Contributor { name, commit_count })
+            .collect();
+        contributors.sort_by(|a, b| {
+            b.commit_count
+                .cmp(&a.commit_count)
+                .then_with(|| a.name.cmp(&b.name))
+        });
         Self {
             weeks,
             commit_count,
+            contributors,
             recent_commits,
         }
     }

@@ -27,6 +27,28 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
         )));
     }
     lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "Contributors · commit authors · past year",
+        Style::new().fg(theme::IDLE),
+    ));
+    if activity.contributors.is_empty() {
+        lines.push(Line::from("No contributors in the past year"));
+    } else {
+        for contributor in &activity.contributors {
+            let commits = contributor.commit_count;
+            lines.push(Line::from(vec![
+                Span::styled(
+                    contributor.name.clone(),
+                    Style::new().add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(format!(
+                    "  {commits} commit{}",
+                    if commits == 1 { "" } else { "s" }
+                )),
+            ]));
+        }
+    }
+    lines.push(Line::from(""));
     lines.push(Line::styled("Recent commits", Style::new().fg(theme::IDLE)));
     if activity.recent_commits.is_empty() {
         lines.push(Line::from(
