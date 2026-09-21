@@ -311,6 +311,7 @@ did in phase 6.
 | Key | Context | Action |
 | --- | --- | --- |
 | `c` | Nav, index has staged changes | open the commit popup |
+| `c` | Nav, index empty | ask to stage all changed files, then open the commit popup |
 | `A` | Nav, at least one commit on the branch | open amend popup, message pre-filled |
 | `w` | Nav, at least one commit | open reword popup (message only, `--only`) |
 | `f` | Nav | enter fixup-pick on the Commits pane |
@@ -325,8 +326,9 @@ did in phase 6.
 | `Esc` | any popup | cancel (commit popup keeps the draft) |
 | `Enter` | fixup-pick | create `git commit --fixup=<hash>` |
 
-`c` is disabled (inert, brief keybar note "nothing staged") when
-`staged_count() == 0`. `A` and `w` are enabled even with an empty index
+When `c` finds an empty index, a centered `tui_overlay` with backdrop asks
+"You have not staged any files. Commit all files?" `y` runs `git add -A` and
+opens the editor; `n` / `Esc` cancels. `A` and `w` are enabled even with an empty index
 because amending a message is valid; `A` with nothing staged just reuses the
 tree, which is what `git commit --amend` does.
 

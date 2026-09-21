@@ -5,6 +5,7 @@ use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInput
 #[derive(Clone, Copy)]
 enum PopupKind {
     Commit,
+    CommitAllConfirm,
     NewBranch,
     RemotePick,
     Note,
@@ -15,12 +16,16 @@ impl App {
     pub fn popup_view(&mut self) -> Option<PopupView<'_>> {
         let kind = match self.popup.as_ref()? {
             Popup::Commit(_) => PopupKind::Commit,
+            Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
             Popup::RemotePick(_) => PopupKind::RemotePick,
             Popup::Note(_) => PopupKind::Note,
         };
         match kind {
             PopupKind::Commit => self.commit_popup().map(PopupView::Commit),
+            PopupKind::CommitAllConfirm => {
+                Some(PopupView::CommitAllConfirm(&mut self.commit_overlay))
+            },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::RemotePick => self
                 .remote_pick()
@@ -81,6 +86,10 @@ impl App {
             self.commit_popup_key(key);
             return;
         }
+        if matches!(self.popup, Some(Popup::CommitAllConfirm)) {
+            self.commit_all_confirm_key(key);
+            return;
+        }
         let mut dismiss = false;
         let mut create_branch_now = false;
         let mut pick_remote_now = false;
@@ -93,6 +102,7 @@ impl App {
                 }
             },
             Some(Popup::Commit(_)) => unreachable!("commit popup routed above"),
+            Some(Popup::CommitAllConfirm) => unreachable!("commit confirmation routed above"),
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => create_branch_now = true,

@@ -8,6 +8,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 ## [Unreleased]
 
 - Commit editor now follows lazygit’s summary/description flow: `Enter` commits from Summary, `Tab` switches fields, `Enter` inserts Description newlines, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains an alias.
+- Pressing `c` with an empty index now opens a `tui_overlay` backdrop confirmation to stage all changed files before committing.
 - App errors now retain typed Git/app categories and appear in Status plus a persistent bottom-right toast, dismissible with its `x` button.
 
 - Bottom panel now has an `Infos` heading above its frame; configured Git

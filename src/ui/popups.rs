@@ -1,7 +1,7 @@
 //! Popup rendering, separate from the screen and pane layout.
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
@@ -146,6 +146,52 @@ pub(super) fn draw_commit(frame: &mut Frame<'_>, area: Rect, view: &mut CommitPo
         },
         None => frame.render_widget(Paragraph::new(hints), dialog.footer),
     }
+}
+
+/// Confirm staging all worktree changes when `c` is pressed with an empty index.
+pub(super) fn draw_commit_all_confirm(frame: &mut Frame<'_>, area: Rect, state: &mut OverlayState) {
+    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(focused)
+        .title(Line::styled(" Commit all files? ", focused));
+    frame.render_stateful_widget(
+        Overlay::new()
+            .anchor(Anchor::Center)
+            .width(Constraint::Percentage(68))
+            .height(Constraint::Percentage(34))
+            .backdrop(
+                Backdrop::new(ratatui::style::Color::Black).fg(ratatui::style::Color::DarkGray),
+            )
+            .block(block),
+        area,
+        state,
+    );
+    let Some(inner) = state.inner_area() else {
+        return;
+    };
+    let [heading, question, footer] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(2),
+        Constraint::Length(1),
+    ])
+    .areas(inner);
+    frame.render_widget(
+        Paragraph::new("No files staged")
+            .style(Style::new().fg(theme::ADD).add_modifier(Modifier::BOLD))
+            .alignment(Alignment::Center),
+        heading,
+    );
+    frame.render_widget(
+        Paragraph::new("You have not staged any files.\nCommit all files?")
+            .alignment(Alignment::Center),
+        question,
+    );
+    frame.render_widget(
+        Paragraph::new(KeyBar::hints("Y: Yes, stage all | N / Esc: No").line())
+            .alignment(Alignment::Center),
+        footer,
+    );
 }
 
 pub(super) fn draw_remote_pick(

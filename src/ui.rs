@@ -71,6 +71,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         Some(PopupView::Commit(mut view) | PopupView::NewBranch(mut view)) => {
             popups::draw_commit(frame, area, &mut view);
         },
+        Some(PopupView::CommitAllConfirm(state)) => {
+            popups::draw_commit_all_confirm(frame, area, state);
+        },
         Some(PopupView::RemotePick(remotes, selected)) => {
             popups::draw_remote_pick(frame, area, remotes, selected);
         },

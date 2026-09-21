@@ -2,7 +2,7 @@
 //! editor: `c` opens it; Tab switches fields; Enter confirms summary.
 
 use super::{
-    App, AppError, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
+    App, AppError, ApplyDir, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
     TextInputMode, git,
 };
 
@@ -83,7 +83,9 @@ impl App {
         if self.popup.is_some() {
             return;
         }
-        let Some(repo) = &self.repo else { return };
+        if self.repo.is_none() {
+            return;
+        }
         match &kind {
             git::commit::CommitKind::Normal
                 if !self
@@ -91,7 +93,8 @@ impl App {
                     .iter()
                     .any(|f| f.staged != git::status::Change::None) =>
             {
-                self.report_error(AppError::NothingStaged);
+                self.popup = Some(Popup::CommitAllConfirm);
+                self.commit_overlay.open();
                 return;
             },
             git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
@@ -105,10 +108,15 @@ impl App {
 
         let prefill = match &kind {
             git::commit::CommitKind::Amend | git::commit::CommitKind::Reword => {
+                let Some(repo) = &self.repo else { return };
                 repo.head_message().ok().flatten()
             },
             _ => self.commit_draft.take(),
         };
+        self.open_commit_editor(kind, prefill);
+    }
+
+    fn open_commit_editor(&mut self, kind: git::commit::CommitKind, prefill: Option<String>) {
         let mut draft = CommitDraft {
             summary: TextInput::default(),
             description: TextInput::default(),
@@ -124,6 +132,38 @@ impl App {
         }
         self.popup = Some(Popup::Commit(draft));
         self.commit_overlay.open();
+    }
+
+    /// Handle the explicit "commit all" choice shown when the index is empty.
+    pub(super) fn commit_all_confirm_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('y') => {
+                let result = self
+                    .repo
+                    .as_ref()
+                    .map(|repo| repo.stage_all(ApplyDir::Forward));
+                match result {
+                    Some(Ok(())) => {
+                        self.popup = None;
+                        self.commit_overlay.close();
+                        self.request_refresh();
+                        let prefill = self.commit_draft.take();
+                        self.open_commit_editor(git::commit::CommitKind::Normal, prefill);
+                    },
+                    Some(Err(error)) => {
+                        self.popup = None;
+                        self.commit_overlay.close();
+                        self.report_error(error);
+                    },
+                    None => {},
+                }
+            },
+            KeyCode::Char('n') | KeyCode::Esc => {
+                self.popup = None;
+                self.commit_overlay.close();
+            },
+            _ => {},
+        }
     }
 
     /// Route lazygit-style commit-editor keys while the editor owns input.

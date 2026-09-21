@@ -18,11 +18,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::{App, DiffView, Pane};
+use ferrit::app::{App, DiffView, Pane, PopupView};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::style::Color;
 
 struct TempDir(PathBuf);
 
@@ -50,7 +51,10 @@ impl Drop for TempDir {
 }
 
 fn configure_identity(dir: &Path) {
-    for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {
+    for (key, value) in [
+        ("user.name", "Max Wells"),
+        ("user.email", "maxwells.pro@proton.me"),
+    ] {
         let out = Command::new("git")
             .arg("-C")
             .arg(dir)
@@ -260,7 +264,7 @@ fn the_popup_actually_renders_its_title_text_and_footer() {
 }
 
 #[test]
-fn c_is_a_noop_with_nothing_staged() {
+fn c_with_empty_index_prompts_and_n_cancels() {
     let dir = TempDir::new("app-commit-nostage");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -269,10 +273,71 @@ fn c_is_a_noop_with_nothing_staged() {
 
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('c'));
+    assert!(matches!(
+        app.popup_view(),
+        Some(PopupView::CommitAllConfirm(_))
+    ));
+    app.feed_key(char_key('n'));
+    assert!(app.commit_popup().is_none(), "n cancels the confirmation");
+}
+
+#[test]
+fn y_stages_tracked_and_untracked_changes_then_opens_commit_editor() {
+    let dir = TempDir::new("app-commit-all");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    fs::write(dir.path().join("new.txt"), "new file\n").unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    assert!(matches!(
+        app.popup_view(),
+        Some(PopupView::CommitAllConfirm(_))
+    ));
+    app.feed_key(char_key('y'));
+    assert!(app.commit_popup().is_some(), "y opens the commit editor");
+
+    let mut index = repo.index().unwrap();
+    index.read(true).unwrap();
+    assert!(index.get_path(Path::new("a.txt"), 0).is_some());
+    assert!(index.get_path(Path::new("new.txt"), 0).is_some());
+
+    type_text(&mut app, "feat: commit all");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(head.summary().unwrap(), Some("feat: commit all"));
+    assert_eq!(head.author().name().unwrap(), "Max Wells");
+    assert_eq!(head.author().email().unwrap(), "maxwells.pro@proton.me");
+    let tree = head.tree().unwrap();
+    assert!(tree.get_path(Path::new("a.txt")).is_ok());
+    assert!(tree.get_path(Path::new("new.txt")).is_ok());
+}
+
+#[test]
+fn empty_index_confirmation_uses_overlay_backdrop() {
+    let dir = TempDir::new("app-commit-confirm-render");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    term.draw(|f| ferrit::ui::draw(f, &mut app)).unwrap();
+    let out = term.backend().to_string();
+
+    assert!(out.contains("No files staged"), "heading shows:\n{out}");
     assert!(
-        app.commit_popup().is_none(),
-        "nothing staged: c does nothing"
+        out.contains("You have not staged any files."),
+        "question shows:\n{out}"
     );
+    assert!(out.contains("Y: Yes, stage all"), "choices show:\n{out}");
+    assert_eq!(term.backend().buffer()[(0, 0)].fg, Color::DarkGray);
+    assert_eq!(term.backend().buffer()[(0, 0)].bg, Color::Black);
 }
 
 #[test]

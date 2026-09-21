@@ -96,6 +96,7 @@ pub struct CommitPopupView<'a> {
 /// precedence in one `match` instead of chaining `if let` checks.
 pub enum PopupView<'a> {
     Commit(CommitPopupView<'a>),
+    CommitAllConfirm(&'a mut OverlayState),
     NewBranch(CommitPopupView<'a>),
     RemotePick(&'a [git::remote::RemoteEntry], usize),
     Note(&'a str),
@@ -321,6 +322,7 @@ fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
 enum Popup {
     Commit(commit::CommitDraft),
+    CommitAllConfirm,
     /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextInput` outright.

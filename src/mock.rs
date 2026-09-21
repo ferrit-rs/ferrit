@@ -211,7 +211,7 @@ Enter / l         focus the diff, to stage within it
 h / Esc           (in the diff) back to the file list
 V                 start / clear a line selection
 d                 discard the change under the cursor (asks first)
-c                 open the commit popup (needs something staged)
+c                 open commit popup; with no staged files, ask to stage all
 A                 amend HEAD, message pre-filled
 w                 reword HEAD's message only, index untouched
 Enter: commit Summary; Tab: switch; Enter: body newline
