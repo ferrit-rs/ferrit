@@ -10,6 +10,8 @@ use ratatui::text::Line;
 
 const RGB_CHANNEL_LABELS: [&str; crate::app::theme_config::RGB_CHANNEL_COUNT] = ["R", "G", "B"];
 const RGB_VALUE_WIDTH: usize = 3;
+const SECTION_SEPARATOR_MARGIN_X: u16 = 1;
+const SECTION_SEPARATOR_MARGIN_Y: u16 = 1;
 
 pub(super) fn lines(
     settings: &Settings,
@@ -23,16 +25,18 @@ pub(super) fn lines(
     let divider = |label| {
         Separator::new(label)
             .style(Style::new().fg(theme::IDLE))
-            .line(width)
+            .margin_x(SECTION_SEPARATOR_MARGIN_X)
+            .margin_y(SECTION_SEPARATOR_MARGIN_Y)
+            .lines(width)
     };
-    let mut lines = vec![divider("Git identities")];
+    let mut lines = divider("Git identities");
     append_identity(&mut lines, "Global", settings.global_identity.as_ref());
     append_identity(
         &mut lines,
         "Repository",
         settings.repository_identity.as_ref(),
     );
-    lines.push(divider("Ferrit settings"));
+    lines.extend(divider("Ferrit settings"));
     lines.push(Line::from(format!("Theme: {}", config.preset.name())));
     lines.extend(
         ColorPicker::new(config.color())
@@ -55,7 +59,7 @@ pub(super) fn lines(
         },
         Style::new().fg(theme::IDLE),
     ));
-    lines.push(divider("Effective author identities"));
+    lines.extend(divider("Effective author identities"));
     if settings.effective_identities.is_empty() {
         lines.push(Line::from("Not configured"));
     } else {

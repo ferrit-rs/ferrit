@@ -8,14 +8,18 @@ use crate::components::ui::separator::Separator;
 use crate::domain::profile::Activity;
 
 const COMPACT_ACTIVITY_WIDTH: u16 = 60;
+const SECTION_SEPARATOR_MARGIN_X: u16 = 1;
+const SECTION_SEPARATOR_MARGIN_Y: u16 = 1;
 
 pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
     let divider = |label| {
         Separator::new(label)
             .style(Style::new().fg(theme::IDLE))
-            .line(width)
+            .margin_x(SECTION_SEPARATOR_MARGIN_X)
+            .margin_y(SECTION_SEPARATOR_MARGIN_Y)
+            .lines(width)
     };
-    let mut lines = vec![divider("Repository activity · local and remote branches")];
+    let mut lines = divider("Repository activity · local and remote branches");
     if width < COMPACT_ACTIVITY_WIDTH {
         lines.push(Line::from(format!(
             "{} commits in the past year",
@@ -28,7 +32,7 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
             activity.commit_count
         )));
     }
-    lines.push(divider("Contributors · past year"));
+    lines.extend(divider("Contributors · past year"));
     if activity.contributors.is_empty() {
         lines.push(Line::from("No contributors in the past year"));
     } else {
@@ -43,24 +47,6 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
                     "  {commits} commit{}",
                     if commits == 1 { "" } else { "s" }
                 )),
-            ]));
-        }
-    }
-    lines.push(divider("Recent commits"));
-    if activity.recent_commits.is_empty() {
-        lines.push(Line::from(
-            "No recent commits on local or fetched remote branches",
-        ));
-    } else {
-        for commit in &activity.recent_commits {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    commit.author.clone(),
-                    Style::new().add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("  "),
-                Span::styled(commit.short_hash.clone(), Style::new().fg(theme::HASH)),
-                Span::raw(format!("  {}", commit.summary)),
             ]));
         }
     }
