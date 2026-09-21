@@ -7,8 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
-- Bottom panel now titled `Info`, with configured Git author name shown at
-  the right beside a person icon.
+- Bottom panel now has an `Infos` heading above its frame; configured Git
+  author name appears inside the frame, right-aligned beside the first command.
 
 ## [0.4.0] - 2026-09-20
 

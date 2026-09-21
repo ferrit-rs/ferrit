@@ -28,7 +28,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     let [content, log, keybar] = Layout::vertical([
         Constraint::Min(0),
-        Constraint::Length(4),
+        Constraint::Length(5),
         Constraint::Length(1),
     ])
     .areas(area);
@@ -517,21 +517,45 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
 fn draw_command_log(frame: &mut Frame<'_>, area: Rect, git_user_name: Option<&str>) {
-    let lines: Vec<Line<'_>> = mock::COMMAND_LOG
-        .iter()
-        .map(|s| theme::log_line(s))
-        .collect();
-    let mut panel = Panel::new()
-        .title(Line::styled(" Info ", Style::new().fg(theme::IDLE)))
-        .border_style(Style::new().fg(theme::IDLE));
-    if let Some(name) = git_user_name {
-        panel = panel.title(
-            Line::styled(format!(" 👤 {name} "), Style::new().fg(theme::IDLE))
-                .alignment(Alignment::Right),
-        );
+    let [heading, panel_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
+    frame.render_widget(
+        Paragraph::new("Infos").style(Style::new().fg(theme::IDLE)),
+        heading,
+    );
+
+    let block = Panel::new()
+        .border_style(Style::new().fg(theme::IDLE))
+        .block();
+    let inner = block.inner(panel_area);
+    frame.render_widget(block, panel_area);
+
+    let [first, second] =
+        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(inner);
+    if let Some(command) = mock::COMMAND_LOG.first() {
+        let line = theme::log_line(command);
+        if let Some(name) = git_user_name {
+            let name = format!("👤 {name}");
+            let name_width = u16::try_from(name.chars().count()).unwrap_or(u16::MAX);
+            let [command_area, name_area] = Layout::horizontal([
+                Constraint::Min(0),
+                Constraint::Length(name_width.min(first.width)),
+            ])
+            .areas(first);
+            frame.render_widget(Paragraph::new(line), command_area);
+            frame.render_widget(
+                Paragraph::new(name)
+                    .alignment(Alignment::Right)
+                    .style(Style::new().fg(theme::IDLE)),
+                name_area,
+            );
+        } else {
+            frame.render_widget(Paragraph::new(line), first);
+        }
     }
-    let panel = Paragraph::new(lines).block(panel.block());
-    frame.render_widget(panel, area);
+    if let Some(command) = mock::COMMAND_LOG.get(1) {
+        frame.render_widget(Paragraph::new(theme::log_line(command)), second);
+    }
 }
 
 /// The bottom key-hint bar, or — while a discard or branch-delete has a
