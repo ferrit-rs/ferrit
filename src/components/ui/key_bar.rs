@@ -8,11 +8,11 @@ pub struct KeyBar(Line<'static>);
 
 impl KeyBar {
     pub fn hints(raw: &'static str) -> Self {
-        Self(crate::components::theme::keybar_line(raw))
+        Self(crate::components::ui::style::keybar_line(raw))
     }
 
     pub fn confirm(message: &str) -> Self {
-        Self(crate::components::theme::confirm_line(message))
+        Self(crate::components::ui::style::confirm_line(message))
     }
 
     pub fn line(self) -> Line<'static> {

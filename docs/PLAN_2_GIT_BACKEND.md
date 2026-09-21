@@ -21,7 +21,8 @@ awkward mutations stay on the table for later phases, not now.
 ## The module boundary
 
 ```
-src/domain/git/          <- Git reads/writes; no `ratatui` imports
+src/domain/git/          <- Git models and reads/writes; no `ratatui` imports
+  model.rs          owned rows shared with app state and rendering
   mod.rs            Repo: open(path) -> Repo, holds git2::Repository
   error.rs          GitError, converted into color_eyre::Report at the edge
   status.rs         header (branch, upstream, ahead/behind, conflicts)
@@ -33,12 +34,12 @@ src/domain/git/          <- Git reads/writes; no `ratatui` imports
                     diffs in phase 3+)
 ```
 
-`src/components/screens/` has no Git access. `src/domain/app/` owns app state
+`src/app/screens/` has no Git access. `src/app/` owns app state
 and cached snapshots, and asks `domain::git::Repo` to refresh.
 
-Repository row models live in `src/domain/repository.rs`; Git access modules
-convert `git2` data into those owned types. Components and screens consume
-the same types, while `git2` and Ratatui types stay at their boundaries.
+Git row models live in `src/domain/git/model.rs`; adapter modules convert
+`git2` data into those owned types. App screens consume the same types, while
+`git2` and Ratatui types stay at their boundaries.
 
 ## Data model
 
@@ -46,7 +47,7 @@ Plain owned structs, `#[derive(Debug, Clone)]`, no lifetime tied to
 libgit2. The UI never sees a `git2::*` type.
 
 `BranchEntry` / `CommitEntry` / `StashEntry` and `CommitEntry::author_initials`
-landed early in `src/domain/repository.rs` as part of phase 1's lazygit re-skin (M6):
+landed early in `src/domain/git/model.rs` as part of phase 1's lazygit re-skin (M6):
 `mock.rs` builds them now, G3..G5 fill the same structs from real reads. Also
 early: `Repo::name()` for the `ferrit -> main` status line, and the right-pane
 contextual titles (`Pane::right_title`).
@@ -291,7 +292,7 @@ Lands in the same commits as the features:
      to spend here, first shipped compact and then widened once the compact
      version read as visually thin next to lazygit's own Log panel. No
      gutter/stat/hunk-jump, that treatment is for an actual diff. It does
-     scroll like one, though: `right_is_diff` (`src/domain/app/mod.rs`) originally
+     scroll like one, though: `right_is_diff` (`src/app/mod.rs`) originally
      listed only `Files`/`Commit`, so J/K, PageUp/Down and the mouse wheel
      over this view fell through to the Branches selection instead of
      scrolling the log — fixed by adding `BranchLog` there and giving it a
@@ -329,7 +330,7 @@ Lands in the same commits as the features:
      branch-log preview's `Date:` line below) already showed for the same
      commit.
   4. **Diff from the drilled log.** `right_key_for`/`build_diff`
-     (`src/domain/app/mod.rs`) route a selected row in `branch_drill` to
+     (`src/app/mod.rs`) route a selected row in `branch_drill` to
      `RightKey::Commit`, same as Commits; `build_diff`'s commit lookup checks
      both `self.commits` and `branch_drill`'s list, so a row in a drilled log
      shows its `Patch` through the exact same rendering path the Commits

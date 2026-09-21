@@ -6,7 +6,7 @@
 use git2::{BranchType, Repository, Revwalk, Sort};
 
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::repository::CommitEntry;
+use crate::domain::git::model::CommitEntry;
 
 /// Walk HEAD's history, newest first, up to `max` entries. An unborn branch
 /// (fresh repo, no commits) comes back as an empty list, not an error.

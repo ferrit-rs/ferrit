@@ -70,10 +70,10 @@ the popup until it closes. This is the first real input popup in ferrit
 
 ```
 ┌ [1] Status ───────────┐┌ Staged changes ──────────────────────────────────┐
-│ ferrit → main ↑2      ││  diff --git a/src/domain/app/mod.rs b/src/domain/app/mod.rs            .│
+│ ferrit → main ↑2      ││  diff --git a/src/app/mod.rs b/src/app/mod.rs            .│
 └───────────────────────┘│  @@ -40,6 +40,8 @@                               .│
 ┌ [2] Files ────────────┐│  +    self.mode = Mode::Diff;                    .│
-│  M  src/domain/app/mod.rs        .││                                                 .│
+│  M  src/app/mod.rs        .││                                                 .│
 │                       ┌ Commit ─────────────────────────────────────────┐ .│
 │                       │ feat(stage): line-level staging in the diff     │ .│
 │                       │                                                 │ .│
@@ -290,9 +290,9 @@ A commit made from another shell arrives as an `AppEvent::Refresh` (phase 2.5
 fs-watch on `.git/`), so the Commits pane updates on its own, same as staging
 did in phase 6.
 
-## Rendering (`src/components/screens/`)
+## Rendering (`src/app/screens/`)
 
-- New `src/components/screens/popup.rs`: a centered `Clear` + bordered `Block`, sized to a
+- New `src/app/screens/popup.rs`: a centered `Clear` + bordered `Block`, sized to a
   fraction of the frame (min 40 wide, grows with the terminal), with the
   `tui-textarea` widget inside and a two-line footer. The `Clear` widget wipes
   what is under it; the rest of the screen is drawn first and dimmed via a
@@ -455,7 +455,7 @@ interactive rebase todo editing" if the version gap ever closes.
 
 Phase 8 is branches: checkout, create, delete, fast-forward, merge. It uses
 the Commits pane picker pattern this phase introduced for `f`, and the popup
-primitive from `src/components/screens/popup.rs` for the "new branch name" input.
+primitive from `src/app/screens/popup.rs` for the "new branch name" input.
 
 Deferred out of phase 7, their own phases or a follow-up:
 

@@ -24,11 +24,11 @@ pub enum AppEvent {
     Refresh,
     /// Repository snapshot finished off-thread. Error is flattened here so
     /// the event boundary carries only owned, sendable application data.
-    RefreshDone(crate::domain::app::RefreshCompletion),
+    RefreshDone(crate::app::RefreshCompletion),
     /// Selected diff read finished. Generation and key reject stale results.
-    DiffDone(crate::domain::app::diff_query::DiffCompletion),
+    DiffDone(crate::app::diff_query::DiffCompletion),
     /// Selected image blob read/decode finished. Stale generations are dropped.
-    ImageDone(crate::domain::app::image_query::ImageCompletion),
+    ImageDone(crate::app::image_query::ImageCompletion),
     /// A background `fetch`/`pull`/`push` finished. `message` is already a
     /// user-facing string (`Ok` success line or `Err` failure text) — this
     /// module stays git-agnostic, so the spawned thread converts a

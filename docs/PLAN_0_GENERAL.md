@@ -30,17 +30,14 @@ command line: the value is the TUI.
 
 ```
 src/
-  domain/       app state, Git access, image logic, profile, repository models
-  components/   screens, reusable UI, theme, terminal lifecycle, tui_overlay
-
-later: split into two crates in a workspace
-  ferrit-git/   library: open repo, status, diff, stage, commit, branch, ...
-                unit-tested against fixture repos, no terminal
-  ferrit/       binary: ratatui TUI, depends on ferrit-git
+  app/          Ferrit-specific state, events, screens, theme and terminal loop
+  domain/       features: git (models + backend), profile, image
+  components/   reusable UI primitives and isolated tui_overlay code
 ```
 
-The current crate keeps the core and presentation together, with `domain/`
-and `components/` as the only source subtrees. The crate split remains deferred.
+`components/` stays independent of Ferrit screens and app state. The current
+crate keeps orchestration and presentation together; splitting the Git backend
+into its own crate remains deferred.
 
 ## Phases
 
@@ -49,7 +46,7 @@ and `components/` as the only source subtrees. The crate split remains deferred.
 | 0 | `PLAN_0_GENERAL.md` | this overview | living |
 | 1 | `PLAN_1_LAYOUT.md` | layout only, mock data, keyboard nav, no git | ✅ done |
 | 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data; blob reads + image preview | in progress (G0, G1, G3..G7 done; G2 partial) |
-| 2.5 | (no file) | live refresh: `src/domain/events.rs` multiplexes terminal input, a recursive fs-watch on the worktree and a 10s poll; a change from another shell re-snapshots on its own, lazygit style | ✅ done |
+| 2.5 | (no file) | live refresh: `src/app/events.rs` multiplexes terminal input, a recursive fs-watch on the worktree and a 10s poll; a change from another shell re-snapshots on its own, lazygit style | ✅ done |
 | 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane via `git diff` / `git show` subprocess (lazygit style, honours user `git config`), git-native colouring, hunk navigation, scrolling | ✅ done |
 | 4 | `PLAN_4_SCROLL_BEHAVIOR.md` | right-pane scroll keys (lazygit style, no left-pane fight), viewport-aware clamp, scrollbar widget, mouse wheel | ✅ done |
 | 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | ✅ done |
@@ -68,7 +65,7 @@ Cross-cutting:
 
 - `PLAN_SELF_TESTING.md` (headless snapshot tests + `vhs` screenshot tapes)
   applies to every phase from 1 on.
-- Live refresh (`src/domain/events.rs`) is already wired: every phase from 3 on that
+- Live refresh (`src/app/events.rs`) is already wired: every phase from 3 on that
   adds a cached, rebuilt-on-nav right-pane value must also rebuild it on a
   background `AppEvent::Refresh`, without discarding scroll or view state that
   belongs to an unchanged selection. See `PLAN_3_DIFF_VIEW.md` "App wiring".

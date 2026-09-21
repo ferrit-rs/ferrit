@@ -91,7 +91,7 @@ impl App {
                 if !self
                     .files
                     .iter()
-                    .any(|f| f.staged != crate::domain::repository::Change::None) =>
+                    .any(|f| f.staged != git::model::Change::None) =>
             {
                 self.popup = Some(Popup::CommitAllConfirm);
                 self.commit_overlay.open();

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use git2::{ErrorCode, Repository, Status, StatusOptions};
 
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::repository::{Change, FileEntry, StatusHeader};
+use crate::domain::git::model::{Change, FileEntry, StatusHeader};
 
 /// Read the header: branch, upstream, ahead/behind, conflict count.
 pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {

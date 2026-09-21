@@ -5,6 +5,12 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+pub mod events;
+pub mod mock;
+pub mod screens;
+pub mod terminal;
+pub mod theme;
+
 use std::collections::HashSet;
 use std::fmt::{self, Display, Write as _};
 use std::ops::Range;
@@ -28,11 +34,10 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Text};
 use ratatui_image::picker::Picker;
 
-use crate::components::screens as ui;
-use crate::components::terminal::Tui;
+use crate::app::events::{AppEvent, Events};
+use crate::app::screens as ui;
+use crate::app::terminal::Tui;
 use crate::components::ui::text_input::{TextInput, TextInputMode};
-use crate::components::{mock, theme};
-use crate::domain::events::{self, AppEvent, Events};
 use crate::domain::git;
 use crate::domain::git::apply::{ApplyDir, ApplyTarget};
 use crate::domain::git::diff::{DiffOpts, DiffSide};
@@ -55,7 +60,7 @@ pub enum DiffView {
     Files(FilesDiff),
     /// Commits pane, or a drilled branch's log: one commit's metadata and
     /// `git show` diff.
-    Commit(crate::domain::repository::CommitEntry, git::diff::Diff),
+    Commit(git::model::CommitEntry, git::diff::Diff),
     /// Branches pane, not drilled in: the selected branch's own log, shown
     /// passively (no Enter needed), lazygit's live branch -> log preview.
     BranchLog(BranchLog),
@@ -108,7 +113,7 @@ pub enum PopupView<'a> {
 #[derive(Debug, Clone)]
 pub struct BranchLog {
     pub branch: String,
-    pub commits: Vec<crate::domain::repository::CommitEntry>,
+    pub commits: Vec<git::model::CommitEntry>,
 }
 
 /// Snapshot plus any active drill-down data loaded in the same worker.
@@ -117,14 +122,8 @@ pub struct BranchLog {
 pub struct RefreshCompletion {
     pub(crate) snapshot: Result<git::Snapshot, String>,
     pub(crate) profile: Option<Profile>,
-    pub(crate) branch_log: Option<(
-        String,
-        Result<Vec<crate::domain::repository::CommitEntry>, String>,
-    )>,
-    pub(crate) commit_files: Option<(
-        String,
-        Result<Vec<crate::domain::repository::FileEntry>, String>,
-    )>,
+    pub(crate) branch_log: Option<(String, Result<Vec<git::model::CommitEntry>, String>)>,
+    pub(crate) commit_files: Option<(String, Result<Vec<git::model::FileEntry>, String>)>,
 }
 
 #[derive(Default)]
@@ -155,7 +154,7 @@ struct RenderedDiff {
 /// `DiffView::BranchLog` preview, which needs no Enter at all.
 struct BranchDrill {
     branch: String,
-    commits: Vec<crate::domain::repository::CommitEntry>,
+    commits: Vec<git::model::CommitEntry>,
     /// The branch-list cursor to restore when `Esc` backs out.
     return_index: usize,
 }
@@ -171,7 +170,7 @@ struct CommitDrill {
     /// One synthetic `FileEntry` per file the commit's diff touched, same
     /// index order as the underlying `git::diff::Diff::files`/`file_lines()` so a
     /// selected row's scroll target is a plain index lookup.
-    files: Vec<crate::domain::repository::FileEntry>,
+    files: Vec<git::model::FileEntry>,
     /// The commit-list cursor to restore when `Esc` backs out.
     return_index: usize,
 }
@@ -442,29 +441,29 @@ pub struct App {
     /// Git settings and activity shown in the profile drawer.
     profile: Profile,
     profile_tab: ProfileTab,
-    header: crate::domain::repository::StatusHeader,
-    files: Vec<crate::domain::repository::FileEntry>,
+    header: git::model::StatusHeader,
+    files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
     /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
     /// default; paths persist across `refresh()`, only `Enter` on a
     /// directory row changes this.
     collapsed_dirs: HashSet<PathBuf>,
-    branches: Vec<crate::domain::repository::BranchEntry>,
+    branches: Vec<git::model::BranchEntry>,
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
     branch_drill: Option<BranchDrill>,
     /// Configured remotes, feeding the Branches pane's Remotes tab.
     /// `docs/PLAN_9_REMOTE.md`.
-    remotes: Vec<crate::domain::repository::RemoteEntry>,
+    remotes: Vec<git::model::RemoteEntry>,
     /// Which of the Branches pane's own two tabs is showing.
     /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
     branches_tab: BranchesTab,
-    commits: Vec<crate::domain::repository::CommitEntry>,
+    commits: Vec<git::model::CommitEntry>,
     /// `Some` while the Commits pane is drilled into one commit's own
     /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
     /// shows the commit list.
     commit_drill: Option<CommitDrill>,
-    stashes: Vec<crate::domain::repository::StashEntry>,
+    stashes: Vec<git::model::StashEntry>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
     /// Optional worktree watcher failure; polling remains active as fallback.
@@ -631,7 +630,7 @@ impl App {
             git_user_name,
             profile,
             profile_tab: ProfileTab::Settings,
-            header: crate::domain::repository::StatusHeader::default(),
+            header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
             branches: Vec::new(),
@@ -1496,7 +1495,7 @@ impl App {
             Some(&FileRow::File { index, .. }) => self
                 .files
                 .get(index)
-                .map(crate::domain::repository::FileEntry::display)
+                .map(git::model::FileEntry::display)
                 .unwrap_or_default(),
             _ => String::new(),
         }
@@ -1651,7 +1650,7 @@ impl App {
 
 fn selection_key_for_file_rows(
     rows: &[FileRow],
-    files: &[crate::domain::repository::FileEntry],
+    files: &[git::model::FileEntry],
     selected: usize,
 ) -> Option<SelectionKey> {
     match rows.get(selected)? {
@@ -1664,7 +1663,7 @@ fn selection_key_for_file_rows(
 
 fn find_file_row_key(
     rows: &[FileRow],
-    files: &[crate::domain::repository::FileEntry],
+    files: &[git::model::FileEntry],
     key: &SelectionKey,
 ) -> Option<usize> {
     rows.iter().position(|row| match (row, key) {

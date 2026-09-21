@@ -13,9 +13,9 @@ use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
 use crate::domain::git::diff::{Diff, DiffStat};
-use crate::domain::repository::FileEntry;
-use crate::domain::repository::RemoteEntry;
-use crate::domain::repository::{BranchEntry, CommitEntry, StashEntry};
+use crate::domain::git::model::FileEntry;
+use crate::domain::git::model::RemoteEntry;
+use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[

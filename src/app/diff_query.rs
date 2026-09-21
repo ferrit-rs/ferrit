@@ -34,7 +34,7 @@ pub(crate) enum DiffQueryResult {
         staged: git::diff::Diff,
     },
     Commit(git::diff::Diff),
-    BranchLog(Vec<crate::domain::repository::CommitEntry>),
+    BranchLog(Vec<git::model::CommitEntry>),
 }
 
 /// Hidden event payload for a selected-diff worker completion.

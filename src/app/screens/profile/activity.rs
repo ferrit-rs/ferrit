@@ -6,7 +6,7 @@ use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use crate::components::theme;
+use crate::app::theme;
 use crate::domain::profile::Activity;
 
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, activity: &Activity) {

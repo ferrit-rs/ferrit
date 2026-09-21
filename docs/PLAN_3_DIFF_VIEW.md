@@ -41,9 +41,9 @@ patch output:
 │ ---                                                                    │
 │ CHANGELOG.md             | 6 ++++                                      │
 │ docs/PLAN_3_DIFF_VIEW.md | 25 ++++++++++++++++-----                    │
-│ src/domain/app/mod.rs               | 50 +++++++++++++++++++++++++++++++++++++++  │
-│ src/components/theme.rs             | 121 ++++++++++++++++++++++++++++++++++++++-- │
-│ src/components/screens/mod.rs                | 38 ++++++++++++++++++------                 │
+│ src/app/mod.rs               | 50 +++++++++++++++++++++++++++++++++++++++  │
+│ src/app/theme.rs             | 121 ++++++++++++++++++++++++++++++++++++++-- │
+│ src/app/screens/mod.rs                | 38 ++++++++++++++++++------                 │
 │ 5 files changed, 155 insertions(+), 85 deletions(-)                  │
 │                                                                        │
 │ Δ CHANGELOG.md                                                         │
@@ -82,9 +82,9 @@ metadata inside every file section.
 ```text
 CHANGELOG.md             | 6 ++++
 docs/PLAN_3_DIFF_VIEW.md | 25 ++++++++++++++++-----
-src/domain/app/mod.rs               | 50 +++++++++++++++++++++++++++++++++++++++
-src/components/theme.rs             | 121 ++++++++++++++++++++++++++++++++++++++--------
-src/components/screens/mod.rs                | 38 ++++++++++++++++++------
+src/app/mod.rs               | 50 +++++++++++++++++++++++++++++++++++++++
+src/app/theme.rs             | 121 ++++++++++++++++++++++++++++++++++++++--------
+src/app/screens/mod.rs                | 38 ++++++++++++++++++------
 5 files changed, 155 insertions(+), 85 deletions(-)
 ```
 

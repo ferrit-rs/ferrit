@@ -8,10 +8,10 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 
-use crate::components::theme;
+use crate::app::theme;
+use crate::app::{App, DiffView};
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::domain::app::{App, DiffView};
 use crate::domain::git;
 
 pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {

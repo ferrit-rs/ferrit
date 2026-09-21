@@ -250,7 +250,7 @@ test/
 
 ## Relationship to the other plans
 
-- `PLAN_0_GENERAL.md` sets the `src/domain/git/` (no ratatui) vs `src/components/screens/`
+- `PLAN_0_GENERAL.md` sets the `src/domain/git/` (no ratatui) vs `src/app/screens/`
   (no git logic) boundary that makes mechanisms 1 and 2 possible.
 - `PLAN_1_LAYOUT.md` defines the mock data and target screen that ST0
   through ST3 assert against.

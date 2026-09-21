@@ -3,10 +3,10 @@
 mod activity;
 mod settings;
 
-use crate::components::theme;
+use crate::app::ProfileTab;
+use crate::app::theme;
 use crate::components::tui_overlay::OverlayState;
 use crate::components::ui::drawer::Drawer;
-use crate::domain::app::ProfileTab;
 use crate::domain::profile::Profile;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};

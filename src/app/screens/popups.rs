@@ -6,12 +6,12 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
+use crate::app::CommitPopupView;
+use crate::app::{mock, theme};
 use crate::components::tui_overlay::{Anchor, Backdrop, Overlay, OverlayState};
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
-use crate::components::{mock, theme};
-use crate::domain::app::CommitPopupView;
 
 pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect) {
     let width = 55.min(area.width);

@@ -17,7 +17,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ferrit::domain::app::{App, DiffView, Pane};
+use ferrit::app::{App, DiffView, Pane};
 use ferrit::domain::git::diff::DiffSide;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

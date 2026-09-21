@@ -22,7 +22,7 @@ use git2::Repository;
 
 use crate::domain::git::diff::workdir;
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::repository::RemoteEntry;
+use crate::domain::git::model::RemoteEntry;
 
 const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
 const TERMINATE_GRACE: Duration = Duration::from_secs(2);

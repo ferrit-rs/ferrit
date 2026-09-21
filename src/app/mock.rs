@@ -6,9 +6,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::domain::repository::RemoteEntry;
-use crate::domain::repository::{BranchEntry, CommitEntry, StashEntry};
-use crate::domain::repository::{Change, FileEntry, StatusHeader};
+use crate::domain::git::model::RemoteEntry;
+use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
+use crate::domain::git::model::{Change, FileEntry, StatusHeader};
 
 /// An 8x8 PNG, embedded so `App::mock()` can drive the image-preview path with
 /// no repo and nothing on disk.

@@ -298,7 +298,7 @@ extends), and merge either succeeds cleanly or lands in the well-known
 command line — ferrit is not making a worse decision than typing the
 command yourself would.
 
-## Rendering (`src/components/screens/mod.rs`)
+## Rendering (`src/app/screens/mod.rs`)
 
 - No new right-pane view: the phase 2 branch-list / branch-log-preview
   split is untouched.

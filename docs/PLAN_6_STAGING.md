@@ -61,7 +61,7 @@ Consequences ferrit takes on, matching phase 3's reasoning:
 ```
         Files pane           right pane (DiffView::Files, phase 3)
    ┌ [2] Files ──────────┐   +- Unstaged changes -------------------------+
-   │  M src/domain/app/mod.rs        │   | diff --git a/src/domain/app/mod.rs b/src/domain/app/mod.rs      |  file
+   │  M src/app/mod.rs        │   | diff --git a/src/app/mod.rs b/src/app/mod.rs      |  file
    │ >M src/domain/git/diff.rs   │<--| index 1a2b3c..4d5e6f 100644              |  header
    │ ?? docs/notes.md     │   | --- a/src/domain/git/diff.rs                     |
    │                      │   | +++ b/src/domain/git/diff.rs                     |
@@ -299,7 +299,7 @@ on a per-hunk content hash").
 Staging from another shell (fs-watch `AppEvent::Refresh`) runs the same
 re-find, so ferrit's diff cursor tracks the repo whoever moved it.
 
-## Rendering (`src/components/screens/diff.rs`)
+## Rendering (`src/app/screens/diff.rs`)
 
 Phase 3's `render_diff(&Diff, focus)` gains a cursor argument:
 

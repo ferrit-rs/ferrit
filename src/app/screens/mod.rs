@@ -12,12 +12,12 @@ use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
+use crate::app::{App, DiffView, PANES, Pane, PopupView};
+use crate::app::{mock, theme};
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::components::{mock, theme};
-use crate::domain::app::{App, DiffView, PANES, Pane, PopupView};
 use crate::domain::image::preview::Preview;
 
 mod diff;

@@ -1,6 +1,6 @@
 //! Git and Ferrit settings shown in the profile drawer.
 
-use crate::components::theme;
+use crate::app::theme;
 use crate::domain::profile::{Identity, Settings};
 use ratatui::Frame;
 use ratatui::layout::Rect;

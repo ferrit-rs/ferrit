@@ -17,6 +17,7 @@ pub mod commit;
 pub mod diff;
 pub mod error;
 pub mod log;
+pub mod model;
 pub mod refs;
 pub mod remote;
 pub mod stash;
@@ -33,10 +34,10 @@ use self::branch::MergeOutcome;
 use self::commit::{CommitKind, CommitOpts};
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
-use crate::domain::profile::Identity;
-use crate::domain::repository::{
+use crate::domain::git::model::{
     BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader,
 };
+use crate::domain::profile::Identity;
 
 /// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
 /// constant until the pane grows real scrolling/paging.

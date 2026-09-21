@@ -16,7 +16,7 @@
 
 use std::path::Path;
 
-use ferrit::domain::app::{App, Pane};
+use ferrit::app::{App, Pane};
 use ferrit::domain::image::preview::Preview;
 
 fn main() {

@@ -85,12 +85,12 @@ this exact discipline: "gitui's async-git-off-the-UI-thread". This is the
 phase that actually needs it, because it is the first phase where the *no*
 readable answer ("done" or "failed") arrives in milliseconds.
 
-`src/domain/events.rs` already multiplexes independent sources onto one channel
+`src/app/events.rs` already multiplexes independent sources onto one channel
 (`Events`, `AppEvent`) so `App::run` can block on a single `recv()` — fetch,
 pull and push become a fourth source, not a new synchronization primitive:
 
 ```rust
-// src/domain/events.rs
+// src/app/events.rs
 pub enum AppEvent {
     Input(Event),
     Refresh,
@@ -328,7 +328,7 @@ not a progress bar: ferrit has no way to know fetch/push percentages without
 parsing git's `--progress` output, which is meant for a terminal's own
 carriage-return redraws, not structured data.
 
-## Rendering (`src/components/screens/mod.rs`)
+## Rendering (`src/app/screens/mod.rs`)
 
 - Status pane: `remote_busy_label()` and `status_note()` render as an extra
   line under the existing `ferrit -> main ↑2` line. The checked-out branch

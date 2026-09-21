@@ -168,8 +168,8 @@ impl App {
         self.files
             .iter()
             .filter(|f| {
-                f.staged == crate::domain::repository::Change::Conflicted
-                    || f.worktree == crate::domain::repository::Change::Conflicted
+                f.staged == git::model::Change::Conflicted
+                    || f.worktree == git::model::Change::Conflicted
             })
             .map(|f| f.path.display().to_string())
             .collect()

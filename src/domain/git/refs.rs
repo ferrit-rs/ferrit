@@ -5,7 +5,7 @@
 use git2::{BranchType, Repository};
 
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::repository::BranchEntry;
+use crate::domain::git::model::BranchEntry;
 
 /// Read the local branches, HEAD first, then alphabetical by name.
 pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {

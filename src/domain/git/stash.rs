@@ -5,7 +5,7 @@
 use git2::Repository;
 
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::repository::StashEntry;
+use crate::domain::git::model::StashEntry;
 
 /// Read the stash list. `git2::Repository::stash_foreach` needs `&mut`, so
 /// this is the one read in `Repo::snapshot()` that borrows mutably.
