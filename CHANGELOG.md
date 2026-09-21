@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Commit editor now follows lazygit’s summary/description flow: `Enter` commits from Summary, `Tab` switches fields, `Enter` inserts Description newlines, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains an alias.
 - App errors now retain typed Git/app categories and appear in Status plus a persistent bottom-right toast, dismissible with its `x` button.
 
 - Bottom panel now has an `Infos` heading above its frame; configured Git
@@ -27,8 +28,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - The staged index can now be committed: `c` opens a message popup and
   creates a normal commit (disabled with nothing staged); `A` amends `HEAD`
   with the pre-filled message plus whatever is staged; `w` rewords `HEAD`'s
-  message only, leaving the index untouched. `Ctrl-S` commits, `Ctrl-O` /
-  `Ctrl-N` toggle sign-off / no-verify (no-verify shown in red, never a
+  message only, leaving the index untouched. The commit editor has separate
+  Summary and Description fields: `Enter` commits from Summary, `Tab` switches
+  fields, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains
+  an alias. `Ctrl-O` / `Ctrl-N` toggle sign-off / no-verify (no-verify shown in red, never a
   silent skip), `Esc` cancels but keeps the draft for the next `c`. Every
   commit hook, GPG/SSH signing, and `commit.*` config setting applies,
   because it's a real `git commit` subprocess; a rejecting hook or any

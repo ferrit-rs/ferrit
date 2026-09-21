@@ -83,19 +83,19 @@ the popup until it closes. This is the first real input popup in ferrit
 │                       │                                                 │ .│
 │                       ├─────────────────────────────────────────────────┤ .│
 │                       │ 2 files staged   sign-off: on   verify: on      │ .│
-│                       │ ^S commit   ^O sign-off   ^N no-verify   Esc    │ .│
+│                       │ Enter commit   Shift-Enter newline   Esc       │ .│
 │                       └─────────────────────────────────────────────────┘ .│
 └───────────────────────┘└──────────────────────────────────────────────────┘
  Commit: c | Amend: A | Reword: w | Fixup: f | Keybindings: ? | Quit: q
 ```
 
-- Subject line and body in one `tui-textarea` (multiline). First line is the
-  subject; a blank second line is inserted on save if the user typed a body
-  straight after the subject, matching git convention. No hard wrap, no
-  enforced 50/72 (a lint hint in the footer is optional polish, not phase 7).
+- The shipped editor uses separate Summary and Description inputs in a centered
+  `tui_overlay` with backdrop. `Tab` switches fields; `Enter` commits from
+  Summary and inserts a newline in Description; `Meta`/`Ctrl-Enter` commits
+  from Description. Git receives the conventional blank line between fields.
 - Footer shows the precondition (`N files staged`) and the two toggles.
-- `Ctrl-S` (or `Ctrl-Enter`) commits. `Esc` cancels and **keeps the draft**
-  (see "Draft persistence").
+- `Ctrl-S` remains a submit alias. `Esc` cancels and **keeps the draft** (see
+  "Draft persistence").
 
 ### Amend / reword / fixup entry points
 
@@ -256,9 +256,11 @@ on_key(key):
     'f' => self.popup = Some(Popup::FixupPick)
 ```
 
-`popup_key` for `Popup::Commit`: printable keys and editing keys go to
-`textarea.input(key)`; `Ctrl-S` -> `do_commit()`; `Ctrl-O` / `Ctrl-N` flip the
-toggles; `Esc` -> stash `textarea` text into `commit_draft`, close.
+`popup_key` routes commit editor input to `app::commit`; Summary and
+Description use independent `TextInput`s. `Enter` / `Ctrl-S` submits Summary;
+`Tab` switches fields; `Enter` inserts a Description newline and
+`Meta`/`Ctrl-Enter` submits. `Ctrl-O` / `Ctrl-N` flip the toggles; `Esc`
+stashes the composed message into `commit_draft` and closes the overlay.
 
 ### `do_commit()`
 
@@ -313,7 +315,11 @@ did in phase 6.
 | `w` | Nav, at least one commit | open reword popup (message only, `--only`) |
 | `f` | Nav | enter fixup-pick on the Commits pane |
 | `s` | Nav, Commits focused | open squash popup targeting the selected commit |
-| `Ctrl-S` / `Ctrl-Enter` | commit popup | create the commit |
+| `Enter` | Summary field | create the commit |
+| `Tab` | commit popup | switch Summary / Description |
+| `Enter` | Description field | insert a newline |
+| `Meta`/`Ctrl-Enter` | Description field | create the commit |
+| `Ctrl-S` | either field | create the commit (alias) |
 | `Ctrl-O` | commit popup | toggle sign-off (`-s`) |
 | `Ctrl-N` | commit popup | toggle no-verify (`-n`) |
 | `Esc` | any popup | cancel (commit popup keeps the draft) |
@@ -360,7 +366,7 @@ ST1..ST3 like phases 3 and 5.
     fixture's `user.email`.
   - root commit on an unborn branch.
 - `tests/app_commit.rs` (extends phase 6's `app_stage.rs`): stage a file,
-  press `c`, type a message into the draft, `Ctrl-S`, assert `app.commits[0]`
+  press `c`, type a message into the draft, `Enter`, assert `app.commits[0]`
   is the new commit, `app.popup` is `None`, `app.commit_draft` is `None`, the
   staged diff view is a `Note`. Then press `c` again, type, `Esc`, press `c`
   once more and assert the draft came back.
@@ -402,7 +408,7 @@ interactive rebase todo editing" if the version gap ever closes.
   `HookRejected`, see the deviation note up top). `tests/git_commit.rs`
   green, including a rejecting `pre-commit` hook.
 - ✅ **C1** `Popup::Commit`, `CommitDraft`, and the local `TextInput`
-  in place of `tui-textarea` (deviation note). `c` opens it, `Ctrl-S`
+  in place of `tui-textarea` (deviation note). `c` opens it, `Enter`
   commits, `Esc` cancels with the draft kept. `on_key` popup branch.
   `refresh()` after a successful commit. `tests/app_commit.rs` green.
 - ✅ **C2** `A` amend (message pre-filled from `head_message`), `w` reword

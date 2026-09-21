@@ -197,8 +197,7 @@ pub const RIGHT_STASH: &str = "(no stash entries)";
 
 /// Help overlay body, toggled with `?`.
 pub const HELP: &str = "1 .. 5            focus that pane
-Tab / Right       focus next pane
-Shift-Tab / Left  focus previous pane
+Tab / Right       focus next pane; Shift-Tab / Left previous pane
 j / Down          move selection down
 k / Up            move selection up
 J / K             scroll the diff pane
@@ -215,7 +214,8 @@ d                 discard the change under the cursor (asks first)
 c                 open the commit popup (needs something staged)
 A                 amend HEAD, message pre-filled
 w                 reword HEAD's message only, index untouched
-Ctrl-S            (in the commit popup) create the commit
+Enter: commit Summary; Tab: switch; Enter: body newline
+Meta/Ctrl-Enter: commit body; Ctrl-S: commit alias
 Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify
 Esc               (in the commit popup) cancel, keeping the draft
 <space>           (Branches) checkout the selected branch

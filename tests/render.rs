@@ -84,7 +84,7 @@ fn renders_every_region() {
         "[3] Local branches",
         "[4] Commits",
         "[5] Stash",
-        "command log",
+        "Infos",
         "Stage:", // keybar label
         "Quit:",  // keybar label
     ] {

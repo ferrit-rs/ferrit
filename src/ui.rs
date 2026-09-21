@@ -11,7 +11,7 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
-use crate::app::{App, DiffView, PANES, Pane};
+use crate::app::{App, DiffView, PANES, Pane, PopupView};
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
@@ -67,14 +67,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if show_help {
         popups::draw_help(frame, area);
     }
-    if let Some(view) = app.commit_popup() {
-        popups::draw_commit(frame, area, &view);
-    } else if let Some(view) = app.new_branch_popup() {
-        popups::draw_commit(frame, area, &view);
-    } else if let Some((remotes, selected)) = app.remote_pick() {
-        popups::draw_remote_pick(frame, area, remotes, selected);
-    } else if let Some(msg) = app.note_popup() {
-        popups::draw_note(frame, area, msg);
+    match app.popup_view() {
+        Some(PopupView::Commit(mut view) | PopupView::NewBranch(mut view)) => {
+            popups::draw_commit(frame, area, &mut view);
+        },
+        Some(PopupView::RemotePick(remotes, selected)) => {
+            popups::draw_remote_pick(frame, area, remotes, selected);
+        },
+        Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
+        None => {},
     }
 
     if let Some(toast) = &mut app.toast {

@@ -10,7 +10,7 @@
     reason = "integration test scaffolding: a failed setup is the assertion, helper ergonomics beat lint-cleanliness here"
 )]
 //! `App`-level wiring for the commit popup (`docs/PLAN_7_COMMIT.md`): `c`
-//! opens it, typing fills the draft, `Ctrl-S` commits and refreshes, `Esc`
+//! opens it, typing fills the draft, `Enter` commits and refreshes, `Esc`
 //! cancels but keeps the draft for the next `c`. `A` / `w` pre-fill from
 //! `HEAD`'s message.
 
@@ -102,7 +102,7 @@ fn head_summary(app: &mut App) -> String {
 }
 
 #[test]
-fn c_opens_types_and_ctrl_s_commits() {
+fn c_opens_types_and_enter_commits() {
     let dir = TempDir::new("app-commit-basic");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -122,7 +122,7 @@ fn c_opens_types_and_ctrl_s_commits() {
     app.feed_key(char_key('c'));
     assert!(app.commit_popup().is_some(), "c opened the popup");
     type_text(&mut app, "feat: a new line");
-    app.feed_key(ctrl_key('s'));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
 
     assert!(app.commit_popup().is_none(), "popup closed on success");
     assert!(app.note_popup().is_none());
@@ -132,6 +132,37 @@ fn c_opens_types_and_ctrl_s_commits() {
         "the new commit showed up"
     );
     assert_eq!(head_summary(&mut app), "feat: a new line");
+}
+
+#[test]
+fn tab_switches_to_body_and_ctrl_enter_commits_message() {
+    let dir = TempDir::new("app-commit-body");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["add", "a.txt"])
+        .output()
+        .unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    type_text(&mut app, "feat: summary");
+    app.feed_key(KeyEvent::from(KeyCode::Tab));
+    type_text(&mut app, "body line one");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    type_text(&mut app, "body line two");
+    app.feed_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL));
+
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(
+        head.message().unwrap(),
+        "feat: summary\n\nbody line one\nbody line two\n"
+    );
 }
 
 #[test]
@@ -166,7 +197,7 @@ fn esc_cancels_but_keeps_the_draft_for_next_time() {
 }
 
 #[test]
-fn empty_message_is_rejected_with_a_note_and_no_commit() {
+fn empty_message_is_rejected_and_popup_stays_open() {
     let dir = TempDir::new("app-commit-empty");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -186,7 +217,16 @@ fn empty_message_is_rejected_with_a_note_and_no_commit() {
     app.feed_key(char_key('c'));
     app.feed_key(ctrl_key('s'));
 
-    assert!(app.note_popup().is_some(), "empty message is rejected");
+    assert!(
+        app.commit_popup().is_some(),
+        "popup stays open for correction"
+    );
+    assert!(
+        app.status_lines()[0]
+            .to_string()
+            .contains("cannot be empty"),
+        "empty message error is shown in Status"
+    );
     assert_eq!(app.row_count(Pane::Commits), before, "no commit was made");
 }
 
@@ -215,7 +255,7 @@ fn the_popup_actually_renders_its_title_text_and_footer() {
 
     assert!(out.contains("Commit"), "popup title shows:\n{out}");
     assert!(out.contains("feat: rendered"), "typed text shows:\n{out}");
-    assert!(out.contains("Ctrl-S"), "footer hints show:\n{out}");
+    assert!(out.contains("Enter: commit"), "footer hints show:\n{out}");
     assert!(out.contains("sign-off"), "toggle status shows:\n{out}");
 }
 

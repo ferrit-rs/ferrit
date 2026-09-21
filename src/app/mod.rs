@@ -75,7 +75,12 @@ pub struct FilesDiff {
 /// rather than cached.
 pub struct CommitPopupView<'a> {
     pub title: &'static str,
+    /// Commit subject, or the whole single-field input for another popup.
     pub input: &'a TextInput,
+    /// Commit body editor; absent for the new-branch input.
+    pub description: Option<&'a TextInput>,
+    pub summary_focused: bool,
+    pub overlay_state: Option<&'a mut OverlayState>,
     /// Compatibility view of the component's text lines.
     pub lines: &'a [String],
     /// `(row, character column)` cursor position.
@@ -85,6 +90,15 @@ pub struct CommitPopupView<'a> {
     pub toggles: Option<(bool, bool)>,
     /// Footer key hints, e.g. `"Commit: Ctrl-S | ... | Cancel: Esc"`.
     pub hints: &'static str,
+}
+
+/// The one active popup, ready for rendering. Explicit variants keep popup
+/// precedence in one `match` instead of chaining `if let` checks.
+pub enum PopupView<'a> {
+    Commit(CommitPopupView<'a>),
+    NewBranch(CommitPopupView<'a>),
+    RemotePick(&'a [git::remote::RemoteEntry], usize),
+    Note(&'a str),
 }
 
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
@@ -306,7 +320,7 @@ fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
 /// Modal state that owns all input while it is up, the same idea as
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
 enum Popup {
-    Commit(CommitDraft),
+    Commit(commit::CommitDraft),
     /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextInput` outright.
@@ -324,13 +338,6 @@ enum Popup {
 struct RemotePick {
     remotes: Vec<git::remote::RemoteEntry>,
     selected: usize,
-}
-
-struct CommitDraft {
-    text: TextInput,
-    kind: git::commit::CommitKind,
-    sign_off: bool,
-    no_verify: bool,
 }
 
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default
@@ -489,6 +496,8 @@ pub struct App {
     mouse_pointer: MousePointer,
     /// Animated side sheet opened by clicking that author.
     pub(crate) author_overlay: OverlayState,
+    /// Backdrop state for the commit editor modal.
+    pub(crate) commit_overlay: OverlayState,
     /// Persistent bottom-right error notification, dismissed by clicking `x`.
     pub(crate) toast: Option<Toast>,
     /// Each left pane's bordered rect from the last frame, for routing a
@@ -551,6 +560,7 @@ pub struct App {
 mod tree;
 
 mod branch_actions;
+mod commit;
 pub mod diff_query;
 mod drill_nav;
 mod error;
@@ -610,6 +620,7 @@ impl App {
             author_hovered: false,
             mouse_pointer: MousePointer::default(),
             author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
+            commit_overlay: OverlayState::new(),
             toast: None,
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),

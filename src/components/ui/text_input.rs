@@ -93,6 +93,12 @@ impl TextInput {
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
     }
 
+    /// Render without cursor emphasis when this input is not focused.
+    pub fn render_inactive(&self, frame: &mut Frame<'_>, area: Rect) {
+        let lines: Vec<Line<'static>> = self.lines.iter().cloned().map(Line::raw).collect();
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+    }
+
     fn insert_char(&mut self, c: char) {
         let byte = self.byte_col();
         if let Some(line) = self.lines.get_mut(self.row) {
