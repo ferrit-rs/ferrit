@@ -4,17 +4,19 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
 use crate::app::theme;
+use crate::components::ui::separator::Separator;
 use crate::domain::profile::Activity;
 
+const COMPACT_ACTIVITY_WIDTH: u16 = 60;
+
 pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
-    let mut lines = vec![
-        Line::from(""),
-        Line::styled(
-            "Repository activity · local and fetched remote branches",
-            Style::new().fg(theme::IDLE),
-        ),
-    ];
-    if width < 60 {
+    let divider = |label| {
+        Separator::new(label)
+            .style(Style::new().fg(theme::IDLE))
+            .line(width)
+    };
+    let mut lines = vec![divider("Repository activity · local and remote branches")];
+    if width < COMPACT_ACTIVITY_WIDTH {
         lines.push(Line::from(format!(
             "{} commits in the past year",
             activity.commit_count
@@ -26,11 +28,7 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
             activity.commit_count
         )));
     }
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        "Contributors · commit authors · past year",
-        Style::new().fg(theme::IDLE),
-    ));
+    lines.push(divider("Contributors · past year"));
     if activity.contributors.is_empty() {
         lines.push(Line::from("No contributors in the past year"));
     } else {
@@ -48,8 +46,7 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
             ]));
         }
     }
-    lines.push(Line::from(""));
-    lines.push(Line::styled("Recent commits", Style::new().fg(theme::IDLE)));
+    lines.push(divider("Recent commits"));
     if activity.recent_commits.is_empty() {
         lines.push(Line::from(
             "No recent commits on local or fetched remote branches",

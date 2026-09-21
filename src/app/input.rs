@@ -5,6 +5,18 @@ use super::{
     Pane, Position, WHEEL_LINES, events, git,
 };
 
+const KEY_THEME_PALETTE: char = 'p';
+const KEY_THEME_PRESET: char = 't';
+const KEY_THEME_RGB: char = 'e';
+const KEY_NAV_LEFT: char = 'h';
+const KEY_NAV_DOWN: char = 'j';
+const KEY_NAV_UP: char = 'k';
+const KEY_NAV_RIGHT: char = 'l';
+const RGB_CHANNEL_STEP: i16 = 8;
+const RGB_CHANNEL_INDEX_STEP: usize = 1;
+const RGB_MIN_VALUE: i16 = 0;
+const RGB_MAX_VALUE: i16 = 255;
+
 impl App {
     pub(super) fn on_key(&mut self, key: KeyEvent) {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
@@ -40,21 +52,62 @@ impl App {
         }
 
         if !self.author_overlay.is_closed() {
-            if key.code == KeyCode::Char('t') {
+            if self.theme_palette_open {
+                match key.code {
+                    KeyCode::Esc | KeyCode::Char(KEY_THEME_PALETTE) => {
+                        self.theme_palette_open = false
+                    },
+                    KeyCode::Left | KeyCode::Char(KEY_NAV_LEFT) => self.move_theme_palette(
+                        crate::components::ui::color_picker::PaletteDirection::Left,
+                    ),
+                    KeyCode::Right | KeyCode::Char(KEY_NAV_RIGHT) => self.move_theme_palette(
+                        crate::components::ui::color_picker::PaletteDirection::Right,
+                    ),
+                    KeyCode::Up | KeyCode::Char(KEY_NAV_UP) => self.move_theme_palette(
+                        crate::components::ui::color_picker::PaletteDirection::Up,
+                    ),
+                    KeyCode::Down | KeyCode::Char(KEY_NAV_DOWN) => self.move_theme_palette(
+                        crate::components::ui::color_picker::PaletteDirection::Down,
+                    ),
+                    KeyCode::Enter => {
+                        if let Some(color) = crate::components::ui::color_picker::palette_color(
+                            self.theme_palette_selected,
+                        ) {
+                            self.theme_config.accent = Some(color);
+                            self.persist_theme();
+                        }
+                    },
+                    _ => {},
+                }
+                return;
+            }
+            if key.code == KeyCode::Char(KEY_THEME_PALETTE) {
+                self.theme_palette_open = true;
+                self.theme_editing = false;
+                self.theme_palette_selected =
+                    crate::components::ui::color_picker::nearest_palette_index(
+                        self.theme_config.color(),
+                    );
+                return;
+            }
+            if key.code == KeyCode::Char(KEY_THEME_PRESET) {
                 self.theme_config.preset = self.theme_config.preset.next();
                 self.theme_config.accent = None;
                 self.persist_theme();
                 return;
             }
-            if key.code == KeyCode::Char('e') {
+            if key.code == KeyCode::Char(KEY_THEME_RGB) {
                 self.theme_editing = !self.theme_editing;
                 return;
             }
             if self.theme_editing {
                 match key.code {
-                    KeyCode::Tab => self.theme_rgb_channel = (self.theme_rgb_channel + 1) % 3,
-                    KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(8),
-                    KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-8),
+                    KeyCode::Tab => {
+                        self.theme_rgb_channel = (self.theme_rgb_channel + RGB_CHANNEL_INDEX_STEP)
+                            % super::theme_config::RGB_CHANNEL_COUNT;
+                    },
+                    KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(RGB_CHANNEL_STEP),
+                    KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-RGB_CHANNEL_STEP),
                     KeyCode::Esc => self.theme_editing = false,
                     _ => {},
                 }
@@ -179,6 +232,16 @@ impl App {
         }
     }
 
+    fn move_theme_palette(
+        &mut self,
+        direction: crate::components::ui::color_picker::PaletteDirection,
+    ) {
+        self.theme_palette_selected = crate::components::ui::color_picker::move_palette_selection(
+            self.theme_palette_selected,
+            direction,
+        );
+    }
+
     fn adjust_theme_rgb(&mut self, delta: i16) {
         let (mut r, mut g, mut b) = match self.theme_config.color() {
             ratatui::style::Color::Rgb(r, g, b) => (r, g, b),
@@ -189,11 +252,12 @@ impl App {
             _ => (0, 255, 0),
         };
         let channel = match self.theme_rgb_channel {
-            0 => &mut r,
-            1 => &mut g,
+            super::theme_config::RGB_RED_CHANNEL => &mut r,
+            super::theme_config::RGB_GREEN_CHANNEL => &mut g,
             _ => &mut b,
         };
-        *channel = u8::try_from((i16::from(*channel) + delta).clamp(0, 255)).unwrap_or(0);
+        *channel = u8::try_from((i16::from(*channel) + delta).clamp(RGB_MIN_VALUE, RGB_MAX_VALUE))
+            .unwrap_or_default();
         self.theme_config.accent = Some(ratatui::style::Color::Rgb(r, g, b));
         self.persist_theme();
     }

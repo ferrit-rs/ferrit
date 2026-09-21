@@ -446,6 +446,8 @@ pub struct App {
     theme_config: theme_config::ThemeConfig,
     theme_rgb_channel: usize,
     theme_editing: bool,
+    theme_palette_open: bool,
+    theme_palette_selected: usize,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -614,6 +616,8 @@ impl App {
             },
             &activity_commits,
         );
+        let theme_palette_selected =
+            crate::components::ui::color_picker::nearest_palette_index(theme_config.color());
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -625,8 +629,10 @@ impl App {
             profile,
             profile_scroll: 0,
             theme_config,
-            theme_rgb_channel: 0,
+            theme_rgb_channel: theme_config::RGB_RED_CHANNEL,
             theme_editing: false,
+            theme_palette_open: false,
+            theme_palette_selected,
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),

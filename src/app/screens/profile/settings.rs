@@ -2,58 +2,60 @@
 
 use crate::app::theme;
 use crate::app::theme_config::ThemeConfig;
+use crate::components::ui::color_picker::ColorPicker;
+use crate::components::ui::separator::Separator;
 use crate::domain::profile::{Identity, Settings};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
+
+const RGB_CHANNEL_LABELS: [&str; crate::app::theme_config::RGB_CHANNEL_COUNT] = ["R", "G", "B"];
+const RGB_VALUE_WIDTH: usize = 3;
 
 pub(super) fn lines(
     settings: &Settings,
     config: &ThemeConfig,
     editing: bool,
     channel: usize,
+    palette_open: bool,
+    palette_selected: usize,
+    width: u16,
 ) -> Vec<Line<'static>> {
-    let mut lines = vec![Line::styled("Git identities", Style::new().fg(theme::IDLE))];
+    let divider = |label| {
+        Separator::new(label)
+            .style(Style::new().fg(theme::IDLE))
+            .line(width)
+    };
+    let mut lines = vec![divider("Git identities")];
     append_identity(&mut lines, "Global", settings.global_identity.as_ref());
     append_identity(
         &mut lines,
         "Repository",
         settings.repository_identity.as_ref(),
     );
-    lines.push(Line::from(""));
-    lines.push(Line::styled("Ferrit", Style::new().fg(theme::IDLE)));
-    let (r, g, b) = match config.color() {
-        ratatui::style::Color::Rgb(r, g, b) => (r, g, b),
-        ratatui::style::Color::Green => (0, 255, 0),
-        ratatui::style::Color::Cyan => (0, 255, 255),
-        ratatui::style::Color::Magenta => (255, 0, 255),
-        ratatui::style::Color::Yellow => (255, 255, 0),
-        _ => (0, 255, 0),
-    };
+    lines.push(divider("Ferrit settings"));
     lines.push(Line::from(format!("Theme: {}", config.preset.name())));
-    lines.push(Line::styled(
-        format!("Accent: #{r:02X}{g:02X}{b:02X}"),
-        Style::new().fg(config.color()),
-    ));
+    lines.extend(
+        ColorPicker::new(config.color())
+            .selected(palette_selected)
+            .active(palette_open)
+            .lines(),
+    );
+    let (r, g, b) = crate::components::ui::color_picker::rgb(config.color());
     lines.push(Line::styled(
         if editing {
             format!(
-                "RGB: [R {r:03}] [G {g:03}] [B {b:03}] · channel {}",
-                match channel {
-                    0 => "R",
-                    1 => "G",
-                    _ => "B",
-                }
+                "RGB: [R {r:0RGB_VALUE_WIDTH$}] [G {g:0RGB_VALUE_WIDTH$}] [B {b:0RGB_VALUE_WIDTH$}] · channel {}",
+                RGB_CHANNEL_LABELS
+                    .get(channel)
+                    .copied()
+                    .unwrap_or(RGB_CHANNEL_LABELS[crate::app::theme_config::RGB_BLUE_CHANNEL])
             )
         } else {
-            "t cycle preset · e edit RGB".to_owned()
+            "p palette · t preset · e edit RGB".to_owned()
         },
         Style::new().fg(theme::IDLE),
     ));
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        "Effective author identities",
-        Style::new().fg(theme::IDLE),
-    ));
+    lines.push(divider("Effective author identities"));
     if settings.effective_identities.is_empty() {
         lines.push(Line::from("Not configured"));
     } else {
@@ -71,7 +73,6 @@ pub(super) fn lines(
             ));
         }
     }
-    lines.push(Line::from(""));
     lines
 }
 
@@ -92,5 +93,4 @@ fn append_identity(lines: &mut Vec<Line<'static>>, label: &str, identity: Option
     } else {
         lines.push(Line::styled("Not configured", Style::new().fg(theme::IDLE)));
     }
-    lines.push(Line::from(""));
 }

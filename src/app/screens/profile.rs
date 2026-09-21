@@ -24,6 +24,8 @@ pub(super) fn draw_author(
     config: &ThemeConfig,
     theme_editing: bool,
     rgb_channel: usize,
+    palette_open: bool,
+    palette_selected: usize,
 ) {
     let Some(inner) = Drawer::new(state, " Profile ")
         .width(Constraint::Percentage(75))
@@ -37,7 +39,15 @@ pub(super) fn draw_author(
     let [body, track] =
         Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(content);
 
-    let mut lines = settings::lines(&profile.settings, config, theme_editing, rgb_channel);
+    let mut lines = settings::lines(
+        &profile.settings,
+        config,
+        theme_editing,
+        rgb_channel,
+        palette_open,
+        palette_selected,
+        body.width,
+    );
     lines.extend(activity::lines(&profile.activity, body.width));
 
     let content_length = lines.len();
@@ -53,7 +63,7 @@ pub(super) fn draw_author(
         .render(frame, track);
     frame.render_widget(
         Paragraph::new(Line::styled(
-            "t preset · e edit RGB · Tab channel · ↑/↓ adjust · Esc close",
+            "p palette · arrows select · Enter apply · e RGB · t preset · Esc close",
             Style::new().fg(theme::IDLE),
         )),
         hint,

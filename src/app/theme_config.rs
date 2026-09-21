@@ -7,6 +7,11 @@ use directories::ProjectDirs;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
+pub(super) const RGB_RED_CHANNEL: usize = 0;
+pub(super) const RGB_GREEN_CHANNEL: usize = 1;
+pub(super) const RGB_BLUE_CHANNEL: usize = 2;
+pub(super) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
+
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Preset {

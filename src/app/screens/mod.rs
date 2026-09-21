@@ -74,6 +74,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             &app.theme_config,
             app.theme_editing,
             app.theme_rgb_channel,
+            app.theme_palette_open,
+            app.theme_palette_selected,
         );
     }
 
