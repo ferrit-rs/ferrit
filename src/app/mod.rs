@@ -427,6 +427,8 @@ pub struct App {
     repo_name: String,
     /// Git author name from the repository's effective config.
     git_user_name: Option<String>,
+    /// All Git author identities configured for the repository.
+    git_user_identities: Vec<git::model::UserIdentity>,
     header: git::status::StatusHeader,
     files: Vec<git::status::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -572,6 +574,9 @@ impl App {
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
         let git_user_name = repo.as_ref().and_then(git::Repo::user_name);
+        let git_user_identities = repo
+            .as_ref()
+            .map_or_else(Vec::new, git::Repo::user_identities);
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -580,6 +585,7 @@ impl App {
             repo,
             repo_name,
             git_user_name,
+            git_user_identities,
             header: git::status::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -1015,6 +1021,11 @@ impl App {
     /// Configured Git author name, shown in the Info panel header when set.
     pub fn git_user_name(&self) -> Option<&str> {
         self.git_user_name.as_deref()
+    }
+
+    /// All author identities configured for the open repository.
+    pub fn git_user_identities(&self) -> &[git::model::UserIdentity] {
+        &self.git_user_identities
     }
 
     /// Return cached styled diff. Cache invalidates on selection, diff text,

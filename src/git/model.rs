@@ -4,6 +4,13 @@
 //! G3..G5 fill the same structs from real git reads (`refs.rs`, `log.rs`,
 //! `stash.rs`). The UI never learns which source it got.
 
+/// One configured Git author identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserIdentity {
+    pub name: String,
+    pub email: Option<String>,
+}
+
 /// One row of the Commits pane.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitEntry {

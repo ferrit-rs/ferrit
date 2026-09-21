@@ -26,9 +26,9 @@ needs a reason stated in the commit message.
 
 
 
-## Explaining visual behavior
+## Explaining and planning visual behavior
 
-- When explaining a visual concept, layout, or UI behavior to the user, include an ASCII diagram so the intended appearance or interaction is clear.
+- When explaining, interpreting, or planning a visual concept, layout, or UI behavior with the user, include an ASCII diagram. Show what you understand the user wants and what the interface should look like or do, so the user can check the plan before implementation.
 
 ### Self improving
 

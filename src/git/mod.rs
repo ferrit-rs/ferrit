@@ -33,13 +33,26 @@ use self::branch::MergeOutcome;
 use self::commit::{CommitKind, CommitOpts};
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
-use self::model::{BranchEntry, CommitEntry, StashEntry};
+use self::model::{BranchEntry, CommitEntry, StashEntry, UserIdentity};
 use self::remote::RemoteEntry;
 use self::status::{FileEntry, StatusHeader};
 
 /// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
 /// constant until the pane grows real scrolling/paging.
 const COMMITS_LIMIT: usize = 200;
+
+fn config_values(config: &git2::Config, key: &str) -> Vec<String> {
+    let Ok(mut entries) = config.multivar(key, None) else {
+        return Vec::new();
+    };
+    let mut values = Vec::new();
+    while let Some(Ok(entry)) = entries.next() {
+        if let Ok(value) = entry.value() {
+            values.push(value.to_owned());
+        }
+    }
+    values
+}
 
 /// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
 pub struct Repo {
@@ -100,6 +113,23 @@ impl Repo {
     /// and system config precedence.
     pub fn user_name(&self) -> Option<String> {
         self.inner.config().ok()?.get_string("user.name").ok()
+    }
+
+    /// All configured author names paired with email values in config order.
+    pub fn user_identities(&self) -> Vec<UserIdentity> {
+        let Ok(config) = self.inner.config() else {
+            return Vec::new();
+        };
+        let names = config_values(&config, "user.name");
+        let emails = config_values(&config, "user.email");
+        names
+            .into_iter()
+            .enumerate()
+            .map(|(index, name)| UserIdentity {
+                name,
+                email: emails.get(index).cloned(),
+            })
+            .collect()
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.

@@ -60,8 +60,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_keybar(frame, keybar, app);
 
     if !app.author_overlay.is_closed() {
-        let name = app.git_user_name().unwrap_or("Not configured").to_owned();
-        drawers::draw_author(frame, area, &mut app.author_overlay, &name);
+        let identities = app.git_user_identities().to_vec();
+        drawers::draw_author(frame, area, &mut app.author_overlay, &identities);
     }
 
     if show_help {
