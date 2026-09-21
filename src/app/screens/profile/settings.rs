@@ -89,8 +89,10 @@ pub(super) fn lines(
             let marker = if selected { "●" } else { "○" };
             let location = if settings.repository_identity.as_ref() == Some(identity) {
                 "Repo"
-            } else {
+            } else if settings.global_identities.contains(identity) {
                 "Global"
+            } else {
+                "Repo history"
             };
             let email = identity.email.as_deref().unwrap_or("Email not configured");
             lines.push(Line::styled(

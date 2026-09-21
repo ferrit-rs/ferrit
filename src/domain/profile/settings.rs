@@ -6,6 +6,7 @@ pub struct Settings {
     pub repository_identity: Option<Identity>,
     pub effective_identity: Option<Identity>,
     pub identity_source: IdentitySource,
+    pub recognized_authors: Vec<Identity>,
 }
 
 impl Settings {
@@ -15,6 +16,11 @@ impl Settings {
             && !identities.contains(repository_identity)
         {
             identities.push(repository_identity.clone());
+        }
+        for author in &self.recognized_authors {
+            if !identities.contains(author) {
+                identities.push(author.clone());
+            }
         }
         identities
             .into_iter()
@@ -37,14 +43,22 @@ mod tests {
             name: "Incomplete User".to_owned(),
             email: None,
         };
+        let recognized_author = Identity {
+            name: "Repository Author".to_owned(),
+            email: Some("author@example.com".to_owned()),
+        };
         let settings = Settings {
             global_identities: vec![global.clone(), no_email],
             repository_identity: Some(global.clone()),
             effective_identity: Some(global.clone()),
             identity_source: IdentitySource::Global,
+            recognized_authors: vec![global.clone(), recognized_author.clone()],
         };
 
-        assert_eq!(settings.available_identities(), vec![global]);
+        assert_eq!(
+            settings.available_identities(),
+            vec![global, recognized_author]
+        );
     }
 }
 
