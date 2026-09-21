@@ -45,7 +45,7 @@ impl App {
                 });
                 self.selection[Pane::Commits] = 0;
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(e) => self.report_error(e),
         }
     }
 

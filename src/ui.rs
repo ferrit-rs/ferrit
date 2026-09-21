@@ -76,6 +76,10 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     } else if let Some(msg) = app.note_popup() {
         popups::draw_note(frame, area, msg);
     }
+
+    if let Some(toast) = &mut app.toast {
+        toast.render(frame, area);
+    }
 }
 
 /// Colour each pane's rows by what they mean. Status and Files come from the

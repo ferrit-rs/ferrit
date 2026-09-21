@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- App errors now retain typed Git/app categories and appear in Status plus a persistent bottom-right toast, dismissible with its `x` button.
+
 - Bottom panel now has an `Infos` heading above its frame; configured Git
   author name appears inside the frame, right-aligned beside the first command.
 - Clicking the configured author opens an animated right-side Git identity drawer.

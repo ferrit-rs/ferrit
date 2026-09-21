@@ -1,7 +1,8 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
 use super::{
-    App, AppEvent, Popup, RemotePick, Result, WorkerKind, events, mpsc, run_worker, thread,
+    App, AppError, AppEvent, Popup, RemotePick, Result, WorkerKind, events, mpsc, run_worker,
+    thread,
 };
 use std::sync::atomic::Ordering;
 
@@ -36,7 +37,7 @@ impl App {
         let Some(repo) = &self.repo else { return };
         match repo.remotes() {
             Ok(remotes) if remotes.is_empty() => {
-                self.last_error = Some("no remote configured".to_owned());
+                self.report_error(AppError::NoRemoteConfigured);
             },
             Ok(mut remotes) if remotes.len() == 1 => {
                 self.push_with_upstream(remotes.remove(0).name);
@@ -47,7 +48,7 @@ impl App {
                     selected: 0,
                 }));
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(e) => self.report_error(e),
         }
     }
 
@@ -130,7 +131,7 @@ impl App {
             Err(line) => {
                 self.remote_refresh_error = self.event_sender.as_ref().map(|_| line.clone());
                 self.status_note = None;
-                self.last_error = Some(line);
+                self.report_error(AppError::Background(line));
             },
         }
     }

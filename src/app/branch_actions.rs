@@ -45,7 +45,7 @@ impl App {
                 });
                 self.selection[Pane::Branches] = 0;
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(e) => self.report_error(e),
         }
     }
 
@@ -55,7 +55,7 @@ impl App {
     pub(super) fn finish_branch_action(&mut self, result: GitResult<()>) {
         self.request_refresh();
         if let Err(e) = result {
-            self.last_error = Some(e.to_string());
+            self.report_error(e);
         }
     }
 
@@ -108,7 +108,7 @@ impl App {
                 self.popup = None;
                 self.request_refresh();
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(e) => self.report_error(e),
         }
     }
 
@@ -202,7 +202,7 @@ impl App {
                      from the shell — conflict resolution UI is phase 11."
                 )));
             },
-            Err(e) => self.last_error = Some(e.to_string()),
+            Err(e) => self.report_error(e),
         }
     }
 }

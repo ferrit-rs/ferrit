@@ -1,7 +1,7 @@
 //! Popup state readers and the commit / new-branch / remote-pick / note popup key handling.
 
 use super::{
-    App, CommitDraft, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
+    App, AppError, CommitDraft, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
     TextInputMode, git,
 };
 
@@ -81,13 +81,13 @@ impl App {
                     .iter()
                     .any(|f| f.staged != git::status::Change::None) =>
             {
-                self.last_error = Some("nothing staged to commit".to_owned());
+                self.report_error(AppError::NothingStaged);
                 return;
             },
             git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
                 if self.commits.is_empty() =>
             {
-                self.last_error = Some("no commit yet to amend".to_owned());
+                self.report_error(AppError::NoCommitToAmend);
                 return;
             },
             _ => {},
@@ -193,7 +193,7 @@ impl App {
             return;
         };
         if !matches!(draft.kind, git::commit::CommitKind::Fixup { .. }) && draft.text.is_blank() {
-            self.popup = Some(Popup::Note("empty commit message".to_owned()));
+            self.report_error(AppError::EmptyCommitMessage);
             return;
         }
         let message = draft.text.text();
@@ -212,11 +212,9 @@ impl App {
                 self.request_refresh();
             },
             Err(git::error::GitError::NothingStaged) => {
-                self.popup = Some(Popup::Note("nothing staged to commit".to_owned()));
+                self.report_error(AppError::NothingStaged);
             },
-            Err(e) => {
-                self.popup = Some(Popup::Note(e.to_string()));
-            },
+            Err(e) => self.report_error(e),
         }
     }
 }

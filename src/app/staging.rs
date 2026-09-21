@@ -228,7 +228,7 @@ impl App {
     pub(super) fn finish_apply(&mut self, result: GitResult<()>) {
         self.request_refresh();
         if let Err(e) = result {
-            self.last_error = Some(e.to_string());
+            self.report_error(e);
         }
     }
 
@@ -390,7 +390,7 @@ impl App {
                             action: ConfirmAction::DeleteBranch { name, force: true },
                         });
                     },
-                    Err(e) => self.last_error = Some(e.to_string()),
+                    Err(e) => self.report_error(e),
                 }
             },
         }

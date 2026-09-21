@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 
 use crate::components::tui_overlay::OverlayState;
 use crate::components::ui::mouse_pointer::MousePointer;
+use crate::components::ui::toast::Toast;
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
@@ -486,6 +487,8 @@ pub struct App {
     mouse_pointer: MousePointer,
     /// Animated side sheet opened by clicking that author.
     pub(crate) author_overlay: OverlayState,
+    /// Persistent bottom-right error notification, dismissed by clicking `x`.
+    pub(crate) toast: Option<Toast>,
     /// Each left pane's bordered rect from the last frame, for routing a
     /// click to the pane it landed in. `Rect::ZERO` before the first draw.
     left_areas: EnumMap<Pane, Rect>,
@@ -548,11 +551,14 @@ mod tree;
 mod branch_actions;
 pub mod diff_query;
 mod drill_nav;
+mod error;
 pub mod image_query;
 mod input;
 mod popups;
 mod remote;
 mod staging;
+
+pub(crate) use error::AppError;
 
 #[cfg(test)]
 mod tests;
@@ -598,6 +604,7 @@ impl App {
             author_hovered: false,
             mouse_pointer: MousePointer::default(),
             author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
+            toast: None,
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
             right_focused: false,
@@ -649,7 +656,7 @@ impl App {
     pub fn detect_graphics(&mut self) {
         if let Some(found) = detect::pick() {
             if let Some(line) = found.debug_line() {
-                self.last_error = Some(line);
+                self.report_notice(line);
             }
             self.picker = found.picker;
             self.invalidate_image_query();
@@ -746,7 +753,7 @@ impl App {
                 self.stashes = snap.stashes;
                 self.last_error = None;
             },
-            Err(error) => self.last_error = Some(error),
+            Err(error) => self.report_error(AppError::Refresh(error)),
         }
 
         // A drilled branch log (Enter on Branches) stays live across a
@@ -809,7 +816,7 @@ impl App {
         if rerun {
             self.request_refresh();
         } else if let Some(error) = self.remote_refresh_error.take() {
-            self.last_error = Some(error);
+            self.report_error(AppError::Refresh(error));
         }
         if self.last_error.is_none() {
             self.last_error = self.watch_error.clone();
@@ -1291,6 +1298,17 @@ impl App {
         out
     }
 
+    /// Keep persistent Status text while moving typed error into transient toast.
+    pub(super) fn report_error(&mut self, error: impl Into<AppError>) {
+        let error = error.into();
+        self.last_error = Some(error.to_string());
+        self.toast = Some(Toast::error(error));
+    }
+
+    pub(super) fn report_notice(&mut self, message: impl Into<String>) {
+        self.last_error = Some(message.into());
+    }
+
     /// Branches pane rows: the branch list, or one branch's own commit log
     /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
     /// own empty-state line.
@@ -1467,11 +1485,16 @@ impl App {
             terminal.draw(|frame| ui::draw(frame, self))?;
 
             let was_animating = self.author_overlay.is_animating();
-            let batch = if was_animating {
-                match events.next_batch_timeout(Duration::from_millis(16))? {
-                    Some(batch) => batch,
-                    None => {
-                        self.author_overlay.tick(overlay_tick.elapsed());
+            let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
+            let timeout = (was_animating || toast_animating).then_some(Duration::from_millis(16));
+            let batch = if let Some(timeout) = timeout {
+                match events.next_batch_timeout(timeout) {
+                    Err(error) => return Err(error),
+                    Ok(Some(batch)) => batch,
+                    Ok(None) => {
+                        let elapsed = overlay_tick.elapsed();
+                        self.author_overlay.tick(elapsed);
+                        self.tick_toast(elapsed);
                         overlay_tick = Instant::now();
                         continue;
                     },
@@ -1486,8 +1509,14 @@ impl App {
                         self.on_key(key);
                     },
                     AppEvent::Input(Event::Mouse(m)) => {
-                        self.on_mouse(m);
-                        self.mouse_pointer.set_hovered(self.author_hovered)?;
+                        let toast_consumed =
+                            self.toast.as_mut().is_some_and(|toast| toast.on_mouse(m));
+                        if toast_consumed {
+                            self.mouse_pointer.set_hovered(false)?;
+                        } else {
+                            self.on_mouse(m);
+                            self.mouse_pointer.set_hovered(self.author_hovered)?;
+                        }
                     },
                     AppEvent::Input(_) => {},
                     AppEvent::Refresh => self.request_refresh(),
@@ -1503,6 +1532,7 @@ impl App {
             if self.author_overlay.is_animating() && was_animating {
                 self.author_overlay.tick(overlay_tick.elapsed());
             }
+            self.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
         }
         if self.remote_worker.is_some() {
@@ -1514,6 +1544,15 @@ impl App {
             self.remote_busy = None;
         }
         Ok(())
+    }
+
+    fn tick_toast(&mut self, elapsed: Duration) {
+        if let Some(toast) = &mut self.toast {
+            toast.tick(elapsed);
+            if toast.is_closed() {
+                self.toast = None;
+            }
+        }
     }
 }
 
