@@ -831,6 +831,8 @@ dependencies = [
  "ratatui-widgets",
  "syntect",
  "thiserror 2.0.20",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]

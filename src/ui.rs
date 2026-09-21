@@ -10,6 +10,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, DiffView, PANES, Pane, PopupView};
 use crate::components::ui::key_bar::KeyBar;
@@ -555,7 +556,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let line = theme::log_line(command);
         if let Some(name) = git_user_name {
             let name = format!("👤 {name}");
-            let name_width = u16::try_from(name.chars().count()).unwrap_or(u16::MAX);
+            let name_width = u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
             let [command_area, name_area] = Layout::horizontal([
                 Constraint::Min(0),
                 Constraint::Length(name_width.min(first.width)),

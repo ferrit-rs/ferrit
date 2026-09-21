@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Whether Enter inserts a newline or remains available to the parent dialog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,7 +38,9 @@ impl TextInput {
             lines.push(String::new());
         }
         let row = lines.len() - 1;
-        let col = lines.get(row).map_or(0, |line| line.chars().count());
+        let col = lines
+            .get(row)
+            .map_or(0, |line| line.graphemes(true).count());
         Self { lines, row, col }
     }
 
@@ -124,7 +127,7 @@ impl TextInput {
                 return;
             };
             let start = line
-                .char_indices()
+                .grapheme_indices(true)
                 .nth(self.col - 1)
                 .map_or(0, |(byte, _)| byte);
             line.replace_range(start..end, "");
@@ -135,7 +138,7 @@ impl TextInput {
             let prev_len = self
                 .lines
                 .get(self.row)
-                .map_or(0, |line| line.chars().count());
+                .map_or(0, |line| line.graphemes(true).count());
             if let Some(line) = self.lines.get_mut(self.row) {
                 line.push_str(&current);
             }
@@ -148,12 +151,12 @@ impl TextInput {
             self.col -= 1;
         } else if self.row > 0 {
             self.row -= 1;
-            self.col = self.current_line().chars().count();
+            self.col = self.current_line().graphemes(true).count();
         }
     }
 
     fn move_right(&mut self) {
-        let len = self.current_line().chars().count();
+        let len = self.current_line().graphemes(true).count();
         if self.col < len {
             self.col += 1;
         } else if self.row + 1 < self.lines.len() {
@@ -165,14 +168,14 @@ impl TextInput {
     fn move_up(&mut self) {
         if self.row > 0 {
             self.row -= 1;
-            self.col = self.col.min(self.current_line().chars().count());
+            self.col = self.col.min(self.current_line().graphemes(true).count());
         }
     }
 
     fn move_down(&mut self) {
         if self.row + 1 < self.lines.len() {
             self.row += 1;
-            self.col = self.col.min(self.current_line().chars().count());
+            self.col = self.col.min(self.current_line().graphemes(true).count());
         }
     }
 
@@ -182,30 +185,63 @@ impl TextInput {
 
     fn byte_col(&self) -> usize {
         self.current_line()
-            .char_indices()
+            .grapheme_indices(true)
             .nth(self.col)
             .map_or_else(|| self.current_line().len(), |(byte, _)| byte)
     }
 }
 
 fn line_with_cursor(text: &str, col: usize) -> Line<'static> {
-    let mut chars: Vec<char> = text.chars().collect();
-    if col >= chars.len() {
-        chars.push(' ');
+    let mut graphemes: Vec<&str> = text.graphemes(true).collect();
+    if col >= graphemes.len() {
+        graphemes.push(" ");
     }
-    let before: String = chars.get(..col).unwrap_or_default().iter().collect();
-    let cursor = chars.get(col).copied().unwrap_or(' ');
-    let after: String = chars
+    let before = graphemes.get(..col).unwrap_or_default().concat();
+    let cursor = graphemes.get(col).copied().unwrap_or(" ");
+    let after = graphemes
         .get(col.saturating_add(1)..)
         .unwrap_or_default()
-        .iter()
-        .collect();
+        .concat();
     Line::from(vec![
         Span::raw(before),
         Span::styled(
-            cursor.to_string(),
+            cursor.to_owned(),
             ratatui::style::Style::new().add_modifier(Modifier::REVERSED),
         ),
         Span::raw(after),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TextInput, TextInputMode};
+    use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+    #[test]
+    fn cursor_and_backspace_keep_combining_graphemes_together() {
+        let mut input = TextInput::from_text("e\u{301}x");
+        assert_eq!(input.cursor(), (0, 2));
+        input.handle_key_event(
+            KeyEvent::from(KeyCode::Backspace),
+            TextInputMode::SingleLine,
+        );
+        assert_eq!(input.text(), "e\u{301}");
+        input.handle_key_event(
+            KeyEvent::from(KeyCode::Backspace),
+            TextInputMode::SingleLine,
+        );
+        assert_eq!(input.text(), "");
+    }
+
+    #[test]
+    fn cursor_moves_by_emoji_grapheme() {
+        let mut input = TextInput::from_text("👨‍👩‍👧‍👦x");
+        assert_eq!(input.cursor(), (0, 2));
+        input.handle_key_event(KeyEvent::from(KeyCode::Left), TextInputMode::SingleLine);
+        input.handle_key_event(
+            KeyEvent::from(KeyCode::Backspace),
+            TextInputMode::SingleLine,
+        );
+        assert_eq!(input.text(), "x");
+    }
 }

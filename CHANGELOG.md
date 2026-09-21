@@ -12,6 +12,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Push progress now appears inline on the checked-out branch with an animated indicator, like lazygit; Status shows it beside any earlier error.
 - Pushing a branch behind its upstream now asks before using `--force-with-lease`, protecting unseen remote updates.
 - `push.default=current` now pushes a new local branch without opening the remote picker and sets its upstream.
+- Text input cursor/editing now treats combining accents and joined emoji as one grapheme; author label alignment uses terminal cell width.
 - App errors now retain typed Git/app categories and appear in Status plus a persistent bottom-right toast, dismissible with its `x` button.
 
 - Bottom panel now has an `Infos` heading above its frame; configured Git
