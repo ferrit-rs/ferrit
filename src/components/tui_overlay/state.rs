@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ratatui_core::layout::Rect;
 
-use super::Easing;
+use super::easing::Easing;
 
 /// Lifecycle phase of the overlay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

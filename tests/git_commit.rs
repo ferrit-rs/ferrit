@@ -244,6 +244,7 @@ fn sign_off_appends_a_trailer() {
             CommitOpts {
                 sign_off: true,
                 no_verify: false,
+                author: None,
             },
         )
         .unwrap();
@@ -252,6 +253,42 @@ fn sign_off_appends_a_trailer() {
     assert!(
         body.contains("Signed-off-by: Test <test@example.com>"),
         "got: {body}"
+    );
+}
+
+#[test]
+fn selected_author_applies_to_commit_without_changing_git_config() {
+    let dir = TempDir::new("commit-selected-author");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    let _ = repo;
+
+    let backend = Repo::open(dir.path()).unwrap();
+    backend
+        .commit(
+            &CommitKind::Normal,
+            "feat: selected author",
+            CommitOpts {
+                author: Some("Chosen User <chosen@example.com>".to_owned()),
+                ..CommitOpts::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        git(dir.path(), &["log", "-1", "--format=%an <%ae>"]).trim(),
+        "Chosen User <chosen@example.com>"
+    );
+    assert_eq!(
+        git(dir.path(), &["log", "-1", "--format=%cn <%ce>"]).trim(),
+        "Test <test@example.com>"
+    );
+    assert_eq!(git(dir.path(), &["config", "user.name"]).trim(), "Test");
+    assert_eq!(
+        git(dir.path(), &["config", "user.email"]).trim(),
+        "test@example.com"
     );
 }
 

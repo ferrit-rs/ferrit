@@ -8,10 +8,18 @@ use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::CommitPopupView;
 use crate::app::{mock, theme};
-use crate::components::tui_overlay::{Anchor, Backdrop, Overlay, OverlayState};
+use crate::components::tui_overlay::anchor::Anchor;
+use crate::components::tui_overlay::backdrop::Backdrop;
+use crate::components::tui_overlay::overlay::Overlay;
+use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
+
+const CONFIRM_DIALOG_WIDTH_PERCENT: u16 = 70;
+const CONFIRM_DIALOG_HEIGHT_PERCENT: u16 = 34;
+const CONFIRM_DIALOG_TITLE: &str = " Confirm identity change? ";
+const CONFIRM_DIALOG_HINT: &str = "Y: Confirm · N / Esc: Cancel";
 
 pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, accent: ratatui::style::Color) {
     let width = 55.min(area.width);
@@ -199,6 +207,46 @@ pub(super) fn draw_commit_all_confirm(
     frame.render_widget(
         Paragraph::new(KeyBar::hints("Y: Yes, stage all | N / Esc: No").line())
             .alignment(Alignment::Center),
+        footer,
+    );
+}
+
+pub(super) fn draw_confirmation(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    message: &str,
+    state: &mut OverlayState,
+    accent: ratatui::style::Color,
+) {
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(focused)
+        .title(Line::styled(CONFIRM_DIALOG_TITLE, focused));
+    frame.render_stateful_widget(
+        Overlay::new()
+            .anchor(Anchor::Center)
+            .width(Constraint::Percentage(CONFIRM_DIALOG_WIDTH_PERCENT))
+            .height(Constraint::Percentage(CONFIRM_DIALOG_HEIGHT_PERCENT))
+            .backdrop(
+                Backdrop::new(ratatui::style::Color::Black).fg(ratatui::style::Color::DarkGray),
+            )
+            .block(block),
+        area,
+        state,
+    );
+    let Some(inner) = state.inner_area() else {
+        return;
+    };
+    let [body, footer] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+    frame.render_widget(
+        Paragraph::new(message)
+            .wrap(Wrap { trim: false })
+            .alignment(Alignment::Center),
+        body,
+    );
+    frame.render_widget(
+        Paragraph::new(KeyBar::hints(CONFIRM_DIALOG_HINT).line()).alignment(Alignment::Center),
         footer,
     );
 }

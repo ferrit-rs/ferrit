@@ -63,6 +63,11 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_command_log(frame, app, log);
     draw_keybar(frame, keybar, app);
 
+    if app.author_overlay.is_closed() {
+        app.theme_picker_hit_areas =
+            crate::components::ui::color_picker::ColorPickerHitAreas::default();
+    }
+
     if !app.author_overlay.is_closed() {
         let profile_data = app.profile().clone();
         profile::draw_author(
@@ -76,6 +81,10 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             app.theme_rgb_channel,
             app.theme_palette_open,
             app.theme_palette_selected,
+            app.theme_picker_display,
+            app.theme_config != app.theme_saved_config,
+            &mut app.theme_picker_hit_areas,
+            app.selected_author.as_ref(),
         );
     }
 
@@ -96,6 +105,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
         None => {},
+    }
+    if let Some(message) = app.confirm_dialog_message().map(str::to_owned) {
+        popups::draw_confirmation(
+            frame,
+            area,
+            &message,
+            &mut app.confirm_overlay,
+            app.theme_config.color(),
+        );
     }
 
     if let Some(toast) = &mut app.toast {

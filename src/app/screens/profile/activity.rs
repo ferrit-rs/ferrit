@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 
 use crate::app::theme;
 use crate::components::ui::separator::Separator;
-use crate::domain::profile::Activity;
+use crate::domain::profile::activity::Activity;
 
 const COMPACT_ACTIVITY_WIDTH: u16 = 60;
 const SECTION_SEPARATOR_MARGIN_X: u16 = 1;

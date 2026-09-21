@@ -22,10 +22,11 @@ use std::sync::{Arc, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use crate::components::tui_overlay::OverlayState;
+use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::mouse_pointer::MousePointer;
 use crate::components::ui::toast::Toast;
-use crate::domain::profile::{Profile, Settings};
+use crate::domain::profile::Profile;
+use crate::domain::profile::settings::Settings;
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
@@ -242,6 +243,8 @@ struct ConfirmPrompt {
 }
 
 enum ConfirmAction {
+    /// Apply an existing Git identity to future Ferrit commits for this run.
+    SelectAuthor(Option<crate::domain::profile::settings::Identity>),
     /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
     DiscardFile(PathBuf),
     /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).
@@ -441,6 +444,8 @@ pub struct App {
     git_user_name: Option<String>,
     /// Git settings and activity shown in the profile drawer.
     profile: Profile,
+    /// Optional per-commit author chosen from identities already in Git config.
+    selected_author: Option<crate::domain::profile::settings::Identity>,
     /// First visible profile drawer line.
     profile_scroll: usize,
     theme_config: theme_config::ThemeConfig,
@@ -448,6 +453,9 @@ pub struct App {
     theme_editing: bool,
     theme_palette_open: bool,
     theme_palette_selected: usize,
+    theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
+    theme_saved_config: theme_config::ThemeConfig,
+    theme_picker_hit_areas: crate::components::ui::color_picker::ColorPickerHitAreas,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -532,6 +540,7 @@ pub struct App {
     cursor: DiffCursor,
     /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
     pending_confirm: Option<ConfirmPrompt>,
+    confirm_overlay: OverlayState,
     /// A commit popup or dismissible note; owns all input while `Some`
     /// (`docs/PLAN_7_COMMIT.md`).
     popup: Option<Popup>,
@@ -598,26 +607,36 @@ impl App {
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
         let git_user_name = repo.as_ref().and_then(git::Repo::user_name);
-        let git_user_identities = repo
-            .as_ref()
-            .map_or_else(Vec::new, git::Repo::user_identities);
-        let (git_global_identity, git_local_identity) = repo
-            .as_ref()
-            .map_or((None, None), git::Repo::identity_settings);
+        let (global_identities, repository_identity, effective_identity, identity_source) =
+            repo.as_ref().map_or_else(
+                || {
+                    (
+                        Vec::new(),
+                        None,
+                        None,
+                        crate::domain::profile::settings::IdentitySource::Unset,
+                    )
+                },
+                git::Repo::identity_settings,
+            );
         let activity_commits = repo
             .as_ref()
             .and_then(|repo| repo.activity().ok())
             .unwrap_or_default();
         let profile = Profile::new(
             Settings {
-                global_identity: git_global_identity,
-                repository_identity: git_local_identity,
-                effective_identities: git_user_identities,
+                global_identities,
+                repository_identity,
+                effective_identity,
+                identity_source,
             },
             &activity_commits,
         );
-        let theme_palette_selected =
-            crate::components::ui::color_picker::nearest_palette_index(theme_config.color());
+        let theme_palette_selected = crate::components::ui::color_picker::nearest_index(
+            theme_config.color(),
+            crate::components::ui::color_picker::ColorPickerDisplay::default(),
+        );
+        let theme_saved_config = theme_config.clone();
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -627,12 +646,18 @@ impl App {
             repo_name,
             git_user_name,
             profile,
+            selected_author: None,
             profile_scroll: 0,
             theme_config,
             theme_rgb_channel: theme_config::RGB_RED_CHANNEL,
             theme_editing: false,
             theme_palette_open: false,
             theme_palette_selected,
+            theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
+            ),
+            theme_saved_config,
+            theme_picker_hit_areas:
+                crate::components::ui::color_picker::ColorPickerHitAreas::default(),
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -665,6 +690,7 @@ impl App {
             mode: Mode::default(),
             cursor: DiffCursor::default(),
             pending_confirm: None,
+            confirm_overlay: OverlayState::new(),
             popup: None,
             commit_draft: None,
             remote_busy: None,
@@ -796,12 +822,14 @@ impl App {
         RefreshCompletion {
             snapshot,
             profile: repo.activity().ok().map(|commits| {
-                let (global, local) = repo.identity_settings();
+                let (global_identities, repository_identity, effective_identity, identity_source) =
+                    repo.identity_settings();
                 Profile::new(
                     Settings {
-                        global_identity: global,
-                        repository_identity: local,
-                        effective_identities: repo.user_identities(),
+                        global_identities,
+                        repository_identity,
+                        effective_identity,
+                        identity_source,
                     },
                     &commits,
                 )

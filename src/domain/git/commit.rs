@@ -48,10 +48,11 @@ impl CommitKind {
 
 /// Per-commit toggles, both visible in the popup footer
 /// (`docs/PLAN_7_COMMIT.md` "Sign-off default": never a silent `-s`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CommitOpts {
     pub sign_off: bool,
     pub no_verify: bool,
+    pub author: Option<String>,
 }
 
 /// Run `git commit` with `message` on stdin (`-F -`), except for `Fixup`,
@@ -82,6 +83,9 @@ pub(super) fn commit(
     }
     if opts.no_verify {
         args.push("--no-verify".to_owned());
+    }
+    if let Some(author) = opts.author {
+        args.push(format!("--author={author}"));
     }
     if writes_message {
         args.push("-F".to_owned());

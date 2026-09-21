@@ -6,7 +6,11 @@
 //! ```rust
 //! use std::time::Duration;
 //! use ratatui_core::layout::Constraint;
-//! use ferrit::components::tui_overlay::{Anchor, Easing, Overlay, OverlayState, Slide};
+//! use ferrit::components::tui_overlay::anchor::Anchor;
+//! use ferrit::components::tui_overlay::easing::Easing;
+//! use ferrit::components::tui_overlay::overlay::Overlay;
+//! use ferrit::components::tui_overlay::slide::Slide;
+//! use ferrit::components::tui_overlay::state::OverlayState;
 //!
 //! let overlay = Overlay::new()
 //!     .anchor(Anchor::Right)
@@ -44,17 +48,10 @@
 //!
 //! [Ratatui]: https://ratatui.rs
 
-mod anchor;
-mod backdrop;
-mod easing;
+pub mod anchor;
+pub mod backdrop;
+pub mod easing;
 mod layout;
-mod overlay;
-mod slide;
-mod state;
-
-pub use anchor::Anchor;
-pub use backdrop::Backdrop;
-pub use easing::Easing;
-pub use overlay::Overlay;
-pub use slide::Slide;
-pub use state::OverlayState;
+pub mod overlay;
+pub mod slide;
+pub mod state;

@@ -12,7 +12,7 @@ pub(super) const RGB_GREEN_CHANNEL: usize = 1;
 pub(super) const RGB_BLUE_CHANNEL: usize = 2;
 pub(super) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
 
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Preset {
     #[default]
@@ -51,7 +51,7 @@ impl Preset {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default)]
 pub(super) struct ThemeConfig {
     pub(super) preset: Preset,

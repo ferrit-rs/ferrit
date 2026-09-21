@@ -7,7 +7,7 @@ use ratatui_widgets::block::Block;
 use super::backdrop::Backdrop;
 use super::layout::resolve_rect;
 use super::state::{OverlayState, Phase};
-use super::{Anchor, Slide};
+use super::{anchor::Anchor, slide::Slide};
 
 /// Composable overlay widget for Ratatui.
 ///

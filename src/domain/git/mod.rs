@@ -37,7 +37,7 @@ use self::error::{GitError, GitResult};
 use crate::domain::git::model::{
     BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader,
 };
-use crate::domain::profile::Identity;
+use crate::domain::profile::settings::{Identity, IdentitySource};
 
 /// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
 /// constant until the pane grows real scrolling/paging.
@@ -54,6 +54,65 @@ fn config_values(config: &git2::Config, key: &str) -> Vec<String> {
         }
     }
     values
+}
+
+fn unique_identities(identities: impl IntoIterator<Item = Identity>) -> Vec<Identity> {
+    let mut unique = Vec::new();
+    for identity in identities {
+        if !unique.contains(&identity) {
+            unique.push(identity);
+        }
+    }
+    unique
+}
+
+fn config_identities(config: &git2::Config) -> Vec<Identity> {
+    let names = config_values(config, "user.name");
+    let emails = config_values(config, "user.email");
+    unique_identities(names.into_iter().enumerate().map(|(index, name)| Identity {
+        name,
+        email: emails.get(index).cloned(),
+    }))
+}
+
+fn config_identity(config: &git2::Config) -> Option<Identity> {
+    let name = config.get_string("user.name").ok()?;
+    Some(Identity {
+        name,
+        email: config.get_string("user.email").ok(),
+    })
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::unique_identities;
+    use crate::domain::profile::settings::Identity;
+
+    #[test]
+    fn removes_duplicate_identity_pairs_and_preserves_first_seen_order() {
+        let max = Identity {
+            name: "Max Wells".to_owned(),
+            email: Some("max@example.com".to_owned()),
+        };
+        let username = Identity {
+            name: "Username".to_owned(),
+            email: Some("user@example.com".to_owned()),
+        };
+        let distinct_email = Identity {
+            name: "Max Wells".to_owned(),
+            email: Some("other@example.com".to_owned()),
+        };
+
+        assert_eq!(
+            unique_identities([
+                max.clone(),
+                username.clone(),
+                max.clone(),
+                distinct_email.clone(),
+            ]),
+            [max, username, distinct_email]
+        );
+    }
 }
 
 /// An open repository. Wraps `git2::Repository` and hands out owned snapshots.
@@ -117,43 +176,51 @@ impl Repo {
         self.inner.config().ok()?.get_string("user.name").ok()
     }
 
-    /// All configured author names paired with email values in config order.
-    pub fn user_identities(&self) -> Vec<Identity> {
-        let Ok(config) = self.inner.config() else {
-            return Vec::new();
+    /// Global choices, repository override, resolved identity, and its source.
+    pub fn identity_settings(
+        &self,
+    ) -> (
+        Vec<Identity>,
+        Option<Identity>,
+        Option<Identity>,
+        IdentitySource,
+    ) {
+        let global_config = git2::Config::open_default().ok();
+        let global_identities = global_config
+            .as_ref()
+            .map_or_else(Vec::new, config_identities);
+        let local_config = git2::Config::open(&self.inner.path().join("config")).ok();
+        let repository_identity = local_config.as_ref().and_then(config_identity);
+        let repository_overrides_identity = local_config.as_ref().is_some_and(|config| {
+            config.get_entry("user.name").is_ok() || config.get_entry("user.email").is_ok()
+        });
+        let effective_identity = self
+            .inner
+            .config()
+            .ok()
+            .and_then(|config| config_identity(&config));
+        let identity_source = if repository_overrides_identity {
+            IdentitySource::Repository
+        } else if global_identities.is_empty() {
+            if effective_identity.is_some() {
+                IdentitySource::System
+            } else {
+                IdentitySource::Unset
+            }
+        } else {
+            IdentitySource::Global
         };
-        let names = config_values(&config, "user.name");
-        let emails = config_values(&config, "user.email");
-        names
-            .into_iter()
-            .enumerate()
-            .map(|(index, name)| Identity {
-                name,
-                email: emails.get(index).cloned(),
-            })
-            .collect()
+        (
+            global_identities,
+            repository_identity,
+            effective_identity,
+            identity_source,
+        )
     }
 
     /// Recent commit activity across local and fetched remote branches.
     pub fn activity(&self) -> GitResult<Vec<CommitEntry>> {
         activity::commits(&self.inner)
-    }
-
-    /// Repository-local and user-global author config, kept separate for Settings.
-    pub fn identity_settings(&self) -> (Option<Identity>, Option<Identity>) {
-        fn identity(config: &git2::Config) -> Option<Identity> {
-            let name = config.get_string("user.name").ok()?;
-            let email = config.get_string("user.email").ok();
-            Some(Identity { name, email })
-        }
-        let global = git2::Config::open_default()
-            .ok()
-            .and_then(|config| identity(&config));
-        let local_path = self.inner.path().join("config");
-        let local = git2::Config::open(&local_path)
-            .ok()
-            .and_then(|config| identity(&config));
-        (global, local)
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.

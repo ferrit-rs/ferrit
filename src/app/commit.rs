@@ -264,6 +264,12 @@ impl App {
         let opts = git::commit::CommitOpts {
             sign_off: draft.sign_off,
             no_verify: draft.no_verify,
+            author: self.selected_author.as_ref().and_then(|identity| {
+                identity
+                    .email
+                    .as_ref()
+                    .map(|email| format!("{} <{email}>", identity.name))
+            }),
         };
         let kind = draft.kind.clone();
         let Some(repo) = &self.repo else { return };

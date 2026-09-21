@@ -2,9 +2,11 @@
 
 use crate::app::theme;
 use crate::app::theme_config::ThemeConfig;
-use crate::components::ui::color_picker::ColorPicker;
+use crate::components::ui::color_picker::{
+    ColorPicker, ColorPickerDisplay, ColorPickerGridMetrics, rgb,
+};
 use crate::components::ui::separator::Separator;
-use crate::domain::profile::{Identity, Settings};
+use crate::domain::profile::settings::{Identity, IdentitySource, Settings};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 
@@ -12,6 +14,17 @@ const RGB_CHANNEL_LABELS: [&str; crate::app::theme_config::RGB_CHANNEL_COUNT] = 
 const RGB_VALUE_WIDTH: usize = 3;
 const SECTION_SEPARATOR_MARGIN_X: u16 = 1;
 const SECTION_SEPARATOR_MARGIN_Y: u16 = 1;
+pub(super) const SAVE_BUTTON_LABEL: &str = "[ Save ]";
+const SAVED_BUTTON_LABEL: &str = "[ Saved ]";
+const AUTHOR_SELECTION_KEYS: [&str; 9] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+pub(super) struct SettingsView {
+    pub(super) lines: Vec<Line<'static>>,
+    pub(super) picker_grid_line: usize,
+    pub(super) picker_grid_metrics: ColorPickerGridMetrics,
+    pub(super) save_button_line: usize,
+    pub(super) save_button_width: u16,
+}
 
 pub(super) fn lines(
     settings: &Settings,
@@ -20,8 +33,11 @@ pub(super) fn lines(
     channel: usize,
     palette_open: bool,
     palette_selected: usize,
+    picker_display: ColorPickerDisplay,
+    theme_dirty: bool,
     width: u16,
-) -> Vec<Line<'static>> {
+    selected_author: Option<&Identity>,
+) -> SettingsView {
     let divider = |label| {
         Separator::new(label)
             .style(Style::new().fg(theme::IDLE))
@@ -29,22 +45,79 @@ pub(super) fn lines(
             .margin_y(SECTION_SEPARATOR_MARGIN_Y)
             .lines(width)
     };
-    let mut lines = divider("Git identities");
-    append_identity(&mut lines, "Global", settings.global_identity.as_ref());
-    append_identity(
-        &mut lines,
-        "Repository",
-        settings.repository_identity.as_ref(),
-    );
+    let mut lines = divider("Git identities · selection applies to Ferrit commits only");
+    let active_identity = selected_author.or(settings.effective_identity.as_ref());
+    let source = if selected_author.is_some() {
+        "Ferrit selection"
+    } else {
+        match settings.identity_source {
+            IdentitySource::Repository => "Repository config",
+            IdentitySource::Global => "Global config",
+            IdentitySource::System => "System config",
+            IdentitySource::Unset => "Not configured",
+        }
+    };
+    lines.push(Line::styled(
+        format!(
+            "In use ({source}): {}",
+            active_identity.map_or("Not configured", |identity| identity.name.as_str())
+        ),
+        Style::new().add_modifier(Modifier::BOLD),
+    ));
+    if let Some(identity) = active_identity {
+        lines.push(Line::styled(
+            identity
+                .email
+                .clone()
+                .unwrap_or_else(|| "Email not configured".to_owned()),
+            Style::new().fg(theme::IDLE),
+        ));
+    }
+    let available = settings.available_identities();
+    if available.is_empty() {
+        lines.push(Line::styled(
+            "No configured identities",
+            Style::new().fg(theme::IDLE),
+        ));
+    } else {
+        for (index, identity) in available.iter().enumerate() {
+            let selected = selected_author.map_or(
+                settings.effective_identity.as_ref() == Some(identity),
+                |active| active == identity,
+            );
+            let key = AUTHOR_SELECTION_KEYS.get(index).copied().unwrap_or("-");
+            let marker = if selected { "●" } else { "○" };
+            let location = if settings.repository_identity.as_ref() == Some(identity) {
+                "Repo"
+            } else {
+                "Global"
+            };
+            let email = identity.email.as_deref().unwrap_or("Email not configured");
+            lines.push(Line::styled(
+                format!("{marker} {key} · {location} · {} · {email}", identity.name),
+                Style::new().fg(if selected {
+                    theme::FOCUS
+                } else {
+                    ratatui::style::Color::Reset
+                }),
+            ));
+        }
+    }
+    lines.push(Line::styled(
+        "0 · use Git config identity",
+        Style::new().fg(theme::IDLE),
+    ));
     lines.extend(divider("Ferrit settings"));
     lines.push(Line::from(format!("Theme: {}", config.preset.name())));
-    lines.extend(
-        ColorPicker::new(config.color())
-            .selected(palette_selected)
-            .active(palette_open)
-            .lines(),
-    );
-    let (r, g, b) = crate::components::ui::color_picker::rgb(config.color());
+    let picker_lines = ColorPicker::new(config.color())
+        .selected(palette_selected)
+        .active(palette_open)
+        .display(picker_display)
+        .lines();
+    let picker_grid_line = lines.len() + 1;
+    let picker_grid_metrics = crate::components::ui::color_picker::grid_metrics(picker_display);
+    lines.extend(picker_lines);
+    let (r, g, b) = rgb(config.color());
     lines.push(Line::styled(
         if editing {
             format!(
@@ -55,46 +128,41 @@ pub(super) fn lines(
                     .unwrap_or(RGB_CHANNEL_LABELS[crate::app::theme_config::RGB_BLUE_CHANNEL])
             )
         } else {
-            "p palette · t preset · e edit RGB".to_owned()
+            if palette_open {
+                "arrows preview · v view · s save".to_owned()
+            } else {
+                "p picker · e edit RGB · t preset · s save".to_owned()
+            }
         },
         Style::new().fg(theme::IDLE),
     ));
-    lines.extend(divider("Effective author identities"));
-    if settings.effective_identities.is_empty() {
-        lines.push(Line::from("Not configured"));
+    let save_button_line = lines.len();
+    let save_button_label = if theme_dirty {
+        SAVE_BUTTON_LABEL
     } else {
-        for identity in &settings.effective_identities {
-            lines.push(Line::styled(
-                identity.name.clone(),
-                Style::new().add_modifier(Modifier::BOLD),
-            ));
-            lines.push(Line::styled(
-                identity
-                    .email
-                    .clone()
-                    .unwrap_or_else(|| "Email not configured".to_owned()),
-                Style::new().fg(theme::IDLE),
-            ));
-        }
-    }
-    lines
-}
-
-fn append_identity(lines: &mut Vec<Line<'static>>, label: &str, identity: Option<&Identity>) {
+        SAVED_BUTTON_LABEL
+    };
+    let save_button_width =
+        u16::try_from(Line::from(save_button_label).width()).unwrap_or(u16::MAX);
     lines.push(Line::styled(
-        label.to_owned(),
-        Style::new().add_modifier(Modifier::BOLD),
+        save_button_label,
+        Style::new()
+            .fg(if theme_dirty {
+                config.color()
+            } else {
+                theme::IDLE
+            })
+            .add_modifier(if theme_dirty {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            }),
     ));
-    if let Some(identity) = identity {
-        lines.push(Line::from(identity.name.clone()));
-        lines.push(Line::styled(
-            identity
-                .email
-                .clone()
-                .unwrap_or_else(|| "Email not configured".to_owned()),
-            Style::new().fg(theme::IDLE),
-        ));
-    } else {
-        lines.push(Line::styled("Not configured", Style::new().fg(theme::IDLE)));
+    SettingsView {
+        lines,
+        picker_grid_line,
+        picker_grid_metrics,
+        save_button_line,
+        save_button_width,
     }
 }

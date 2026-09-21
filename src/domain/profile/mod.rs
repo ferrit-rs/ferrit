@@ -1,10 +1,10 @@
 //! Profile settings and repository-wide commit activity.
 
-mod activity;
-mod settings;
+pub mod activity;
+pub mod settings;
 
-pub use activity::{Activity, ActivityWeek};
-pub use settings::{Identity, Settings};
+use self::activity::Activity;
+use self::settings::Settings;
 
 #[derive(Debug, Clone, Default)]
 pub struct Profile {

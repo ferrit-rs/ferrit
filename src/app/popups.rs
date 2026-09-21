@@ -39,6 +39,12 @@ impl App {
         self.pending_confirm.as_ref().map(|p| p.message.as_str())
     }
 
+    pub fn confirm_dialog_message(&self) -> Option<&str> {
+        let prompt = self.pending_confirm.as_ref()?;
+        matches!(prompt.action, super::ConfirmAction::SelectAuthor(_))
+            .then_some(prompt.message.as_str())
+    }
+
     /// The new-branch popup's render data, reusing `ui::draw_commit_popup`'s
     /// shape (`docs/PLAN_8_BRANCHES.md`), or `None` when it is not up.
     pub fn new_branch_popup(&self) -> Option<CommitPopupView<'_>> {
