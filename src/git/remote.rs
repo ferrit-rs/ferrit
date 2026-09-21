@@ -296,8 +296,19 @@ fn current_branch_name(repo: &Repository) -> GitResult<String> {
 /// `GitError::NoUpstream` rather than a generic `PushFailed` so `App` can
 /// act on it (offer `-u`) instead of just displaying it.
 pub(super) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<String> {
+    push_with_lease(repo, set_upstream, false)
+}
+
+fn push_with_lease(
+    repo: &Repository,
+    set_upstream: Option<&str>,
+    force_with_lease: bool,
+) -> GitResult<String> {
     let workdir = workdir(repo)?;
     let mut args = vec!["push".to_owned()];
+    if force_with_lease {
+        args.push("--force-with-lease".to_owned());
+    }
     if let Some(remote) = set_upstream {
         let branch = current_branch_name(repo)?;
         args.push("-u".to_owned());
@@ -311,10 +322,14 @@ pub(super) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<S
 pub(crate) fn push_cancellable(
     repo: &Repository,
     set_upstream: Option<&str>,
+    force_with_lease: bool,
     cancel: &AtomicBool,
 ) -> GitResult<String> {
     let workdir = workdir(repo)?;
     let mut args = vec!["push".to_owned()];
+    if force_with_lease {
+        args.push("--force-with-lease".to_owned());
+    }
     if let Some(remote) = set_upstream {
         args.push("-u".to_owned());
         args.push(remote.to_owned());

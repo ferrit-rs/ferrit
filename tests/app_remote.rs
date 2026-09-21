@@ -273,6 +273,66 @@ fn capital_p_with_one_remote_and_no_upstream_pushes_with_dash_u() {
 }
 
 #[test]
+fn push_of_behind_branch_requires_confirm_and_uses_force_with_lease() {
+    let (origin, work) = two_repo_fixture("app-remote-force-lease");
+    fs::write(work.path().join("local.txt"), "local\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "local commit");
+
+    let remote_work = TempDir::new("app-remote-force-lease-peer");
+    git(
+        Path::new("."),
+        &[
+            "clone",
+            "-q",
+            origin.path().to_str().unwrap(),
+            remote_work.path().to_str().unwrap(),
+        ],
+    );
+    configure_identity(remote_work.path());
+    fs::write(remote_work.path().join("remote.txt"), "remote\n").unwrap();
+    let remote_repo = Repository::open(remote_work.path()).unwrap();
+    commit_all(&remote_repo, "remote commit");
+    git(remote_work.path(), &["push", "origin", "base"]);
+    git(work.path(), &["fetch", "origin"]);
+
+    let mut app = App::open(work.path()).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    app.feed_key(char_key('P'));
+    let prompt = app.confirm_message().expect("behind branch asks first");
+    assert!(prompt.contains("--force-with-lease"), "{prompt}");
+    assert!(
+        app.remote_busy_label().is_none(),
+        "no push before confirmation"
+    );
+
+    // Simulate a remote update after confirmation appeared. Lease must reject
+    // overwrite because the remote-tracking ref no longer matches.
+    fs::write(remote_work.path().join("remote.txt"), "remote changed\n").unwrap();
+    commit_all(&remote_repo, "remote advances again");
+    git(remote_work.path(), &["push", "origin", "base"]);
+    let protected_tip = git(origin.path(), &["rev-parse", "refs/heads/base"]);
+
+    app.feed_key(char_key('y'));
+    assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
+    wait_for_remote_done(&mut app, &rx);
+    let lines = app.status_lines();
+    assert!(
+        lines.iter().any(|line| {
+            let text = line.to_string().to_lowercase();
+            text.contains("stale info") || text.contains("rejected")
+        }),
+        "stale lease reports rejected push: {lines:?}"
+    );
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "refs/heads/base"]),
+        protected_tip,
+        "new remote commit stays intact"
+    );
+}
+
+#[test]
 fn push_progress_is_visible_inline_even_when_status_has_old_error() {
     let (_origin, work) = two_repo_fixture("app-remote-p-visible");
     let mut app = App::open(work.path()).unwrap();

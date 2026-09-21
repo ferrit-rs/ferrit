@@ -1,8 +1,8 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
 use super::{
-    App, AppError, AppEvent, Popup, RemotePick, Result, WorkerKind, events, mpsc, run_worker,
-    thread,
+    App, AppError, AppEvent, ConfirmAction, ConfirmPrompt, Popup, RemotePick, Result, WorkerKind,
+    events, mpsc, run_worker, thread,
 };
 use std::sync::atomic::Ordering;
 use std::time::Instant;
@@ -32,6 +32,16 @@ impl App {
             return;
         }
         if self.header.upstream.is_some() {
+            if self.header.behind > 0 {
+                self.pending_confirm = Some(ConfirmPrompt {
+                    message: format!(
+                        "Branch is behind upstream by {} commit(s). Push with --force-with-lease?",
+                        self.header.behind
+                    ),
+                    action: ConfirmAction::ForcePush,
+                });
+                return;
+            }
             self.trigger_remote_op(events::RemoteOp::Push);
             return;
         }
@@ -85,6 +95,16 @@ impl App {
         push_upstream: Option<String>,
         sender: mpsc::Sender<AppEvent>,
     ) {
+        self.start_remote_op_with_force(op, push_upstream, false, sender);
+    }
+
+    pub(super) fn start_remote_op_with_force(
+        &mut self,
+        op: events::RemoteOp,
+        push_upstream: Option<String>,
+        force_with_lease: bool,
+        sender: mpsc::Sender<AppEvent>,
+    ) {
         if self.remote_busy.is_some() {
             return;
         }
@@ -100,7 +120,9 @@ impl App {
             let message = run_worker(WorkerKind::RemoteOperation, || match op {
                 events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
                 events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
-                events::RemoteOp::Push => repo.push_cancellable(push_upstream.as_deref(), &cancel),
+                events::RemoteOp::Push => {
+                    repo.push_cancellable(push_upstream.as_deref(), force_with_lease, &cancel)
+                },
             })
             .map_err(|error| error.to_string())
             .and_then(|result| result.map_err(|error| error.to_string()));

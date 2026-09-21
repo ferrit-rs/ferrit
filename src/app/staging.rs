@@ -2,8 +2,8 @@
 
 use super::{
     App, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide, DiffView,
-    FileRow, GitResult, Granule, KeyCode, KeyEvent, Mode, Pane, Range, git, hunk_content_id,
-    hunk_id_at, hunk_lines_for, selectable_lines,
+    FileRow, GitResult, Granule, KeyCode, KeyEvent, Mode, Pane, Range, events, git,
+    hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
 };
 
 impl App {
@@ -391,6 +391,11 @@ impl App {
                         });
                     },
                     Err(e) => self.report_error(e),
+                }
+            },
+            ConfirmAction::ForcePush => {
+                if let Some(sender) = self.event_sender.clone() {
+                    self.start_remote_op_with_force(events::RemoteOp::Push, None, true, sender);
                 }
             },
         }

@@ -302,8 +302,9 @@ impl Repo {
     pub(crate) fn push_cancellable(
         &self,
         set_upstream: Option<&str>,
+        force_with_lease: bool,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        remote::push_cancellable(&self.inner, set_upstream, cancel)
+        remote::push_cancellable(&self.inner, set_upstream, force_with_lease, cancel)
     }
 }

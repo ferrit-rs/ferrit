@@ -523,7 +523,9 @@ Deferred out of phase 9, revisit with their own follow-up:
   phase's remote list plus phase 8's checkout).
 - force-push, with whatever guard rail (a distinct confirm wording,
   `--force-with-lease` always, a "this branch looks pushed and shared"
-  heuristic) turns out to be worth it.
+  heuristic) turns out to be worth it. Ferrit now confirms when the checked-
+  out branch is behind and uses `--force-with-lease`; a stale lease is
+  rejected by Git and shown as an error.
 - fetch/push progress reporting beyond a static "Fetching…" label — would
   need parsing git's `--progress` stderr stream, a genuinely different
   (streaming) shape than every other subprocess call in `git::` today.

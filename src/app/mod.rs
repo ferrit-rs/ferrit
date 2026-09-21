@@ -241,6 +241,8 @@ enum ConfirmAction {
     /// is `false` on the first confirm, `true` on the second one offered
     /// after an unmerged-branch refusal (`App::run_confirm`).
     DeleteBranch { name: String, force: bool },
+    /// Push a branch known to be behind its upstream, using a lease guard.
+    ForcePush,
 }
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a
