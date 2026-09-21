@@ -16,6 +16,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::components::tui_overlay::OverlayState;
+use crate::components::ui::mouse_pointer::MousePointer;
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
@@ -480,6 +481,9 @@ pub struct App {
     right_area: Rect,
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
+    /// Whether the mouse is currently over that clickable author name.
+    author_hovered: bool,
+    mouse_pointer: MousePointer,
     /// Animated side sheet opened by clicking that author.
     pub(crate) author_overlay: OverlayState,
     /// Each left pane's bordered rect from the last frame, for routing a
@@ -591,6 +595,8 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
+            author_hovered: false,
+            mouse_pointer: MousePointer::default(),
             author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
@@ -1479,7 +1485,10 @@ impl App {
                     AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                         self.on_key(key);
                     },
-                    AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
+                    AppEvent::Input(Event::Mouse(m)) => {
+                        self.on_mouse(m);
+                        self.mouse_pointer.set_hovered(self.author_hovered)?;
+                    },
                     AppEvent::Input(_) => {},
                     AppEvent::Refresh => self.request_refresh(),
                     AppEvent::RefreshDone(completion) => self.on_refresh_done(completion),

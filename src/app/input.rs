@@ -146,7 +146,16 @@ impl App {
     /// dismisses the help overlay first. Right click, middle click, drag
     /// and move are no-ops for now.
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
+        if matches!(ev.kind, MouseEventKind::Moved) {
+            self.author_hovered = self.author_overlay.is_closed()
+                && self
+                    .author_click_area
+                    .contains(Position::new(ev.column, ev.row));
+            return;
+        }
+
         if !self.author_overlay.is_closed() {
+            self.author_hovered = false;
             if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left))
                 && !self
                     .author_overlay
@@ -175,6 +184,7 @@ impl App {
             .author_click_area
             .contains(Position::new(ev.column, ev.row))
         {
+            self.author_hovered = false;
             self.author_overlay.open();
             return;
         }

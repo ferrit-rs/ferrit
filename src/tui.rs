@@ -14,6 +14,8 @@ use ratatui::crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
+use crate::components::ui::mouse_pointer::MousePointer;
+
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 
 /// Enable raw mode, switch to the alternate screen, capture the mouse (for
@@ -21,6 +23,10 @@ pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 pub fn init() -> io::Result<Tui> {
     enable_raw_mode()?;
     if let Err(error) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture, Hide) {
+        let _ = restore();
+        return Err(error);
+    }
+    if let Err(error) = MousePointer::reset_terminal() {
         let _ = restore();
         return Err(error);
     }
@@ -36,6 +42,7 @@ pub fn init() -> io::Result<Tui> {
 
 /// Exact reverse of `init`. Safe to call more than once.
 pub fn restore() -> io::Result<()> {
+    let pointer = MousePointer::reset_terminal();
     let screen = execute!(
         io::stdout(),
         LeaveAlternateScreen,
@@ -43,7 +50,7 @@ pub fn restore() -> io::Result<()> {
         Show
     );
     let raw = disable_raw_mode();
-    screen.and(raw)
+    pointer.and(screen).and(raw)
 }
 
 fn set_panic_hook() {
