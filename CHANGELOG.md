@@ -7,6 +7,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Bottom panel now titled `Info`, with configured Git author name shown at
+  the right beside a person icon.
+
 ## [0.4.0] - 2026-09-20
 
 ### Added

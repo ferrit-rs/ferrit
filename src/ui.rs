@@ -5,7 +5,7 @@
 //! Colours come from `theme`.
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
@@ -55,7 +55,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     } else {
         draw_right_pane(frame, app, right);
     }
-    draw_command_log(frame, log);
+    draw_command_log(frame, log, app.git_user_name());
     draw_keybar(frame, keybar, app);
 
     if show_help {
@@ -516,17 +516,21 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
-fn draw_command_log(frame: &mut Frame<'_>, area: Rect) {
+fn draw_command_log(frame: &mut Frame<'_>, area: Rect, git_user_name: Option<&str>) {
     let lines: Vec<Line<'_>> = mock::COMMAND_LOG
         .iter()
         .map(|s| theme::log_line(s))
         .collect();
-    let panel = Paragraph::new(lines).block(
-        Panel::new()
-            .title(Line::styled(" command log ", Style::new().fg(theme::IDLE)))
-            .border_style(Style::new().fg(theme::IDLE))
-            .block(),
-    );
+    let mut panel = Panel::new()
+        .title(Line::styled(" Info ", Style::new().fg(theme::IDLE)))
+        .border_style(Style::new().fg(theme::IDLE));
+    if let Some(name) = git_user_name {
+        panel = panel.title(
+            Line::styled(format!(" 👤 {name} "), Style::new().fg(theme::IDLE))
+                .alignment(Alignment::Right),
+        );
+    }
+    let panel = Paragraph::new(lines).block(panel.block());
     frame.render_widget(panel, area);
 }
 

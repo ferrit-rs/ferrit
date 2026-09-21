@@ -96,6 +96,12 @@ impl Repo {
             .map_or_else(|| "repo".to_owned(), |n| n.to_string_lossy().into_owned())
     }
 
+    /// Configured Git author name (`user.name`), respecting repo, global,
+    /// and system config precedence.
+    pub fn user_name(&self) -> Option<String> {
+        self.inner.config().ok()?.get_string("user.name").ok()
+    }
+
     /// Re-read every wired pane in one go. Partial failure fails the whole call.
     ///
     /// `&mut self`: reading the stash list needs `&mut git2::Repository`.
