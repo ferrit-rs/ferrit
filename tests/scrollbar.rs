@@ -20,11 +20,11 @@ use std::path::{Path, PathBuf};
 
 use ferrit::app::{App, Pane};
 use ferrit::mock;
+use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
-use git2::{IndexAddOption, Repository, Signature};
 
 struct TempDir(PathBuf);
 
@@ -190,7 +190,8 @@ fn right_pane_thumb_starts_at_the_top_at_zero_scroll() {
 
     let (min_y, _) = thumb_span(&buf, 0..buf.area.width);
     assert_eq!(
-        min_y, 2, // border (y=0) + stat line (y=1): the diff track starts at y=2
+        min_y,
+        2, // border (y=0) + stat line (y=1): the diff track starts at y=2
         "thumb should touch the track's top at zero scroll\n{buf:?}"
     );
 }
