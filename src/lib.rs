@@ -4,6 +4,7 @@
 
 pub mod app;
 pub mod components;
+pub mod domain;
 pub mod events;
 pub mod git;
 pub mod image;

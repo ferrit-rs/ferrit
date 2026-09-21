@@ -9,6 +9,7 @@
 //! merge); those are the three submodules that are not read-only, and all
 //! three shell out to `git` rather than writing objects directly.
 
+pub mod activity;
 pub mod apply;
 pub mod blob;
 pub mod branch;
@@ -130,6 +131,33 @@ impl Repo {
                 email: emails.get(index).cloned(),
             })
             .collect()
+    }
+
+    /// Commit timestamps on HEAD, newest first. Activity view aggregates by day.
+    pub fn activity(&self) -> GitResult<Vec<i64>> {
+        activity::timestamps(&self.inner)
+    }
+
+    /// Timestamps of successful pushes performed through Ferrit for this repo.
+    pub fn push_activity(&self) -> Vec<i64> {
+        activity::push_timestamps(&self.inner)
+    }
+
+    /// Repository-local and user-global author config, kept separate for Settings.
+    pub fn identity_settings(&self) -> (Option<UserIdentity>, Option<UserIdentity>) {
+        fn identity(config: &git2::Config) -> Option<UserIdentity> {
+            let name = config.get_string("user.name").ok()?;
+            let email = config.get_string("user.email").ok();
+            Some(UserIdentity { name, email })
+        }
+        let global = git2::Config::open_default()
+            .ok()
+            .and_then(|config| identity(&config));
+        let local_path = self.inner.path().join("config");
+        let local = git2::Config::open(&local_path)
+            .ok()
+            .and_then(|config| identity(&config));
+        (global, local)
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.
@@ -296,7 +324,11 @@ impl Repo {
     /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
     /// `Some`. Slow, same as `fetch`.
     pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
-        remote::push(&self.inner, set_upstream)
+        let result = remote::push(&self.inner, set_upstream);
+        if result.is_ok() {
+            activity::record_push(&self.inner);
+        }
+        result
     }
 
     pub(crate) fn push_cancellable(
@@ -306,13 +338,17 @@ impl Repo {
         set_upstream_current: bool,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        remote::push_cancellable(
+        let result = remote::push_cancellable(
             &self.inner,
             set_upstream,
             force_with_lease,
             set_upstream_current,
             cancel,
-        )
+        );
+        if result.is_ok() {
+            activity::record_push(&self.inner);
+        }
+        result
     }
 
     pub fn push_default_current(&self) -> bool {

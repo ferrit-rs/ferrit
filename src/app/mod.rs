@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 use crate::components::tui_overlay::OverlayState;
 use crate::components::ui::mouse_pointer::MousePointer;
 use crate::components::ui::toast::Toast;
+use crate::domain::profile::{Identity, Profile, Settings};
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
@@ -114,6 +115,7 @@ pub struct BranchLog {
 #[derive(Debug)]
 pub struct RefreshCompletion {
     pub(crate) snapshot: Result<git::Snapshot, String>,
+    pub(crate) profile: Option<Profile>,
     pub(crate) branch_log: Option<(String, Result<Vec<git::model::CommitEntry>, String>)>,
     pub(crate) commit_files: Option<(String, Result<Vec<git::status::FileEntry>, String>)>,
 }
@@ -438,8 +440,9 @@ pub struct App {
     repo_name: String,
     /// Git author name from the repository's effective config.
     git_user_name: Option<String>,
-    /// All Git author identities configured for the repository.
-    git_user_identities: Vec<git::model::UserIdentity>,
+    /// Git settings and activity shown in the profile drawer.
+    profile: Profile,
+    profile_tab: ProfileTab,
     header: git::status::StatusHeader,
     files: Vec<git::status::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -563,6 +566,22 @@ pub struct App {
     image_query: ImageQueryState,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum ProfileTab {
+    #[default]
+    Settings,
+    Activity,
+}
+
+impl From<git::model::UserIdentity> for Identity {
+    fn from(identity: git::model::UserIdentity) -> Self {
+        Self {
+            name: identity.name,
+            email: identity.email,
+        }
+    }
+}
+
 mod tree;
 
 mod branch_actions;
@@ -593,6 +612,28 @@ impl App {
         let git_user_identities = repo
             .as_ref()
             .map_or_else(Vec::new, git::Repo::user_identities);
+        let (git_global_identity, git_local_identity) = repo
+            .as_ref()
+            .map_or((None, None), git::Repo::identity_settings);
+        let activity_times = repo
+            .as_ref()
+            .and_then(|repo| repo.activity().ok())
+            .unwrap_or_default();
+        let push_times = repo
+            .as_ref()
+            .map_or_else(Vec::new, git::Repo::push_activity);
+        let profile = Profile::new(
+            Settings {
+                global_identity: git_global_identity.map(Identity::from),
+                repository_identity: git_local_identity.map(Identity::from),
+                effective_identities: git_user_identities
+                    .into_iter()
+                    .map(Identity::from)
+                    .collect(),
+            },
+            &activity_times,
+            &push_times,
+        );
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -601,7 +642,8 @@ impl App {
             repo,
             repo_name,
             git_user_name,
-            git_user_identities,
+            profile,
+            profile_tab: ProfileTab::Settings,
             header: git::status::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -726,6 +768,7 @@ impl App {
                     let message = error.to_string();
                     RefreshCompletion {
                         snapshot: Err(message.clone()),
+                        profile: None,
                         branch_log: branch.map(|name| (name, Err(message.clone()))),
                         commit_files: commit.map(|hash| (hash, Err(message))),
                     }
@@ -733,6 +776,7 @@ impl App {
             })
             .unwrap_or_else(|error| RefreshCompletion {
                 snapshot: Err(error.to_string()),
+                profile: None,
                 branch_log: None,
                 commit_files: None,
             });
@@ -759,12 +803,31 @@ impl App {
         });
         RefreshCompletion {
             snapshot,
+            profile: repo.activity().ok().map(|timestamps| {
+                let (global, local) = repo.identity_settings();
+                Profile::new(
+                    Settings {
+                        global_identity: global.map(Identity::from),
+                        repository_identity: local.map(Identity::from),
+                        effective_identities: repo
+                            .user_identities()
+                            .into_iter()
+                            .map(Identity::from)
+                            .collect(),
+                    },
+                    &timestamps,
+                    &repo.push_activity(),
+                )
+            }),
             branch_log,
             commit_files,
         }
     }
 
     fn apply_refresh_result(&mut self, completion: RefreshCompletion) {
+        if let Some(profile) = completion.profile {
+            self.profile = profile;
+        }
         let old_selection: [(Pane, usize, Option<SelectionKey>); 5] =
             PANES.map(|pane| (pane, self.selection[pane], self.selection_key(pane)));
         match completion.snapshot {
@@ -1042,8 +1105,11 @@ impl App {
     }
 
     /// All author identities configured for the open repository.
-    pub fn git_user_identities(&self) -> &[git::model::UserIdentity] {
-        &self.git_user_identities
+    pub(crate) fn profile_tab(&self) -> ProfileTab {
+        self.profile_tab
+    }
+    pub(crate) fn profile(&self) -> &Profile {
+        &self.profile
     }
 
     /// Return cached styled diff. Cache invalidates on selection, diff text,

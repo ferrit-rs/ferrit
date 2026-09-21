@@ -40,8 +40,21 @@ impl App {
         }
 
         if !self.author_overlay.is_closed() {
-            if key.code == KeyCode::Esc {
-                self.author_overlay.close();
+            match key.code {
+                KeyCode::Esc => self.author_overlay.close(),
+                KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
+                    self.profile_tab = match self.profile_tab {
+                        super::ProfileTab::Settings => super::ProfileTab::Activity,
+                        super::ProfileTab::Activity => super::ProfileTab::Settings,
+                    }
+                },
+                KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
+                    self.profile_tab = match self.profile_tab {
+                        super::ProfileTab::Settings => super::ProfileTab::Activity,
+                        super::ProfileTab::Activity => super::ProfileTab::Settings,
+                    }
+                },
+                _ => {},
             }
             return;
         }

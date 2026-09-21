@@ -22,6 +22,12 @@ first "yes":
 Adding a new dependency, a new module, or an abstraction with a single caller
 needs a reason stated in the commit message.
 
+Keep distinct logic in separate files or modules. Put domain models and
+transformations under `src/domain/`, Git reads and writes under `src/git/`, app
+coordination under `src/app/`, and rendering under `src/ui/`. Avoid mixing
+those responsibilities in one file so each stays easy to find, review, and
+change.
+
 
 
 

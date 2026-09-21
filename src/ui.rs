@@ -21,8 +21,8 @@ use crate::image::preview::Preview;
 use crate::{mock, theme};
 
 mod diff;
-mod drawers;
 mod popups;
+mod profile;
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -64,8 +64,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_keybar(frame, keybar, app);
 
     if !app.author_overlay.is_closed() {
-        let identities = app.git_user_identities().to_vec();
-        drawers::draw_author(frame, area, &mut app.author_overlay, &identities);
+        let profile_data = app.profile().clone();
+        let profile_tab = app.profile_tab();
+        profile::draw_author(
+            frame,
+            area,
+            &mut app.author_overlay,
+            profile_tab,
+            &profile_data,
+        );
     }
 
     if show_help {
