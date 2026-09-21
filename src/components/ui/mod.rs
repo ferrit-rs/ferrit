@@ -1,6 +1,7 @@
 //! Small reusable UI building blocks (`components/ui/*`).
 
 pub mod dialog;
+pub mod drawer;
 pub mod key_bar;
 pub mod pane_list;
 pub mod panel;

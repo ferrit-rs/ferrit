@@ -39,6 +39,13 @@ impl App {
             return;
         }
 
+        if !self.author_overlay.is_closed() {
+            if key.code == KeyCode::Esc {
+                self.author_overlay.close();
+            }
+            return;
+        }
+
         // `Mode::Diff` keys (Files pane, cursor focused into the diff) take
         // priority; unhandled ones fall through to the ordinary scroll block
         // and the generic match below, same as `Mode::Nav`.
@@ -139,6 +146,18 @@ impl App {
     /// dismisses the help overlay first. Right click, middle click, drag
     /// and move are no-ops for now.
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
+        if !self.author_overlay.is_closed() {
+            if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left))
+                && !self
+                    .author_overlay
+                    .overlay_rect()
+                    .is_some_and(|rect| rect.contains(Position::new(ev.column, ev.row)))
+            {
+                self.author_overlay.close();
+            }
+            return;
+        }
+
         match ev.kind {
             MouseEventKind::ScrollDown => return self.wheel(ev, 1),
             MouseEventKind::ScrollUp => return self.wheel(ev, -1),
@@ -149,6 +168,14 @@ impl App {
 
         if self.show_help {
             self.show_help = false; // any click dismisses the overlay
+            return;
+        }
+
+        if self
+            .author_click_area
+            .contains(Position::new(ev.column, ev.row))
+        {
+            self.author_overlay.open();
             return;
         }
 

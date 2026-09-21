@@ -9,6 +9,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - Bottom panel now has an `Infos` heading above its frame; configured Git
   author name appears inside the frame, right-aligned beside the first command.
+- Clicking the configured author opens an animated right-side Git identity drawer.
 
 ## [0.4.0] - 2026-09-20
 

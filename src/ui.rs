@@ -20,6 +20,7 @@ use crate::image::preview::Preview;
 use crate::{mock, theme};
 
 mod diff;
+mod drawers;
 mod popups;
 
 /// Render the full screen for the current `App` state.
@@ -55,8 +56,13 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     } else {
         draw_right_pane(frame, app, right);
     }
-    draw_command_log(frame, log, app.git_user_name());
+    draw_command_log(frame, app, log);
     draw_keybar(frame, keybar, app);
+
+    if !app.author_overlay.is_closed() {
+        let name = app.git_user_name().unwrap_or("Not configured").to_owned();
+        drawers::draw_author(frame, area, &mut app.author_overlay, &name);
+    }
 
     if show_help {
         popups::draw_help(frame, area);
@@ -516,7 +522,8 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
-fn draw_command_log(frame: &mut Frame<'_>, area: Rect, git_user_name: Option<&str>) {
+fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    let git_user_name = app.git_user_name().map(str::to_owned);
     let [heading, panel_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
     frame.render_widget(
@@ -532,6 +539,7 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect, git_user_name: Option<&st
 
     let [first, second] =
         Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(inner);
+    app.set_author_click_area(Rect::ZERO);
     if let Some(command) = mock::COMMAND_LOG.first() {
         let line = theme::log_line(command);
         if let Some(name) = git_user_name {
@@ -549,6 +557,7 @@ fn draw_command_log(frame: &mut Frame<'_>, area: Rect, git_user_name: Option<&st
                     .style(Style::new().fg(theme::IDLE)),
                 name_area,
             );
+            app.set_author_click_area(name_area);
         } else {
             frame.render_widget(Paragraph::new(line), first);
         }

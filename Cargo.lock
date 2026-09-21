@@ -826,7 +826,9 @@ dependencies = [
  "image",
  "notify-debouncer-full",
  "ratatui",
+ "ratatui-core",
  "ratatui-image",
+ "ratatui-widgets",
  "syntect",
  "thiserror 2.0.20",
 ]

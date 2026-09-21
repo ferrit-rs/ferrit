@@ -6,7 +6,7 @@
 
 use std::any::Any;
 use std::path::Path;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
 
@@ -115,13 +115,30 @@ impl Events {
     /// it, matching the input-batching pattern used by responsive TUIs.
     pub fn next_batch(&self) -> Result<Vec<AppEvent>> {
         let mut batch = vec![self.rx.recv()?];
+        self.drain_batch(&mut batch);
+        Ok(batch)
+    }
+
+    /// Wait briefly for input while an animated overlay needs regular frames.
+    /// `None` means the timeout elapsed without an event.
+    pub fn next_batch_timeout(&self, timeout: Duration) -> Result<Option<Vec<AppEvent>>> {
+        let first = match self.rx.recv_timeout(timeout) {
+            Ok(event) => event,
+            Err(RecvTimeoutError::Timeout) => return Ok(None),
+            Err(error @ RecvTimeoutError::Disconnected) => return Err(error.into()),
+        };
+        let mut batch = vec![first];
+        self.drain_batch(&mut batch);
+        Ok(Some(batch))
+    }
+
+    fn drain_batch(&self, batch: &mut Vec<AppEvent>) {
         while batch.len() < MAX_EVENT_BATCH {
             match self.rx.try_recv() {
                 Ok(event) => batch.push(event),
                 Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => break,
             }
         }
-        Ok(batch)
     }
 
     /// A cloneable handle so `App` can hand a background thread a way back

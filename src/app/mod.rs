@@ -13,7 +13,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, mpsc};
 use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
 
+use crate::components::tui_overlay::OverlayState;
 use color_eyre::Result;
 use enum_map::{Enum, EnumMap};
 use ratatui::crossterm::event::{
@@ -476,6 +478,10 @@ pub struct App {
     /// Whole right-pane rect from the last frame, for routing the mouse wheel
     /// to the diff (over the right column) or the selection (over the left).
     right_area: Rect,
+    /// Click target for the configured Git author in the bottom info panel.
+    author_click_area: Rect,
+    /// Animated side sheet opened by clicking that author.
+    pub(crate) author_overlay: OverlayState,
     /// Each left pane's bordered rect from the last frame, for routing a
     /// click to the pane it landed in. `Rect::ZERO` before the first draw.
     left_areas: EnumMap<Pane, Rect>,
@@ -584,6 +590,8 @@ impl App {
             right_scroll: 0,
             right_viewport: 0,
             right_area: Rect::ZERO,
+            author_click_area: Rect::ZERO,
+            author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
             right_focused: false,
@@ -1063,6 +1071,11 @@ impl App {
         self.right_area = area;
     }
 
+    /// Store the configured Git author's clickable cells for mouse routing.
+    pub fn set_author_click_area(&mut self, area: Rect) {
+        self.author_click_area = area;
+    }
+
     /// A left pane's bordered rect, written by `ui::draw_left_column` each
     /// frame so a click can be routed to the pane it landed in.
     pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
@@ -1436,6 +1449,7 @@ impl App {
         // which has none).
         self.event_sender = Some(events.sender());
         let mut prev_was_image = false;
+        let mut overlay_tick = Instant::now();
         while !self.should_quit {
             let is_image = self.preview_is_image();
             if prev_was_image && !is_image {
@@ -1446,7 +1460,21 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw(frame, self))?;
 
-            for event in events.next_batch()? {
+            let was_animating = self.author_overlay.is_animating();
+            let batch = if was_animating {
+                match events.next_batch_timeout(Duration::from_millis(16))? {
+                    Some(batch) => batch,
+                    None => {
+                        self.author_overlay.tick(overlay_tick.elapsed());
+                        overlay_tick = Instant::now();
+                        continue;
+                    },
+                }
+            } else {
+                events.next_batch()?
+            };
+
+            for event in batch {
                 match event {
                     AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                         self.on_key(key);
@@ -1463,6 +1491,10 @@ impl App {
                     break;
                 }
             }
+            if self.author_overlay.is_animating() && was_animating {
+                self.author_overlay.tick(overlay_tick.elapsed());
+            }
+            overlay_tick = Instant::now();
         }
         if self.remote_worker.is_some() {
             self.remote_cancel
