@@ -25,7 +25,7 @@ pub(super) struct SettingsView {
     pub(super) picker_grid_metrics: ColorPickerGridMetrics,
     pub(super) save_button_line: usize,
     pub(super) save_button_width: u16,
-    pub(super) author_card_lines: Vec<usize>,
+    pub(super) author_cards: Vec<(usize, u16)>,
 }
 
 pub(super) fn lines(
@@ -76,7 +76,7 @@ pub(super) fn lines(
         ));
     }
     let available = settings.available_identities();
-    let mut author_card_lines = Vec::with_capacity(available.len());
+    let mut author_cards = Vec::with_capacity(available.len());
     if available.is_empty() {
         lines.push(Line::styled(
             "No configured identities",
@@ -90,14 +90,13 @@ pub(super) fn lines(
             );
             let key = AUTHOR_SELECTION_KEYS.get(index).copied().unwrap_or("-");
             let email = identity.email.as_deref().unwrap_or("Email not configured");
-            author_card_lines.push(lines.len());
-            lines.extend(
-                RadioCard::new(identity.name.clone(), email)
-                    .key(key)
-                    .selected(selected)
-                    .accent(config.color())
-                    .lines(width),
-            );
+            let card = RadioCard::new(identity.name.clone(), email)
+                .key(key)
+                .selected(selected)
+                .accent(config.color())
+                .w_fit(width);
+            author_cards.push((lines.len(), card.fitted_width()));
+            lines.extend(card.lines());
         }
     }
     lines.push(Line::styled(
@@ -161,6 +160,6 @@ pub(super) fn lines(
         picker_grid_metrics,
         save_button_line,
         save_button_width,
-        author_card_lines,
+        author_cards,
     }
 }

@@ -70,7 +70,7 @@ pub(super) fn draw_author(
     let grid_rows = settings_view.picker_grid_metrics.rows;
     let save_line = settings_view.save_button_line;
     let save_width = settings_view.save_button_width;
-    let author_card_lines = settings_view.author_card_lines;
+    let author_cards = settings_view.author_cards;
     let mut lines = settings_view.lines;
     lines.extend(activity::lines(&profile.activity, body.width));
 
@@ -85,7 +85,7 @@ pub(super) fn draw_author(
         grid_rows,
         save_line,
         save_width,
-        &author_card_lines,
+        &author_cards,
     );
     frame.render_widget(
         Paragraph::new(lines).scroll((u16::try_from(*scroll).unwrap_or(u16::MAX), 0)),
@@ -110,7 +110,7 @@ fn hit_areas(
     grid_rows: usize,
     save_line: usize,
     save_width: u16,
-    author_card_lines: &[usize],
+    author_card_metrics: &[(usize, u16)],
 ) -> ProfileHitAreas {
     let viewport_start = scroll;
     let viewport_end = scroll.saturating_add(usize::from(body.height));
@@ -140,10 +140,10 @@ fn hit_areas(
     } else {
         Rect::ZERO
     };
-    let author_cards = author_card_lines
+    let author_cards = author_card_metrics
         .iter()
         .enumerate()
-        .filter_map(|(index, line)| {
+        .filter_map(|(index, (line, width))| {
             let card_end =
                 line.saturating_add(crate::components::ui::radio_card::RadioCard::HEIGHT);
             let visible_start = (*line).max(viewport_start);
@@ -156,7 +156,7 @@ fn hit_areas(
                         body.y.saturating_add(
                             u16::try_from(visible_start - viewport_start).unwrap_or(u16::MAX),
                         ),
-                        body.width,
+                        (*width).min(body.width),
                         u16::try_from(visible_end - visible_start).unwrap_or(u16::MAX),
                     ),
                 )

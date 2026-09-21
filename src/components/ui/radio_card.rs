@@ -15,6 +15,10 @@ const CARD_BOTTOM_RIGHT: &str = "┘";
 const CARD_HORIZONTAL: &str = "─";
 const CARD_VERTICAL: &str = "│";
 const DEFAULT_ACCENT: Color = Color::Green;
+const SOFT_BORDER_NEUTRAL: (u8, u8, u8) = (71, 85, 105);
+const SOFT_BORDER_ACCENT_WEIGHT: u16 = 3;
+const SOFT_BORDER_NEUTRAL_WEIGHT: u16 = 7;
+const SOFT_BORDER_WEIGHT_TOTAL: u16 = SOFT_BORDER_ACCENT_WEIGHT + SOFT_BORDER_NEUTRAL_WEIGHT;
 
 #[derive(Debug, Clone)]
 pub struct RadioCard {
@@ -23,6 +27,7 @@ pub struct RadioCard {
     description: String,
     selected: bool,
     accent: Color,
+    max_width: Option<u16>,
 }
 
 impl RadioCard {
@@ -35,6 +40,7 @@ impl RadioCard {
             description: description.into(),
             selected: false,
             accent: DEFAULT_ACCENT,
+            max_width: None,
         }
     }
 
@@ -56,10 +62,42 @@ impl RadioCard {
         self
     }
 
-    pub fn lines(self, width: u16) -> Vec<Line<'static>> {
-        let width = usize::from(width);
+    #[must_use]
+    pub fn w_fit(mut self, max_width: u16) -> Self {
+        self.max_width = Some(max_width);
+        self
+    }
+
+    pub fn fitted_width(&self) -> u16 {
+        let key_prefix = format!(
+            "{}{}",
+            self.key,
+            if self.key.is_empty() { "" } else { " · " }
+        );
+        let marker = if self.selected {
+            CARD_SELECTED_MARK
+        } else {
+            CARD_UNSELECTED_MARK
+        };
+        let title_width = CARD_BORDER_WIDTH
+            .saturating_add(UnicodeWidthStr::width(key_prefix.as_str()))
+            .saturating_add(UnicodeWidthStr::width(self.title.as_str()))
+            .saturating_add(UnicodeWidthStr::width(" "))
+            .saturating_add(UnicodeWidthStr::width(marker));
+        let description_width = CARD_BORDER_WIDTH
+            .saturating_add(UnicodeWidthStr::width(CARD_CONTENT_PADDING))
+            .saturating_add(UnicodeWidthStr::width(self.description.as_str()));
+        let content_width = title_width.max(description_width);
+        let capped_width = self.max_width.map_or(content_width, |max_width| {
+            content_width.min(usize::from(max_width))
+        });
+        u16::try_from(capped_width).unwrap_or(u16::MAX)
+    }
+
+    pub fn lines(self) -> Vec<Line<'static>> {
+        let width = usize::from(self.fitted_width());
         let border_style = Style::new().fg(if self.selected {
-            self.accent
+            softened_accent(self.accent)
         } else {
             Color::DarkGray
         });
@@ -153,4 +191,41 @@ fn fit_width(value: &str, width: usize) -> String {
         used = used.saturating_add(char_width);
     }
     fitted
+}
+
+fn softened_accent(accent: Color) -> Color {
+    let (accent_red, accent_green, accent_blue) = accent_rgb(accent);
+    let (neutral_red, neutral_green, neutral_blue) = SOFT_BORDER_NEUTRAL;
+    let blend = |accent: u8, neutral: u8| {
+        let accent = u16::from(accent).saturating_mul(SOFT_BORDER_ACCENT_WEIGHT);
+        let neutral = u16::from(neutral).saturating_mul(SOFT_BORDER_NEUTRAL_WEIGHT);
+        u8::try_from(
+            accent
+                .saturating_add(neutral)
+                .checked_div(SOFT_BORDER_WEIGHT_TOTAL)
+                .unwrap_or_default(),
+        )
+        .unwrap_or(u8::MAX)
+    };
+    Color::Rgb(
+        blend(accent_red, neutral_red),
+        blend(accent_green, neutral_green),
+        blend(accent_blue, neutral_blue),
+    )
+}
+
+fn accent_rgb(color: Color) -> (u8, u8, u8) {
+    match color {
+        Color::Rgb(red, green, blue) => (red, green, blue),
+        Color::Green => (0, 255, 0),
+        Color::Cyan => (0, 255, 255),
+        Color::Magenta => (255, 0, 255),
+        Color::Yellow => (255, 255, 0),
+        Color::Red => (255, 0, 0),
+        Color::Blue => (0, 0, 255),
+        Color::Gray => (190, 190, 190),
+        Color::DarkGray => (100, 100, 100),
+        Color::White => (255, 255, 255),
+        _ => SOFT_BORDER_NEUTRAL,
+    }
 }
