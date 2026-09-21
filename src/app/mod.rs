@@ -534,6 +534,8 @@ pub struct App {
     /// sidestepping two git processes racing over the same `index.lock`.
     /// See `docs/PLAN_9_REMOTE.md`.
     remote_busy: Option<events::RemoteOp>,
+    /// Start time for the inline branch-row spinner.
+    remote_busy_started: Option<Instant>,
     remote_cancel: Arc<AtomicBool>,
     remote_worker: Option<JoinHandle<()>>,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
@@ -633,6 +635,7 @@ impl App {
             popup: None,
             commit_draft: None,
             remote_busy: None,
+            remote_busy_started: None,
             remote_cancel: Arc::new(AtomicBool::new(false)),
             remote_worker: None,
             status_note: None,
@@ -1296,27 +1299,31 @@ impl App {
     /// Status pane: lazygit's one-liner `ferrit -> main ↑2`, plus a conflict
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
-        if let Some(err) = &self.last_error {
-            return vec![theme::error_line(&format!("error: {err}"))];
-        }
-        let h = &self.header;
-        let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
-        if h.ahead > 0 {
-            let _ = write!(line, " \u{2191}{}", h.ahead);
-        }
-        if h.behind > 0 {
-            let _ = write!(line, " \u{2193}{}", h.behind);
-        }
-        let mut out = vec![theme::status_line(&line)];
-        if h.conflicts > 0 {
-            out.push(theme::error_line(&format!(
-                "\u{2717} {} merge conflict(s)",
-                h.conflicts
-            )));
-        }
+        let mut out = if let Some(err) = &self.last_error {
+            vec![theme::error_line(&format!("error: {err}"))]
+        } else {
+            let h = &self.header;
+            let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
+            if h.ahead > 0 {
+                let _ = write!(line, " \u{2191}{}", h.ahead);
+            }
+            if h.behind > 0 {
+                let _ = write!(line, " \u{2193}{}", h.behind);
+            }
+            let mut lines = vec![theme::status_line(&line)];
+            if h.conflicts > 0 {
+                lines.push(theme::error_line(&format!(
+                    "\u{2717} {} merge conflict(s)",
+                    h.conflicts
+                )));
+            }
+            lines
+        };
         if let Some(label) = self.remote_busy_label() {
             out.push(theme::busy_line(label));
-        } else if let Some(note) = &self.status_note {
+        } else if self.last_error.is_none()
+            && let Some(note) = &self.status_note
+        {
             out.push(theme::status_line(note));
         }
         out
@@ -1352,7 +1359,16 @@ impl App {
         if self.branches.is_empty() {
             return vec![Line::raw("no local branches")];
         }
-        self.branches.iter().map(theme::branch_line).collect()
+        self.branches
+            .iter()
+            .map(|branch| {
+                let operation = branch
+                    .is_head
+                    .then(|| self.remote_branch_status())
+                    .flatten();
+                theme::branch_line_with_status(branch, operation.as_deref())
+            })
+            .collect()
     }
 
     /// `[3] Local branches - Remotes - Tags`, or `[3] Commits (<branch>)`
@@ -1510,7 +1526,9 @@ impl App {
 
             let was_animating = self.author_overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
-            let timeout = (was_animating || toast_animating).then_some(Duration::from_millis(16));
+            let remote_animating = self.remote_busy.is_some();
+            let timeout = (was_animating || toast_animating || remote_animating)
+                .then_some(Duration::from_millis(16));
             let batch = if let Some(timeout) = timeout {
                 match events.next_batch_timeout(timeout) {
                     Err(error) => return Err(error),

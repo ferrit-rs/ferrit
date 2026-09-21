@@ -479,25 +479,20 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
 
 ## Files pane: Unstaged / Staged split — done
 
-lazygit's Files pane, with a real diff selected, splits the right side into
-two panels side by side — Unstaged Changes, Staged Changes — instead of one.
-ferrit showed a single `git diff` (worktree side, falling back to staged
-only when a file was fully staged). Now both sides always show, lazygit
-style, and the left column narrows while this split is up so both panels
-stay readable.
+lazygit's Files pane uses a single full-width diff by default. It splits the
+right side into Unstaged Changes and Staged Changes only when a file has both
+staged and unstaged edits (or `gui.splitDiff: always`). Ferrit shows both
+sides for partially staged files and a single full-width panel for one-sided
+changes; the left column narrows only while the split is active.
 
-- **`DiffView::Files` now holds `FilesDiff { unstaged, staged }`** (two
-  `git::Diff`s) instead of one plain `git::Diff`. `RightKey::File` drops its
-  `side: DiffSide` field — a Files selection's identity is just the path
-  now, since both sides are always fetched. `build_diff`'s `RightKey::File`
-  arm runs `repo.file_diff` twice (`DiffSide::Worktree` and
-  `DiffSide::Staged`) and only falls back to the "no changes to show" `Note`
-  when both come back empty; a half-staged file — or one entirely on one
-  side — just shows an empty diff on the other, no special case.
+- **`DiffView::Files` holds `FilesDiff { unstaged, staged }`** (two
+  `git::Diff`s). `RightKey::File` identifies the selection by path, and
+  `build_diff` fetches both sides. A fully one-sided file renders its
+  non-empty diff in one full-width panel; a partially staged file uses both.
 - **Left column narrows to make room.** `ui::draw`'s `side` (the left
   column's width) drops from `area.width / 3` down to `area.width / 8`
-  (floor 14, versus the normal floor of 24) whenever Files is focused on a
-  real `DiffView::Files` selection (`files_split`) — lazygit shrinks its own
+  (floor 14, versus the normal floor of 24) only when Files is focused on a
+  partially staged `DiffView::Files` selection (`files_split`) — lazygit shrinks its own
   side panel to little more than the pane numbers and truncated titles once
   both diff columns are up, and ferrit now matches that ratio rather than
   the gentler one first tried; every other selection (Status, Branches,

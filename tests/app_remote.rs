@@ -273,6 +273,37 @@ fn capital_p_with_one_remote_and_no_upstream_pushes_with_dash_u() {
 }
 
 #[test]
+fn push_progress_is_visible_inline_even_when_status_has_old_error() {
+    let (_origin, work) = two_repo_fixture("app-remote-p-visible");
+    let mut app = App::open(work.path()).unwrap();
+    app.on_remote_done(RemoteOp::Push, Err("previous push failed".to_owned()));
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx.clone());
+    app.start_remote_op(RemoteOp::Push, None, tx);
+
+    assert!(
+        app.status_lines()
+            .iter()
+            .any(|line| line.to_string().contains("Pushing")),
+        "status keeps push progress visible alongside old error"
+    );
+    assert!(
+        app.branch_lines()
+            .iter()
+            .any(|line| line.to_string().contains("Pushing")),
+        "checked-out branch shows LazyGit-style inline push status"
+    );
+
+    wait_for_remote_done(&mut app, &rx);
+    assert!(
+        !app.branch_lines()
+            .iter()
+            .any(|line| line.to_string().contains("Pushing")),
+        "inline operation status clears on completion"
+    );
+}
+
+#[test]
 fn capital_p_with_two_remotes_and_no_upstream_opens_a_picker() {
     let dir = TempDir::new("app-remote-p-two-remotes");
     let repo = Repository::init(dir.path()).unwrap();

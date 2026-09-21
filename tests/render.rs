@@ -135,6 +135,41 @@ fn right_pane_follows_focus() {
     assert!(frame(&mut app, 120, 40).contains("(no stash entries)"));
 }
 
+#[test]
+fn one_sided_file_diff_uses_one_full_width_panel() {
+    let dir = TempDir::new("render-one-sided-file-diff");
+    let repo = Repository::init(dir.path()).unwrap();
+    for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {
+        let mut config = repo.config().unwrap();
+        config.set_str(key, value).unwrap();
+    }
+    fs::write(dir.path().join("a.txt"), "before\n").unwrap();
+    let mut index = repo.index().unwrap();
+    index
+        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
+        .unwrap();
+    index.write().unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let sig = Signature::now("Test", "test@example.com").unwrap();
+    repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+        .unwrap();
+    fs::write(dir.path().join("a.txt"), "after\n").unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.select(Pane::Files, 0);
+    let out = frame(&mut app, 120, 40);
+
+    assert!(
+        out.contains("Unstaged Changes"),
+        "shows the worktree diff:\n{out}"
+    );
+    assert!(out.contains("after"), "renders changed content:\n{out}");
+    assert!(
+        !out.contains("Staged Changes"),
+        "does not waste half the screen on an empty staged diff:\n{out}"
+    );
+}
+
 /// Status's welcome screen (`docs/PLAN_1_LAYOUT.md`, "Welcome screen"): no
 /// repo data, so `App::mock()` shows the same thing a real repo would.
 /// lazygit grows its own banner as the terminal grows rather than showing
@@ -438,6 +473,15 @@ fn busy_and_status_note_render_on_the_status_pane_and_are_exclusive() {
     assert!(
         !busy_out.contains("Fetched origin"),
         "no success line while busy:\n{busy_out}"
+    );
+    assert!(
+        busy_out.lines().any(|line| {
+            line.contains("Fetching")
+                && ["●∙∙", "∙●∙", "∙∙●"]
+                    .iter()
+                    .any(|spinner| line.contains(spinner))
+        }),
+        "checked-out branch renders LazyGit-style activity spinner:\n{busy_out}"
     );
 
     app.on_remote_done(RemoteOp::Fetch, Ok("Fetched origin".to_owned()));

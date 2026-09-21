@@ -326,21 +326,19 @@ pub fn remote_busy_label(&self) -> Option<&'static str> {
 }
 ```
 
-Rendered as a Status-pane line (`ui::draw_left_column`'s Status row already
-special-cases its content; one more `if let Some(label) = ...` alongside
-the existing error line) — not a spinner, not a progress bar: ferrit has no
-way to know fetch/push progress percentages without parsing git's
-`--progress` output, which is meant for a terminal's own carriage-return
-redraws, not structured data. A static "Fetching…" that disappears when
-`RemoteDone` arrives is honest about what ferrit actually knows.
+Rendered as a Status-pane line and inline beside the checked-out branch,
+with a short animated loader like lazygit. It remains an activity indicator,
+not a progress bar: ferrit has no way to know fetch/push percentages without
+parsing git's `--progress` output, which is meant for a terminal's own
+carriage-return redraws, not structured data.
 
 ## Rendering (`src/ui.rs`)
 
 - Status pane: `remote_busy_label()` and `status_note()` render as an extra
-  line under the existing `ferrit -> main ↑2` line, styled green
-  (`status_note`) or dim (`remote_busy_label`, matching the `Note` diff
-  view's dim style) — never both, `remote_busy` and `status_note` are
-  mutually exclusive by construction (one clears when the other is set).
+  line under the existing `ferrit -> main ↑2` line. The checked-out branch
+  also shows an animated `Pushing` / `Pulling` / `Fetching` indicator.
+  Busy status stays visible alongside an earlier error; success and busy
+  status remain mutually exclusive.
 - **Remotes tab**: the Branches pane's `[3] Local branches - Remotes -
   Tags` title gains a real second tab. `Tab`/`BackTab` already cycle
   *panes*; a new pane-*internal* tab needs its own key — `Ctrl-Right` /

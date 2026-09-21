@@ -5,6 +5,7 @@ use super::{
     thread,
 };
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 impl App {
     /// `f` / `p`: fetch / pull. Global, not Branches-only — unlike phase
@@ -91,6 +92,7 @@ impl App {
             return;
         };
         self.remote_busy = Some(op);
+        self.remote_busy_started = Some(Instant::now());
         self.status_note = None;
         self.remote_cancel.store(false, Ordering::Release);
         let cancel = std::sync::Arc::clone(&self.remote_cancel);
@@ -115,6 +117,7 @@ impl App {
     /// `run()` loop to receive the result for it.
     pub fn on_remote_done(&mut self, _op: events::RemoteOp, message: Result<String, String>) {
         self.remote_busy = None;
+        self.remote_busy_started = None;
         if let Some(worker) = self.remote_worker.take() {
             let _ = worker.join();
         }
@@ -147,5 +150,20 @@ impl App {
             events::RemoteOp::Pull => Some("Pulling\u{2026}"),
             events::RemoteOp::Push => Some("Pushing\u{2026}"),
         }
+    }
+
+    /// LazyGit-style label attached to the checked-out branch row.
+    pub(super) fn remote_branch_status(&self) -> Option<String> {
+        let label = match self.remote_busy? {
+            events::RemoteOp::Fetch => "Fetching",
+            events::RemoteOp::Pull => "Pulling",
+            events::RemoteOp::Push => "Pushing",
+        };
+        let elapsed = self.remote_busy_started?.elapsed().as_millis();
+        let frame = ["●∙∙", "∙●∙", "∙∙●", "∙●∙"]
+            .get(usize::try_from(elapsed / 120).unwrap_or(usize::MAX) % 4)
+            .copied()
+            .unwrap_or("●∙∙");
+        Some(format!("{label} {frame}"))
     }
 }

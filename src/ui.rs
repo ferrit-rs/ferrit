@@ -34,10 +34,11 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     ])
     .areas(area);
 
-    // Files with a real diff selected gets lazygit's own two-column split
-    // (Unstaged Changes beside Staged Changes) instead of the single right
-    // pane, so the left column narrows to leave both room to breathe.
-    let files_split = app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_));
+    // LazyGit splits the diff only for partially staged files. One-sided
+    // changes use the full-width diff pane.
+    let files_split = app.focus == Pane::Files
+        && matches!(app.diff_view(), DiffView::Files(files)
+            if !files.unstaged.text.trim().is_empty() && !files.staged.text.trim().is_empty());
 
     // lazygit's default `sidePanelWidth: 0.3333`: the left column takes a third
     // of the width, floored so it stays usable on a narrow terminal.
@@ -53,6 +54,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_left_column(frame, app, left);
     if files_split {
         diff::draw_files_columns(frame, app, right);
+    } else if app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
+        diff::draw_single_file_diff(frame, app, right);
     } else {
         draw_right_pane(frame, app, right);
     }

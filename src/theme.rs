@@ -171,6 +171,11 @@ fn relative_age(tip_time: i64) -> String {
 /// bold), `3d   feat/x` for the rest. Ahead/behind arrows in yellow when
 /// there is an upstream to compare against.
 pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
+    branch_line_with_status(entry, None)
+}
+
+/// Branch row with LazyGit-style inline operation status during remote work.
+pub fn branch_line_with_status(entry: &BranchEntry, operation: Option<&str>) -> Line<'static> {
     let marker = if entry.is_head { "* " } else { "  " };
     let name_style = if entry.is_head {
         Style::new().fg(ADD).add_modifier(Modifier::BOLD)
@@ -182,7 +187,9 @@ pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
         Span::styled(marker, fg(ADD)),
         Span::styled(entry.name.clone(), name_style),
     ];
-    if entry.upstream.is_some() {
+    if let Some(operation) = operation {
+        spans.push(Span::styled(format!(" {operation}"), fg(HUNK)));
+    } else if entry.upstream.is_some() {
         if entry.ahead > 0 {
             spans.push(Span::styled(format!(" \u{2191}{}", entry.ahead), fg(WARN)));
         }

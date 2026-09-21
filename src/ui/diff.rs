@@ -54,6 +54,52 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
     app.set_right_viewport(viewport);
 }
 
+/// One-sided file changes use a single full-width panel, matching LazyGit's
+/// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
+pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    app.set_right_area(area);
+    let DiffView::Files(files) = app.diff_view() else {
+        return;
+    };
+    let (side, diff, title) = if files.unstaged.text.trim().is_empty() {
+        (
+            git::diff::DiffSide::Staged,
+            files.staged.clone(),
+            " Staged Changes ",
+        )
+    } else {
+        (
+            git::diff::DiffSide::Worktree,
+            files.unstaged.clone(),
+            " Unstaged Changes ",
+        )
+    };
+    let cursor = diff_cursor_for(app.diff_cursor(), side);
+    let scroll = app.right_scroll();
+    let block = Panel::new()
+        .title(Line::styled(title, Style::new().fg(theme::IDLE)))
+        .border_style(Style::new().fg(theme::IDLE))
+        .block();
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let [stat_row, diff_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+    frame.render_widget(Paragraph::new(theme::stat_line(diff.stat())), stat_row);
+    let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
+        || theme::render_diff(&diff, None, diff_area.width as usize),
+        |formatted| theme::render_delta(&formatted, diff_area.width as usize),
+    );
+    overlay_diff_cursor(&mut text, cursor, diff_area.width as usize);
+    let total = text.lines.len();
+    frame.render_widget(
+        Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
+        diff_area,
+    );
+    app.set_right_viewport(diff_area.height as usize);
+    ScrollBar::new(total, diff_area.height as usize, scroll).render(frame, diff_area);
+}
+
 /// `app.diff_cursor()`'s `(line, V-select range)` for `side`, or `None` when
 /// the cursor is on the other side (or `Mode::Diff` isn't up at all).
 fn diff_cursor_for(

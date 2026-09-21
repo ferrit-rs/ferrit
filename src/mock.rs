@@ -227,7 +227,7 @@ u                 (Branches) fast-forward the selected branch to its
 M                 (Branches) merge the selected branch into the current one
 Enter             (new-branch popup) create the branch
 Esc               (new-branch popup) cancel, no draft kept
-f / p / P         fetch / pull / push (P offers -u; 2+ remotes: a picker)
+f / p / P         fetch / pull / push (Pushing appears on the current branch)
 Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
 Enter / Esc       (remote picker) push to the highlighted one / cancel
 mouse wheel       scroll the pane under the pointer
