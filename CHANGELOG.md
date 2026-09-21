@@ -5,8 +5,10 @@ All notable changes to ferrit are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-09-21
 
+- Profile drawer now shows machine-global Git users as selectable radio cards. Choosing an author requires confirmation and applies to Ferrit commits without modifying Git config.
+- Radio cards use fitted widths and a softened accent border for the selected user.
 - Theme accent now supports Green, Blue, Purple, Amber presets and custom RGB editing from the profile drawer; selection persists in the platform TOML config.
 - Source now groups Ferrit orchestration and screens under `app/`, feature logic under `domain/`: Git models and backend, profile, and image; reusable primitives and `tui_overlay` stay under `components/`.
 - Profile drawer now shows settings and repository activity together in one scrollable page, including a contributor ranking by commit author and recent commits across local and fetched remote branches.
@@ -301,7 +303,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.4.0
 [0.2.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.1.0
