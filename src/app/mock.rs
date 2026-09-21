@@ -127,7 +127,6 @@ pub fn mock_commits() -> Vec<CommitEntry> {
             full_hash: format!("{hash}{}", "0".repeat(33)),
             short_hash: hash.to_string(),
             author: "Max Wells".to_owned(),
-            author_email: "maxwells.pro@proton.me".to_owned(),
             summary: summary.to_string(),
             time: 1_725_000_000 - (i64::try_from(i).unwrap_or(0) * 3600),
         })

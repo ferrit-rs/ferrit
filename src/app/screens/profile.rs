@@ -6,7 +6,7 @@ mod settings;
 use crate::app::theme;
 use crate::app::theme_config::ThemeConfig;
 use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::color_picker::{ColorPickerDisplay, ColorPickerHitAreas};
+use crate::components::ui::color_picker::ColorPickerDisplay;
 use crate::components::ui::drawer::Drawer;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::profile::Profile;
@@ -17,6 +17,14 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 
 const PROFILE_BUTTON_HEIGHT: u16 = 1;
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ProfileHitAreas {
+    pub(crate) color_grid: Rect,
+    pub(crate) color_grid_first_row: usize,
+    pub(crate) save_button: Rect,
+    pub(crate) author_cards: Vec<(usize, Rect)>,
+}
 
 pub(super) fn draw_author(
     frame: &mut Frame<'_>,
@@ -31,7 +39,7 @@ pub(super) fn draw_author(
     palette_selected: usize,
     picker_display: ColorPickerDisplay,
     theme_dirty: bool,
-    picker_hit_areas: &mut ColorPickerHitAreas,
+    profile_hit_areas: &mut ProfileHitAreas,
     selected_author: Option<&crate::domain::profile::settings::Identity>,
 ) {
     let Some(inner) = Drawer::new(state, " Profile ")
@@ -62,6 +70,7 @@ pub(super) fn draw_author(
     let grid_rows = settings_view.picker_grid_metrics.rows;
     let save_line = settings_view.save_button_line;
     let save_width = settings_view.save_button_width;
+    let author_card_lines = settings_view.author_card_lines;
     let mut lines = settings_view.lines;
     lines.extend(activity::lines(&profile.activity, body.width));
 
@@ -69,7 +78,15 @@ pub(super) fn draw_author(
     let viewport = usize::from(body.height);
     let max_scroll = content_length.saturating_sub(viewport);
     *scroll = (*scroll).min(max_scroll);
-    *picker_hit_areas = hit_areas(body, *scroll, grid_start, grid_rows, save_line, save_width);
+    *profile_hit_areas = hit_areas(
+        body,
+        *scroll,
+        grid_start,
+        grid_rows,
+        save_line,
+        save_width,
+        &author_card_lines,
+    );
     frame.render_widget(
         Paragraph::new(lines).scroll((u16::try_from(*scroll).unwrap_or(u16::MAX), 0)),
         body,
@@ -79,7 +96,7 @@ pub(super) fn draw_author(
         .render(frame, track);
     frame.render_widget(
         Paragraph::new(Line::styled(
-            "1–9 select author · 0 Git author · p picker · click color · s save · Esc close",
+            "Click card / 1–9 choose · 0 Git · p picker · click color · s save",
             Style::new().fg(theme::IDLE),
         )),
         hint,
@@ -93,7 +110,8 @@ fn hit_areas(
     grid_rows: usize,
     save_line: usize,
     save_width: u16,
-) -> ColorPickerHitAreas {
+    author_card_lines: &[usize],
+) -> ProfileHitAreas {
     let viewport_start = scroll;
     let viewport_end = scroll.saturating_add(usize::from(body.height));
     let grid_end = grid_start.saturating_add(grid_rows);
@@ -122,9 +140,33 @@ fn hit_areas(
     } else {
         Rect::ZERO
     };
-    ColorPickerHitAreas {
-        grid,
-        grid_first_row: visible_grid_start.saturating_sub(grid_start),
+    let author_cards = author_card_lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let card_end =
+                line.saturating_add(crate::components::ui::radio_card::RadioCard::HEIGHT);
+            let visible_start = (*line).max(viewport_start);
+            let visible_end = card_end.min(viewport_end);
+            (visible_start < visible_end).then(|| {
+                (
+                    index,
+                    Rect::new(
+                        body.x,
+                        body.y.saturating_add(
+                            u16::try_from(visible_start - viewport_start).unwrap_or(u16::MAX),
+                        ),
+                        body.width,
+                        u16::try_from(visible_end - visible_start).unwrap_or(u16::MAX),
+                    ),
+                )
+            })
+        })
+        .collect();
+    ProfileHitAreas {
+        color_grid: grid,
+        color_grid_first_row: visible_grid_start.saturating_sub(grid_start),
         save_button,
+        author_cards,
     }
 }

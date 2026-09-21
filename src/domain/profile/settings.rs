@@ -6,25 +6,14 @@ pub struct Settings {
     pub repository_identity: Option<Identity>,
     pub effective_identity: Option<Identity>,
     pub identity_source: IdentitySource,
-    pub recognized_authors: Vec<Identity>,
 }
 
 impl Settings {
     pub fn available_identities(&self) -> Vec<Identity> {
-        let mut identities = self.global_identities.clone();
-        if let Some(repository_identity) = &self.repository_identity
-            && !identities.contains(repository_identity)
-        {
-            identities.push(repository_identity.clone());
-        }
-        for author in &self.recognized_authors {
-            if !identities.contains(author) {
-                identities.push(author.clone());
-            }
-        }
-        identities
-            .into_iter()
+        self.global_identities
+            .iter()
             .filter(|identity| identity.email.is_some())
+            .cloned()
             .collect()
     }
 }
@@ -34,7 +23,7 @@ mod tests {
     use super::{Identity, IdentitySource, Settings};
 
     #[test]
-    fn available_identities_deduplicates_and_requires_email() {
+    fn available_identities_uses_global_config_only_and_requires_email() {
         let global = Identity {
             name: "Global User".to_owned(),
             email: Some("global@example.com".to_owned()),
@@ -43,22 +32,18 @@ mod tests {
             name: "Incomplete User".to_owned(),
             email: None,
         };
-        let recognized_author = Identity {
-            name: "Repository Author".to_owned(),
-            email: Some("author@example.com".to_owned()),
+        let repository = Identity {
+            name: "Repository User".to_owned(),
+            email: Some("repo@example.com".to_owned()),
         };
         let settings = Settings {
             global_identities: vec![global.clone(), no_email],
-            repository_identity: Some(global.clone()),
-            effective_identity: Some(global.clone()),
-            identity_source: IdentitySource::Global,
-            recognized_authors: vec![global.clone(), recognized_author.clone()],
+            repository_identity: Some(repository.clone()),
+            effective_identity: Some(repository),
+            identity_source: IdentitySource::Repository,
         };
 
-        assert_eq!(
-            settings.available_identities(),
-            vec![global, recognized_author]
-        );
+        assert_eq!(settings.available_identities(), vec![global]);
     }
 }
 

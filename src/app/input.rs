@@ -23,6 +23,9 @@ const RGB_CHANNEL_STEP: i16 = 8;
 const RGB_CHANNEL_INDEX_STEP: usize = 1;
 const RGB_MIN_VALUE: i16 = 0;
 const RGB_MAX_VALUE: i16 = 255;
+const AUTHOR_CHANGE_CONFIRM_MESSAGE: &str =
+    "Use this global Git user for future Ferrit commits? Git config stays unchanged.";
+const AUTHOR_RESET_CONFIRM_MESSAGE: &str = "Return to the identity resolved from Git config?";
 
 impl App {
     pub(super) fn on_key(&mut self, key: KeyEvent) {
@@ -64,25 +67,14 @@ impl App {
             if let KeyCode::Char(key @ AUTHOR_KEY_START..=AUTHOR_KEY_END) = key.code {
                 let index =
                     usize::try_from(key as u32 - AUTHOR_KEY_START as u32).unwrap_or(usize::MAX);
-                if let Some(identity) = self.profile.settings.available_identities().get(index)
-                    && self.selected_author.as_ref() != Some(identity)
-                {
-                    self.pending_confirm = Some(super::ConfirmPrompt {
-                        message: format!(
-                            "Use {} for future Ferrit commits? Git config stays unchanged.",
-                            identity.name
-                        ),
-                        action: super::ConfirmAction::SelectAuthor(Some(identity.clone())),
-                    });
+                if let Some(identity) = self.profile.settings.available_identities().get(index) {
+                    self.request_author_selection(Some(identity.clone()));
                 }
                 return;
             }
             if key.code == KeyCode::Char(KEY_GIT_AUTHOR) {
                 if self.selected_author.is_some() {
-                    self.pending_confirm = Some(super::ConfirmPrompt {
-                        message: "Return to the identity resolved from Git config?".to_owned(),
-                        action: super::ConfirmAction::SelectAuthor(None),
-                    });
+                    self.request_author_selection(None);
                 }
                 return;
             }
@@ -258,6 +250,29 @@ impl App {
         self.update_right_pane();
     }
 
+    fn request_author_selection(
+        &mut self,
+        identity: Option<crate::domain::profile::settings::Identity>,
+    ) {
+        let active =
+            self.selected_author
+                .as_ref()
+                .or(self.profile.settings.effective_identity.as_ref());
+        if active == identity.as_ref() {
+            return;
+        }
+        let message = if identity.is_some() {
+            let name = identity.as_ref().map_or("", |author| author.name.as_str());
+            format!("{AUTHOR_CHANGE_CONFIRM_MESSAGE}\nSelected: {name}")
+        } else {
+            AUTHOR_RESET_CONFIRM_MESSAGE.to_owned()
+        };
+        self.pending_confirm = Some(super::ConfirmPrompt {
+            message,
+            action: super::ConfirmAction::SelectAuthor(identity),
+        });
+    }
+
     fn save_theme(&mut self) {
         if self.theme_config == self.theme_saved_config {
             return;
@@ -361,18 +376,34 @@ impl App {
             self.author_hovered = false;
             if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left)) {
                 let point = Position::new(ev.column, ev.row);
-                if self.theme_picker_hit_areas.save_button.contains(point) {
+                if self.profile_hit_areas.save_button.contains(point) {
                     self.save_theme();
                     return;
                 }
-                let grid = self.theme_picker_hit_areas.grid;
+                if let Some((identity_index, _)) = self
+                    .profile_hit_areas
+                    .author_cards
+                    .iter()
+                    .find(|(_, area)| area.contains(point))
+                {
+                    if let Some(identity) = self
+                        .profile
+                        .settings
+                        .available_identities()
+                        .get(*identity_index)
+                    {
+                        self.request_author_selection(Some(identity.clone()));
+                    }
+                    return;
+                }
+                let grid = self.profile_hit_areas.color_grid;
                 if grid.contains(point) {
                     let metrics = crate::components::ui::color_picker::grid_metrics(
                         self.theme_picker_display,
                     );
                     let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
                     let visible_row = usize::from(ev.row.saturating_sub(grid.y));
-                    let row = self.theme_picker_hit_areas.grid_first_row + visible_row;
+                    let row = self.profile_hit_areas.color_grid_first_row + visible_row;
                     self.select_theme_picker_cell(column, row);
                     return;
                 }

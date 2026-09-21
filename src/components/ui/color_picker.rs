@@ -3,7 +3,6 @@
 #[path = "color_picker_spectrum.rs"]
 pub mod color_picker_spectrum;
 
-use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -39,13 +38,6 @@ pub enum ColorPickerDisplay {
     Palette,
     #[default]
     Spectrum,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ColorPickerHitAreas {
-    pub grid: Rect,
-    pub grid_first_row: usize,
-    pub save_button: Rect,
 }
 
 #[derive(Debug, Clone, Copy)]

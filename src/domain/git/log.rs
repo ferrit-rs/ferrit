@@ -56,7 +56,6 @@ fn walk(repo: &Repository, mut revwalk: Revwalk<'_>, max: usize) -> GitResult<Ve
                 short_hash: full_hash.chars().take(7).collect(),
                 full_hash,
                 author: commit.author().name().unwrap_or("unknown").to_owned(),
-                author_email: commit.author().email().unwrap_or_default().to_owned(),
                 summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
                 time: commit.time().seconds(),
             })

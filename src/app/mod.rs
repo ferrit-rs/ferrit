@@ -455,7 +455,7 @@ pub struct App {
     theme_palette_selected: usize,
     theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
     theme_saved_config: theme_config::ThemeConfig,
-    theme_picker_hit_areas: crate::components::ui::color_picker::ColorPickerHitAreas,
+    profile_hit_areas: screens::profile::ProfileHitAreas,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -601,26 +601,6 @@ mod tests;
 use diff_query::{DiffQueryState, RightKey};
 use tree::{FileRow, commit_drill_files, tree_rows};
 
-fn recognized_authors(
-    commits: &[git::model::CommitEntry],
-) -> Vec<crate::domain::profile::settings::Identity> {
-    let mut identities = Vec::new();
-    for commit in commits {
-        let email = commit.author_email.trim();
-        if email.is_empty() {
-            continue;
-        }
-        let identity = crate::domain::profile::settings::Identity {
-            name: commit.author.trim().to_owned(),
-            email: Some(email.to_owned()),
-        };
-        if !identities.contains(&identity) {
-            identities.push(identity);
-        }
-    }
-    identities
-}
-
 impl App {
     fn base(repo: Option<git::Repo>, theme_config: theme_config::ThemeConfig) -> Self {
         let repo_name = repo
@@ -649,7 +629,6 @@ impl App {
                 repository_identity,
                 effective_identity,
                 identity_source,
-                recognized_authors: recognized_authors(&activity_commits),
             },
             &activity_commits,
         );
@@ -677,8 +656,7 @@ impl App {
             theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
             ),
             theme_saved_config,
-            theme_picker_hit_areas:
-                crate::components::ui::color_picker::ColorPickerHitAreas::default(),
+            profile_hit_areas: screens::profile::ProfileHitAreas::default(),
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -851,7 +829,6 @@ impl App {
                         repository_identity,
                         effective_identity,
                         identity_source,
-                        recognized_authors: recognized_authors(&commits),
                     },
                     &commits,
                 )

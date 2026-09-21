@@ -75,6 +75,19 @@ fn config_identities(config: &git2::Config) -> Vec<Identity> {
     }))
 }
 
+fn global_config_identities(config: &git2::Config) -> Vec<Identity> {
+    [git2::ConfigLevel::XDG, git2::ConfigLevel::Global]
+        .into_iter()
+        .filter_map(|level| config.open_level(level).ok())
+        .flat_map(|level| config_identities(&level))
+        .fold(Vec::new(), |mut unique, identity| {
+            if !unique.contains(&identity) {
+                unique.push(identity);
+            }
+            unique
+        })
+}
+
 fn config_identity(config: &git2::Config) -> Option<Identity> {
     let name = config.get_string("user.name").ok()?;
     Some(Identity {
@@ -185,10 +198,9 @@ impl Repo {
         Option<Identity>,
         IdentitySource,
     ) {
-        let global_config = git2::Config::open_default().ok();
-        let global_identities = global_config
-            .as_ref()
-            .map_or_else(Vec::new, config_identities);
+        let global_identities = git2::Config::open_default()
+            .ok()
+            .map_or_else(Vec::new, |config| global_config_identities(&config));
         let local_config = git2::Config::open(&self.inner.path().join("config")).ok();
         let repository_identity = local_config.as_ref().and_then(config_identity);
         let repository_overrides_identity = local_config.as_ref().is_some_and(|config| {

@@ -89,7 +89,6 @@ pub struct CommitEntry {
     pub full_hash: String,
     pub short_hash: String,
     pub author: String,
-    pub author_email: String,
     pub summary: String,
     pub time: i64,
 }

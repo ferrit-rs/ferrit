@@ -22,7 +22,7 @@ use crate::domain::image::preview::Preview;
 
 mod diff;
 mod popups;
-mod profile;
+pub(super) mod profile;
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -64,8 +64,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     draw_keybar(frame, keybar, app);
 
     if app.author_overlay.is_closed() {
-        app.theme_picker_hit_areas =
-            crate::components::ui::color_picker::ColorPickerHitAreas::default();
+        app.profile_hit_areas = profile::ProfileHitAreas::default();
     }
 
     if !app.author_overlay.is_closed() {
@@ -83,7 +82,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             app.theme_palette_selected,
             app.theme_picker_display,
             app.theme_config != app.theme_saved_config,
-            &mut app.theme_picker_hit_areas,
+            &mut app.profile_hit_areas,
             app.selected_author.as_ref(),
         );
     }

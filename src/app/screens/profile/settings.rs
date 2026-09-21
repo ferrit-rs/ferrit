@@ -5,6 +5,7 @@ use crate::app::theme_config::ThemeConfig;
 use crate::components::ui::color_picker::{
     ColorPicker, ColorPickerDisplay, ColorPickerGridMetrics, rgb,
 };
+use crate::components::ui::radio_card::RadioCard;
 use crate::components::ui::separator::Separator;
 use crate::domain::profile::settings::{Identity, IdentitySource, Settings};
 use ratatui::style::{Modifier, Style};
@@ -24,6 +25,7 @@ pub(super) struct SettingsView {
     pub(super) picker_grid_metrics: ColorPickerGridMetrics,
     pub(super) save_button_line: usize,
     pub(super) save_button_width: u16,
+    pub(super) author_card_lines: Vec<usize>,
 }
 
 pub(super) fn lines(
@@ -45,7 +47,7 @@ pub(super) fn lines(
             .margin_y(SECTION_SEPARATOR_MARGIN_Y)
             .lines(width)
     };
-    let mut lines = divider("Git identities · selection applies to Ferrit commits only");
+    let mut lines = divider("Global Git users · selection applies to Ferrit commits only");
     let active_identity = selected_author.or(settings.effective_identity.as_ref());
     let source = if selected_author.is_some() {
         "Ferrit selection"
@@ -74,6 +76,7 @@ pub(super) fn lines(
         ));
     }
     let available = settings.available_identities();
+    let mut author_card_lines = Vec::with_capacity(available.len());
     if available.is_empty() {
         lines.push(Line::styled(
             "No configured identities",
@@ -86,23 +89,15 @@ pub(super) fn lines(
                 |active| active == identity,
             );
             let key = AUTHOR_SELECTION_KEYS.get(index).copied().unwrap_or("-");
-            let marker = if selected { "●" } else { "○" };
-            let location = if settings.repository_identity.as_ref() == Some(identity) {
-                "Repo"
-            } else if settings.global_identities.contains(identity) {
-                "Global"
-            } else {
-                "Repo history"
-            };
             let email = identity.email.as_deref().unwrap_or("Email not configured");
-            lines.push(Line::styled(
-                format!("{marker} {key} · {location} · {} · {email}", identity.name),
-                Style::new().fg(if selected {
-                    theme::FOCUS
-                } else {
-                    ratatui::style::Color::Reset
-                }),
-            ));
+            author_card_lines.push(lines.len());
+            lines.extend(
+                RadioCard::new(identity.name.clone(), email)
+                    .key(key)
+                    .selected(selected)
+                    .accent(config.color())
+                    .lines(width),
+            );
         }
     }
     lines.push(Line::styled(
@@ -166,5 +161,6 @@ pub(super) fn lines(
         picker_grid_metrics,
         save_button_line,
         save_button_width,
+        author_card_lines,
     }
 }
