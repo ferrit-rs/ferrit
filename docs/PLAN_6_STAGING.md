@@ -1,6 +1,6 @@
 # Plan: phase 6, staging
 
-**Status: S0-S4 implemented** (`src/git/apply.rs`, `Mode::Diff` in `App`,
+**Status: S0-S4 implemented** (`src/domain/git/apply.rs`, `Mode::Diff` in `App`,
 `tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs`). S5's exhaustive
 edge-case sweep and the `40-stage.script` golden are still open, and three
 deliberate deviations from the plan text below are called out in
@@ -61,10 +61,10 @@ Consequences ferrit takes on, matching phase 3's reasoning:
 ```
         Files pane           right pane (DiffView::Files, phase 3)
    ┌ [2] Files ──────────┐   +- Unstaged changes -------------------------+
-   │  M src/app.rs        │   | diff --git a/src/app.rs b/src/app.rs      |  file
-   │ >M src/git/diff.rs   │<--| index 1a2b3c..4d5e6f 100644              |  header
-   │ ?? docs/notes.md     │   | --- a/src/git/diff.rs                     |
-   │                      │   | +++ b/src/git/diff.rs                     |
+   │  M src/domain/app/mod.rs        │   | diff --git a/src/domain/app/mod.rs b/src/domain/app/mod.rs      |  file
+   │ >M src/domain/git/diff.rs   │<--| index 1a2b3c..4d5e6f 100644              |  header
+   │ ?? docs/notes.md     │   | --- a/src/domain/git/diff.rs                     |
+   │                      │   | +++ b/src/domain/git/diff.rs                     |
    └──────────────1 of 3 ─┘   | @@ -10,6 +10,8 @@ fn file_diff(          |> hunk 0
                               |      let workdir = workdir(repo)?;        |  cursor
                               |  +    let started = Instant::now();       |  line  <- V-select
@@ -101,9 +101,9 @@ an explicit unstage key handles the other direction. lazygit uses `<space>` to
 stage and `u` is implicit in context; ferrit keeps `<space>` = toggle for the
 common case and adds no second binding unless testing shows it is needed.
 
-## Backend: `src/git/apply.rs`
+## Backend: `src/domain/git/apply.rs`
 
-New module under `src/git/`, sibling of `diff.rs`. No `ratatui`, same rule as
+New module under `src/domain/git/`, sibling of `diff.rs`. No `ratatui`, same rule as
 the rest of `git::`. Reuses `diff::DiffCmd`'s spawn pattern (`git -C <workdir>
 ...`) but for `apply` / `add` / `restore`.
 
@@ -196,7 +196,7 @@ file, and the keybar/help say so. Unstaging it is `git restore --staged`
 
 ## Data model
 
-No new owned type crosses out of `src/git/`. The patch strings are built in
+No new owned type crosses out of `src/domain/git/`. The patch strings are built in
 `App` from the phase 3 `Diff` and passed in as `&str`. Phase 3's
 `FileMeta` / `HunkMeta` already carry every range needed:
 
@@ -299,7 +299,7 @@ on a per-hunk content hash").
 Staging from another shell (fs-watch `AppEvent::Refresh`) runs the same
 re-find, so ferrit's diff cursor tracks the repo whoever moved it.
 
-## Rendering (`src/ui/diff.rs`)
+## Rendering (`src/components/screens/diff.rs`)
 
 Phase 3's `render_diff(&Diff, focus)` gains a cursor argument:
 
@@ -328,7 +328,7 @@ pub fn render_diff(
 
 ```
   +- discard? --------------------------------------+
-  |  discard 2 lines in src/git/diff.rs?            |
+  |  discard 2 lines in src/domain/git/diff.rs?            |
   |  this cannot be undone.        [y] yes   [n] no |
   +------------------------------------------------+
 ```
@@ -417,7 +417,7 @@ still pending, so scripts wait.
 
 ## Milestones
 
-- ✅ **S0** `src/git/apply.rs`: `ApplyDir`, `ApplyTarget`, `GitError::ApplyFailed`.
+- ✅ **S0** `src/domain/git/apply.rs`: `ApplyDir`, `ApplyTarget`, `GitError::ApplyFailed`.
   `stage_file` (add / restore, incl. untracked). `tests/git_stage.rs`
   file-level cases green.
 - ✅ **S1** `apply_hunk` (full-hunk patch = `file.header.start .. hunk.body.end`,
@@ -455,7 +455,7 @@ still pending, so scripts wait.
   worktree exactly as they were; the diff re-reads so the user can retry.
 - The diff cursor sticks to the same hunk across a background `refresh()`,
   including one triggered by staging from another shell.
-- `src/git/` still has no `ratatui` import (`cargo tree` check from phase 2).
+- `src/domain/git/` still has no `ratatui` import (`cargo tree` check from phase 2).
 - `cargo clippy --all-targets` clean; `tests/apply_patch.rs`,
   `tests/git_stage.rs`, `tests/app_stage.rs` pass.
 - Untracked, binary, rename, mode-change, and no-newline files each stage

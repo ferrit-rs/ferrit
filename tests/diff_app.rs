@@ -17,7 +17,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ferrit::app::{App, DiffView, Pane};
+use ferrit::domain::app::{App, DiffView, Pane};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -144,7 +144,9 @@ fn char_key(c: char) -> KeyEvent {
 
 fn render(app: &mut App, w: u16, h: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
-    terminal.draw(|f| ferrit::ui::draw(f, app)).unwrap();
+    terminal
+        .draw(|f| ferrit::components::screens::draw(f, app))
+        .unwrap();
     terminal.backend().to_string()
 }
 

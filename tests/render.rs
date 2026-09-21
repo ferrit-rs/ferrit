@@ -15,9 +15,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use ferrit::app::{App, Pane};
-use ferrit::events::RemoteOp;
-use ferrit::{mock, ui};
+use ferrit::components::{mock, screens as ui};
+use ferrit::domain::app::{App, Pane};
+use ferrit::domain::events::RemoteOp;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -319,8 +319,8 @@ fn click_on_the_command_log_or_keybar_is_a_no_op() {
     let mut app = App::mock();
     frame(&mut app, 120, 40); // a real draw, so left_areas / list_offset are set
 
-    // src/ui.rs `draw` reserves the bottom of the screen for the command
-    // log (4 rows) then the keybar (1 row): at height 40 that is rows
+    // `components::screens::draw` reserves the bottom of the screen for the
+    // command log (4 rows) then the keybar (1 row): at height 40 that is rows
     // 35..39 and row 39. Neither is a left pane's rect.
     for row in [36, 39] {
         app.feed_mouse(MouseEvent {

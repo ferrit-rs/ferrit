@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Source modules now group the app, Git, image, and repository models under `domain/`; screens, reusable UI, terminal, theme, and overlay components live under `components/`.
 - Profile drawer now separates Git/Ferrit settings from a year-view activity heatmap with commit counts and Ferrit-recorded pushes; new `domain/profile` modules own profile data and activity aggregation.
 - Commit editor now follows lazygit’s summary/description flow: `Enter` commits from Summary, `Tab` switches fields, `Enter` inserts Description newlines, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains an alias.
 - Pressing `c` with an empty index now opens a `tui_overlay` backdrop confirmation to stage all changed files before committing.

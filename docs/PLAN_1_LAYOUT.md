@@ -212,7 +212,7 @@ Example at a typical 80x24 terminal, Commits focused:
 └ [5] Stash ─────────────┘  2  (1 share, MIN_HEIGHT floor)
 ```
 
-Implemented (not deferred): `draw_left_column` in `src/ui.rs`.
+Implemented (not deferred): `draw_left_column` in `src/components/screens/mod.rs`.
 
 ## State model
 
@@ -289,7 +289,7 @@ right; those keys do nothing yet.
   panel titles, bottom-right `N of M` counters, Status collapsed to one line,
   blue selection bar, `Label: key` keybar, `<hash> <initials> o <subject>`
   commit rows. Typed `CommitEntry` / `BranchEntry` / `StashEntry` in
-  `src/git/model.rs` so G3..G5 swap the source without touching the UI.
+  `src/domain/repository.rs` so G3..G5 swap the source without touching the UI.
 
 ## Definition of done (phase 1)
 
@@ -313,7 +313,7 @@ all: it's a static welcome screen — a big ASCII wordmark, the tagline,
 version, licence, and a keybindings pointer. ferrit never built this. The
 "Right pane content by focus" table above planned a real `git status`-style
 summary for that slot instead, which was never implemented either — on a
-real repo (`!app.is_mock()`), `draw_right_pane` (`src/ui.rs`) falls straight
+real repo (`!app.is_mock()`), `draw_right_pane` (`src/components/screens/mod.rs`) falls straight
 through to a blank `Paragraph::new("")` the moment Status is focused,
 because `right_key_for` has no arm for `Pane::Status` (there is nothing to
 diff). That blank pane is the actual gap this closes; the mock-only status
@@ -385,7 +385,7 @@ tier.
 - **Every wordmark row needs the same width.** `toilet` right-pads every
   row of a figlet-style font to the widest row, so all rows span the same
   columns and the letterforms line up down the block; each `Wordmark`
-  constant in `src/ui.rs` stores its rows trimmed of that trailing padding
+  constant in `src/components/screens/mod.rs` stores its rows trimmed of that trailing padding
   instead (no trailing whitespace sitting in the source), so
   `welcome_lines` re-pads every row to that tier's own `width` field before
   centering it. Skipping that re-pad was a real bug during implementation:
@@ -393,12 +393,12 @@ tier.
   length, which shifted rows against each other and broke the letterforms
   — centering only reads as "the same logo, centered" when every row is
   still the same width first.
-- **Tier selection**: `welcome_lines(width, height)` (`src/ui.rs`) takes
+- **Tier selection**: `welcome_lines(width, height)` (`src/components/screens/mod.rs`) takes
   the right pane's own `(area.width, area.height)`, tries `WORDMARK_LARGE`,
   `WORDMARK_MEDIUM`, `WORDMARK_SMALL` in that order against each one's
   `min_area`, and falls back to a plain bold `ferrit` label below all
   three rather than wrapping or truncating a wordmark into noise.
-- **Where it hooks**: `draw_right_pane` in `src/ui.rs`, a dedicated
+- **Where it hooks**: `draw_right_pane` in `src/components/screens/mod.rs`, a dedicated
   `app.focus == Pane::Status` branch placed before the mock/real-repo split
   (image preview and `Preview::Note` still win first, same precedence as
   every other pane, since they're handled even earlier in the function).
@@ -428,11 +428,11 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   file directly at the repo root — stays exactly the flat list it always
   was: no root row, no directory headers, `row_count(Pane::Files) ==
   self.files.len()`. The tree only appears once at least one changed file
-  has a parent directory (`App::files_tree_rows`, `src/app.rs`) — matches
+  has a parent directory (`App::files_tree_rows`, `src/domain/app/mod.rs`) — matches
   lazygit's own behaviour and keeps the previous, simpler rendering (and
   every test built around it) valid for the case most working trees are in
   most of the time.
-- **Building the tree.** `build_file_tree` (`src/app.rs`) groups
+- **Building the tree.** `build_file_tree` (`src/domain/app/mod.rs`) groups
   `self.files` (already a flat, path-sorted `Vec<FileEntry>` from
   `git::status::files`) into nested `BTreeMap<String, TreeNode>` levels —
   `BTreeMap` for free alphabetical iteration per level, directories and
@@ -469,7 +469,7 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   — `click_on_a_files_directory_row_toggles_it`, the same shrink/grow check
   but through a real `feed_mouse` click. Existing tests keyed off
   `mock::mock_files()` (which spans several directories, so it does
-  trigger the tree) — `src/app.rs`'s own unit tests and
+  trigger the tree) — `src/domain/app/mod.rs`'s own unit tests and
   `tests/render.rs`'s image-preview test — moved off hardcoded flat indices
   onto `row_count`/`file_display`-based lookups, the same pattern
   `tests/diff_app.rs`'s `files_row` helper already used. Tests built on a

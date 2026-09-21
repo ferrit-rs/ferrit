@@ -18,7 +18,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::{App, Pane};
+use ferrit::domain::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

@@ -18,7 +18,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::{App, DiffView, Pane, PopupView};
+use ferrit::domain::app::{App, DiffView, Pane, PopupView};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -254,7 +254,8 @@ fn the_popup_actually_renders_its_title_text_and_footer() {
     type_text(&mut app, "feat: rendered");
 
     let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    term.draw(|f| ferrit::ui::draw(f, &mut app)).unwrap();
+    term.draw(|f| ferrit::components::screens::draw(f, &mut app))
+        .unwrap();
     let out = term.backend().to_string();
 
     assert!(out.contains("Commit"), "popup title shows:\n{out}");
@@ -327,7 +328,8 @@ fn empty_index_confirmation_uses_overlay_backdrop() {
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('c'));
     let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    term.draw(|f| ferrit::ui::draw(f, &mut app)).unwrap();
+    term.draw(|f| ferrit::components::screens::draw(f, &mut app))
+        .unwrap();
     let out = term.backend().to_string();
 
     assert!(out.contains("No files staged"), "heading shows:\n{out}");

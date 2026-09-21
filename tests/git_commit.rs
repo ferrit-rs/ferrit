@@ -20,9 +20,9 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::git::Repo;
-use ferrit::git::commit::{CommitKind, CommitOpts};
-use ferrit::git::error::GitError;
+use ferrit::domain::git::Repo;
+use ferrit::domain::git::commit::{CommitKind, CommitOpts};
+use ferrit::domain::git::error::GitError;
 use git2::{IndexAddOption, Repository, Signature};
 
 struct TempDir(PathBuf);

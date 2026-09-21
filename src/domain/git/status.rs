@@ -1,0 +1,134 @@
+//! Repo status: the header line data and the working-tree file list.
+//!
+//! All types here are plain owned values. No `git2` type escapes this module.
+
+use std::path::PathBuf;
+
+use git2::{ErrorCode, Repository, Status, StatusOptions};
+
+use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::repository::{Change, FileEntry, StatusHeader};
+
+/// Read the header: branch, upstream, ahead/behind, conflict count.
+pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
+    let mut out = StatusHeader::default();
+
+    match repo.head() {
+        Ok(head) => {
+            out.detached = repo.head_detached().unwrap_or(false);
+            let local_oid = head.target();
+            out.branch = if out.detached {
+                local_oid.map_or_else(
+                    || "HEAD".to_owned(),
+                    |oid| crate::domain::git::short_hash(&oid),
+                )
+            } else {
+                head.shorthand().unwrap_or("HEAD").to_owned()
+            };
+
+            if !out.detached
+                && let Ok(upstream) = git2::Branch::wrap(head).upstream()
+            {
+                out.upstream = upstream.name().ok().flatten().map(str::to_owned);
+                if let (Some(local_oid), Some(up_oid)) = (local_oid, upstream.get().target())
+                    && let Ok((ahead, behind)) = repo.graph_ahead_behind(local_oid, up_oid)
+                {
+                    out.ahead = ahead;
+                    out.behind = behind;
+                }
+            }
+        },
+        Err(e) if e.code() == ErrorCode::UnbornBranch => {
+            // Fresh repo, no commits yet.
+            out.branch = repo
+                .find_reference("HEAD")
+                .ok()
+                .and_then(|r| r.symbolic_target().ok().flatten().map(str::to_owned))
+                .map_or_else(
+                    || "main".to_owned(),
+                    |t| t.trim_start_matches("refs/heads/").to_owned(),
+                );
+        },
+        Err(e) => return Err(GitError::Read(e)),
+    }
+
+    let index = repo.index().map_err(GitError::Read)?;
+    out.conflicts = if index.has_conflicts() {
+        index.conflicts().map_or(0, Iterator::count)
+    } else {
+        0
+    };
+
+    Ok(out)
+}
+
+/// Read the working-tree entries, sorted by path. Untracked files included,
+/// ignored files excluded.
+pub(super) fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
+    let mut opts = StatusOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true)
+        .exclude_submodules(true);
+
+    let statuses = repo.statuses(Some(&mut opts)).map_err(GitError::Read)?;
+
+    let mut out: Vec<FileEntry> = statuses
+        .iter()
+        .filter_map(|entry| {
+            let s = entry.status();
+            if s.contains(Status::IGNORED) {
+                return None;
+            }
+            let path = PathBuf::from(entry.path().ok()?);
+            Some(FileEntry {
+                staged: staged_change(s),
+                worktree: worktree_change(s),
+                binary: false, // filled in a later milestone
+                path,
+            })
+        })
+        .collect();
+
+    out.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(out)
+}
+
+/// First flag the status carries wins; table order is the priority.
+/// `CONFLICTED` leads both tables so a conflicted path never reads as a plain
+/// modification.
+fn first_change(s: Status, table: &[(Status, Change)]) -> Change {
+    table
+        .iter()
+        .find(|(flag, _)| s.contains(*flag))
+        .map_or(Change::None, |&(_, change)| change)
+}
+
+fn staged_change(s: Status) -> Change {
+    first_change(
+        s,
+        &[
+            (Status::CONFLICTED, Change::Conflicted),
+            (Status::INDEX_NEW, Change::Added),
+            (Status::INDEX_MODIFIED, Change::Modified),
+            (Status::INDEX_DELETED, Change::Deleted),
+            (Status::INDEX_RENAMED, Change::Renamed),
+            (Status::INDEX_TYPECHANGE, Change::Typechange),
+        ],
+    )
+}
+
+fn worktree_change(s: Status) -> Change {
+    first_change(
+        s,
+        &[
+            (Status::CONFLICTED, Change::Conflicted),
+            (Status::WT_NEW, Change::Untracked),
+            (Status::WT_MODIFIED, Change::Modified),
+            (Status::WT_DELETED, Change::Deleted),
+            (Status::WT_RENAMED, Change::Renamed),
+            (Status::WT_TYPECHANGE, Change::Typechange),
+        ],
+    )
+}

@@ -7,7 +7,7 @@ pub struct Settings {
     pub effective_identities: Vec<Identity>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Identity {
     pub name: String,
     pub email: Option<String>,

@@ -128,8 +128,8 @@ Dropped for phase 5:
    | [1] Status            |  Unstaged      |   click here (col < side):
    +----------------------+                 |     -> which left pane row?
    | [2] Files            |   <diff text>   |
-   |  M src/app.rs   <----+-- click row     |   click here (col >= side):
-   |  M src/ui.rs         |                 |     -> right pane. no-op for now
+   |  M src/domain/app/mod.rs   <----+-- click row     |   click here (col >= side):
+   |  M src/components/screens/mod.rs         |                 |     -> right pane. no-op for now
    +----------------------+                 |         (right-pane-focus plan)
    | [3] Local branches   |                 |
    |  * main              |                 |
@@ -190,8 +190,8 @@ origin into the view Y for lazygit; ratatui does not, so ferrit adds
 
    pane_rect
    +-- (y)   -------------------------  <- border/title      inner_row -1
-   | (y+1) > M src/app.rs               <- list_offset 0     inner_row  0
-   | (y+2)   M src/ui.rs                                     inner_row  1
+   | (y+1) > M src/domain/app/mod.rs               <- list_offset 0     inner_row  0
+   | (y+2)   M src/components/screens/mod.rs                                     inner_row  1
    | (y+3)   ? notes.md          <-- click here, ev.row = y+3
    +-- (y+h-1) ----------------------
                                  inner_row = (y+3) - y - 1 = 2
@@ -430,7 +430,7 @@ row, redraw, assert the focused-border style moved from `Status` to
   `u16::MAX` click and a `usize::MAX` `list_offset` never panic
   (`extreme_coordinates_and_offsets_never_panic`); a real-frame click on
   the command log or the keybar is a no-op
-  (`click_on_the_command_log_or_keybar_is_a_no_op`); `src/git/` still has
+  (`click_on_the_command_log_or_keybar_is_a_no_op`); `src/domain/git/` still has
   no `ratatui` import; C0..C2 tests green.
 
 ## Definition of done (phase 5)

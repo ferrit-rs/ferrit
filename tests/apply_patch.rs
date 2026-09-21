@@ -3,7 +3,7 @@
 //! byte-for-byte patch body out. No repo, no `git` subprocess. See
 //! `docs/PLAN_6_STAGING.md` milestone S2.
 
-use ferrit::git::apply::transform_body;
+use ferrit::domain::git::apply::transform_body;
 
 #[test]
 fn selected_addition_is_kept_the_rest_of_the_hunk_is_untouched() {

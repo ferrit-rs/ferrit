@@ -70,10 +70,10 @@ the popup until it closes. This is the first real input popup in ferrit
 
 ```
 ┌ [1] Status ───────────┐┌ Staged changes ──────────────────────────────────┐
-│ ferrit → main ↑2      ││  diff --git a/src/app.rs b/src/app.rs            .│
+│ ferrit → main ↑2      ││  diff --git a/src/domain/app/mod.rs b/src/domain/app/mod.rs            .│
 └───────────────────────┘│  @@ -40,6 +40,8 @@                               .│
 ┌ [2] Files ────────────┐│  +    self.mode = Mode::Diff;                    .│
-│  M  src/app.rs        .││                                                 .│
+│  M  src/domain/app/mod.rs        .││                                                 .│
 │                       ┌ Commit ─────────────────────────────────────────┐ .│
 │                       │ feat(stage): line-level staging in the diff     │ .│
 │                       │                                                 │ .│
@@ -127,9 +127,9 @@ and its selection cursor; it is a mode flag, not a new widget.
 └───────────────1 of 3 ─┘
 ```
 
-## Backend: `src/git/commit.rs`
+## Backend: `src/domain/git/commit.rs`
 
-New module under `src/git/`, sibling of `apply.rs` (phase 6). No `ratatui`.
+New module under `src/domain/git/`, sibling of `apply.rs` (phase 6). No `ratatui`.
 Reuses the `git -C <workdir> ...` spawn pattern from `diff.rs` / `apply.rs`.
 
 ```rust
@@ -290,9 +290,9 @@ A commit made from another shell arrives as an `AppEvent::Refresh` (phase 2.5
 fs-watch on `.git/`), so the Commits pane updates on its own, same as staging
 did in phase 6.
 
-## Rendering (`src/ui/`)
+## Rendering (`src/components/screens/`)
 
-- New `src/ui/popup.rs`: a centered `Clear` + bordered `Block`, sized to a
+- New `src/components/screens/popup.rs`: a centered `Clear` + bordered `Block`, sized to a
   fraction of the frame (min 40 wide, grows with the terminal), with the
   `tui-textarea` widget inside and a two-line footer. The `Clear` widget wipes
   what is under it; the rest of the screen is drawn first and dimmed via a
@@ -403,7 +403,7 @@ interactive rebase todo editing" if the version gap ever closes.
 
 ## Milestones
 
-- ✅ **C0** `src/git/commit.rs`: `CommitKind`, `CommitOpts`, `Repo::commit`
+- ✅ **C0** `src/domain/git/commit.rs`: `CommitKind`, `CommitOpts`, `Repo::commit`
   (Normal + Amend + Reword + Fixup + Squash, the backend supports all five
   even though the UI only opens the first three so far), `head_message`,
   `staged_count`. `GitError::CommitFailed` / `NothingStaged` (no separate
@@ -446,7 +446,7 @@ interactive rebase todo editing" if the version gap ever closes.
 - Sign-off and no-verify are per-commit toggles, both visible in the popup
   footer; no-verify reads as a warning.
 - Cancelling the commit popup with `Esc` keeps the draft for the next `c`.
-- `src/git/` still has no `ratatui` import (`cargo tree` check from phase 2).
+- `src/domain/git/` still has no `ratatui` import (`cargo tree` check from phase 2).
 - `cargo clippy --all-targets` clean; `tests/git_commit.rs`,
   `tests/app_commit.rs` pass; the unborn-branch and merge-in-progress paths
   do not panic.
@@ -455,7 +455,7 @@ interactive rebase todo editing" if the version gap ever closes.
 
 Phase 8 is branches: checkout, create, delete, fast-forward, merge. It uses
 the Commits pane picker pattern this phase introduced for `f`, and the popup
-primitive from `src/ui/popup.rs` for the "new branch name" input.
+primitive from `src/components/screens/popup.rs` for the "new branch name" input.
 
 Deferred out of phase 7, their own phases or a follow-up:
 

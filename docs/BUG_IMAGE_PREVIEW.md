@@ -35,7 +35,7 @@ crisp even in a small pane.
 
 ## Fix
 
-`src/image/detect.rs`, `pick()`. The host and the `FERRIT_*` knobs are each
+`src/domain/image/detect.rs`, `pick()`. The host and the `FERRIT_*` knobs are each
 classified once, into a `Host` enum and an `Override` struct; every `Host`
 carries its own `Plan` (`Query`, `QueryOr { when, swap_to }`, or `Pin`).
 

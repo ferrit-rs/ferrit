@@ -3,7 +3,7 @@
 ## Goal
 
 Replace `mock.rs` with real repository data, one pane at a time, behind a
-headless `src/git/` module that never imports `ratatui`. Read only: no
+headless `src/domain/git/` module that never imports `ratatui`. Read only: no
 staging, no commit, no mutation of any kind. The TUI becomes a consumer of
 `git::Repo` snapshots instead of hardcoded strings.
 
@@ -21,7 +21,7 @@ awkward mutations stay on the table for later phases, not now.
 ## The module boundary
 
 ```
-src/git/          <- no `ratatui` import anywhere under here
+src/domain/git/          <- Git reads/writes; no `ratatui` imports
   mod.rs            Repo: open(path) -> Repo, holds git2::Repository
   error.rs          GitError, converted into color_eyre::Report at the edge
   status.rs         header (branch, upstream, ahead/behind, conflicts)
@@ -33,8 +33,12 @@ src/git/          <- no `ratatui` import anywhere under here
                     diffs in phase 3+)
 ```
 
-`src/ui/` still has no git logic. `app.rs` is the only glue: it owns a
-`git::Repo` and the cached snapshots, and asks the backend to refresh.
+`src/components/screens/` has no Git access. `src/domain/app/` owns app state
+and cached snapshots, and asks `domain::git::Repo` to refresh.
+
+Repository row models live in `src/domain/repository.rs`; Git access modules
+convert `git2` data into those owned types. Components and screens consume
+the same types, while `git2` and Ratatui types stay at their boundaries.
 
 ## Data model
 
@@ -42,7 +46,7 @@ Plain owned structs, `#[derive(Debug, Clone)]`, no lifetime tied to
 libgit2. The UI never sees a `git2::*` type.
 
 `BranchEntry` / `CommitEntry` / `StashEntry` and `CommitEntry::author_initials`
-landed early in `src/git/model.rs` as part of phase 1's lazygit re-skin (M6):
+landed early in `src/domain/repository.rs` as part of phase 1's lazygit re-skin (M6):
 `mock.rs` builds them now, G3..G5 fill the same structs from real reads. Also
 early: `Repo::name()` for the `ferrit -> main` status line, and the right-pane
 contextual titles (`Pane::right_title`).
@@ -181,8 +185,8 @@ polish: richer sixel / kitty output, size cues, hooking Commits as well.
   - Decode bytes with the `image` crate, hand the `DynamicImage` to a
     `StatefulImage` widget. Anything that fails to decode or encode falls
     back to a `Preview::Note` line. Never an error, never a panic.
-- `src/git/` never imports `ratatui-image` or `image`. Decoding lives in
-  `src/preview.rs`, the only module that touches either crate.
+- `src/domain/git/` never imports `ratatui-image` or `image`. Decoding lives in
+  `src/domain/image/preview.rs`, the only module that touches either crate.
 
 ## Dependencies
 
@@ -261,7 +265,7 @@ Lands in the same commits as the features:
   `&mut self` (the plan's "decide at implementation" note), no `RefCell`
   needed.
 - **G6** done. `blob_bytes(path, rev)` with `Rev::{Workdir, Head}`, unit
-  tested in `tests/git_backend.rs`. `src/preview.rs` decodes the bytes;
+  tested in `tests/git_backend.rs`. `src/domain/image/preview.rs` decodes the bytes;
   the right pane shows the image for an image selection in Files, on a
   half-block picker that upgrades to sixel / kitty when the terminal
   answers. `App::mock()` carries an embedded 8x8 PNG so the render tests
@@ -287,7 +291,7 @@ Lands in the same commits as the features:
      to spend here, first shipped compact and then widened once the compact
      version read as visually thin next to lazygit's own Log panel. No
      gutter/stat/hunk-jump, that treatment is for an actual diff. It does
-     scroll like one, though: `right_is_diff` (`src/app.rs`) originally
+     scroll like one, though: `right_is_diff` (`src/domain/app/mod.rs`) originally
      listed only `Files`/`Commit`, so J/K, PageUp/Down and the mouse wheel
      over this view fell through to the Branches selection instead of
      scrolling the log — fixed by adding `BranchLog` there and giving it a
@@ -325,7 +329,7 @@ Lands in the same commits as the features:
      branch-log preview's `Date:` line below) already showed for the same
      commit.
   4. **Diff from the drilled log.** `right_key_for`/`build_diff`
-     (`src/app.rs`) route a selected row in `branch_drill` to
+     (`src/domain/app/mod.rs`) route a selected row in `branch_drill` to
      `RightKey::Commit`, same as Commits; `build_diff`'s commit lookup checks
      both `self.commits` and `branch_drill`'s list, so a row in a drilled log
      shows its `Patch` through the exact same rendering path the Commits
@@ -344,7 +348,7 @@ script test still waits on `PLAN_SELF_TESTING.md`).
 
 ## Definition of done (phase 2)
 
-- `src/git/` has no `ratatui` dependency; `cargo tree -e no-dev` proves it.
+- `src/domain/git/` has no `ratatui` dependency; `cargo tree -e no-dev` proves it.
 - Status and Files panes show real data for the repo `ferrit` was pointed
   at (`-p/--path`, default `.`).
 - A non-git directory produces a one-line message and a non-zero exit,

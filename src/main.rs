@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::Parser;
 use color_eyre::Result;
 
-use ferrit::app::App;
-use ferrit::tui;
+use ferrit::components::terminal as tui;
+use ferrit::domain::app::App;
 
 /// A lazygit-style terminal UI for git, written in Rust.
 #[derive(Parser)]

@@ -189,7 +189,7 @@ tests/
 ├── support/mod.rs           shared helpers
 ├── render.rs                mechanism 1: TestBackend region snapshots
 ├── replay.rs                mechanism 2: runs every test/scripts/*.script
-└── git_backend.rs           src/git/ unit tests (phase 2+)
+└── git_backend.rs           src/domain/git/ unit tests (phase 2+)
 tests/snapshots/             insta .snap files, committed and reviewed
 test/
 ├── scripts/*.script         source of truth, one per flow
@@ -250,7 +250,7 @@ test/
 
 ## Relationship to the other plans
 
-- `PLAN_0_GENERAL.md` sets the `src/git/` (no ratatui) vs `src/ui/`
+- `PLAN_0_GENERAL.md` sets the `src/domain/git/` (no ratatui) vs `src/components/screens/`
   (no git logic) boundary that makes mechanisms 1 and 2 possible.
 - `PLAN_1_LAYOUT.md` defines the mock data and target screen that ST0
   through ST3 assert against.

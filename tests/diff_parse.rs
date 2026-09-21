@@ -5,12 +5,12 @@
     clippy::indexing_slicing,
     reason = "integration test: a failed setup or a bad slice is the assertion"
 )]
-//! Parser coverage for `ferrit::git::diff::parse_diff`: feed it canned plain-text
+//! Parser coverage for `ferrit::domain::git::diff::parse_diff`: feed it canned plain-text
 //! `git diff` output and check the byte ranges slice back to the right spans,
 //! rename detection fires, and the hunk-header numbers come out.
 
-use ferrit::git::diff::parse::FileStatus;
-use ferrit::git::diff::parse_diff;
+use ferrit::domain::git::diff::parse::FileStatus;
+use ferrit::domain::git::diff::parse_diff;
 
 /// Two files in one diff: a modified source file with two hunks, and a rename
 /// with a small edit. Trailing `\ No newline at end of file` on the first.

@@ -107,9 +107,9 @@ Files/`Mode::Diff` and, from this phase, "delete a branch" in Branches: the
 letter carries the same *shape* of action (destroy something, ask first),
 not the same target.
 
-## Backend: `src/git/branch.rs`
+## Backend: `src/domain/git/branch.rs`
 
-New module under `src/git/`, sibling of `apply.rs` / `commit.rs`. No
+New module under `src/domain/git/`, sibling of `apply.rs` / `commit.rs`. No
 `ratatui`. Reuses the `git -C <workdir> ...` spawn pattern.
 
 ```rust
@@ -298,7 +298,7 @@ extends), and merge either succeeds cleanly or lands in the well-known
 command line — ferrit is not making a worse decision than typing the
 command yourself would.
 
-## Rendering (`src/ui.rs`)
+## Rendering (`src/components/screens/mod.rs`)
 
 - No new right-pane view: the phase 2 branch-list / branch-log-preview
   split is untouched.
@@ -400,7 +400,7 @@ pending, so scripts wait.
 
 ## Milestones
 
-- ✅ **S0** `src/git/branch.rs`: `checkout`, `create_branch`,
+- ✅ **S0** `src/domain/git/branch.rs`: `checkout`, `create_branch`,
   `delete_branch`, `GitError::CheckoutFailed`/`BranchFailed`.
   `tests/git_branch.rs` checkout + create + delete (merged and unmerged)
   cases green.
@@ -435,7 +435,7 @@ pending, so scripts wait.
   would also leave.
 - A merge conflict is visible (Files pane, `Note` popup) and does not
   pretend to be resolved; ferrit does not attempt to resolve it.
-- `src/git/` still has no `ratatui` import (`cargo tree` check, unchanged
+- `src/domain/git/` still has no `ratatui` import (`cargo tree` check, unchanged
   since phase 2).
 - `cargo clippy --all-targets` clean; `tests/git_branch.rs`,
   `tests/app_branch.rs` pass.

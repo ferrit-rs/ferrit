@@ -23,8 +23,8 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
-use ferrit::events::{AppEvent, RemoteOp};
+use ferrit::domain::app::App;
+use ferrit::domain::events::{AppEvent, RemoteOp};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

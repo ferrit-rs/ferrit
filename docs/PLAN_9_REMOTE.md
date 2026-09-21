@@ -85,12 +85,12 @@ this exact discipline: "gitui's async-git-off-the-UI-thread". This is the
 phase that actually needs it, because it is the first phase where the *no*
 readable answer ("done" or "failed") arrives in milliseconds.
 
-`src/events.rs` already multiplexes independent sources onto one channel
+`src/domain/events.rs` already multiplexes independent sources onto one channel
 (`Events`, `AppEvent`) so `App::run` can block on a single `recv()` — fetch,
 pull and push become a fourth source, not a new synchronization primitive:
 
 ```rust
-// src/events.rs
+// src/domain/events.rs
 pub enum AppEvent {
     Input(Event),
     Refresh,
@@ -152,9 +152,9 @@ main thread's own `Repo` calls (still all synchronous, still all fast) to
 contend with. This is the same "cheap enough to redo" call `App::open`
 already makes once at startup.
 
-## Backend: `src/git/remote.rs`
+## Backend: `src/domain/git/remote.rs`
 
-New module under `src/git/`, sibling of `branch.rs`. No `ratatui`.
+New module under `src/domain/git/`, sibling of `branch.rs`. No `ratatui`.
 Subprocess `git`, for the same reason `apply.rs`/`commit.rs`/`branch.rs`
 all are: hooks (`post-receive` is the *server's* hook, out of ferrit's
 hands either way, but `pre-push` is local and must run), and — the reason
@@ -328,7 +328,7 @@ not a progress bar: ferrit has no way to know fetch/push percentages without
 parsing git's `--progress` output, which is meant for a terminal's own
 carriage-return redraws, not structured data.
 
-## Rendering (`src/ui.rs`)
+## Rendering (`src/components/screens/mod.rs`)
 
 - Status pane: `remote_busy_label()` and `status_note()` render as an extra
   line under the existing `ferrit -> main ↑2` line. The checked-out branch
@@ -442,7 +442,7 @@ path) remote URL, no network, no real GitHub involved — the same trick
 
 ## Milestones
 
-- ✅ **S0** `src/git/remote.rs`: `RemoteEntry`, `remotes()`,
+- ✅ **S0** `src/domain/git/remote.rs`: `RemoteEntry`, `remotes()`,
   `GitError::FetchFailed`/`PullFailed`/`PushFailed`/`NoUpstream`. Still
   synchronous at this milestone (call it straight from `on_key`, no thread
   yet) so the git-level behaviour can be proven before the threading
@@ -488,7 +488,7 @@ path) remote URL, no network, no real GitHub involved — the same trick
   push URLs.
 - Ahead/behind (Status header, every Branches row) reflects reality
   immediately after a fetch or pull, with no extra keypress.
-- `src/git/` still has no `ratatui` import (`cargo tree` check, unchanged
+- `src/domain/git/` still has no `ratatui` import (`cargo tree` check, unchanged
   since phase 2). Remote operations and repository snapshots run on
   background threads; snapshot results cross into `app.rs`, where refresh
   events coalesce while one read is in flight.

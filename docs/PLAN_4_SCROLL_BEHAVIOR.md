@@ -253,7 +253,7 @@ Both are still static text (dynamic, context-aware keybar is a later phase).
   handles `Event::Mouse`; `App::on_mouse` routes wheel by column
   (`App::right_area`). `tests/diff_app.rs` wheel cases.
 - **S3** polish: `cargo clippy --all-targets` clean, no warnings; scroll /
-  wheel on empty, one-line, and huge diffs never panic; `src/git/` still has
+  wheel on empty, one-line, and huge diffs never panic; `src/domain/git/` still has
   no `ratatui` import; all S0..S2 tests green.
 
 ## Definition of done (phase 4)
