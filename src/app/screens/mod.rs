@@ -71,22 +71,26 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             &mut app.author_overlay,
             &profile_data,
             &mut app.profile_scroll,
+            &app.theme_config,
+            app.theme_editing,
+            app.theme_rgb_channel,
         );
     }
 
     if show_help {
-        popups::draw_help(frame, area);
+        popups::draw_help(frame, area, app.theme_config.color());
     }
+    let accent = app.theme_config.color();
     match app.popup_view() {
         Some(
             PopupView::Commit(mut view)
             | PopupView::NewBranch(mut view)
             | PopupView::Upstream(mut view),
         ) => {
-            popups::draw_commit(frame, area, &mut view);
+            popups::draw_commit(frame, area, &mut view, accent);
         },
         Some(PopupView::CommitAllConfirm(state)) => {
-            popups::draw_commit_all_confirm(frame, area, state);
+            popups::draw_commit_all_confirm(frame, area, state, accent);
         },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
         None => {},
@@ -190,7 +194,9 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
         let focused = app.focus == pane;
         let border = if focused {
-            Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
+            Style::new()
+                .fg(app.theme_config.color())
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::new().fg(theme::IDLE)
         };
@@ -204,7 +210,9 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let title = Line::styled(
             format!(" {title_text} "),
             if focused {
-                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD)
+                Style::new()
+                    .fg(app.theme_config.color())
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::new().fg(theme::IDLE)
             },
@@ -303,7 +311,7 @@ const WORDMARK_LARGE: Wordmark = Wordmark {
 /// this renders identically in `App::mock()` and against a real repo. Below
 /// every tier's minimum area, the wordmark is dropped for a plain `ferrit`
 /// label instead of wrapping into noise.
-fn welcome_lines(width: u16, height: u16) -> Vec<Line<'static>> {
+fn welcome_lines(width: u16, height: u16, accent: ratatui::style::Color) -> Vec<Line<'static>> {
     let fits = |w: &Wordmark| width >= w.min_area.0 && height >= w.min_area.1;
     let wordmark = [WORDMARK_LARGE, WORDMARK_MEDIUM, WORDMARK_SMALL]
         .into_iter()
@@ -313,13 +321,13 @@ fn welcome_lines(width: u16, height: u16) -> Vec<Line<'static>> {
     if let Some(wordmark) = wordmark {
         lines.extend(wordmark.art.lines().map(|line| {
             let padded = format!("{line:<0$}", wordmark.width);
-            Line::styled(padded, Style::new().fg(theme::FOCUS)).centered()
+            Line::styled(padded, Style::new().fg(accent)).centered()
         }));
     } else {
         lines.push(
             Line::styled(
                 "ferrit",
-                Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD),
+                Style::new().fg(accent).add_modifier(Modifier::BOLD),
             )
             .centered(),
         );
@@ -351,7 +359,9 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // the diff, one over the left column moves the selection.
     app.set_right_area(area);
 
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let focused = Style::new()
+        .fg(app.theme_config.color())
+        .add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(theme::IDLE);
     // Branches normally previews nothing (" Log "); once drilled into a
     // branch's commit list, a selected row shows a real diff, so the title
@@ -499,9 +509,13 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // Status: lazygit's welcome screen, not repo data — same in mock and on
     // a real repo, so this comes before the mock/real split below.
     if app.focus == Pane::Status {
-        let panel = Paragraph::new(welcome_lines(area.width, area.height))
-            .block(block)
-            .wrap(Wrap { trim: false });
+        let panel = Paragraph::new(welcome_lines(
+            area.width,
+            area.height,
+            app.theme_config.color(),
+        ))
+        .block(block)
+        .wrap(Wrap { trim: false });
         frame.render_widget(panel, area);
         return;
     }

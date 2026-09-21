@@ -4,6 +4,7 @@ mod activity;
 mod settings;
 
 use crate::app::theme;
+use crate::app::theme_config::ThemeConfig;
 use crate::components::tui_overlay::OverlayState;
 use crate::components::ui::drawer::Drawer;
 use crate::components::ui::scroll_bar::ScrollBar;
@@ -20,9 +21,13 @@ pub(super) fn draw_author(
     state: &mut OverlayState,
     profile: &Profile,
     scroll: &mut usize,
+    config: &ThemeConfig,
+    theme_editing: bool,
+    rgb_channel: usize,
 ) {
     let Some(inner) = Drawer::new(state, " Profile ")
         .width(Constraint::Percentage(75))
+        .border_style(Style::new().fg(config.color()))
         .render(frame, area)
     else {
         return;
@@ -32,7 +37,7 @@ pub(super) fn draw_author(
     let [body, track] =
         Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(content);
 
-    let mut lines = settings::lines(&profile.settings);
+    let mut lines = settings::lines(&profile.settings, config, theme_editing, rgb_channel);
     lines.extend(activity::lines(&profile.activity, body.width));
 
     let content_length = lines.len();
@@ -48,7 +53,7 @@ pub(super) fn draw_author(
         .render(frame, track);
     frame.render_widget(
         Paragraph::new(Line::styled(
-            "↑/↓ or j/k scroll · PgUp/PgDn page · Home/End · Esc close",
+            "t preset · e edit RGB · Tab channel · ↑/↓ adjust · Esc close",
             Style::new().fg(theme::IDLE),
         )),
         hint,

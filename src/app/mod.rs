@@ -10,6 +10,7 @@ pub mod mock;
 pub mod screens;
 pub mod terminal;
 pub mod theme;
+pub(super) mod theme_config;
 
 use std::collections::HashSet;
 use std::fmt::{self, Display, Write as _};
@@ -442,6 +443,9 @@ pub struct App {
     profile: Profile,
     /// First visible profile drawer line.
     profile_scroll: usize,
+    theme_config: theme_config::ThemeConfig,
+    theme_rgb_channel: usize,
+    theme_editing: bool,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -587,7 +591,7 @@ use diff_query::{DiffQueryState, RightKey};
 use tree::{FileRow, commit_drill_files, tree_rows};
 
 impl App {
-    fn base(repo: Option<git::Repo>) -> Self {
+    fn base(repo: Option<git::Repo>, theme_config: theme_config::ThemeConfig) -> Self {
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
@@ -620,6 +624,9 @@ impl App {
             git_user_name,
             profile,
             profile_scroll: 0,
+            theme_config,
+            theme_rgb_channel: 0,
+            theme_editing: false,
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -669,14 +676,17 @@ impl App {
 
     /// Open the repo at or above `path`, then take one snapshot.
     pub fn open(path: &Path) -> GitResult<Self> {
-        let mut app = Self::base(Some(git::Repo::open(path)?));
+        let mut app = Self::base(
+            Some(git::Repo::open(path)?),
+            theme_config::ThemeConfig::load(),
+        );
         app.refresh();
         Ok(app)
     }
 
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
-        let mut app = Self::base(None);
+        let mut app = Self::base(None, theme_config::ThemeConfig::default());
         app.header = mock::mock_header();
         app.files = mock::mock_files();
         app.branches = mock::mock_branches();

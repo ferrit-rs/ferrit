@@ -40,8 +40,31 @@ impl App {
         }
 
         if !self.author_overlay.is_closed() {
+            if key.code == KeyCode::Char('t') {
+                self.theme_config.preset = self.theme_config.preset.next();
+                self.theme_config.accent = None;
+                self.persist_theme();
+                return;
+            }
+            if key.code == KeyCode::Char('e') {
+                self.theme_editing = !self.theme_editing;
+                return;
+            }
+            if self.theme_editing {
+                match key.code {
+                    KeyCode::Tab => self.theme_rgb_channel = (self.theme_rgb_channel + 1) % 3,
+                    KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(8),
+                    KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-8),
+                    KeyCode::Esc => self.theme_editing = false,
+                    _ => {},
+                }
+                return;
+            }
             match key.code {
-                KeyCode::Esc => self.author_overlay.close(),
+                KeyCode::Esc => {
+                    self.theme_editing = false;
+                    self.author_overlay.close();
+                },
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.profile_scroll = self.profile_scroll.saturating_sub(1);
                 },
@@ -148,6 +171,31 @@ impl App {
 
         // Focus or selection may have moved; keep the right-pane preview in sync.
         self.update_right_pane();
+    }
+
+    fn persist_theme(&mut self) {
+        if let Err(error) = self.theme_config.save() {
+            self.report_notice(format!("Could not save theme settings: {error}"));
+        }
+    }
+
+    fn adjust_theme_rgb(&mut self, delta: i16) {
+        let (mut r, mut g, mut b) = match self.theme_config.color() {
+            ratatui::style::Color::Rgb(r, g, b) => (r, g, b),
+            ratatui::style::Color::Green => (0, 255, 0),
+            ratatui::style::Color::Cyan => (0, 255, 255),
+            ratatui::style::Color::Magenta => (255, 0, 255),
+            ratatui::style::Color::Yellow => (255, 255, 0),
+            _ => (0, 255, 0),
+        };
+        let channel = match self.theme_rgb_channel {
+            0 => &mut r,
+            1 => &mut g,
+            _ => &mut b,
+        };
+        *channel = u8::try_from((i16::from(*channel) + delta).clamp(0, 255)).unwrap_or(0);
+        self.theme_config.accent = Some(ratatui::style::Color::Rgb(r, g, b));
+        self.persist_theme();
     }
 
     /// A left click focuses the pane it lands in and, when it lands on a

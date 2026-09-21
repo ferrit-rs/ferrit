@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Theme accent now supports Green, Blue, Purple, Amber presets and custom RGB editing from the profile drawer; selection persists in the platform TOML config.
 - Source now groups Ferrit orchestration and screens under `app/`, feature logic under `domain/`: Git models and backend, profile, and image; reusable primitives and `tui_overlay` stay under `components/`.
 - Profile drawer now shows settings and repository activity together in one scrollable page, including a contributor ranking by commit author and recent commits across local and fetched remote branches.
 - Commit editor now follows lazygit’s summary/description flow: `Enter` commits from Summary, `Tab` switches fields, `Enter` inserts Description newlines, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains an alias.

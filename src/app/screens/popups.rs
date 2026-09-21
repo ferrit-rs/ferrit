@@ -13,12 +13,12 @@ use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
 
-pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect) {
+pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, accent: ratatui::style::Color) {
     let width = 55.min(area.width);
     let body_rows = u16::try_from(mock::HELP.lines().count())
         .unwrap_or(area.height)
         .max(1);
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(" keybindings ", focused))
         .fit_content(width, body_rows, 0)
         .border_style(focused)
@@ -27,10 +27,15 @@ pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect) {
 }
 
 /// Shared editor popup for commit messages and branch names.
-pub(super) fn draw_commit(frame: &mut Frame<'_>, area: Rect, view: &mut CommitPopupView<'_>) {
+pub(super) fn draw_commit(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &mut CommitPopupView<'_>,
+    accent: ratatui::style::Color,
+) {
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
     if let Some(description) = view.description {
-        let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+        let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
         let idle = Style::new().fg(theme::IDLE);
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
@@ -111,7 +116,7 @@ pub(super) fn draw_commit(frame: &mut Frame<'_>, area: Rect, view: &mut CommitPo
 
     let body_height = u16::try_from(view.input.lines().len().max(1)).unwrap_or(u16::MAX);
     let footer_height: u16 = if view.toggles.is_some() { 2 } else { 1 };
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(format!(" {} ", view.title), focused))
         .fit_content(width, body_height, footer_height)
         .border_style(focused)
@@ -148,8 +153,13 @@ pub(super) fn draw_commit(frame: &mut Frame<'_>, area: Rect, view: &mut CommitPo
 }
 
 /// Confirm staging all worktree changes when `c` is pressed with an empty index.
-pub(super) fn draw_commit_all_confirm(frame: &mut Frame<'_>, area: Rect, state: &mut OverlayState) {
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
+pub(super) fn draw_commit_all_confirm(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &mut OverlayState,
+    accent: ratatui::style::Color,
+) {
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(focused)
