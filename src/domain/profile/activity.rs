@@ -1,4 +1,6 @@
-//! Convert commit timestamps into a year of daily contribution counts.
+//! Convert repository commits into a year of daily activity and a recent feed.
+
+use crate::domain::git::model::CommitEntry;
 
 const DAYS_PER_WEEK: usize = 7;
 const WEEKS_PER_YEAR: usize = 52;
@@ -8,7 +10,7 @@ const DAY_SECONDS: i64 = 86_400;
 pub struct Activity {
     pub weeks: Vec<ActivityWeek>,
     pub commit_count: u32,
-    pub push_count: u32,
+    pub recent_commits: Vec<CommitEntry>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -19,7 +21,7 @@ pub struct ActivityWeek {
 }
 
 impl Activity {
-    pub fn from_timestamps(timestamps: &[i64], pushes: &[i64]) -> Self {
+    pub fn from_commits(commits: &[CommitEntry]) -> Self {
         let today = today_days();
         let weekday = (today + 3).rem_euclid(7); // Unix epoch began Thursday.
         let start = today
@@ -42,7 +44,8 @@ impl Activity {
             };
             weeks.push(week);
         }
-        for &timestamp in timestamps {
+        for commit in commits {
+            let timestamp = commit.time;
             let offset = timestamp.div_euclid(DAY_SECONDS).saturating_sub(start);
             if let Ok(offset) = usize::try_from(offset) {
                 if let Some(week) = weeks.get_mut(offset / DAYS_PER_WEEK)
@@ -57,17 +60,19 @@ impl Activity {
             .flat_map(|week| week.days)
             .fold(0_u32, u32::saturating_add);
         let range_end = start + i64::try_from(WEEKS_PER_YEAR * DAYS_PER_WEEK).unwrap_or(0);
-        let push_count = pushes
+        let recent_commits = commits
             .iter()
-            .filter(|&&timestamp| {
-                let day = timestamp.div_euclid(DAY_SECONDS);
+            .filter(|commit| {
+                let day = commit.time.div_euclid(DAY_SECONDS);
                 day >= start && day < range_end
             })
-            .count();
+            .take(12)
+            .cloned()
+            .collect();
         Self {
             weeks,
             commit_count,
-            push_count: u32::try_from(push_count).unwrap_or(u32::MAX),
+            recent_commits,
         }
     }
 }

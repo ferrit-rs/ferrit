@@ -1,4 +1,4 @@
-//! Profile domain model assembled from settings and repository activity.
+//! Profile settings and repository-wide commit activity.
 
 mod activity;
 mod settings;
@@ -13,10 +13,10 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn new(settings: Settings, commit_timestamps: &[i64], push_timestamps: &[i64]) -> Self {
+    pub fn new(settings: Settings, commits: &[crate::domain::git::model::CommitEntry]) -> Self {
         Self {
             settings,
-            activity: Activity::from_timestamps(commit_timestamps, push_timestamps),
+            activity: Activity::from_commits(commits),
         }
     }
 }

@@ -7,8 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
-- Source now groups Ferrit orchestration and screens under `app/`, feature logic under `domain/`: Git backend and models, profile, and image, and reusable primitives plus `tui_overlay` under `components/`.
-- Profile drawer now separates Git/Ferrit settings from a year-view activity heatmap with commit counts and Ferrit-recorded pushes; new `domain/profile` modules own profile data and activity aggregation.
+- Source now groups Ferrit orchestration and screens under `app/`, feature logic under `domain/`: Git models and backend, profile, and image; reusable primitives and `tui_overlay` stay under `components/`.
+- Profile drawer now shows settings and repository activity together in one scrollable page. Activity heatmap and recent commit list cover local and fetched remote branches, with contributor names.
 - Commit editor now follows lazygit’s summary/description flow: `Enter` commits from Summary, `Tab` switches fields, `Enter` inserts Description newlines, and `Meta`/`Ctrl-Enter` commits from Description. `Ctrl-S` remains an alias.
 - Pressing `c` with an empty index now opens a `tui_overlay` backdrop confirmation to stage all changed files before committing.
 - Push progress now appears inline on the checked-out branch with an animated indicator, like lazygit; Status shows it beside any earlier error.

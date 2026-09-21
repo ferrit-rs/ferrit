@@ -2,13 +2,10 @@
 
 use crate::app::theme;
 use crate::domain::profile::{Identity, Settings};
-use ratatui::Frame;
-use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Paragraph, Wrap};
 
-pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, settings: &Settings) {
+pub(super) fn lines(settings: &Settings) -> Vec<Line<'static>> {
     let mut lines = vec![Line::styled("Git identities", Style::new().fg(theme::IDLE))];
     append_identity(&mut lines, "Global", settings.global_identity.as_ref());
     append_identity(
@@ -41,7 +38,8 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, settings: &Settings) {
             ));
         }
     }
-    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+    lines.push(Line::from(""));
+    lines
 }
 
 fn append_identity(lines: &mut Vec<Line<'static>>, label: &str, identity: Option<&Identity>) {

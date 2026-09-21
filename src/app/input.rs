@@ -42,18 +42,16 @@ impl App {
         if !self.author_overlay.is_closed() {
             match key.code {
                 KeyCode::Esc => self.author_overlay.close(),
-                KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
-                    self.profile_tab = match self.profile_tab {
-                        super::ProfileTab::Settings => super::ProfileTab::Activity,
-                        super::ProfileTab::Activity => super::ProfileTab::Settings,
-                    }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.profile_scroll = self.profile_scroll.saturating_sub(1);
                 },
-                KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
-                    self.profile_tab = match self.profile_tab {
-                        super::ProfileTab::Settings => super::ProfileTab::Activity,
-                        super::ProfileTab::Activity => super::ProfileTab::Settings,
-                    }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.profile_scroll = self.profile_scroll.saturating_add(1);
                 },
+                KeyCode::PageUp => self.profile_scroll = self.profile_scroll.saturating_sub(10),
+                KeyCode::PageDown => self.profile_scroll = self.profile_scroll.saturating_add(10),
+                KeyCode::Home => self.profile_scroll = 0,
+                KeyCode::End => self.profile_scroll = usize::MAX,
                 _ => {},
             }
             return;
@@ -169,13 +167,22 @@ impl App {
 
         if !self.author_overlay.is_closed() {
             self.author_hovered = false;
-            if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left))
-                && !self
-                    .author_overlay
-                    .overlay_rect()
-                    .is_some_and(|rect| rect.contains(Position::new(ev.column, ev.row)))
-            {
-                self.author_overlay.close();
+            match ev.kind {
+                MouseEventKind::ScrollUp => {
+                    self.profile_scroll = self.profile_scroll.saturating_sub(3);
+                },
+                MouseEventKind::ScrollDown => {
+                    self.profile_scroll = self.profile_scroll.saturating_add(3);
+                },
+                MouseEventKind::Down(MouseButton::Left)
+                    if !self
+                        .author_overlay
+                        .overlay_rect()
+                        .is_some_and(|rect| rect.contains(Position::new(ev.column, ev.row))) =>
+                {
+                    self.author_overlay.close();
+                },
+                _ => {},
             }
             return;
         }

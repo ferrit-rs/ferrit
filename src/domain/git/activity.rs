@@ -1,15 +1,28 @@
-//! Commit dates used by the profile activity heatmap.
+//! Commit activity across local and fetched remote branches.
 
 use git2::{Repository, Sort};
-use std::io::Write as _;
 
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::model::CommitEntry;
 
-/// Read reachable HEAD commit timestamps. Stop once history is older than two years.
-pub(super) fn timestamps(repo: &Repository) -> GitResult<Vec<i64>> {
+/// Read recent commits across local and fetched remote branches, newest first.
+/// This captures activity from every contributor, including unmerged branches.
+pub(super) fn commits(repo: &Repository) -> GitResult<Vec<CommitEntry>> {
     let mut walk = repo.revwalk().map_err(GitError::Read)?;
-    if walk.push_head().is_err() {
-        return Ok(Vec::new());
+    let references = repo.references().map_err(GitError::Read)?;
+    for reference in references {
+        let reference = reference.map_err(GitError::Read)?;
+        let Ok(name) = reference.name() else {
+            continue;
+        };
+        if !(name.starts_with("refs/heads/") || name.starts_with("refs/remotes/"))
+            || name.ends_with("/HEAD")
+        {
+            continue;
+        }
+        if let Ok(commit) = reference.peel_to_commit() {
+            walk.push(commit.id()).map_err(GitError::Read)?;
+        }
     }
     walk.set_sorting(Sort::TIME | Sort::TOPOLOGICAL)
         .map_err(GitError::Read)?;
@@ -23,39 +36,16 @@ pub(super) fn timestamps(repo: &Repository) -> GitResult<Vec<i64>> {
         if time < cutoff {
             break;
         }
-        result.push(time);
+        let full_hash = commit.id().to_string();
+        result.push(CommitEntry {
+            short_hash: full_hash.chars().take(7).collect(),
+            full_hash,
+            author: commit.author().name().unwrap_or("unknown").to_owned(),
+            summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
+            time,
+        });
     }
     Ok(result)
-}
-
-/// Read push events recorded by successful pushes through Ferrit.
-pub(super) fn push_timestamps(repo: &Repository) -> Vec<i64> {
-    std::fs::read_to_string(repo.path().join("ferrit-pushes.log")).map_or_else(
-        |_| Vec::new(),
-        |contents| {
-            contents
-                .lines()
-                .filter_map(|line| line.parse::<i64>().ok())
-                .collect()
-        },
-    )
-}
-
-/// Append a local event after a successful Ferrit push. Never changes push result.
-pub(super) fn record_push(repo: &Repository) {
-    let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(repo.path().join("ferrit-pushes.log"))
-    else {
-        return;
-    };
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0_i64, |duration| {
-            i64::try_from(duration.as_secs()).unwrap_or(i64::MAX)
-        });
-    let _ = writeln!(file, "{timestamp}");
 }
 
 fn now_days() -> i64 {

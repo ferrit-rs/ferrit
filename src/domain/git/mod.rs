@@ -134,14 +134,9 @@ impl Repo {
             .collect()
     }
 
-    /// Commit timestamps on HEAD, newest first. Activity view aggregates by day.
-    pub fn activity(&self) -> GitResult<Vec<i64>> {
-        activity::timestamps(&self.inner)
-    }
-
-    /// Timestamps of successful pushes performed through Ferrit for this repo.
-    pub fn push_activity(&self) -> Vec<i64> {
-        activity::push_timestamps(&self.inner)
+    /// Recent commit activity across local and fetched remote branches.
+    pub fn activity(&self) -> GitResult<Vec<CommitEntry>> {
+        activity::commits(&self.inner)
     }
 
     /// Repository-local and user-global author config, kept separate for Settings.
@@ -325,11 +320,7 @@ impl Repo {
     /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
     /// `Some`. Slow, same as `fetch`.
     pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
-        let result = remote::push(&self.inner, set_upstream);
-        if result.is_ok() {
-            activity::record_push(&self.inner);
-        }
-        result
+        remote::push(&self.inner, set_upstream)
     }
 
     pub(crate) fn push_cancellable(
@@ -340,18 +331,14 @@ impl Repo {
         set_upstream_current: bool,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        let result = remote::push_cancellable(
+        remote::push_cancellable(
             &self.inner,
             set_upstream,
             upstream_branch,
             force_with_lease,
             set_upstream_current,
             cancel,
-        );
-        if result.is_ok() {
-            activity::record_push(&self.inner);
-        }
-        result
+        )
     }
 
     pub fn push_default_current(&self) -> bool {

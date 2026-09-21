@@ -1,22 +1,54 @@
-//! Terminal rendering for the profile contribution heatmap.
+//! Repository-wide commit heatmap and recent contributor activity.
 
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
 
 use crate::app::theme;
 use crate::domain::profile::Activity;
 
-pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, activity: &Activity) {
-    if area.width < 82 {
-        frame.render_widget(
-            Paragraph::new("Widen terminal to view activity chart"),
-            area,
-        );
-        return;
+pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
+    let mut lines = vec![
+        Line::from(""),
+        Line::styled(
+            "Repository activity · local and fetched remote branches",
+            Style::new().fg(theme::IDLE),
+        ),
+    ];
+    if width < 60 {
+        lines.push(Line::from(format!(
+            "{} commits in the past year",
+            activity.commit_count
+        )));
+    } else {
+        lines.extend(heatmap_lines(activity));
+        lines.push(Line::from(format!(
+            "{} commits in the past year",
+            activity.commit_count
+        )));
     }
+    lines.push(Line::from(""));
+    lines.push(Line::styled("Recent commits", Style::new().fg(theme::IDLE)));
+    if activity.recent_commits.is_empty() {
+        lines.push(Line::from(
+            "No recent commits on local or fetched remote branches",
+        ));
+    } else {
+        for commit in &activity.recent_commits {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    commit.author.clone(),
+                    Style::new().add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::styled(commit.short_hash.clone(), Style::new().fg(theme::HASH)),
+                Span::raw(format!("  {}", commit.summary)),
+            ]));
+        }
+    }
+    lines
+}
+
+fn heatmap_lines(activity: &Activity) -> Vec<Line<'static>> {
     let colors = [
         Color::Rgb(22, 27, 34),
         Color::Rgb(14, 68, 41),
@@ -24,8 +56,8 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, activity: &Activity) {
         Color::Rgb(38, 166, 65),
         Color::Rgb(57, 211, 83),
     ];
-    let mut lines = vec![month_line(activity)];
     let labels = ["Mon", "   ", "Wed", "   ", "Fri", "   ", "   "];
+    let mut lines = vec![month_line(activity)];
     for row in 0..7 {
         let mut spans = vec![
             Span::styled(
@@ -50,16 +82,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, activity: &Activity) {
         }
         lines.push(Line::from(spans));
     }
-    lines.push(Line::from(""));
-    lines.push(Line::from(format!(
-        "{} commits · {} Ferrit pushes in past year",
-        activity.commit_count, activity.push_count
-    )));
-    lines.push(Line::styled(
-        "Squares = commits/day · pushes via Ferrit only",
-        Style::new().fg(theme::IDLE),
-    ));
-    frame.render_widget(Paragraph::new(lines), area);
+    lines
 }
 
 fn month_line(activity: &Activity) -> Line<'static> {

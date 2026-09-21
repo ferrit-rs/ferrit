@@ -65,13 +65,12 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     if !app.author_overlay.is_closed() {
         let profile_data = app.profile().clone();
-        let profile_tab = app.profile_tab();
         profile::draw_author(
             frame,
             area,
             &mut app.author_overlay,
-            profile_tab,
             &profile_data,
+            &mut app.profile_scroll,
         );
     }
 

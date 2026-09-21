@@ -440,7 +440,8 @@ pub struct App {
     git_user_name: Option<String>,
     /// Git settings and activity shown in the profile drawer.
     profile: Profile,
-    profile_tab: ProfileTab,
+    /// First visible profile drawer line.
+    profile_scroll: usize,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -564,13 +565,6 @@ pub struct App {
     image_query: ImageQueryState,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) enum ProfileTab {
-    #[default]
-    Settings,
-    Activity,
-}
-
 mod tree;
 
 mod branch_actions;
@@ -604,21 +598,17 @@ impl App {
         let (git_global_identity, git_local_identity) = repo
             .as_ref()
             .map_or((None, None), git::Repo::identity_settings);
-        let activity_times = repo
+        let activity_commits = repo
             .as_ref()
             .and_then(|repo| repo.activity().ok())
             .unwrap_or_default();
-        let push_times = repo
-            .as_ref()
-            .map_or_else(Vec::new, git::Repo::push_activity);
         let profile = Profile::new(
             Settings {
                 global_identity: git_global_identity,
                 repository_identity: git_local_identity,
                 effective_identities: git_user_identities,
             },
-            &activity_times,
-            &push_times,
+            &activity_commits,
         );
         Self {
             focus: Pane::default(),
@@ -629,7 +619,7 @@ impl App {
             repo_name,
             git_user_name,
             profile,
-            profile_tab: ProfileTab::Settings,
+            profile_scroll: 0,
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -789,7 +779,7 @@ impl App {
         });
         RefreshCompletion {
             snapshot,
-            profile: repo.activity().ok().map(|timestamps| {
+            profile: repo.activity().ok().map(|commits| {
                 let (global, local) = repo.identity_settings();
                 Profile::new(
                     Settings {
@@ -797,8 +787,7 @@ impl App {
                         repository_identity: local,
                         effective_identities: repo.user_identities(),
                     },
-                    &timestamps,
-                    &repo.push_activity(),
+                    &commits,
                 )
             }),
             branch_log,
@@ -1086,10 +1075,7 @@ impl App {
         self.git_user_name.as_deref()
     }
 
-    /// All author identities configured for the open repository.
-    pub(crate) fn profile_tab(&self) -> ProfileTab {
-        self.profile_tab
-    }
+    /// All author identities and activity for the open repository.
     pub(crate) fn profile(&self) -> &Profile {
         &self.profile
     }
