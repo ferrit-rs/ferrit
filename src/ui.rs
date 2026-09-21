@@ -79,14 +79,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         popups::draw_help(frame, area);
     }
     match app.popup_view() {
-        Some(PopupView::Commit(mut view) | PopupView::NewBranch(mut view)) => {
+        Some(
+            PopupView::Commit(mut view)
+            | PopupView::NewBranch(mut view)
+            | PopupView::Upstream(mut view),
+        ) => {
             popups::draw_commit(frame, area, &mut view);
         },
         Some(PopupView::CommitAllConfirm(state)) => {
             popups::draw_commit_all_confirm(frame, area, state);
-        },
-        Some(PopupView::RemotePick(remotes, selected)) => {
-            popups::draw_remote_pick(frame, area, remotes, selected);
         },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
         None => {},
@@ -563,7 +564,8 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let line = theme::log_line(command);
         if let Some(name) = git_user_name {
             let name = format!("👤 {name}");
-            let name_width = u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
+            let name_width =
+                u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
             let [command_area, name_area] = Layout::horizontal([
                 Constraint::Min(0),
                 Constraint::Length(name_width.min(first.width)),

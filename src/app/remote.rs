@@ -1,7 +1,7 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
 use super::{
-    App, AppError, AppEvent, ConfirmAction, ConfirmPrompt, Popup, RemotePick, Result, WorkerKind,
+    App, AppError, AppEvent, ConfirmAction, ConfirmPrompt, Popup, Result, TextInput, WorkerKind,
     events, mpsc, run_worker, thread,
 };
 use std::sync::atomic::Ordering;
@@ -24,9 +24,8 @@ impl App {
     /// .upstream`, already read by phase 2 for the ahead/behind count) —
     /// `Repo::push`'s own `NoUpstream` detection exists as a defensive
     /// fallback, not the primary path, because ferrit already knows the
-    /// answer without asking git. No upstream: 0 remotes is an immediate
-    /// `last_error`, 1 remote pushes straight there with `-u`, 2+ opens
-    /// `Popup::RemotePick` to choose one.
+    /// answer without asking git. No upstream: honor `push.default=current`,
+    /// otherwise open LazyGit-style editable `<remote> <branch>` prompt.
     pub(super) fn push_current_branch(&mut self) {
         if self.popup.is_some() {
             return;
@@ -51,6 +50,7 @@ impl App {
                 self.start_remote_op_with_options(
                     events::RemoteOp::Push,
                     None,
+                    None,
                     false,
                     true,
                     sender,
@@ -58,30 +58,49 @@ impl App {
             }
             return;
         }
-        match repo.remotes() {
-            Ok(remotes) if remotes.is_empty() => {
-                self.report_error(AppError::NoRemoteConfigured);
+        let remotes = match repo.remotes() {
+            Ok(remotes) => remotes,
+            Err(error) => {
+                self.report_error(error);
+                return;
             },
-            Ok(mut remotes) if remotes.len() == 1 => {
-                self.push_with_upstream(remotes.remove(0).name);
-            },
-            Ok(remotes) => {
-                self.popup = Some(Popup::RemotePick(RemotePick {
-                    remotes,
-                    selected: 0,
-                }));
-            },
-            Err(e) => self.report_error(e),
-        }
+        };
+        let remote = remotes
+            .iter()
+            .find(|remote| remote.name == "origin")
+            .or_else(|| remotes.first())
+            .map_or("origin", |remote| remote.name.as_str());
+        self.popup = Some(Popup::Upstream(TextInput::from_text(&format!(
+            "{remote} {}",
+            self.header.branch
+        ))));
     }
 
-    /// `git push -u <remote> <branch>`: the 1-remote short-circuit and
-    /// `Popup::RemotePick`'s `Enter` both land here.
-    pub(super) fn push_with_upstream(&mut self, remote: String) {
+    pub(super) fn submit_upstream(&mut self, value: &str) {
+        let mut parts = value.split_whitespace();
+        let (Some(remote), Some(branch), None) = (parts.next(), parts.next(), parts.next()) else {
+            self.report_error(AppError::Operation(
+                "upstream must be `<remote> <branch>`".to_owned(),
+            ));
+            return;
+        };
+        self.popup = None;
+        self.push_with_upstream(remote.to_owned(), branch.to_owned());
+    }
+
+    /// `git push -u <remote> <local>:<remote branch>`.
+    pub(super) fn push_with_upstream(&mut self, remote: String, branch: String) {
         let Some(sender) = self.event_sender.clone() else {
             return;
         };
-        self.start_remote_op(events::RemoteOp::Push, Some(remote), sender);
+        self.start_remote_op_with_options(
+            events::RemoteOp::Push,
+            Some(remote),
+            Some(branch),
+            false,
+            false,
+            sender,
+        );
     }
 
     /// Spawn `op` on its own thread, `sender` its way back onto the same
@@ -107,23 +126,32 @@ impl App {
         push_upstream: Option<String>,
         sender: mpsc::Sender<AppEvent>,
     ) {
-        self.start_remote_op_with_force(op, push_upstream, false, sender);
+        self.start_remote_op_with_force(op, push_upstream, None, false, sender);
     }
 
     pub(super) fn start_remote_op_with_force(
         &mut self,
         op: events::RemoteOp,
         push_upstream: Option<String>,
+        upstream_branch: Option<String>,
         force_with_lease: bool,
         sender: mpsc::Sender<AppEvent>,
     ) {
-        self.start_remote_op_with_options(op, push_upstream, force_with_lease, false, sender);
+        self.start_remote_op_with_options(
+            op,
+            push_upstream,
+            upstream_branch,
+            force_with_lease,
+            false,
+            sender,
+        );
     }
 
     fn start_remote_op_with_options(
         &mut self,
         op: events::RemoteOp,
         push_upstream: Option<String>,
+        upstream_branch: Option<String>,
         force_with_lease: bool,
         set_upstream_current: bool,
         sender: mpsc::Sender<AppEvent>,
@@ -145,6 +173,7 @@ impl App {
                 events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
                 events::RemoteOp::Push => repo.push_cancellable(
                     push_upstream.as_deref(),
+                    upstream_branch.as_deref(),
                     force_with_lease,
                     set_upstream_current,
                     &cancel,

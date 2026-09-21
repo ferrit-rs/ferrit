@@ -334,6 +334,7 @@ impl Repo {
     pub(crate) fn push_cancellable(
         &self,
         set_upstream: Option<&str>,
+        upstream_branch: Option<&str>,
         force_with_lease: bool,
         set_upstream_current: bool,
         cancel: &AtomicBool,
@@ -341,6 +342,7 @@ impl Repo {
         let result = remote::push_cancellable(
             &self.inner,
             set_upstream,
+            upstream_branch,
             force_with_lease,
             set_upstream_current,
             cancel,

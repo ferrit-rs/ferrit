@@ -1,13 +1,13 @@
-//! New-branch, remote-pick and note popup state / key handling.
+//! New-branch, upstream-input and note popup state / key handling.
 
-use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInputMode, git};
+use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInputMode};
 
 #[derive(Clone, Copy)]
 enum PopupKind {
     Commit,
     CommitAllConfirm,
     NewBranch,
-    RemotePick,
+    Upstream,
     Note,
 }
 
@@ -18,7 +18,7 @@ impl App {
             Popup::Commit(_) => PopupKind::Commit,
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
-            Popup::RemotePick(_) => PopupKind::RemotePick,
+            Popup::Upstream(_) => PopupKind::Upstream,
             Popup::Note(_) => PopupKind::Note,
         };
         match kind {
@@ -27,9 +27,7 @@ impl App {
                 Some(PopupView::CommitAllConfirm(&mut self.commit_overlay))
             },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
-            PopupKind::RemotePick => self
-                .remote_pick()
-                .map(|(remotes, selected)| PopupView::RemotePick(remotes, selected)),
+            PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
     }
@@ -69,14 +67,28 @@ impl App {
         }
     }
 
-    /// The remote-pick popup's remotes and highlighted index
-    /// (`docs/PLAN_9_REMOTE.md`'s "No upstream" flow, 2+ remotes), or
-    /// `None` when it is not up.
-    pub fn remote_pick(&self) -> Option<(&[git::remote::RemoteEntry], usize)> {
+    pub fn upstream_value(&self) -> Option<String> {
         match &self.popup {
-            Some(Popup::RemotePick(pick)) => Some((&pick.remotes, pick.selected)),
+            Some(Popup::Upstream(input)) => Some(input.text()),
             _ => None,
         }
+    }
+
+    pub fn upstream_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Upstream(input)) = &self.popup else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: "Set upstream",
+            input,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: input.lines(),
+            cursor: input.cursor(),
+            toggles: None,
+            hints: "Push: Enter | Cancel: Esc",
+        })
     }
 
     /// Every key while a non-commit popup is up. Commit editor routes to
@@ -92,7 +104,7 @@ impl App {
         }
         let mut dismiss = false;
         let mut create_branch_now = false;
-        let mut pick_remote_now = false;
+        let mut submit_upstream = None;
 
         match &mut self.popup {
             None => return,
@@ -110,14 +122,12 @@ impl App {
                     buf.handle_key_event(key, TextInputMode::SingleLine);
                 },
             },
-            Some(Popup::RemotePick(pick)) => match key.code {
+            Some(Popup::Upstream(input)) => match key.code {
                 KeyCode::Esc => dismiss = true,
-                KeyCode::Enter => pick_remote_now = true,
-                KeyCode::Char('j') | KeyCode::Down => {
-                    pick.selected = (pick.selected + 1).min(pick.remotes.len().saturating_sub(1));
+                KeyCode::Enter => submit_upstream = Some(input.text()),
+                _ => {
+                    input.handle_key_event(key, TextInputMode::SingleLine);
                 },
-                KeyCode::Char('k') | KeyCode::Up => pick.selected = pick.selected.saturating_sub(1),
-                _ => {},
             },
         }
 
@@ -127,14 +137,8 @@ impl App {
         if create_branch_now {
             self.do_create_branch();
         }
-        if pick_remote_now {
-            if let Some(Popup::RemotePick(pick)) = &self.popup {
-                let name = pick.remotes.get(pick.selected).map(|r| r.name.clone());
-                self.popup = None;
-                if let Some(name) = name {
-                    self.push_with_upstream(name);
-                }
-            }
+        if let Some(value) = submit_upstream {
+            self.submit_upstream(&value);
         }
     }
 }

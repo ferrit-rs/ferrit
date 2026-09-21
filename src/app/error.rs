@@ -10,8 +10,6 @@ pub(crate) enum AppError {
     NothingStaged,
     #[error("no commit yet to amend")]
     NoCommitToAmend,
-    #[error("no remote configured")]
-    NoRemoteConfigured,
     #[error("commit message cannot be empty")]
     EmptyCommitMessage,
     #[error("repository refresh failed: {0}")]

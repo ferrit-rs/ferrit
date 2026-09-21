@@ -11,8 +11,7 @@ use crate::components::tui_overlay::{Anchor, Backdrop, Overlay, OverlayState};
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
-use crate::components::ui::select_list::SelectList;
-use crate::{git, mock, theme};
+use crate::{mock, theme};
 
 pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect) {
     let width = 55.min(area.width);
@@ -192,30 +191,6 @@ pub(super) fn draw_commit_all_confirm(frame: &mut Frame<'_>, area: Rect, state: 
             .alignment(Alignment::Center),
         footer,
     );
-}
-
-pub(super) fn draw_remote_pick(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    remotes: &[git::remote::RemoteEntry],
-    selected: usize,
-) {
-    let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
-    let body_height = u16::try_from(remotes.len().max(1)).unwrap_or(u16::MAX);
-    let focused = Style::new().fg(theme::FOCUS).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(" Push to which remote? ", focused))
-        .fit_content(width, body_height, 1)
-        .border_style(focused)
-        .render(frame, area);
-
-    let lines: Vec<Line<'static>> = remotes
-        .iter()
-        .map(|remote| Line::raw(remote.name.clone()))
-        .collect();
-    SelectList::new(&lines, selected)
-        .selection_style(theme::selection_style(true))
-        .render(frame, dialog.body);
-    KeyBar::hints("Push: Enter | Cancel: Esc").render(frame, dialog.footer);
 }
 
 pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str) {

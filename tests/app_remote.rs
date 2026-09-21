@@ -222,7 +222,7 @@ fn a_failure_sets_last_error_not_a_status_note() {
 }
 
 #[test]
-fn capital_p_with_no_remotes_shows_last_error() {
+fn capital_p_with_no_remotes_opens_editable_upstream_prompt() {
     let dir = TempDir::new("app-remote-p-no-remotes");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -232,14 +232,11 @@ fn capital_p_with_no_remotes_shows_last_error() {
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('P'));
 
-    let lines = app.status_lines();
     assert!(
-        lines
-            .iter()
-            .any(|l| l.to_string().contains("no remote configured")),
-        "got: {lines:?}"
+        app.upstream_value()
+            .is_some_and(|value| value.starts_with("origin ")),
+        "prompt suggests origin even before remote exists"
     );
-    assert!(app.remote_pick().is_none());
 }
 
 #[test]
@@ -254,10 +251,12 @@ fn capital_p_with_one_remote_and_no_upstream_pushes_with_dash_u() {
     let (tx, rx) = mpsc::channel();
     app.set_event_sender(tx);
     app.feed_key(char_key('P'));
+    assert!(app.upstream_value().is_some(), "prompt asks for upstream");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
     assert_eq!(
         app.remote_busy_label(),
         Some("Pushing\u{2026}"),
-        "one remote pushes straight away, no picker"
+        "confirming suggested upstream starts push"
     );
 
     wait_for_remote_done(&mut app, &rx);
@@ -292,7 +291,7 @@ fn push_default_current_skips_remote_picker_and_sets_upstream() {
 
     assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
     assert!(
-        app.remote_pick().is_none(),
+        app.upstream_value().is_none(),
         "configured current push skips picker"
     );
     wait_for_remote_done(&mut app, &rx);
@@ -398,7 +397,7 @@ fn push_progress_is_visible_inline_even_when_status_has_old_error() {
 }
 
 #[test]
-fn capital_p_with_two_remotes_and_no_upstream_opens_a_picker() {
+fn capital_p_with_two_remotes_prefills_editable_upstream() {
     let dir = TempDir::new("app-remote-p-two-remotes");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -416,25 +415,37 @@ fn capital_p_with_two_remotes_and_no_upstream_opens_a_picker() {
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('P'));
 
-    let (remotes, selected) = app.remote_pick().expect("the picker opened");
-    assert_eq!(remotes.len(), 2);
-    assert_eq!(remotes[0].name, "origin");
-    assert_eq!(remotes[1].name, "upstream");
-    assert_eq!(selected, 0);
-
-    app.feed_key(char_key('j'));
-    let (_, selected) = app.remote_pick().expect("still open");
-    assert_eq!(selected, 1);
+    assert_eq!(app.upstream_value().as_deref(), Some("origin master"));
 
     app.feed_key(KeyEvent::from(KeyCode::Esc));
-    assert!(app.remote_pick().is_none(), "Esc cancelled, no push");
+    assert!(app.upstream_value().is_none(), "Esc cancelled, no push");
 }
 
 #[test]
-fn enter_on_the_picker_pushes_to_the_highlighted_remote() {
+fn invalid_upstream_entry_keeps_prompt_open_and_shows_error() {
+    let (_origin, work) = two_repo_fixture("app-remote-invalid-upstream");
+    git(work.path(), &["checkout", "-q", "-b", "feature"]);
+    let mut app = App::open(work.path()).unwrap();
+    app.feed_key(char_key('P'));
+    let initial = app.upstream_value().unwrap();
+    for _ in initial.chars() {
+        app.feed_key(KeyEvent::from(KeyCode::Backspace));
+    }
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    assert_eq!(app.upstream_value().as_deref(), Some(""));
+    assert!(
+        app.status_lines()
+            .iter()
+            .any(|line| line.to_string().contains("upstream must be")),
+        "invalid input is reported while prompt stays open"
+    );
+}
+
+#[test]
+fn enter_on_upstream_prompt_pushes_to_the_suggested_remote() {
     let (origin, work) = two_repo_fixture("app-remote-p-pick-enter");
-    // A second remote that does not exist on disk: never reached, since
-    // the highlighted one (`origin`, first alphabetically) is picked.
+    // A second remote that does not exist on disk: prompt suggests origin.
     git(
         work.path(),
         &[
@@ -453,17 +464,49 @@ fn enter_on_the_picker_pushes_to_the_highlighted_remote() {
     let (tx, rx) = mpsc::channel();
     app.set_event_sender(tx);
     app.feed_key(char_key('P'));
-    assert!(app.remote_pick().is_some(), "two remotes: the picker opens");
+    assert!(app.upstream_value().is_some(), "upstream prompt opens");
 
     app.feed_key(KeyEvent::from(KeyCode::Enter));
-    assert!(app.remote_pick().is_none(), "picking closed the popup");
+    assert!(app.upstream_value().is_none(), "submitting closes prompt");
     assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
 
     wait_for_remote_done(&mut app, &rx);
     assert_eq!(
         git(origin.path(), &["rev-parse", "refs/heads/feature"]),
         git(work.path(), &["rev-parse", "HEAD"]),
-        "pushed to the highlighted (alphabetically first) remote"
+        "pushed to the suggested remote"
+    );
+}
+
+#[test]
+fn upstream_prompt_can_map_local_branch_to_another_remote_branch() {
+    let (origin, work) = two_repo_fixture("app-remote-upstream-map");
+    git(work.path(), &["checkout", "-q", "-b", "feature"]);
+    fs::write(work.path().join("e.txt"), "feature\n").unwrap();
+    let work_repo = Repository::open(work.path()).unwrap();
+    commit_all(&work_repo, "feature work");
+
+    let mut app = App::open(work.path()).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    app.feed_key(char_key('P'));
+    for _ in 0.."feature".len() {
+        app.feed_key(KeyEvent::from(KeyCode::Backspace));
+    }
+    for c in "review/one".chars() {
+        app.feed_key(char_key(c));
+    }
+    assert_eq!(app.upstream_value().as_deref(), Some("origin review/one"));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    wait_for_remote_done(&mut app, &rx);
+
+    assert_eq!(
+        git(work.path(), &["rev-parse", "--abbrev-ref", "feature@{u}"]),
+        "origin/review/one"
+    );
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "refs/heads/review/one"]),
+        git(work.path(), &["rev-parse", "HEAD"])
     );
 }
 
@@ -477,5 +520,5 @@ fn app_mock_ignores_fetch_pull_push_with_no_thread_spawned() {
         app.remote_busy_label().is_none(),
         "no event_sender, no repo to reopen: nothing to be busy about"
     );
-    assert!(app.remote_pick().is_none());
+    assert!(app.upstream_value().is_none());
 }

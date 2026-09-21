@@ -99,7 +99,7 @@ pub enum PopupView<'a> {
     Commit(CommitPopupView<'a>),
     CommitAllConfirm(&'a mut OverlayState),
     NewBranch(CommitPopupView<'a>),
-    RemotePick(&'a [git::remote::RemoteEntry], usize),
+    Upstream(CommitPopupView<'a>),
     Note(&'a str),
 }
 
@@ -331,19 +331,11 @@ enum Popup {
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextInput` outright.
     NewBranch(TextInput),
-    /// `P` with no upstream and 2+ remotes configured: pick which one to
-    /// push (and set as upstream) to. `docs/PLAN_9_REMOTE.md`'s "No
-    /// upstream" flow; the 0- and 1-remote cases short-circuit before a
-    /// popup is ever needed.
-    RemotePick(RemotePick),
+    /// `P` with no upstream: edit `<remote> <branch>` before first push.
+    Upstream(TextInput),
     /// A dismissible message: a commit failure, "empty commit message", a
     /// branch-op failure, or a merge conflict.
     Note(String),
-}
-
-struct RemotePick {
-    remotes: Vec<git::remote::RemoteEntry>,
-    selected: usize,
 }
 
 /// Mouse-wheel step for the right pane, in lines. Matches gitu's default

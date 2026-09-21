@@ -6,9 +6,9 @@ something like "no remote repository specified". Checked empirically: with
 no remotes configured, `git fetch` (no arguments) has nothing to do and
 exits 0 with empty output. `git pull` still fails in that case (it needs
 *something* to merge from) with "no tracking information for the current
-branch", so `P`'s existing 0-remotes short-circuit (`repo.remotes()` before
-ever asking git) is the only place this actually mattered; `f` needed no
-special-casing at all.
+branch", so `f` needed no special-casing. `P` now opens the editable
+upstream prompt even when no remotes exist; Git reports the failure after
+submission.
 
 **Deviation: a conflicting `pull` is a `PullFailed` error, not a dedicated
 outcome.** The plan below asks for pull-conflict to get "the same treatment
@@ -51,13 +51,12 @@ Out, on purpose:
   machinery; a short follow-up once both exist, not core to either.
 - **Interactive rebase on pull** (`pull.rebase` beyond honouring whatever
   the user already configured — see "Approach"). Phase 11 territory.
-- **Force-push.** Real footgun, no design consensus yet on what guard rail
-  (if any) makes it safe enough for a keybinding; left for a deliberate
-  follow-up rather than bolted on here. `git push --force-with-lease` from
-  the shell still works today, same as everything ferrit does not (yet)
-  wrap.
-- **Multi-remote push/fetch target picker.** S1 handles the common case (0
-  or 1 remote, or an already-set upstream); see "Deferred out of phase 9".
+- **Force-push.** Guarded by an explicit confirmation and
+  `--force-with-lease` when the local branch is behind its upstream. Git
+  rejects a stale lease; Ferrit shows that error.
+- **First-push upstream entry.** Ferrit prompts for `<remote> <branch>` and
+  lets users map local branch to a different remote branch. `push.default=current`
+  follows Git config and pushes without a prompt.
 
 ## Approach part 1: honour the user's config, same as `diff`/`commit`
 
@@ -261,22 +260,19 @@ p  -> start_remote_op(Pull)
 P  -> start_remote_op(Push)     (routes through NoUpstream handling first)
 ```
 
-### No upstream: push picks (or asks for) a remote
+### No upstream: edit remote and branch
 
 ```
 P pressed, current branch has no upstream
-  -> repo.remotes()
-       0 remotes -> last_error "no remote configured"
-       1 remote  -> start_remote_op(Push) with set_upstream: Some(that name)
-       2+        -> Popup::RemotePick(remotes, selected index)
-                    Enter on a highlighted remote name, rendered by the
-                    reusable `components::ui::SelectList`.
+  -> if push.default == current: `git push -u` (Git selects destination)
+  -> otherwise Popup::Upstream("origin <current branch>")
+       edit remote and destination branch, Enter pushes `local:remote`
+       Esc cancels; invalid input keeps popup open with an error
 ```
 
-The 2+-remotes picker is the one piece of real UI this phase adds beyond
-"press a letter, wait, see a status line" — everything else reuses
-`Popup::Note` (failure) and a new `busy` status line (in flight), both
-already-established shapes.
+Suggested remote is `origin`, or first configured remote alphabetically.
+With no configured remote, prompt still suggests `origin`; Git reports the
+failure on submit.
 
 ### One remote op at a time
 
@@ -350,12 +346,11 @@ carriage-return redraws, not structured data.
   yet — nothing is actionable here in phase 9 (see "Out, on purpose");
   it is `Repo::remotes()` rendered plainly, the same "just a list" shape
   the Local Branches tab had for the entirety of phase 2.
-- Shared `Panel`, `SelectList` and `KeyBar` components own rounded panel
-  shells, selected-row fill and key-hint styling. The remote picker uses
-  `SelectList`; other panes and popup footers use the same building blocks.
+- Shared `Panel`, `KeyBar` and `TextInput` components own popup shells,
+  editing, and key-hint styling.
 - Keybar (`mock::KEYBAR`) regains `Fetch: f | Pull: p | Push: P` (the
   phase-1 placeholders phase 6 trimmed for space, now real); `HELP`
-  documents the busy/no-upstream/multi-remote-picker behaviour.
+  documents busy status and editable no-upstream behavior.
 
 ## Keybindings (new in phase 9)
 
@@ -363,10 +358,10 @@ carriage-return redraws, not structured data.
 | --- | --- | --- |
 | `f` | Nav, any pane | fetch (all remotes) |
 | `p` | Nav, any pane | pull (honours `pull.rebase`/`pull.ff`) |
-| `P` | Nav, any pane | push; offers `-u <remote>` when there is no upstream yet |
+| `P` | Nav, any pane | push; asks for `<remote> <branch>` without upstream, unless `push.default=current` |
 | `Ctrl-Right` / `Ctrl-Left` | Nav, Branches focused | switch the pane's own tab (Local branches / Remotes) |
-| `Enter` | `Popup::RemotePick` | push with `-u` to the highlighted remote |
-| `Esc` | `Popup::RemotePick` | cancel, no push |
+| `Enter` | `Popup::Upstream` | push with `-u <remote> <local>:<remote branch>` |
+| `Esc` | `Popup::Upstream` | cancel, no push |
 
 `f`/`p`/`P` are inert (no-op, not an error) while `remote_busy` is `Some`.
 
@@ -382,7 +377,7 @@ carriage-return redraws, not structured data.
 | `f`/`p`/`P` pressed while one is already running | ignored outright (`remote_busy.is_some()`), no queueing |
 | a background fetch/pull/push finishes while a *local* `refresh()` (fs-watch, poll, `r`) also fires | both call `refresh()`; idempotent, same as phase 7's "commit finishes, fs-watch also fires" case |
 | `App::mock()` (no repo) | `f`/`p`/`P` no-op immediately, no thread spawned — `repo_handle()` returns `None` before `thread::spawn` |
-| zero remotes configured, `f`/`p` pressed | git's own "fatal: No remote repository specified" / similar, shown verbatim; `P` short-circuits earlier with `"no remote configured"` (see "No upstream" flow) since ferrit already knows the answer without asking git |
+| no remote configured, `P` pressed | editable prompt suggests `origin`; Git error shown on submit |
 | quitting ferrit (`q`/`Ctrl-c`) while a fetch/pull/push is mid-flight | the spawned thread is detached (`thread::spawn`, not joined); the process exits and the child `git` either finishes writing (harmless, nothing left to read the result) or is killed with it — no different from `Ctrl-c`-ing `git fetch` running standalone in a shell |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
@@ -463,11 +458,8 @@ path) remote URL, no network, no real GitHub involved — the same trick
   applying the op's `Ok`/`Err`, not after — seen up top would have let a
   routine post-op `refresh()` silently clear the very failure line
   `RemoteDone` exists to report.
-- ✅ **S2** the no-upstream flow: `push_current_branch` checks
-  `self.header.upstream` before ever calling `Repo::push`;
-  `Popup::RemotePick` for 2+ remotes, the 0-remote and 1-remote
-  short-circuits. `Repo::push`'s own `NoUpstream` detection stays as a
-  defensive fallback for a direct call, not the primary path.
+- ✅ **S2** no-upstream first push: config-aware `push.default=current`,
+  otherwise editable `remote branch` prompt with remote branch mapping.
 - ✅ **S3** Remotes tab rendering (`Snapshot`/`App` gain `remotes`,
   refreshed like every other pane's data), `Ctrl-Right`/`Ctrl-Left` tab
   switch on the Branches pane, `draw_remote_pick_popup`. Busy/status-note
@@ -486,9 +478,8 @@ path) remote URL, no network, no real GitHub involved — the same trick
 ## Definition of done (phase 9)
 
 - `f` fetches every remote, `p` pulls honouring the user's `pull.*` config,
-  `P` pushes — offering to set an upstream via a remote picker when the
-  current branch has none — without ever freezing the keyboard while the
-  network is slow.
+  `P` pushes — offering editable upstream remote/branch input when the
+  current branch has none — without freezing the keyboard during network work.
 - Only one fetch/pull/push runs at a time; a second attempt while one is in
   flight is a silent no-op, never a second subprocess.
 - A failure (no network, rejected push, auth) shows git's own message; a
@@ -521,13 +512,6 @@ Deferred out of phase 9, revisit with their own follow-up:
   entirely (see "Out, on purpose"), not just deferred within it.
 - checkout from a remote-tracking ref with no local branch yet (needs this
   phase's remote list plus phase 8's checkout).
-- force-push, with whatever guard rail (a distinct confirm wording,
-  `--force-with-lease` always, a "this branch looks pushed and shared"
-  heuristic) turns out to be worth it. Ferrit now confirms when the checked-
-  out branch is behind and uses `--force-with-lease`; a stale lease is
-  rejected by Git and shown as an error.
-- `push.default=current` is honored for a branch with no upstream: Git picks
-  the configured destination and Ferrit sets upstream on the first push.
 - fetch/push progress reporting beyond a static "Fetching…" label — would
   need parsing git's `--progress` stderr stream, a genuinely different
   (streaming) shape than every other subprocess call in `git::` today.

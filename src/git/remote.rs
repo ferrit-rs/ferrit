@@ -316,12 +316,13 @@ fn push_with_lease(
         args.push(branch);
     }
 
-    run_push(workdir, &args, None, set_upstream)
+    run_push(workdir, &args, None, set_upstream, false)
 }
 
 pub(crate) fn push_cancellable(
     repo: &Repository,
     set_upstream: Option<&str>,
+    upstream_branch: Option<&str>,
     force_with_lease: bool,
     set_upstream_current: bool,
     cancel: &AtomicBool,
@@ -331,15 +332,25 @@ pub(crate) fn push_cancellable(
     if force_with_lease {
         args.push("--force-with-lease".to_owned());
     }
-    if set_upstream_current {
+    if set_upstream_current && set_upstream.is_none() {
         args.push("-u".to_owned());
     }
     if let Some(remote) = set_upstream {
         args.push("-u".to_owned());
         args.push(remote.to_owned());
-        args.push(current_branch_name(repo)?);
+        let local_branch = current_branch_name(repo)?;
+        args.push(match upstream_branch {
+            Some(branch) => format!("{local_branch}:{branch}"),
+            None => local_branch,
+        });
     }
-    run_push(workdir, &args, Some(cancel), set_upstream)
+    run_push(
+        workdir,
+        &args,
+        Some(cancel),
+        set_upstream,
+        set_upstream_current,
+    )
 }
 
 fn run_push(
@@ -347,13 +358,17 @@ fn run_push(
     args: &[String],
     cancel: Option<&AtomicBool>,
     set_upstream: Option<&str>,
+    set_upstream_current: bool,
 ) -> GitResult<String> {
     let out = run_command(workdir, args, cancel, &GitError::PushFailed)?;
     let combined = combined_output(&out);
     if out.status.success() {
         return Ok(combined);
     }
-    if set_upstream.is_none() && combined.contains("has no upstream branch") {
+    if set_upstream.is_none()
+        && !set_upstream_current
+        && combined.contains("has no upstream branch")
+    {
         return Err(GitError::NoUpstream);
     }
     Err(GitError::PushFailed(combined))

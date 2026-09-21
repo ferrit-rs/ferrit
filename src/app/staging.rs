@@ -395,7 +395,13 @@ impl App {
             },
             ConfirmAction::ForcePush => {
                 if let Some(sender) = self.event_sender.clone() {
-                    self.start_remote_op_with_force(events::RemoteOp::Push, None, true, sender);
+                    self.start_remote_op_with_force(
+                        events::RemoteOp::Push,
+                        None,
+                        None,
+                        true,
+                        sender,
+                    );
                 }
             },
         }
