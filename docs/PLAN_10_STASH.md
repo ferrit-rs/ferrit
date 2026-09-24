@@ -317,16 +317,14 @@ an unchanged selection", which the oid key gives for free).
   (`keybar_swaps_for_the_stash_pane`, `stash_popup_renders_title_and_hints`),
   `CHANGELOG.md` line (this also adds the `## [Unreleased]` heading, which
   0.5.0 had consumed), `PLAN_0` status flipped to done.
-- ✅ **S5** polish: `cargo fmt --check` clean, `cargo test` green (203
-  tests), `src/domain/git/` has no `ratatui` import, and this phase adds no
-  clippy diagnostic (none in any file it added or edited). Not met, and not
-  this phase's doing: the CI gate `cargo clippy --all-targets --all-features
-  -- -D warnings` (`.github/workflows/ci.yml`) is red on `main` because of 78
-  pre-existing diagnostics (mostly the vendored `components/tui_overlay` and
-  `components/ui`), and the CI rustdoc gate (`-D warnings`) fails on two
-  unresolved links in `tui_overlay`. The 5 clippy *errors* that blocked
-  compilation were fixed in separate commits; the warnings need their own
-  cleanup. So this phase's "clippy clean" clause holds for its own code only.
+- ✅ **S5** polish: `cargo fmt --check` clean, `cargo test` green,
+  `src/domain/git/` has no `ratatui` import, and this phase adds no clippy
+  diagnostic. The repo-wide CI gates were red on `main` before this phase
+  (`cargo clippy --all-targets --all-features -- -D warnings`: 5 errors and
+  78 warnings, and the rustdoc `-D warnings` gate: 2 broken links, in
+  `.github/workflows/ci.yml` terms) and were cleaned afterwards without any
+  `#[allow]` or lint-config change (commits `b1a6951`, `c91b8b3`, `b614d65`,
+  `69ff912`).
   Every row of the edge case table has a test or an explicit inert path:
   - detached HEAD: `stash_round_trips_on_a_detached_head` (git allows it);
   - unborn branch: `push_on_an_unborn_branch_fails_with_gits_own_message`

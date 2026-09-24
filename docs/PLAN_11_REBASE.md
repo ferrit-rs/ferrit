@@ -385,14 +385,6 @@ swap.
 - `cargo clippy --all-targets` clean; `tests/git_rebase.rs`,
   `tests/app_rebase.rs`, `tests/render.rs` and all earlier test files pass.
 
-**Baseline caveat.** The CI gates `cargo clippy --all-targets --all-features
--- -D warnings` and `cargo doc` with `RUSTDOCFLAGS=-D warnings`
-(`.github/workflows/ci.yml`) are already red on `main`, before this phase:
-78 clippy diagnostics (mostly `components/tui_overlay` and `components/ui`)
-and two unresolved rustdoc links in `tui_overlay`. Until a separate cleanup
-turns them green, "clippy clean" below means this phase adds no diagnostic of
-its own, checked by diffing the diagnostic list before and after.
-
 ## After phase 11
 
 Phase 12 is polish. It reuses `Popup::Menu` for the `x` context menu, and its

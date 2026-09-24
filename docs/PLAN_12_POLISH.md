@@ -409,14 +409,6 @@ terminal-lifecycle work with its own failure modes, not a config line.
 - `cargo clippy --all-targets` clean; the new test files and every earlier
   test file pass.
 
-**Baseline caveat.** The CI gates `cargo clippy --all-targets --all-features
--- -D warnings` and `cargo doc` with `RUSTDOCFLAGS=-D warnings`
-(`.github/workflows/ci.yml`) are already red on `main`, before this phase:
-78 clippy diagnostics (mostly `components/tui_overlay` and `components/ui`)
-and two unresolved rustdoc links in `tui_overlay`. Until a separate cleanup
-turns them green, "clippy clean" below means this phase adds no diagnostic of
-its own, checked by diffing the diagnostic list before and after.
-
 ## After phase 12
 
 `PLAN_0_GENERAL.md`'s "Not scheduled" list is next: undo on the reflog, AI
