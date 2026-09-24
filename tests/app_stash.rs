@@ -290,3 +290,55 @@ fn stash_keys_do_nothing_while_the_popup_is_up() {
         "the popup owns input, '5' was typed into it"
     );
 }
+
+/// Two entries, the older (`first`, `stash@{1}`) selected on the Stash pane.
+fn two_stashes_app(tag: &str) -> (TempDir, App) {
+    let (dir, mut app) = dirty_app(tag);
+    app.feed_key(char_key('s'));
+    type_text(&mut app, "first");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    fs::write(dir.path().join("a.txt"), "one\nsecond\n").unwrap();
+    app.refresh();
+    app.feed_key(char_key('s'));
+    type_text(&mut app, "second");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    app.feed_key(char_key('5'));
+    app.select(Pane::Stash, 1);
+    (dir, app)
+}
+
+#[test]
+fn drop_after_the_stack_shifted_still_drops_the_selected_entry() {
+    let (dir, mut app) = two_stashes_app("app-stash-shifted");
+    app.feed_key(char_key('d'));
+    assert!(app.confirm_message().is_some_and(|m| m.contains("first")));
+
+    // Another shell drops `second`: `first` moves from stash@{1} to stash@{0}
+    // while the confirm is still up.
+    git(dir.path(), &["stash", "drop", "stash@{0}"]);
+    app.feed_key(char_key('y'));
+
+    assert_eq!(
+        git(dir.path(), &["stash", "list"]),
+        "",
+        "first was dropped by oid, nothing else was hit"
+    );
+}
+
+#[test]
+fn drop_of_an_entry_already_gone_reports_and_spares_the_others() {
+    let (dir, mut app) = two_stashes_app("app-stash-vanished");
+    app.feed_key(char_key('d'));
+
+    // Another shell drops the very entry the confirm is about.
+    git(dir.path(), &["stash", "drop", "stash@{1}"]);
+    app.feed_key(char_key('y'));
+
+    let left = git(dir.path(), &["stash", "list"]);
+    assert!(left.contains("second"), "the other entry survives: {left}");
+    assert!(
+        status_text(&app).contains("no longer exists"),
+        "{}",
+        status_text(&app)
+    );
+}

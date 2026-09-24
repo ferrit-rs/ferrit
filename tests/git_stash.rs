@@ -249,3 +249,35 @@ fn stash_diff_shows_the_tracked_hunk_and_the_untracked_file() {
     assert!(diff.text.contains("+local"), "{}", diff.text);
     assert!(diff.text.contains("new.txt"), "{}", diff.text);
 }
+
+#[test]
+fn stash_round_trips_on_a_detached_head() {
+    let dir = fixture("stash-detached");
+    git(dir.path(), &["checkout", "-q", "--detach"]);
+    dirty(&dir);
+    let mut repo = Repo::open(dir.path()).unwrap();
+
+    repo.stash_push("detached").unwrap();
+    let oid = oids(&mut repo).remove(0);
+    assert_eq!(git(dir.path(), &["status", "--porcelain"]), "");
+
+    assert_eq!(repo.stash_pop(&oid).unwrap(), StashOutcome::Done);
+    assert!(oids(&mut repo).is_empty());
+    assert!(dir.path().join("new.txt").exists());
+}
+
+#[test]
+fn push_on_an_unborn_branch_fails_with_gits_own_message() {
+    let dir = TempDir::new("stash-unborn");
+    Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+
+    let repo = Repo::open(dir.path()).unwrap();
+    let err = repo.stash_push("x").unwrap_err();
+    assert!(
+        matches!(&err, GitError::StashFailed(m) if m.contains("initial commit")),
+        "got {err:?}"
+    );
+    assert!(dir.path().join("a.txt").exists(), "nothing was touched");
+}

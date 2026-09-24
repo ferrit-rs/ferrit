@@ -317,14 +317,21 @@ an unchanged selection", which the oid key gives for free).
   (`keybar_swaps_for_the_stash_pane`, `stash_popup_renders_title_and_hints`),
   `CHANGELOG.md` line (this also adds the `## [Unreleased]` heading, which
   0.5.0 had consumed), `PLAN_0` status flipped to done.
-- 🟡 **S5** polish: `cargo fmt --check` clean, `cargo test` green (199
-  tests), `cargo clippy --all-targets` reports no error (the 5 it had before
-  this phase were fixed in separate commits; 78 warnings remain, pedantic
-  lints in code this phase did not touch), `src/domain/git/` has no
-  `ratatui` import. Still open: edge cases without a test, namely stash on a
-  detached HEAD or an unborn branch, and a stash dropped from another shell
-  between selection and `d` (covered at the backend by
-  `an_unknown_oid_is_a_vanished_entry`, not through `App`).
+- ✅ **S5** polish: `cargo fmt --check` clean, `cargo test` green (203
+  tests), `cargo clippy --all-targets` reports no error and no diagnostic in
+  any file this phase added (the 5 errors it had before were fixed in
+  separate commits; 78 pedantic warnings remain in code this phase did not
+  touch), `src/domain/git/` has no `ratatui` import. Every row of the edge
+  case table has a test or an explicit inert path:
+  - detached HEAD: `stash_round_trips_on_a_detached_head` (git allows it);
+  - unborn branch: `push_on_an_unborn_branch_fails_with_gits_own_message`
+    (git exits 1, `You do not have the initial commit yet`, worktree
+    untouched);
+  - a stash dropped from another shell while the confirm is up:
+    `drop_after_the_stack_shifted_still_drops_the_selected_entry` and
+    `drop_of_an_entry_already_gone_reports_and_spares_the_others` in
+    `tests/app_stash.rs`. The first fails if `resolve` stops going through
+    the oid (checked by mutating it to a fixed `stash@{1}`).
 
 ## Definition of done (phase 10)
 
