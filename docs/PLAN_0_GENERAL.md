@@ -50,11 +50,11 @@ into its own crate remains deferred.
 | 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane via `git diff` / `git show` subprocess (lazygit style, honours user `git config`), git-native colouring, hunk navigation, scrolling | ✅ done |
 | 4 | `PLAN_4_SCROLL_BEHAVIOR.md` | right-pane scroll keys (lazygit style, no left-pane fight), viewport-aware clamp, scrollbar widget, mouse wheel | ✅ done |
 | 5 | `PLAN_5_CLICK_BEHAVIOR.md` | left-click to focus a pane and move its selection to the clicked row; groundwork for right-pane focus | ✅ done |
-| 6 | `PLAN_6_STAGING.md` | stage / unstage at file, hunk, line; refresh after | 📅 planned |
-| 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | 📅 planned |
+| 6 | `PLAN_6_STAGING.md` | stage / unstage at file, hunk, line; refresh after | ✅ done (S0-S4; S5 edge-case polish open) |
+| 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | ✅ done (C0-C2; C3 fixup/squash UI open, C4/C5 polish open) |
 | 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | ✅ done |
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | ✅ done |
-| 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop | 👉 todo |
+| 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | 📅 planned |
 | 11 | `PLAN_11_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | 👉 todo |
 | 12 | `PLAN_12_POLISH.md` | config file, themes, keymap customization, real command-log capture, help | 👉 todo |
 
