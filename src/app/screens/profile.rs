@@ -4,7 +4,7 @@ mod activity;
 mod settings;
 
 use crate::app::theme;
-use crate::app::theme_config::ThemeConfig;
+use crate::app::theme_config::{ThemeConfig, ThemeMode};
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::color_picker::ColorPickerDisplay;
 use crate::components::ui::drawer::Drawer;
@@ -26,46 +26,41 @@ pub(crate) struct ProfileHitAreas {
     pub(crate) author_cards: Vec<(usize, Rect)>,
 }
 
+/// Read-only theme editor state the drawer renders: the config being edited,
+/// which sub-editor is open, and whether it differs from what is saved.
+pub(super) struct ThemeView<'a> {
+    pub(super) config: &'a ThemeConfig,
+    pub(super) mode: ThemeMode,
+    pub(super) rgb_channel: usize,
+    pub(super) palette_selected: usize,
+    pub(super) picker_display: ColorPickerDisplay,
+    pub(super) dirty: bool,
+}
+
+/// Draw the profile drawer and return where its clickable parts landed, or
+/// the default (nothing clickable) when the drawer is not on screen.
 pub(super) fn draw_author(
     frame: &mut Frame<'_>,
     area: Rect,
     state: &mut OverlayState,
     profile: &Profile,
     scroll: &mut usize,
-    config: &ThemeConfig,
-    theme_editing: bool,
-    rgb_channel: usize,
-    palette_open: bool,
-    palette_selected: usize,
-    picker_display: ColorPickerDisplay,
-    theme_dirty: bool,
-    profile_hit_areas: &mut ProfileHitAreas,
+    theme: &ThemeView<'_>,
     selected_author: Option<&crate::domain::profile::settings::Identity>,
-) {
+) -> ProfileHitAreas {
     let Some(inner) = Drawer::new(state, " Profile ")
         .width(Constraint::Percentage(75))
-        .border_style(Style::new().fg(config.color()))
+        .border_style(Style::new().fg(theme.config.color()))
         .render(frame, area)
     else {
-        return;
+        return ProfileHitAreas::default();
     };
     let [content, hint] =
         Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(inner);
     let [body, track] =
         Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(content);
 
-    let settings_view = settings::lines(
-        &profile.settings,
-        config,
-        theme_editing,
-        rgb_channel,
-        palette_open,
-        palette_selected,
-        picker_display,
-        theme_dirty,
-        body.width,
-        selected_author,
-    );
+    let settings_view = settings::lines(&profile.settings, theme, body.width, selected_author);
     let grid_start = settings_view.picker_grid_line;
     let grid_rows = settings_view.picker_grid_metrics.rows;
     let save_line = settings_view.save_button_line;
@@ -78,7 +73,7 @@ pub(super) fn draw_author(
     let viewport = usize::from(body.height);
     let max_scroll = content_length.saturating_sub(viewport);
     *scroll = (*scroll).min(max_scroll);
-    *profile_hit_areas = hit_areas(
+    let hit_areas = hit_areas(
         body,
         *scroll,
         grid_start,
@@ -101,6 +96,7 @@ pub(super) fn draw_author(
         )),
         hint,
     );
+    hit_areas
 }
 
 fn hit_areas(

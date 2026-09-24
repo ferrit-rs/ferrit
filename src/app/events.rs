@@ -24,7 +24,7 @@ pub enum AppEvent {
     Refresh,
     /// Repository snapshot finished off-thread. Error is flattened here so
     /// the event boundary carries only owned, sendable application data.
-    RefreshDone(crate::app::RefreshCompletion),
+    RefreshDone(Box<crate::app::RefreshCompletion>),
     /// Selected diff read finished. Generation and key reject stale results.
     DiffDone(crate::app::diff_query::DiffCompletion),
     /// Selected image blob read/decode finished. Stale generations are dropped.

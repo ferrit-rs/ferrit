@@ -459,8 +459,7 @@ pub struct App {
     profile_scroll: usize,
     theme_config: theme_config::ThemeConfig,
     theme_rgb_channel: usize,
-    theme_editing: bool,
-    theme_palette_open: bool,
+    theme_mode: theme_config::ThemeMode,
     theme_palette_selected: usize,
     theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
     theme_saved_config: theme_config::ThemeConfig,
@@ -521,7 +520,6 @@ pub struct App {
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
     /// Whether the mouse is currently over that clickable author name.
-    author_hovered: bool,
     mouse_pointer: MousePointer,
     /// Animated side sheet opened by clicking that author.
     pub(crate) author_overlay: OverlayState,
@@ -660,8 +658,7 @@ impl App {
             profile_scroll: 0,
             theme_config,
             theme_rgb_channel: theme_config::RGB_RED_CHANNEL,
-            theme_editing: false,
-            theme_palette_open: false,
+            theme_mode: theme_config::ThemeMode::Idle,
             theme_palette_selected,
             theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
             ),
@@ -688,7 +685,6 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
-            author_hovered: false,
             mouse_pointer: MousePointer::default(),
             author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
             commit_overlay: OverlayState::new(),
@@ -807,7 +803,7 @@ impl App {
                 branch_log: None,
                 commit_files: None,
             });
-            let _ = sender.send(AppEvent::RefreshDone(completion));
+            let _ = sender.send(AppEvent::RefreshDone(Box::new(completion)));
         });
     }
 
@@ -1646,15 +1642,15 @@ impl App {
                         let toast_consumed =
                             self.toast.as_mut().is_some_and(|toast| toast.on_mouse(m));
                         if toast_consumed {
-                            self.mouse_pointer.set_hovered(false)?;
+                            self.mouse_pointer.request(false);
                         } else {
                             self.on_mouse(m);
-                            self.mouse_pointer.set_hovered(self.author_hovered)?;
                         }
+                        self.mouse_pointer.sync()?;
                     },
                     AppEvent::Input(_) => {},
                     AppEvent::Refresh => self.request_refresh(),
-                    AppEvent::RefreshDone(completion) => self.on_refresh_done(completion),
+                    AppEvent::RefreshDone(completion) => self.on_refresh_done(*completion),
                     AppEvent::DiffDone(completion) => self.on_diff_done(completion),
                     AppEvent::ImageDone(completion) => self.on_image_done(completion),
                     AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),

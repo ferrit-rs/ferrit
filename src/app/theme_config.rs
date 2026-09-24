@@ -12,6 +12,17 @@ pub(super) const RGB_GREEN_CHANNEL: usize = 1;
 pub(super) const RGB_BLUE_CHANNEL: usize = 2;
 pub(super) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
 
+/// What the profile drawer's theme section is doing. The swatch picker and
+/// the RGB editor never run together, so one mode replaces two flags that
+/// could otherwise disagree.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum ThemeMode {
+    #[default]
+    Idle,
+    Palette,
+    EditingRgb,
+}
+
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Preset {

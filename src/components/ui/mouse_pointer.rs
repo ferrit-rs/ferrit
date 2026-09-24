@@ -4,18 +4,28 @@ use std::io::{self, Write};
 /// Terminals without OSC 22 support ignore these sequences.
 #[derive(Debug, Default)]
 pub struct MousePointer {
+    /// What the hover logic last asked for.
+    wanted: bool,
+    /// What the terminal is currently showing.
     is_hand: bool,
 }
 
 impl MousePointer {
-    /// Show a pointing hand while `hovered`, restoring the terminal default
-    /// when the pointer leaves the interactive target.
-    pub fn set_hovered(&mut self, hovered: bool) -> io::Result<()> {
-        if self.is_hand == hovered {
+    /// Record whether the pointer is over an interactive target. Nothing is
+    /// written until `sync`.
+    pub fn request(&mut self, hovered: bool) {
+        self.wanted = hovered;
+    }
+
+    /// Show a pointing hand while the last `request` was `true`, restoring
+    /// the terminal default when the pointer leaves the target. Writes only
+    /// on a change.
+    pub fn sync(&mut self) -> io::Result<()> {
+        if self.is_hand == self.wanted {
             return Ok(());
         }
-        Self::write_shape(hovered)?;
-        self.is_hand = hovered;
+        Self::write_shape(self.wanted)?;
+        self.is_hand = self.wanted;
         Ok(())
     }
 

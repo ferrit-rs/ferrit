@@ -1,10 +1,9 @@
 //! Git and Ferrit settings shown in the profile drawer.
 
+use super::ThemeView;
 use crate::app::theme;
-use crate::app::theme_config::ThemeConfig;
-use crate::components::ui::color_picker::{
-    ColorPicker, ColorPickerDisplay, ColorPickerGridMetrics, rgb,
-};
+use crate::app::theme_config::ThemeMode;
+use crate::components::ui::color_picker::{ColorPicker, ColorPickerGridMetrics, rgb};
 use crate::components::ui::radio_card::RadioCard;
 use crate::components::ui::separator::Separator;
 use crate::domain::profile::settings::{Identity, IdentitySource, Settings};
@@ -30,16 +29,20 @@ pub(super) struct SettingsView {
 
 pub(super) fn lines(
     settings: &Settings,
-    config: &ThemeConfig,
-    editing: bool,
-    channel: usize,
-    palette_open: bool,
-    palette_selected: usize,
-    picker_display: ColorPickerDisplay,
-    theme_dirty: bool,
+    theme_view: &ThemeView<'_>,
     width: u16,
     selected_author: Option<&Identity>,
 ) -> SettingsView {
+    let ThemeView {
+        config,
+        mode,
+        rgb_channel: channel,
+        palette_selected,
+        picker_display,
+        dirty: theme_dirty,
+    } = *theme_view;
+    let editing = mode == ThemeMode::EditingRgb;
+    let palette_open = mode == ThemeMode::Palette;
     let divider = |label| {
         Separator::new(label)
             .style(Style::new().fg(theme::IDLE))
@@ -84,8 +87,8 @@ pub(super) fn lines(
         ));
     } else {
         for (index, identity) in available.iter().enumerate() {
-            let selected = selected_author.map_or(
-                settings.effective_identity.as_ref() == Some(identity),
+            let selected = selected_author.map_or_else(
+                || settings.effective_identity.as_ref() == Some(identity),
                 |active| active == identity,
             );
             let key = AUTHOR_SELECTION_KEYS.get(index).copied().unwrap_or("-");
@@ -123,12 +126,10 @@ pub(super) fn lines(
                     .copied()
                     .unwrap_or(RGB_CHANNEL_LABELS[crate::app::theme_config::RGB_BLUE_CHANNEL])
             )
+        } else if palette_open {
+            "arrows preview · v view · s save".to_owned()
         } else {
-            if palette_open {
-                "arrows preview · v view · s save".to_owned()
-            } else {
-                "p picker · e edit RGB · t preset · s save".to_owned()
-            }
+            "p picker · e edit RGB · t preset · s save".to_owned()
         },
         Style::new().fg(theme::IDLE),
     ));

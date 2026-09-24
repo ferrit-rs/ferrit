@@ -69,20 +69,21 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     if !app.author_overlay.is_closed() {
         let profile_data = app.profile().clone();
-        profile::draw_author(
+        let theme_view = profile::ThemeView {
+            config: &app.theme_config,
+            mode: app.theme_mode,
+            rgb_channel: app.theme_rgb_channel,
+            palette_selected: app.theme_palette_selected,
+            picker_display: app.theme_picker_display,
+            dirty: app.theme_config != app.theme_saved_config,
+        };
+        app.profile_hit_areas = profile::draw_author(
             frame,
             area,
             &mut app.author_overlay,
             &profile_data,
             &mut app.profile_scroll,
-            &app.theme_config,
-            app.theme_editing,
-            app.theme_rgb_channel,
-            app.theme_palette_open,
-            app.theme_palette_selected,
-            app.theme_picker_display,
-            app.theme_config != app.theme_saved_config,
-            &mut app.profile_hit_areas,
+            &theme_view,
             app.selected_author.as_ref(),
         );
     }

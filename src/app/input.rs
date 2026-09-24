@@ -1,5 +1,6 @@
 //! Keyboard and mouse input dispatch.
 
+use super::theme_config::ThemeMode;
 use super::{
     App, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
     Pane, Position, WHEEL_LINES, events, git,
@@ -46,8 +47,8 @@ impl App {
         // own answer, same as the help overlay below.
         if self.pending_confirm.is_some() {
             match key.code {
-                KeyCode::Char(KEY_CONFIRM_YES) | KeyCode::Char('Y') => self.run_confirm(),
-                KeyCode::Char(KEY_CONFIRM_NO) | KeyCode::Char('N') | KeyCode::Esc => {
+                KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.run_confirm(),
+                KeyCode::Char(KEY_CONFIRM_NO | 'N') | KeyCode::Esc => {
                     self.pending_confirm = None;
                 },
                 _ => {},
@@ -82,10 +83,10 @@ impl App {
                 self.save_theme();
                 return;
             }
-            if self.theme_palette_open {
+            if self.theme_mode == ThemeMode::Palette {
                 match key.code {
                     KeyCode::Esc | KeyCode::Char(KEY_THEME_PALETTE) => {
-                        self.theme_palette_open = false
+                        self.theme_mode = ThemeMode::Idle;
                     },
                     KeyCode::Left | KeyCode::Char(KEY_NAV_LEFT) => self.move_theme_palette(
                         crate::components::ui::color_picker::PaletteDirection::Left,
@@ -106,8 +107,7 @@ impl App {
                 return;
             }
             if key.code == KeyCode::Char(KEY_THEME_PALETTE) {
-                self.theme_palette_open = true;
-                self.theme_editing = false;
+                self.theme_mode = ThemeMode::Palette;
                 self.theme_palette_selected = crate::components::ui::color_picker::nearest_index(
                     self.theme_config.color(),
                     self.theme_picker_display,
@@ -121,10 +121,14 @@ impl App {
                 return;
             }
             if key.code == KeyCode::Char(KEY_THEME_RGB) {
-                self.theme_editing = !self.theme_editing;
+                self.theme_mode = if self.theme_mode == ThemeMode::EditingRgb {
+                    ThemeMode::Idle
+                } else {
+                    ThemeMode::EditingRgb
+                };
                 return;
             }
-            if self.theme_editing {
+            if self.theme_mode == ThemeMode::EditingRgb {
                 match key.code {
                     KeyCode::Tab => {
                         self.theme_rgb_channel = (self.theme_rgb_channel + RGB_CHANNEL_INDEX_STEP)
@@ -132,14 +136,14 @@ impl App {
                     },
                     KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(RGB_CHANNEL_STEP),
                     KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-RGB_CHANNEL_STEP),
-                    KeyCode::Esc => self.theme_editing = false,
+                    KeyCode::Esc => self.theme_mode = ThemeMode::Idle,
                     _ => {},
                 }
                 return;
             }
             match key.code {
                 KeyCode::Esc => {
-                    self.theme_editing = false;
+                    self.theme_mode = ThemeMode::Idle;
                     self.author_overlay.close();
                 },
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -334,8 +338,7 @@ impl App {
             column,
             row,
         ) {
-            self.theme_palette_open = true;
-            self.theme_editing = false;
+            self.theme_mode = ThemeMode::Palette;
             self.theme_palette_selected = selected;
             self.apply_theme_picker_selection();
         }
@@ -369,15 +372,16 @@ impl App {
     /// and move are no-ops for now.
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
         if matches!(ev.kind, MouseEventKind::Moved) {
-            self.author_hovered = self.author_overlay.is_closed()
+            let over_author = self.author_overlay.is_closed()
                 && self
                     .author_click_area
                     .contains(Position::new(ev.column, ev.row));
+            self.mouse_pointer.request(over_author);
             return;
         }
 
         if !self.author_overlay.is_closed() {
-            self.author_hovered = false;
+            self.mouse_pointer.request(false);
             if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left)) {
                 let point = Position::new(ev.column, ev.row);
                 if self.profile_hit_areas.save_button.contains(point) {
@@ -449,7 +453,7 @@ impl App {
             .author_click_area
             .contains(Position::new(ev.column, ev.row))
         {
-            self.author_hovered = false;
+            self.mouse_pointer.request(false);
             self.author_overlay.open();
             return;
         }
