@@ -318,11 +318,16 @@ an unchanged selection", which the oid key gives for free).
   `CHANGELOG.md` line (this also adds the `## [Unreleased]` heading, which
   0.5.0 had consumed), `PLAN_0` status flipped to done.
 - ✅ **S5** polish: `cargo fmt --check` clean, `cargo test` green (203
-  tests), `cargo clippy --all-targets` reports no error and no diagnostic in
-  any file this phase added (the 5 errors it had before were fixed in
-  separate commits; 78 pedantic warnings remain in code this phase did not
-  touch), `src/domain/git/` has no `ratatui` import. Every row of the edge
-  case table has a test or an explicit inert path:
+  tests), `src/domain/git/` has no `ratatui` import, and this phase adds no
+  clippy diagnostic (none in any file it added or edited). Not met, and not
+  this phase's doing: the CI gate `cargo clippy --all-targets --all-features
+  -- -D warnings` (`.github/workflows/ci.yml`) is red on `main` because of 78
+  pre-existing diagnostics (mostly the vendored `components/tui_overlay` and
+  `components/ui`), and the CI rustdoc gate (`-D warnings`) fails on two
+  unresolved links in `tui_overlay`. The 5 clippy *errors* that blocked
+  compilation were fixed in separate commits; the warnings need their own
+  cleanup. So this phase's "clippy clean" clause holds for its own code only.
+  Every row of the edge case table has a test or an explicit inert path:
   - detached HEAD: `stash_round_trips_on_a_detached_head` (git allows it);
   - unborn branch: `push_on_an_unborn_branch_fails_with_gits_own_message`
     (git exits 1, `You do not have the initial commit yet`, worktree

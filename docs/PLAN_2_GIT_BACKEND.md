@@ -137,7 +137,7 @@ struct App {
 - `App::new(path)` opens the repo and does one `refresh()`.
 - `refresh()` re-reads every wired pane, catches `GitError`, stores it in
   `last_error` instead of propagating, leaves the old snapshot in place.
-- `r` key triggers `refresh()`. Filesystem watching (`notify`) is phase 12.
+- `r` key triggers `refresh()`. Filesystem watching (`notify`) shipped as phase 2.5 (`src/app/events.rs`).
 - Not a git repo: `Repo::open` fails, `main` prints a plain message and
   exits non-zero. No alt-screen garbage.
 
