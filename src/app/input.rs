@@ -3,7 +3,7 @@
 use super::theme_config::ThemeMode;
 use super::{
     App, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
-    Pane, Position, WHEEL_LINES, events, git,
+    Pane, Position, events, git,
 };
 
 const KEY_THEME_PALETTE: char = 'p';
@@ -527,7 +527,7 @@ impl App {
         let a = self.right_area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
         if over_right && self.right_is_diff() {
-            self.scroll_right(step * WHEEL_LINES);
+            self.scroll_right(step * isize::from(self.config.ui.wheel_step));
             return;
         }
         if step > 0 {

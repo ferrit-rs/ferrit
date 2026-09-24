@@ -22,6 +22,7 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use ferrit::app::App;
+use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::screens as ui;
 use ferrit::domain::git::Repo;
 use git2::{IndexAddOption, Repository, Signature};
@@ -242,5 +243,31 @@ fn other_keys_are_swallowed_while_the_viewer_is_up() {
     assert!(
         git(dir.path(), &["diff", "--cached", "--name-only"]).is_empty(),
         "the viewer owns input"
+    );
+}
+
+#[test]
+fn show_reads_lists_read_only_commands_in_the_panel() {
+    let _serial = serial();
+    let (dir, _app) = dirty_app("log-show-reads");
+    let mut config = Config::default();
+    config.log.show_reads = true;
+    let mut app = App::open_with(
+        dir.path(),
+        ConfigLoad {
+            config,
+            file: None,
+            issues: Vec::new(),
+        },
+    )
+    .unwrap();
+    app.feed_key(char_key('2'));
+    app.feed_key(char_key('j'));
+    app.feed_key(char_key('k')); // selecting a file loads its diff, a read
+
+    let panel = frame(&mut app, 120, 40);
+    assert!(
+        panel.contains("$ git diff"),
+        "reads shown when asked for:\n{panel}"
     );
 }

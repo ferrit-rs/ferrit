@@ -40,6 +40,16 @@ The test suite's dependence on the developer's own config directory is gone:
 `App::open` reads and writes no file, and a source scan keeps `Config::load`
 and `default_path` in `main.rs` and `config/mod.rs` only.
 
+**Note (P1b): `wheel_step` is a `u8`.** Its range is 1 to 50 and the wheel
+step is a signed line count, so `u8` converts to `isize` without a cast (`u16`
+does not). A negative or fractional value is a type error, which drops the
+`[ui]` section to its defaults with the section named; a value of the right
+type but out of range (0, 51) resets only that key. `Config::clamp_ranges`
+checks the ranges after parsing. `mouse = false` skips `EnableMouseCapture`;
+`restore` still sends `DisableMouseCapture`, which is harmless when it was
+never enabled. Hover on the author label needs mouse events, so it is
+inactive too when the mouse is off.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -408,15 +418,20 @@ terminal-lifecycle work with its own failure modes, not a config line.
 - ✅ **P0c** `draw_command_log` reads the ring (writes only, failures marked
   `(exit N)`), the author label no longer depends on a command existing,
   `@` opens `Popup::CommandLog`. `tests/app_command_log.rs` (7 cases).
-  `[log] show_reads` waits for P1; the panel hides reads until then.
+  `[log] show_reads` shipped with P1b.
 - ✅ **P1a** `Config` (`src/app/config/mod.rs`) with today's `theme` section
   only, per-section error surfacing, merging save, `App::open` versus
   `open_with`, `--config-path`. `tests/config.rs` (16); each of these fails a
   test when broken: the merging save, the refusal to overwrite a non-TOML
   file, `App::open` reading the real file, unknown-key reporting. See the
   note below for what differs from the sketch.
-- **P1b** `[ui]`, `[diff]`, `[commit]`, `[log]` sections parsed and wired to
-  the constants they replace.
+- ✅ **P1b** `[ui]`, `[diff]`, `[commit]`, `[log]` sections parsed, range
+  checked and wired to the constants they replaced (`WHEEL_LINES`,
+  `POLL_INTERVAL`, `DiffOpts::default()` at five sites, the commit editor's
+  sign-off, the command log panel, mouse capture). `tests/config.rs` (28) and a
+  unit test for the poll; each of these fails a test when broken: the diff
+  options, the wheel step, the sign-off default, `show_reads`, the range
+  checks, the poll interval.
 - **P2a** `Action`, `Context`, `Keymap::default()` and the table test, no
   behaviour change yet.
 - **P2b** `input.rs` routes through the keymap; every existing test unmodified

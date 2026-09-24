@@ -608,7 +608,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .map(|command| theme::log_line(command))
             .collect()
     } else {
-        command_log::recent(2, false)
+        command_log::recent(2, app.config.log.show_reads)
             .iter()
             .map(theme::command_line)
             .collect()

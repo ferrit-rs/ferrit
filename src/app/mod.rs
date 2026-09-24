@@ -395,10 +395,6 @@ enum Popup {
     Note(String),
 }
 
-/// Mouse-wheel step for the right pane, in lines. Matches gitu's default
-/// `mouse_scroll_lines`.
-const WHEEL_LINES: isize = 3;
-
 /// `(discriminant, diff text)` for cheap "did the right pane actually change"
 /// checks: `String` equality on a few KB, no hashing.
 /// The five left panes, in top-to-bottom screen order.
@@ -503,6 +499,9 @@ pub struct App {
     theme_saved_config: theme_config::ThemeConfig,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
     config_file: Option<PathBuf>,
+    /// Everything loaded from `config.toml`. Its `theme` is only the value
+    /// read at startup: the theme being edited lives in `theme_config`.
+    config: config::Config,
     profile_hit_areas: screens::profile::ProfileHitAreas,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
@@ -654,7 +653,8 @@ use diff_query::{DiffQueryState, RightKey};
 use tree::{FileRow, commit_drill_files, tree_rows};
 
 impl App {
-    fn base(repo: Option<git::Repo>, theme_config: theme_config::ThemeConfig) -> Self {
+    fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
+        let theme_config = config.theme.clone();
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
@@ -707,6 +707,7 @@ impl App {
             theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
             ),
             theme_saved_config,
+            config,
             config_file: None,
             profile_hit_areas: screens::profile::ProfileHitAreas::default(),
             header: git::model::StatusHeader::default(),
@@ -772,7 +773,7 @@ impl App {
             file,
             issues,
         } = load;
-        let mut app = Self::base(Some(git::Repo::open(path)?), config.theme);
+        let mut app = Self::base(Some(git::Repo::open(path)?), config);
         app.config_file = file;
         app.refresh();
         if !issues.is_empty() {
@@ -785,6 +786,25 @@ impl App {
         Ok(app)
     }
 
+    /// `[ui] mouse`: should the terminal capture the mouse?
+    pub fn mouse_enabled(&self) -> bool {
+        self.config.ui.mouse
+    }
+
+    /// `[ui] poll_secs` as a duration.
+    pub(crate) fn poll_interval(&self) -> Duration {
+        Duration::from_secs(self.config.ui.poll_secs)
+    }
+
+    /// `[diff]` as the options `git diff` / `git show` are run with.
+    pub(crate) fn diff_opts(&self) -> DiffOpts {
+        DiffOpts {
+            context: self.config.diff.context,
+            ignore_whitespace: self.config.diff.ignore_whitespace,
+            rename_threshold: self.config.diff.rename_threshold,
+        }
+    }
+
     /// Where a settings save writes, if anywhere.
     pub fn config_file(&self) -> Option<&Path> {
         self.config_file.as_deref()
@@ -792,7 +812,7 @@ impl App {
 
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
-        let mut app = Self::base(None, theme_config::ThemeConfig::default());
+        let mut app = Self::base(None, config::Config::default());
         app.header = mock::mock_header();
         app.files = mock::mock_files();
         app.branches = mock::mock_branches();
@@ -827,8 +847,9 @@ impl App {
     pub fn refresh(&mut self) {
         let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
+        let opts = self.diff_opts();
         let Some(repo) = &mut self.repo else { return };
-        let completion = Self::load_refresh(repo, branch, commit);
+        let completion = Self::load_refresh(repo, branch, commit, opts);
         self.apply_refresh_result(completion);
     }
 
@@ -852,10 +873,11 @@ impl App {
         };
         let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
+        let opts = self.diff_opts();
         self.refresh_query.in_flight = true;
         thread::spawn(move || {
             let completion = run_worker(WorkerKind::Refresh, || match git::Repo::open(&path) {
-                Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit),
+                Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit, opts),
                 Err(error) => {
                     let message = error.to_string();
                     RefreshCompletion {
@@ -880,6 +902,7 @@ impl App {
         repo: &mut git::Repo,
         branch: Option<String>,
         commit: Option<String>,
+        opts: DiffOpts,
     ) -> RefreshCompletion {
         let snapshot = repo.snapshot().map_err(|error| error.to_string());
         let branch_log = branch.map(|name| {
@@ -888,7 +911,7 @@ impl App {
         });
         let commit_files = commit.map(|hash| {
             let result = repo
-                .commit_diff(&hash, DiffOpts::default())
+                .commit_diff(&hash, opts)
                 .map(|diff| commit_drill_files(&diff))
                 .map_err(|error| error.to_string());
             (hash, result)
@@ -1667,11 +1690,12 @@ impl App {
     }
 
     /// Draw, then block for the next event batch, until `should_quit`. Events
-    /// come from terminal input, a recursive worktree watch, and a 10s poll.
+    /// come from terminal input, a recursive worktree watch, and a poll (`[ui]
+    /// poll_secs`, 10s by default).
     /// Bounded batches avoid repainting for every auto-repeat key while still
     /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
-        let events = Events::new(self.watch_root().as_deref())?;
+        let events = Events::new(self.watch_root().as_deref(), self.poll_interval())?;
         self.watch_error = events.watch_error().map(|error| {
             format!("filesystem watcher unavailable; polling fallback active: {error}")
         });

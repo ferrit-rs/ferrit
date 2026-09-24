@@ -57,7 +57,7 @@ fn main() -> Result<()> {
     // alternate screen is up. Falls back to half-blocks on its own.
     app.detect_graphics();
 
-    let mut terminal = tui::init()?;
+    let mut terminal = tui::init(app.mouse_enabled())?;
     let result = app.run(&mut terminal);
     tui::restore()?;
     result

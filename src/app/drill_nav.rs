@@ -1,6 +1,6 @@
 //! Files/Commits pane directory-tree drill navigation (expand/collapse, drill into a commit's files).
 
-use super::{App, CommitDrill, DiffOpts, FileRow, Pane, commit_drill_files};
+use super::{App, CommitDrill, FileRow, Pane, commit_drill_files};
 
 impl App {
     /// Enter on a directory row in the Files pane: toggle it collapsed or
@@ -28,6 +28,7 @@ impl App {
         if self.focus != Pane::Commits || self.commit_drill.is_some() {
             return;
         }
+        let opts = self.diff_opts();
         let Some(repo) = &self.repo else { return };
         let return_index = self.selected(Pane::Commits);
         let Some(entry) = self.commits.get(return_index) else {
@@ -35,7 +36,7 @@ impl App {
         };
         let hash = entry.full_hash.clone();
         let title = format!("{} {}", entry.short_hash, entry.summary);
-        match repo.commit_diff(&hash, DiffOpts::default()) {
+        match repo.commit_diff(&hash, opts) {
             Ok(diff) => {
                 self.commit_drill = Some(CommitDrill {
                     hash,

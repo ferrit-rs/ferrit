@@ -33,6 +33,74 @@ const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file whe
 #[serde(default)]
 pub struct Config {
     pub theme: ThemeConfig,
+    pub ui: UiConfig,
+    pub diff: DiffConfig,
+    pub commit: CommitConfig,
+    pub log: LogConfig,
+}
+
+/// `[ui]`: how ferrit talks to the terminal.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct UiConfig {
+    /// `false`: do not capture the mouse, so the terminal's own text selection
+    /// works. Click, hover and wheel are then unavailable.
+    pub mouse: bool,
+    /// Lines the mouse wheel moves the right pane by, `1..=50`.
+    pub wheel_step: u8,
+    /// Seconds between background refreshes when no filesystem event arrives,
+    /// `1..=3600`.
+    pub poll_secs: u64,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            mouse: true,
+            wheel_step: 3,
+            poll_secs: 10,
+        }
+    }
+}
+
+/// `[diff]`: how `git diff` and `git show` are run, mirroring lazygit's
+/// `git.*` settings and defaults.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct DiffConfig {
+    /// Context lines around a change, `0..=200`.
+    pub context: u32,
+    pub ignore_whitespace: bool,
+    /// Similarity percentage for rename detection, `0..=100`.
+    pub rename_threshold: u32,
+}
+
+impl Default for DiffConfig {
+    fn default() -> Self {
+        Self {
+            context: 3,
+            ignore_whitespace: false,
+            rename_threshold: 50,
+        }
+    }
+}
+
+/// `[commit]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CommitConfig {
+    /// Start the commit editor with sign-off on. Still visible in its footer
+    /// and flipped per commit with `Ctrl-O`.
+    pub sign_off: bool,
+}
+
+/// `[log]`: the command log panel.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct LogConfig {
+    /// List read-only commands (`git diff` on every selection) in the panel,
+    /// not just writes. The `@` viewer always lists everything.
+    pub show_reads: bool,
 }
 
 /// A loaded configuration plus where it came from and what was wrong with it.
@@ -92,8 +160,12 @@ impl Config {
         };
         let mut issues = Vec::new();
         let mut failed = Vec::new();
-        let config = Self {
+        let mut config = Self {
             theme: section(&table, "theme", &mut issues, &mut failed),
+            ui: section(&table, "ui", &mut issues, &mut failed),
+            diff: section(&table, "diff", &mut issues, &mut failed),
+            commit: section(&table, "commit", &mut issues, &mut failed),
+            log: section(&table, "log", &mut issues, &mut failed),
         };
         // A section that fell back is reported by `section`; its keys would
         // only be listed a second time as unknown.
@@ -102,7 +174,46 @@ impl Config {
             file.remove(name);
         }
         issues.extend(unknown_keys(&file, &config));
+        issues.extend(config.clamp_ranges());
         (config, issues)
+    }
+
+    /// Put every out-of-range value back to its default and say which. Run
+    /// after parsing: the types accept any `u16`, the meaning does not.
+    fn clamp_ranges(&mut self) -> Vec<String> {
+        let mut issues = Vec::new();
+        let defaults = Self::default();
+        let mut check = |name: &str, ok: bool, range: &str, reset: &mut dyn FnMut()| {
+            if !ok {
+                reset();
+                issues.push(format!("`{name}` must be {range}, using the default"));
+            }
+        };
+        check(
+            "ui.wheel_step",
+            (1..=50).contains(&self.ui.wheel_step),
+            "1 to 50",
+            &mut || self.ui.wheel_step = defaults.ui.wheel_step,
+        );
+        check(
+            "ui.poll_secs",
+            (1..=3600).contains(&self.ui.poll_secs),
+            "1 to 3600",
+            &mut || self.ui.poll_secs = defaults.ui.poll_secs,
+        );
+        check(
+            "diff.context",
+            self.diff.context <= 200,
+            "0 to 200",
+            &mut || self.diff.context = defaults.diff.context,
+        );
+        check(
+            "diff.rename_threshold",
+            self.diff.rename_threshold <= 100,
+            "0 to 100",
+            &mut || self.diff.rename_threshold = defaults.diff.rename_threshold,
+        );
+        issues
     }
 
     /// Write `theme` into `path`'s `[theme]` section, leaving every other

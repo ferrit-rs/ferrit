@@ -155,7 +155,7 @@ impl App {
             focus: CommitField::Summary,
             kind,
             reword: None,
-            sign_off: false,
+            sign_off: self.config.commit.sign_off,
             no_verify: false,
             history_index: None,
             saved_summary: String::new(),

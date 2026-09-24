@@ -17,9 +17,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::App;
-use ferrit::app::config::{Config, ConfigLoad};
+use ferrit::app::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::app::theme_config::{Preset, ThemeConfig};
+use ferrit::app::{App, DiffView, Pane};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -337,4 +337,303 @@ fn config_path_prints_the_file_and_exits_without_opening_a_repository() {
         printed.trim_end().ends_with("config.toml") || printed.contains("no config directory"),
         "{printed}"
     );
+}
+
+// ------------------------------------------------------------------ P1b
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
+}
+
+fn with(config: Config, dir: &Path) -> App {
+    App::open_with(
+        dir,
+        ConfigLoad {
+            config,
+            file: None,
+            issues: Vec::new(),
+        },
+    )
+    .unwrap()
+}
+
+fn repo_with_file(tag: &str, name: &str, content: &str) -> (TempDir, Repository) {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join(name), content).unwrap();
+    commit_all(&repo, "init");
+    (dir, repo)
+}
+
+#[test]
+fn the_documented_defaults_are_what_the_code_used_before() {
+    let config = Config::default();
+    assert_eq!(
+        config.ui,
+        UiConfig {
+            mouse: true,
+            wheel_step: 3,
+            poll_secs: 10
+        }
+    );
+    assert_eq!(
+        config.diff,
+        DiffConfig {
+            context: 3,
+            ignore_whitespace: false,
+            rename_threshold: 50
+        }
+    );
+    assert_eq!(config.commit, CommitConfig { sign_off: false });
+    assert_eq!(config.log, LogConfig { show_reads: false });
+}
+
+#[test]
+fn every_new_section_is_read() {
+    let (config, issues) = Config::parse(
+        "[ui]\nmouse = false\nwheel_step = 7\npoll_secs = 30\n\n[diff]\ncontext = 1\n\
+         ignore_whitespace = true\nrename_threshold = 80\n\n[commit]\nsign_off = true\n\n\
+         [log]\nshow_reads = true\n",
+    );
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(
+        config.ui,
+        UiConfig {
+            mouse: false,
+            wheel_step: 7,
+            poll_secs: 30
+        }
+    );
+    assert_eq!(
+        config.diff,
+        DiffConfig {
+            context: 1,
+            ignore_whitespace: true,
+            rename_threshold: 80
+        }
+    );
+    assert!(config.commit.sign_off && config.log.show_reads);
+}
+
+#[test]
+fn out_of_range_values_go_back_to_their_default_one_by_one_and_are_named() {
+    let (config, issues) = Config::parse(
+        "[ui]\nwheel_step = 0\npoll_secs = 4000\n\n[diff]\ncontext = 201\nrename_threshold = 101\n",
+    );
+    assert_eq!(config.ui, UiConfig::default());
+    assert_eq!(config.diff, DiffConfig::default());
+    for name in [
+        "ui.wheel_step",
+        "ui.poll_secs",
+        "diff.context",
+        "diff.rename_threshold",
+    ] {
+        assert!(
+            issues.iter().any(|i| i.contains(name)),
+            "{name} missing: {issues:?}"
+        );
+    }
+    assert_eq!(issues.len(), 4, "{issues:?}");
+}
+
+#[test]
+fn one_bad_value_does_not_reset_its_valid_neighbours() {
+    let (config, issues) = Config::parse("[ui]\nmouse = false\nwheel_step = 0\npoll_secs = 20\n");
+    assert_eq!(
+        config.ui,
+        UiConfig {
+            mouse: false,
+            wheel_step: 3,
+            poll_secs: 20
+        }
+    );
+    assert_eq!(issues.len(), 1, "{issues:?}");
+}
+
+#[test]
+fn the_edges_of_every_range_are_accepted() {
+    let (config, issues) = Config::parse(
+        "[ui]\nwheel_step = 50\npoll_secs = 3600\n\n[diff]\ncontext = 200\nrename_threshold = 100\n",
+    );
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!((config.ui.wheel_step, config.ui.poll_secs), (50, 3600));
+    assert_eq!(
+        (config.diff.context, config.diff.rename_threshold),
+        (200, 100)
+    );
+    let (config, issues) = Config::parse(
+        "[ui]\nwheel_step = 1\npoll_secs = 1\n\n[diff]\ncontext = 0\nrename_threshold = 0\n",
+    );
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!((config.ui.wheel_step, config.diff.context), (1, 0));
+}
+
+#[test]
+fn a_wrongly_typed_value_drops_only_its_section() {
+    let (config, issues) =
+        Config::parse("[ui]\nmouse = \"yes\"\n\n[diff]\ncontext = 5\n\n[ui.extra]\nx = 1\n");
+    assert_eq!(config.ui, UiConfig::default());
+    assert_eq!(config.diff.context, 5, "the other sections still apply");
+    assert_eq!(issues.len(), 1, "{issues:?}");
+    assert!(issues[0].starts_with("[ui] ignored"), "{issues:?}");
+    // A negative number does not fit `u8` either.
+    let (config, issues) = Config::parse("[ui]\nwheel_step = -2\n");
+    assert_eq!(config.ui, UiConfig::default());
+    assert!(issues[0].starts_with("[ui] ignored"), "{issues:?}");
+}
+
+#[test]
+fn wheel_step_sets_how_far_the_wheel_moves_the_right_pane() {
+    for step in [1_u8, 7] {
+        let base: String = (0..200).map(|n| format!("line {n}\n")).collect();
+        let (dir, _repo) = repo_with_file(&format!("config-wheel-{step}"), "a_tall.txt", &base);
+        // Two changes far apart: a diff tall enough for a 7 line step to fit.
+        let edited = base
+            .replace("line 5\n", "line 5 CHANGED\n")
+            .replace("line 150\n", "line 150 CHANGED\n");
+        fs::write(dir.path().join("a_tall.txt"), edited).unwrap();
+        let mut config = Config::default();
+        config.ui.wheel_step = step;
+        let mut app = with(config, dir.path());
+        app.select(Pane::Files, 0);
+        app.set_right_viewport(10);
+        app.set_right_area(Rect {
+            x: 40,
+            y: 0,
+            width: 80,
+            height: 12,
+        });
+        app.feed_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: 60,
+            row: 3,
+            modifiers: KeyModifiers::NONE,
+        });
+        assert_eq!(app.right_scroll(), usize::from(step));
+    }
+}
+
+fn unstaged_text(app: &App) -> String {
+    match app.diff_view() {
+        DiffView::Files(files) => files.unstaged.text.clone(),
+        other => panic!("expected a file diff, got {other:?}"),
+    }
+}
+
+#[test]
+fn diff_context_sets_the_lines_around_a_change() {
+    let base: String = (0..30).map(|n| format!("line {n}\n")).collect();
+    let (dir, _repo) = repo_with_file("config-context", "a.txt", &base);
+    fs::write(
+        dir.path().join("a.txt"),
+        base.replace("line 15\n", "line 15 CHANGED\n"),
+    )
+    .unwrap();
+
+    // Context lines are the diff lines starting with one space (git also
+    // repeats a nearby line in the `@@` header, so a plain substring is not
+    // enough).
+    let context_lines = |config: Config| {
+        let mut app = with(config, dir.path());
+        app.select(Pane::Files, 0);
+        unstaged_text(&app)
+            .lines()
+            .filter(|line| line.starts_with(" line"))
+            .count()
+    };
+    let with_context = |context: u32| {
+        let mut config = Config::default();
+        config.diff.context = context;
+        config
+    };
+    assert_eq!(context_lines(with_context(0)), 0);
+    assert_eq!(
+        context_lines(with_context(3)),
+        6,
+        "three before and three after"
+    );
+    assert_eq!(context_lines(with_context(6)), 12);
+    assert_eq!(context_lines(Config::default()), 6, "the default is 3");
+}
+
+#[test]
+fn ignore_whitespace_hides_a_whitespace_only_change() {
+    let (dir, _repo) = repo_with_file("config-ws", "a.txt", "one\ntwo\n");
+    fs::write(dir.path().join("a.txt"), "one\n    two\n").unwrap();
+
+    let mut app = with(Config::default(), dir.path());
+    app.select(Pane::Files, 0);
+    assert!(unstaged_text(&app).contains("+    two"));
+
+    let mut config = Config::default();
+    config.diff.ignore_whitespace = true;
+    let mut app = with(config, dir.path());
+    app.select(Pane::Files, 0);
+    assert!(
+        matches!(app.diff_view(), DiffView::Note(note) if note.contains("no changes")),
+        "{:?}",
+        app.diff_view()
+    );
+}
+
+#[test]
+fn rename_threshold_decides_whether_a_similar_file_counts_as_a_rename() {
+    let body: String = (0..10).map(|n| format!("line {n}\n")).collect();
+    let (dir, _repo) = repo_with_file("config-rename", "a.txt", &body);
+    git(dir.path(), &["mv", "a.txt", "b.txt"]);
+    fs::write(
+        dir.path().join("b.txt"),
+        body.replace("line 9\n", "line 9 EDITED\n"),
+    )
+    .unwrap();
+    git(dir.path(), &["add", "b.txt"]);
+    git(dir.path(), &["commit", "-qm", "rename and edit"]);
+
+    let rows = |threshold: u32| {
+        let mut config = Config::default();
+        config.diff.rename_threshold = threshold;
+        let mut app = with(config, dir.path());
+        app.feed_key(KeyEvent::from(KeyCode::Char('4')));
+        app.feed_key(KeyEvent::from(KeyCode::Enter)); // drill into the commit's files
+        app.row_count(Pane::Commits)
+    };
+    assert_eq!(rows(50), 1, "one renamed file");
+    assert_eq!(rows(100), 2, "a deleted file and an added one");
+}
+
+#[test]
+fn commit_sign_off_sets_the_editors_starting_toggle() {
+    for (configured, expected) in [(false, false), (true, true)] {
+        let (dir, _repo) =
+            repo_with_file(&format!("config-signoff-{configured}"), "a.txt", "one\n");
+        fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+        git(dir.path(), &["add", "a.txt"]);
+        let mut config = Config::default();
+        config.commit.sign_off = configured;
+        let mut app = with(config, dir.path());
+        app.feed_key(KeyEvent::from(KeyCode::Char('c')));
+        let view = app.commit_popup().expect("the commit popup opened");
+        assert_eq!(view.toggles, Some((expected, false)));
+    }
+}
+
+#[test]
+fn mouse_and_poll_settings_reach_the_app() {
+    let (dir, _repo) = repo_with_file("config-ui", "a.txt", "one\n");
+    assert!(with(Config::default(), dir.path()).mouse_enabled());
+    let mut config = Config::default();
+    config.ui.mouse = false;
+    assert!(!with(config, dir.path()).mouse_enabled());
 }

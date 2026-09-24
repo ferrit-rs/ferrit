@@ -18,11 +18,19 @@ use crate::components::ui::mouse_pointer::MousePointer;
 
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 
-/// Enable raw mode, switch to the alternate screen, capture the mouse (for
-/// wheel scroll of the diff pane), hide the cursor.
-pub fn init() -> io::Result<Tui> {
+/// Enable raw mode, switch to the alternate screen, hide the cursor, and, when
+/// `mouse` is set, capture the mouse (wheel scroll, clicks, hover). `mouse` is
+/// `[ui] mouse`: off leaves the terminal's own text selection working.
+pub fn init(mouse: bool) -> io::Result<Tui> {
     enable_raw_mode()?;
-    if let Err(error) = execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture, Hide) {
+    let entered = execute!(io::stdout(), EnterAlternateScreen, Hide).and_then(|()| {
+        if mouse {
+            execute!(io::stdout(), EnableMouseCapture)
+        } else {
+            Ok(())
+        }
+    });
+    if let Err(error) = entered {
         let _ = restore();
         return Err(error);
     }

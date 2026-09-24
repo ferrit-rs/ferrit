@@ -57,11 +57,6 @@ pub enum RemoteOp {
 /// burst into a single `Refresh`.
 const FS_DEBOUNCE: Duration = Duration::from_millis(150);
 
-/// Poll fallback, matching lazygit's default `refresher.refreshInterval`.
-/// Covers changes a watcher can miss: network filesystems, dropped inotify
-/// events, editors that swap files in place.
-const POLL_INTERVAL: Duration = Duration::from_secs(10);
-
 /// Process bursts of keys without repainting after every repeated key, while
 /// keeping redraws frequent enough that a paste/repeat storm cannot starve UI.
 const MAX_EVENT_BATCH: usize = 256;
@@ -86,10 +81,10 @@ impl Events {
     /// when one is given (absent for a bare repo with no worktree). A watcher
     /// that fails to start is not fatal: input and poll still run, so `r` and
     /// the 10s poll keep the panes fresh.
-    pub fn new(watch_root: Option<&Path>) -> Result<Self> {
+    pub fn new(watch_root: Option<&Path>, poll: Duration) -> Result<Self> {
         let (tx, rx) = mpsc::channel();
         spawn_input(tx.clone());
-        spawn_poll(tx.clone());
+        spawn_poll(tx.clone(), poll);
         let (watch, watch_error) = match watch_root {
             Some(root) => match spawn_watch(tx.clone(), root) {
                 Ok(watch) => (watch, None),
@@ -166,11 +161,13 @@ fn spawn_input(tx: Sender<AppEvent>) {
 }
 
 /// Slow heartbeat so the panes never sit stale even when the watcher misses
-/// an event.
-fn spawn_poll(tx: Sender<AppEvent>) {
+/// an event: network filesystems, dropped inotify events, editors that swap
+/// files in place. `poll` is `[ui] poll_secs`, 10 seconds by default, matching
+/// lazygit's `refresher.refreshInterval`.
+fn spawn_poll(tx: Sender<AppEvent>, poll: Duration) {
     thread::spawn(move || {
         loop {
-            thread::sleep(POLL_INTERVAL);
+            thread::sleep(poll);
             if tx.send(AppEvent::Refresh).is_err() {
                 break;
             }
@@ -204,4 +201,29 @@ fn is_relevant(path: &Path) -> bool {
         return false;
     }
     !path.to_string_lossy().contains("/.git/objects/")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    use super::{AppEvent, spawn_poll};
+
+    #[test]
+    fn the_poll_fires_at_the_configured_interval_not_a_fixed_one() {
+        let (tx, rx) = mpsc::channel();
+        spawn_poll(tx, Duration::from_millis(20));
+        // Ten seconds would be the old fixed interval; a 20 ms poll answers at
+        // once, and keeps answering.
+        for _ in 0..3 {
+            assert!(
+                matches!(
+                    rx.recv_timeout(Duration::from_secs(2)),
+                    Ok(AppEvent::Refresh)
+                ),
+                "a poll tick"
+            );
+        }
+    }
 }

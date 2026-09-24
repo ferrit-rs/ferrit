@@ -48,8 +48,11 @@ pub struct DiffCompletion {
     pub(crate) result: Result<DiffQueryResult, String>,
 }
 
-pub(crate) fn load(repo: &git::Repo, key: &RightKey) -> Result<DiffQueryResult, String> {
-    let opts = DiffOpts::default();
+pub(crate) fn load(
+    repo: &git::Repo,
+    key: &RightKey,
+    opts: DiffOpts,
+) -> Result<DiffQueryResult, String> {
     match key {
         RightKey::File { path } => Ok(DiffQueryResult::File {
             unstaged: repo
@@ -146,11 +149,12 @@ impl App {
         generation: u64,
     ) {
         self.diff_query.in_flight = true;
+        let opts = self.diff_opts();
         thread::spawn(move || {
             let result = run_worker(WorkerKind::Diff, || {
                 git::Repo::open(&path)
                     .map_err(|error| error.to_string())
-                    .and_then(|repo| load(&repo, &key))
+                    .and_then(|repo| load(&repo, &key, opts))
             })
             .map_err(|error| error.to_string())
             .and_then(|result| result);
@@ -252,7 +256,7 @@ impl App {
         let Some(repo) = &self.repo else {
             return DiffView::None;
         };
-        match load(repo, key) {
+        match load(repo, key, self.diff_opts()) {
             Ok(result) => self.diff_view_from_query(key, result),
             Err(error) => DiffView::Note(error),
         }
