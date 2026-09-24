@@ -1,9 +1,16 @@
 //! Stash entries, stack order (`stash@{0}` = most recent).
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
+//!
+//! Writes shell out to `git` (hooks and git's own safety messages apply),
+//! resolving an entry by its stable oid to `stash@{n}` right before the
+//! command. See `docs/PLAN_10_STASH.md`.
+
+use std::process::{Command, Output};
 
 use git2::Repository;
 
+use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::model::StashEntry;
 
@@ -21,4 +28,88 @@ pub(super) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
     })
     .map_err(GitError::Read)?;
     Ok(out)
+}
+
+/// What an apply or pop actually did. Not a plain `()`: "it worked" and
+/// "it left conflicts" are both ordinary git behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StashOutcome {
+    /// Exit 0.
+    Done,
+    /// Exit non-zero and the index has conflicts. The stash is kept (pop
+    /// does not drop on conflict); Files shows `Change::Conflicted`.
+    Conflicted,
+}
+
+fn git(repo: &Repository, args: &[&str]) -> GitResult<Output> {
+    Command::new("git")
+        .arg("-C")
+        .arg(workdir(repo)?)
+        .args(args)
+        .output()
+        .map_err(|e| GitError::StashFailed(format!("cannot run git: {e}")))
+}
+
+/// `stash@{n}` for the entry with this oid. `git stash drop` refuses a bare
+/// oid, and an index read earlier may have shifted since.
+fn resolve(repo: &mut Repository, oid: &str) -> GitResult<String> {
+    stashes(repo)?
+        .into_iter()
+        .find(|entry| entry.oid == oid)
+        .map(|entry| format!("stash@{{{}}}", entry.index))
+        .ok_or_else(|| GitError::StashFailed("stash entry no longer exists".to_owned()))
+}
+
+/// `git stash push --include-untracked [-m <message>]`. An empty message
+/// lets git write its own `WIP on <branch>: ...`.
+pub(super) fn push(repo: &Repository, message: &str) -> GitResult<()> {
+    let mut args = vec!["stash", "push", "--include-untracked"];
+    if !message.is_empty() {
+        args.extend(["-m", message]);
+    }
+    let out = git(repo, &args)?;
+    if !out.status.success() {
+        return Err(GitError::StashFailed(stderr(&out)));
+    }
+    // A clean tree is exit 0 with this stable line on stdout.
+    if String::from_utf8_lossy(&out.stdout).contains("No local changes to save") {
+        return Err(GitError::NothingToStash);
+    }
+    Ok(())
+}
+
+/// `git stash apply|pop <stash@{n}>`. A failure that left conflicts in the
+/// index is an outcome, not an error.
+fn restore(repo: &mut Repository, oid: &str, verb: &str) -> GitResult<StashOutcome> {
+    let reference = resolve(repo, oid)?;
+    let out = git(repo, &["stash", verb, &reference])?;
+    if out.status.success() {
+        return Ok(StashOutcome::Done);
+    }
+    let mut index = repo.index().map_err(GitError::Read)?;
+    index.read(true).map_err(GitError::Read)?;
+    if index.has_conflicts() {
+        return Ok(StashOutcome::Conflicted);
+    }
+    Err(GitError::StashFailed(stderr(&out)))
+}
+
+/// `git stash apply`: the entry stays.
+pub(super) fn apply(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
+    restore(repo, oid, "apply")
+}
+
+/// `git stash pop`: the entry is removed only after a clean apply.
+pub(super) fn pop(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
+    restore(repo, oid, "pop")
+}
+
+/// `git stash drop`.
+pub(super) fn drop_entry(repo: &mut Repository, oid: &str) -> GitResult<()> {
+    let reference = resolve(repo, oid)?;
+    let out = git(repo, &["stash", "drop", &reference])?;
+    if !out.status.success() {
+        return Err(GitError::StashFailed(stderr(&out)));
+    }
+    Ok(())
 }

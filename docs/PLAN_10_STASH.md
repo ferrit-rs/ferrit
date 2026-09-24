@@ -189,11 +189,14 @@ pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff>;
 `stash_apply` / `pop` / `drop` take `&mut self` because `resolve` reads the
 stash list, the one read that needs `&mut git2::Repository` (already noted
 on `Repo::snapshot`). `stash_diff` goes through `DiffCmd` in `diff.rs`:
-`DiffCmd::base("stash", opts).arg("show").arg("-p").arg("--include-untracked").arg(oid)`.
-Checked on git 2.43: `git stash show` accepts the flags `DiffCmd::base`
-emits (`--no-ext-diff --color=never --unified=N --find-renames=N% --submodule`)
-after the subcommand, a bare oid works, and untracked files appear in the
-patch. Also checked: `git stash drop <oid>` fails with `is not a stash
+`DiffCmd::base("stash", opts).after_subcommand("show").arg("-p").arg("--include-untracked").arg(oid)`.
+`after_subcommand` is a new one-line helper: `base` puts the diff flags
+right after the subcommand, and `git stash --no-ext-diff show` fails with
+`unknown option` (found by `tests/git_stash.rs`, the flags must come after
+`show`). Checked on git 2.43: with that order `git stash show` accepts the
+flags `DiffCmd::base` emits (`--no-ext-diff --color=never --unified=N
+--find-renames=N% --submodule`), a bare oid works, and untracked files appear
+in the patch. Also checked: `git stash drop <oid>` fails with `is not a stash
 reference`, and `git stash push` on a clean tree exits 0 printing
 `No local changes to save`.
 
@@ -287,9 +290,10 @@ an unchanged selection", which the oid key gives for free).
 
 ## Milestones
 
-- **S0** `stash.rs` backend: `stash_push`, `apply`, `pop`, `drop`, `resolve`,
-  `StashOutcome`, `GitError::{StashFailed, NothingToStash}`, `stash_diff`.
-  `tests/git_stash.rs` green, existing tests untouched.
+- ✅ **S0** `stash.rs` backend: `stash_push`, `apply`, `pop`, `drop`, `resolve`,
+  `StashOutcome`, `GitError::{StashFailed, NothingToStash}`, `stash_diff`
+  (`DiffCmd::after_subcommand`). `tests/git_stash.rs` green (10 cases),
+  existing tests untouched.
 - **S1** right pane: `RightKey::Stash`, `DiffView::Stash`, worker wiring,
   scroll and refresh behaviour. Empty state kept.
 - **S2** Stash pane actions: `stash_actions.rs`, `<space>` / `g` / `d` arms,

@@ -82,6 +82,15 @@ pub enum GitError {
     /// `NothingStaged` next to the generic `CommitFailed`.
     #[error("no upstream configured for the current branch")]
     NoUpstream,
+    /// A `git stash` subprocess exited non-zero (apply onto a dirty
+    /// worktree it would clobber, a stash entry that vanished). Holds
+    /// stderr. See `docs/PLAN_10_STASH.md`.
+    #[error("git stash failed: {0}")]
+    StashFailed(String),
+    /// `git stash push` had no local changes to save. Distinct from
+    /// `StashFailed` because git exits 0 here and the message is stable.
+    #[error("no local changes to save")]
+    NothingToStash,
 }
 
 pub type GitResult<T> = Result<T, GitError>;

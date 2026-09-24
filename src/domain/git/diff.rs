@@ -306,6 +306,23 @@ pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitR
     Ok(Diff::new(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
+/// A stash entry's patch (`git stash show -p`), untracked files included.
+/// `oid` is a `StashEntry::oid`; git accepts a stash-like commit directly,
+/// so a shifted `stash@{n}` cannot make this stale.
+pub(super) fn stash_diff(repo: &Repository, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
+    // `git stash show` wants its own verb before the diff flags.
+    let out = DiffCmd::base("stash", opts)
+        .after_subcommand("show")
+        .arg("-p")
+        .arg("--include-untracked")
+        .arg(oid.to_owned())
+        .run(workdir(repo)?)?;
+    if !out.status.success() {
+        return Err(GitError::DiffFailed(stderr(&out)));
+    }
+    Ok(Diff::new(String::from_utf8_lossy(&out.stdout).into_owned()))
+}
+
 /// Is `path` untracked (worktree-new) in `repo`? Decides whether an empty
 /// `git diff` means "nothing changed" or "needs the `--no-index` fallback".
 fn is_untracked(repo: &Repository, path: &Path) -> bool {
@@ -345,6 +362,12 @@ impl DiffCmd {
             args.push("--ignore-all-space".to_owned());
         }
         Self { args }
+    }
+
+    /// Insert a verb right after the subcommand (`stash` `show` ...).
+    fn after_subcommand(mut self, verb: &str) -> Self {
+        self.args.insert(1, verb.to_owned());
+        self
     }
 
     fn arg(mut self, a: impl Into<String>) -> Self {

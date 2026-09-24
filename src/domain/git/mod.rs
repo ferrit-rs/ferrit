@@ -34,6 +34,7 @@ use self::branch::MergeOutcome;
 use self::commit::{CommitKind, CommitOpts};
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
+use self::stash::StashOutcome;
 use crate::domain::git::model::{
     BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader,
 };
@@ -365,6 +366,31 @@ impl Repo {
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)
+    }
+
+    /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.
+    pub fn stash_push(&self, message: &str) -> GitResult<()> {
+        stash::push(&self.inner, message)
+    }
+
+    /// `git stash apply` for the entry with this oid; the entry stays.
+    pub fn stash_apply(&mut self, oid: &str) -> GitResult<StashOutcome> {
+        stash::apply(&mut self.inner, oid)
+    }
+
+    /// `git stash pop` for the entry with this oid.
+    pub fn stash_pop(&mut self, oid: &str) -> GitResult<StashOutcome> {
+        stash::pop(&mut self.inner, oid)
+    }
+
+    /// `git stash drop` for the entry with this oid.
+    pub fn stash_drop(&mut self, oid: &str) -> GitResult<()> {
+        stash::drop_entry(&mut self.inner, oid)
+    }
+
+    /// The entry's patch, for the right pane.
+    pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
+        diff::stash_diff(&self.inner, oid, opts)
     }
 
     /// Configured remotes, alphabetical. See `docs/PLAN_9_REMOTE.md`.
