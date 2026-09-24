@@ -22,6 +22,7 @@ use git2::Repository;
 
 use crate::domain::git::diff::workdir;
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 use crate::domain::git::model::RemoteEntry;
 
 const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
@@ -99,10 +100,8 @@ fn run_command(
     cancel: Option<&AtomicBool>,
     err: &impl Fn(String) -> GitError,
 ) -> GitResult<Output> {
-    let mut command = Command::new("git");
+    let mut command = exec::git(workdir);
     command
-        .arg("-C")
-        .arg(workdir)
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -111,6 +110,7 @@ fn run_command(
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
+    let tracked = exec::track(&command);
     let mut child = command
         .spawn()
         .map_err(|e| err(format!("cannot run git: {e}")))?;
@@ -148,6 +148,7 @@ fn run_command(
             Ok(None) => thread::sleep(POLL_INTERVAL),
         }
     };
+    tracked.finish(status.code());
     let stdout = stdout_reader
         .join()
         .map_err(|_| err("git stdout reader panicked".to_owned()))?

@@ -6,12 +6,13 @@
 //! resolving an entry by its stable oid to `stash@{n}` right before the
 //! command. See `docs/PLAN_10_STASH.md`.
 
-use std::process::{Command, Output};
+use std::process::Output;
 
 use git2::Repository;
 
 use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 use crate::domain::git::model::StashEntry;
 
 /// Read the stash list. `git2::Repository::stash_foreach` needs `&mut`, so
@@ -42,11 +43,7 @@ pub enum StashOutcome {
 }
 
 fn git(repo: &Repository, args: &[&str]) -> GitResult<Output> {
-    Command::new("git")
-        .arg("-C")
-        .arg(workdir(repo)?)
-        .args(args)
-        .output()
+    exec::output(exec::git(workdir(repo)?).args(args))
         .map_err(|e| GitError::StashFailed(format!("cannot run git: {e}")))
 }
 

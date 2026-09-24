@@ -15,6 +15,7 @@ use git2::Repository;
 
 use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 
 /// Which way a patch runs: stage / discard read forward, unstage reads
 /// `git apply --reverse`.
@@ -38,11 +39,9 @@ pub enum ApplyTarget {
 /// up by the caller (rather than a match returning different builder chains)
 /// so a conditional flag never fights the borrow checker over a temporary.
 fn run_git(workdir: &Path, build: impl FnOnce(&mut Command)) -> GitResult<()> {
-    let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(workdir);
+    let mut cmd = exec::git(workdir);
     build(&mut cmd);
-    let out = cmd
-        .output()
+    let out = exec::output(&mut cmd)
         .map_err(|e| GitError::ApplyFailed(format!("cannot run git: {e}")))?;
     if !out.status.success() {
         return Err(GitError::ApplyFailed(stderr(&out)));
@@ -236,13 +235,13 @@ fn run_apply(
         args.push("--recount".to_owned());
     }
 
-    let mut child = Command::new("git")
-        .arg("-C")
-        .arg(workdir)
-        .args(&args)
+    let mut cmd = exec::git(workdir);
+    cmd.args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    let tracked = exec::track(&cmd);
+    let mut child = cmd
         .spawn()
         .map_err(|e| GitError::ApplyFailed(format!("cannot run git: {e}")))?;
 
@@ -258,6 +257,7 @@ fn run_apply(
     let out = child
         .wait_with_output()
         .map_err(|e| GitError::ApplyFailed(format!("cannot run git: {e}")))?;
+    tracked.finish(out.status.code());
     if !out.status.success() {
         return Err(GitError::ApplyFailed(stderr(&out)));
     }

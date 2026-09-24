@@ -15,6 +15,7 @@ use git2::{BranchType, Repository};
 
 use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 
 /// What a merge actually did. Not a plain `()`: "it worked" has two shapes
 /// ferrit's UI treats differently.
@@ -40,12 +41,9 @@ fn run_git(
     build: impl FnOnce(&mut Command),
     err: impl Fn(String) -> GitError,
 ) -> GitResult<()> {
-    let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(workdir);
+    let mut cmd = exec::git(workdir);
     build(&mut cmd);
-    let out = cmd
-        .output()
-        .map_err(|e| err(format!("cannot run git: {e}")))?;
+    let out = exec::output(&mut cmd).map_err(|e| err(format!("cannot run git: {e}")))?;
     if !out.status.success() {
         return Err(err(stderr(&out)));
     }
@@ -171,11 +169,7 @@ pub(super) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
 pub(super) fn merge_branch(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
     let workdir = workdir(repo)?;
     let message = format!("Merge branch '{name}'");
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(workdir)
-        .args(["merge", "-m", &message, name])
-        .output()
+    let out = exec::output(exec::git(workdir).args(["merge", "-m", &message, name]))
         .map_err(|e| GitError::MergeFailed(format!("cannot run git: {e}")))?;
     if out.status.success() {
         return Ok(MergeOutcome::Merged);

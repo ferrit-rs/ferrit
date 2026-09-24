@@ -15,6 +15,7 @@ use git2::Repository;
 
 use self::parse::FileMeta;
 use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 
 pub mod parse;
 
@@ -376,11 +377,7 @@ impl DiffCmd {
     }
 
     fn run(self, workdir: &Path) -> GitResult<Output> {
-        Command::new("git")
-            .arg("-C")
-            .arg(workdir)
-            .args(&self.args)
-            .output()
+        exec::output(exec::git(workdir).args(&self.args))
             .map_err(|e| GitError::DiffFailed(format!("cannot run git: {e}")))
     }
 }
