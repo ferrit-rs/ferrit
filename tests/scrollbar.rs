@@ -166,9 +166,11 @@ fn a_short_diff_has_no_scrollbar() {
 fn right_pane_thumb_reaches_the_bottom_at_max_scroll() {
     let (_dir, mut app) = tall_diff_repo("sb-right-bottom");
     let buf = render_buffer(&mut app, 100, 14); // establishes the real viewport height
-    // The diff track ends above the 5-row command log, 1-row keybar, the
-    // pane's top and bottom borders, and its 1-row stat line.
-    let track_bottom = buf.area.height - 5 - 1 - 2 - 1;
+    // Counted up from the bottom edge: the 1-row keybar, the 5-row command
+    // log (its `Infos` heading included) and the pane's bottom border sit
+    // below the track; the top border and stat line are above it and do not
+    // move its end. `- 1` turns a row count into the last row's index.
+    let track_bottom = buf.area.height - 1 - 5 - 1 - 1;
     for _ in 0..1000 {
         app.feed_key(ratatui::crossterm::event::KeyEvent::from(
             ratatui::crossterm::event::KeyCode::Char('J'),
