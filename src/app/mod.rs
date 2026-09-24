@@ -658,6 +658,7 @@ use tree::{FileRow, commit_drill_files, tree_rows};
 impl App {
     fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
         let theme_config = config.theme.clone();
+        let keymap = keymap::Keymap::from_overrides(&config.keys).0;
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
@@ -711,7 +712,7 @@ impl App {
             ),
             theme_saved_config,
             config,
-            keymap: keymap::Keymap::default(),
+            keymap,
             config_file: None,
             profile_hit_areas: screens::profile::ProfileHitAreas::default(),
             header: git::model::StatusHeader::default(),
@@ -1331,6 +1332,13 @@ impl App {
     #[doc(hidden)]
     pub fn feed_key(&mut self, key: KeyEvent) {
         self.on_key(key);
+    }
+
+    /// Has a quit key been pressed? Integration-test seam: `run()` reads the
+    /// flag itself.
+    #[doc(hidden)]
+    pub fn is_quitting(&self) -> bool {
+        self.should_quit
     }
 
     /// Feed one mouse event to the handler. Integration-test seam.

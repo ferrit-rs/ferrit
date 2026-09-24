@@ -77,6 +77,21 @@ keys (which return without rebuilding the preview), then the pane and global
 bindings, every non-scroll key ending in `update_right_pane`. A scroll key over
 something that is not a diff falls through to the resync, as before.
 
+**Note (P2c): the rules the sketch left open.** An action can be bound only
+in a context where it has a default (`discard` in `files` and `diff`, `quit` in
+`global`); elsewhere is an error naming the context. Every overridden
+action's defaults are removed before any new key is added, so two actions can
+swap keys; entries then apply in name order and the first to claim a key wins,
+so a clash is decided the same way on every run. An entry that loses (or names a
+key that does not parse, or `ctrl-c`) keeps its action's default keys; if
+those are taken too, the action ends up unbound and that is reported. A list
+with a repeated key is one binding; an empty list unbinds the action.
+`[keys]` of the wrong shape is dropped whole like any section. Key issues are
+reported by `Config::parse` (so once, at startup) and computed again, silently,
+when the app builds its keymap. `App::is_quitting` is a test seam. The help
+screen and keybars still print the default keys: P3 generates them from the
+keymap.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -471,7 +486,12 @@ terminal-lifecycle work with its own failure modes, not a config line.
   was fixed, see below). `tests/app_keys.rs` (7) pins the deliberate change and
   the context order; putting `Global` first, dropping the preview resync or
   dropping the diff context fails 9, 4 and 6 tests.
-- **P2c** `[keys]` parsing, validation, fallbacks.
+- ✅ **P2c** `[keys]` parsing, validation, fallbacks
+  (`Keymap::from_overrides`, `Action::name` / `from_name`, `KeyList`).
+  `tests/keymap.rs` (22) and `tests/app_keys.rs` (11); each of these fails a
+  test when broken: removing the overridden defaults, the clash check, the
+  ctrl-c rule, the "only where it lives" rule, restoring a rejected entry's
+  defaults.
 - **P3** generated keybars and scrollable help.
 - **P4** `x` menu with the six seeded entries, right-click, clickable hints.
 - **P5** `Palette`, `dark` / `light`, `[theme.colors]`.

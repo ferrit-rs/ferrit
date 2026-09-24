@@ -14,11 +14,13 @@
 //! unanswerable.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry as MapEntry;
 use std::fmt;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::Pane;
+use super::config::KeyOverrides;
 
 /// Where a binding applies. `resolve` tries the most specific context first,
 /// then `Global`, which is how `d` means discard on Files, delete on Branches
@@ -35,6 +37,31 @@ pub enum Context {
 }
 
 impl Context {
+    /// The `[keys.<name>]` table name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Global => "global",
+            Self::Files => "files",
+            Self::Diff => "diff",
+            Self::Branches => "branches",
+            Self::Commits => "commits",
+            Self::Stash => "stash",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            Self::Global,
+            Self::Files,
+            Self::Diff,
+            Self::Branches,
+            Self::Commits,
+            Self::Stash,
+        ]
+        .into_iter()
+        .find(|context| context.name() == name)
+    }
+
     /// The context of a focused pane, if it has bindings of its own.
     pub fn for_pane(pane: Pane) -> Option<Self> {
         match pane {
@@ -117,6 +144,83 @@ pub enum Action {
     ApplyStash,
     PopStash,
     DropStash,
+}
+
+impl Action {
+    /// The name used in `[keys.<context>]`: `stage_file`, `focus_files`, ...
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Quit => "quit",
+            Self::Help => "help",
+            Self::CommandLog => "command_log",
+            Self::OperationMenu => "operation_menu",
+            Self::Back => "back",
+            Self::Enter => "enter",
+            Self::EnterDiff => "enter_diff",
+            Self::Refresh => "refresh",
+            Self::Fetch => "fetch",
+            Self::Pull => "pull",
+            Self::Push => "push",
+            Self::Commit => "commit",
+            Self::Amend => "amend",
+            Self::RewordHead => "reword_head",
+            Self::Focus(Pane::Status) => "focus_status",
+            Self::Focus(Pane::Files) => "focus_files",
+            Self::Focus(Pane::Branches) => "focus_branches",
+            Self::Focus(Pane::Commits) => "focus_commits",
+            Self::Focus(Pane::Stash) => "focus_stash",
+            Self::NextPane => "next_pane",
+            Self::PrevPane => "prev_pane",
+            Self::ToggleBranchesTab => "toggle_branches_tab",
+            Self::SelectDown => "select_down",
+            Self::SelectUp => "select_up",
+            Self::ScrollLineDown => "scroll_line_down",
+            Self::ScrollLineUp => "scroll_line_up",
+            Self::ScrollPageDown => "scroll_page_down",
+            Self::ScrollPageUp => "scroll_page_up",
+            Self::ScrollHalfDown => "scroll_half_down",
+            Self::ScrollHalfUp => "scroll_half_up",
+            Self::ScrollTop => "scroll_top",
+            Self::ScrollBottom => "scroll_bottom",
+            Self::NextHunk => "next_hunk",
+            Self::PrevHunk => "prev_hunk",
+            Self::StageFile => "stage_file",
+            Self::StageAll => "stage_all",
+            Self::Discard => "discard",
+            Self::StashPush => "stash_push",
+            Self::LeaveDiff => "leave_diff",
+            Self::CursorDown => "cursor_down",
+            Self::CursorUp => "cursor_up",
+            Self::CursorNextHunk => "cursor_next_hunk",
+            Self::CursorPrevHunk => "cursor_prev_hunk",
+            Self::ToggleSelection => "toggle_selection",
+            Self::StageCursor => "stage_cursor",
+            Self::Checkout => "checkout",
+            Self::NewBranch => "new_branch",
+            Self::FastForward => "fast_forward",
+            Self::Merge => "merge",
+            Self::DeleteBranch => "delete_branch",
+            Self::RewordCommit => "reword_commit",
+            Self::DropCommit => "drop_commit",
+            Self::Squash => "squash",
+            Self::Fixup => "fixup",
+            Self::EditCommit => "edit_commit",
+            Self::NewFixup => "new_fixup",
+            Self::Autosquash => "autosquash",
+            Self::ApplyStash => "apply_stash",
+            Self::PopStash => "pop_stash",
+            Self::DropStash => "drop_stash",
+        }
+    }
+
+    /// The action called `name`. Every action has a default binding, so the
+    /// defaults list is the list of actions.
+    pub fn from_name(name: &str) -> Option<Self> {
+        DEFAULTS
+            .iter()
+            .map(|&(_, _, action)| action)
+            .find(|action| action.name() == name)
+    }
 }
 
 /// A key and the modifiers that matter. `Shift` is not tracked: a character's
@@ -317,6 +421,22 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Stash, "d", Action::DropStash),
 ];
 
+/// One `[keys]` entry that passed the first checks.
+struct Override {
+    context: Context,
+    action: Action,
+    keys: Vec<KeyBinding>,
+    label: String,
+}
+
+/// `Ctrl-c` quits from anywhere and is not in the keymap, so it cannot be
+/// rebound to anything else either.
+const RESERVED_QUIT: KeyBinding = KeyBinding {
+    code: KeyCode::Char('c'),
+    ctrl: true,
+    alt: false,
+};
+
 /// `(context, key) -> action`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Keymap {
@@ -342,6 +462,122 @@ impl Keymap {
         contexts
             .iter()
             .find_map(|&context| self.bindings.get(&(context, key)).copied())
+    }
+
+    /// The default keymap with the user's `[keys]` applied, and one issue per
+    /// entry that could not be. An entry is `[keys.<context>] <action> = "<key>"`
+    /// (or a list of keys): it replaces that action's default keys in that
+    /// context.
+    ///
+    /// An entry that is wrong keeps its action's defaults and is reported: an
+    /// unknown context or action, an action used outside the contexts it lives
+    /// in, a key that does not parse, `ctrl-c` (which always quits), or a key
+    /// already taken by another action in that context. The rest still apply.
+    /// Every overridden action's defaults are removed before any new key is
+    /// added, so two actions can swap keys. Entries apply in name order, so a
+    /// clash between two entries is decided the same way every run.
+    pub fn from_overrides(overrides: &KeyOverrides) -> (Self, Vec<String>) {
+        let mut issues = Vec::new();
+        let mut entries: Vec<Override> = Vec::new();
+        for (context_name, actions) in overrides {
+            let Some(context) = Context::from_name(context_name) else {
+                issues.push(format!("unknown key context `keys.{context_name}` ignored"));
+                continue;
+            };
+            for (action_name, list) in actions {
+                let label = format!("keys.{context_name}.{action_name}");
+                let Some(action) = Action::from_name(action_name) else {
+                    issues.push(format!("`{label}`: unknown action, ignored"));
+                    continue;
+                };
+                if !DEFAULTS
+                    .iter()
+                    .any(|&(c, _, a)| c == context && a == action)
+                {
+                    issues.push(format!(
+                        "`{label}`: `{action_name}` is not an action of the `{context_name}` context, ignored"
+                    ));
+                    continue;
+                }
+                let mut keys = Vec::new();
+                let mut valid = true;
+                for text in list.texts() {
+                    match KeyBinding::parse(text) {
+                        None => {
+                            issues.push(format!(
+                                "`{label}`: `{text}` is not a key, keeping the default"
+                            ));
+                            valid = false;
+                        },
+                        Some(binding) if binding == RESERVED_QUIT => {
+                            issues.push(format!("`{label}`: ctrl-c always quits and cannot be bound, keeping the default"));
+                            valid = false;
+                        },
+                        Some(binding) if !keys.contains(&binding) => keys.push(binding),
+                        Some(_) => {},
+                    }
+                }
+                if valid {
+                    entries.push(Override {
+                        context,
+                        action,
+                        keys,
+                        label,
+                    });
+                }
+            }
+        }
+
+        let mut map = Self::default().bindings;
+        map.retain(|&(context, _), action| {
+            !entries
+                .iter()
+                .any(|e| e.context == context && e.action == *action)
+        });
+        let mut rejected: Vec<&Override> = Vec::new();
+        for entry in &entries {
+            let clash = entry.keys.iter().find_map(|&key| {
+                map.get(&(entry.context, key))
+                    .filter(|&&other| other != entry.action)
+                    .map(|&other| (key, other))
+            });
+            match clash {
+                Some((key, other)) => {
+                    issues.push(format!(
+                        "`{}`: `{key}` is already bound to `{}` there, keeping the default",
+                        entry.label,
+                        other.name()
+                    ));
+                    rejected.push(entry);
+                },
+                None => {
+                    for &key in &entry.keys {
+                        map.insert((entry.context, key), entry.action);
+                    }
+                },
+            }
+        }
+        for entry in rejected {
+            for &(context, text, action) in DEFAULTS {
+                if context != entry.context || action != entry.action {
+                    continue;
+                }
+                let Some(key) = KeyBinding::parse(text) else {
+                    continue;
+                };
+                match map.entry((context, key)) {
+                    MapEntry::Occupied(_) => issues.push(format!(
+                        "`{}`: its default `{key}` is taken too, so `{}` is unbound",
+                        entry.label,
+                        action.name()
+                    )),
+                    MapEntry::Vacant(slot) => {
+                        slot.insert(action);
+                    },
+                }
+            }
+        }
+        (Self { bindings: map }, issues)
     }
 
     /// Every binding, for help and tests.

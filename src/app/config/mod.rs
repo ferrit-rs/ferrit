@@ -16,6 +16,7 @@
 //! - Nothing in the library reads the real config directory on its own: only
 //!   `Config::load`, which the binary calls, and `tests/config.rs` checks that.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -37,6 +38,31 @@ pub struct Config {
     pub diff: DiffConfig,
     pub commit: CommitConfig,
     pub log: LogConfig,
+    /// `[keys.<context>] <action> = "<key>"`; see `keymap::Keymap::from_overrides`.
+    pub keys: KeyOverrides,
+}
+
+/// `context name -> action name -> keys`, as written in the file. Names and
+/// key text are checked when the keymap is built, not here, so one typo is one
+/// reported entry and not a dropped section.
+pub type KeyOverrides = BTreeMap<String, BTreeMap<String, KeyList>>;
+
+/// One key or several: `quit = "Q"` or `quit = ["Q", "ctrl-q"]`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum KeyList {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl KeyList {
+    /// The key texts, in order.
+    pub fn texts(&self) -> Vec<&str> {
+        match self {
+            Self::One(text) => vec![text.as_str()],
+            Self::Many(texts) => texts.iter().map(String::as_str).collect(),
+        }
+    }
 }
 
 /// `[ui]`: how ferrit talks to the terminal.
@@ -166,6 +192,7 @@ impl Config {
             diff: section(&table, "diff", &mut issues, &mut failed),
             commit: section(&table, "commit", &mut issues, &mut failed),
             log: section(&table, "log", &mut issues, &mut failed),
+            keys: section(&table, "keys", &mut issues, &mut failed),
         };
         // A section that fell back is reported by `section`; its keys would
         // only be listed a second time as unknown.
@@ -175,6 +202,7 @@ impl Config {
         }
         issues.extend(unknown_keys(&file, &config));
         issues.extend(config.clamp_ranges());
+        issues.extend(super::keymap::Keymap::from_overrides(&config.keys).1);
         (config, issues)
     }
 

@@ -18,6 +18,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -207,4 +208,90 @@ fn a_global_binding_still_answers_inside_a_pane_context() {
         terminal.backend().to_string()
     };
     assert!(out.contains("toggle this help"), "{out}");
+}
+
+fn app_with_keys(tag: &str, toml: &str) -> (TempDir, App) {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    let (config, issues) = Config::parse(toml);
+    let load = ConfigLoad {
+        config,
+        file: None,
+        issues,
+    };
+    let app = App::open_with(dir.path(), load).unwrap();
+    (dir, app)
+}
+
+fn frame(app: &mut App) -> String {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal
+        .draw(|f| ferrit::app::screens::draw(f, app))
+        .unwrap();
+    terminal.backend().to_string()
+}
+
+#[test]
+fn a_remapped_key_does_the_action_and_the_old_key_does_not() {
+    let (_dir, mut app) = app_with_keys("keys-remap", "[keys.global]\nhelp = \"H\"\n");
+    app.feed_key(char_key('?'));
+    assert!(
+        !frame(&mut app).contains("toggle this help"),
+        "the old key is unbound"
+    );
+    app.feed_key(char_key('H'));
+    assert!(
+        frame(&mut app).contains("toggle this help"),
+        "the new one opens help"
+    );
+}
+
+#[test]
+fn a_remap_in_one_pane_context_leaves_the_others_alone() {
+    let (dir, mut app) = app_with_keys("keys-pane", "[keys.commits]\ndrop_commit = \"X\"\n");
+    app.feed_key(char_key('4'));
+    app.feed_key(char_key('d'));
+    assert!(
+        app.confirm_message().is_none(),
+        "d no longer drops on Commits"
+    );
+    app.feed_key(char_key('X'));
+    assert!(
+        app.confirm_message()
+            .is_some_and(|m| m.starts_with("drop "))
+    );
+    let _ = dir;
+}
+
+#[test]
+fn ctrl_c_still_quits_whatever_the_config_says() {
+    // `quit = "ctrl-c"` is rejected, so plain `q` still quits ...
+    let (_dir, mut app) = app_with_keys("keys-ctrlc-q", "[keys.global]\nquit = \"ctrl-c\"\n");
+    assert!(!app.is_quitting());
+    app.feed_key(char_key('q'));
+    assert!(app.is_quitting());
+
+    // ... and Ctrl-c quits even with `quit` moved elsewhere and `q` unbound.
+    let (_dir, mut app) = app_with_keys("keys-ctrlc-moved", "[keys.global]\nquit = \"Q\"\n");
+    app.feed_key(char_key('q'));
+    assert!(!app.is_quitting(), "q no longer quits");
+    app.feed_key(modified(KeyCode::Char('c'), KeyModifiers::CONTROL));
+    assert!(app.is_quitting(), "Ctrl-c is not in the keymap");
+}
+
+#[test]
+fn key_problems_reach_the_status_pane_once() {
+    let (_dir, app) = app_with_keys("keys-report", "[keys.global]\nhelp = \"nonsense key\"\n");
+    let status: String = app
+        .status_lines()
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(status.contains("keys.global.help"), "{status}");
 }

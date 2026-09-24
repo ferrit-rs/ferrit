@@ -11,6 +11,7 @@
 //! the old behaviour fails here.
 
 use ferrit::app::Pane;
+use ferrit::app::config::Config;
 use ferrit::app::keymap::{Action, Context, KeyBinding, Keymap};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -268,4 +269,231 @@ fn a_pane_maps_to_its_own_context() {
     assert_eq!(Context::for_pane(Pane::Branches), Some(C::Branches));
     assert_eq!(Context::for_pane(Pane::Commits), Some(C::Commits));
     assert_eq!(Context::for_pane(Pane::Stash), Some(C::Stash));
+}
+
+// ------------------------------------------------------------------ [keys]
+
+/// The keymap a config file's text produces, and what was reported.
+fn from_toml(text: &str) -> (Keymap, Vec<String>) {
+    let (config, config_issues) = Config::parse(text);
+    let (map, issues) = Keymap::from_overrides(&config.keys);
+    // `Config::parse` reports the same key issues, once.
+    assert!(
+        issues.iter().all(|i| config_issues.contains(i)),
+        "{issues:?} vs {config_issues:?}"
+    );
+    (map, issues)
+}
+
+fn resolve(map: &Keymap, context: Context, text: &str) -> Option<Action> {
+    map.resolve(&[context], key(text))
+}
+
+#[test]
+fn every_action_has_a_unique_name_that_reads_back() {
+    let mut actions: Vec<Action> = Vec::new();
+    for &(_, _, action) in EXPECTED {
+        if !actions.contains(&action) {
+            actions.push(action);
+        }
+    }
+    let mut names = std::collections::HashSet::new();
+    for action in actions {
+        assert!(
+            names.insert(action.name()),
+            "two actions are called {}",
+            action.name()
+        );
+        assert_eq!(
+            Action::from_name(action.name()),
+            Some(action),
+            "{}",
+            action.name()
+        );
+    }
+    assert_eq!(Action::from_name("nope"), None);
+    for context in [
+        C::Global,
+        C::Files,
+        C::Diff,
+        C::Branches,
+        C::Commits,
+        C::Stash,
+    ] {
+        assert_eq!(Context::from_name(context.name()), Some(context));
+    }
+}
+
+#[test]
+fn no_overrides_is_the_default_keymap() {
+    let (map, issues) = from_toml("");
+    assert_eq!(map, Keymap::default());
+    assert!(issues.is_empty());
+}
+
+#[test]
+fn an_override_replaces_the_default_key_in_that_context_only() {
+    let (map, issues) = from_toml("[keys.global]\nquit = \"Q\"\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(resolve(&map, C::Global, "Q"), Some(A::Quit));
+    assert_eq!(
+        resolve(&map, C::Global, "q"),
+        None,
+        "the default key is gone"
+    );
+    assert_eq!(
+        resolve(&map, C::Global, "?"),
+        Some(A::Help),
+        "other bindings untouched"
+    );
+}
+
+#[test]
+fn a_list_binds_several_keys() {
+    let (map, issues) = from_toml("[keys.global]\nquit = [\"Q\", \"ctrl-q\", \"Q\"]\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(resolve(&map, C::Global, "Q"), Some(A::Quit));
+    assert_eq!(resolve(&map, C::Global, "ctrl-q"), Some(A::Quit));
+    assert_eq!(
+        map.bindings().filter(|&(_, _, a)| a == A::Quit).count(),
+        2,
+        "a repeat is one binding"
+    );
+}
+
+#[test]
+fn an_empty_list_unbinds_the_action() {
+    let (map, issues) = from_toml("[keys.global]\nquit = []\n");
+    assert!(issues.is_empty());
+    assert_eq!(map.bindings().filter(|&(_, _, a)| a == A::Quit).count(), 0);
+}
+
+#[test]
+fn an_action_can_be_bound_only_where_it_lives() {
+    let (map, issues) =
+        from_toml("[keys.files]\nstage_file = \"S\"\n\n[keys.diff]\ndiscard = \"D\"\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(resolve(&map, C::Files, "S"), Some(A::StageFile));
+    assert_eq!(
+        resolve(&map, C::Files, "d"),
+        Some(A::Discard),
+        "the Files discard is a separate binding"
+    );
+    assert_eq!(resolve(&map, C::Diff, "D"), Some(A::Discard));
+    assert_eq!(resolve(&map, C::Diff, "d"), None);
+}
+
+#[test]
+fn two_actions_can_swap_keys() {
+    let (map, issues) = from_toml("[keys.commits]\nsquash = \"S\"\nfixup = \"s\"\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(resolve(&map, C::Commits, "S"), Some(A::Squash));
+    assert_eq!(resolve(&map, C::Commits, "s"), Some(A::Fixup));
+}
+
+#[test]
+fn a_key_taken_by_another_action_is_reported_and_the_entry_keeps_its_default() {
+    let (map, issues) = from_toml("[keys.files]\nstage_file = \"d\"\n");
+    assert_eq!(issues.len(), 1, "{issues:?}");
+    assert!(
+        issues[0].contains("keys.files.stage_file") && issues[0].contains("`discard`"),
+        "{issues:?}"
+    );
+    assert_eq!(
+        resolve(&map, C::Files, "space"),
+        Some(A::StageFile),
+        "kept its default"
+    );
+    assert_eq!(resolve(&map, C::Files, "d"), Some(A::Discard));
+}
+
+#[test]
+fn a_clash_between_two_entries_is_decided_by_name_order_every_time() {
+    let (map, issues) = from_toml("[keys.files]\nstage_file = \"x\"\nstage_all = \"x\"\n");
+    assert_eq!(issues.len(), 1, "{issues:?}");
+    assert_eq!(
+        resolve(&map, C::Files, "x"),
+        Some(A::StageAll),
+        "`stage_all` sorts first and wins"
+    );
+    assert_eq!(
+        resolve(&map, C::Files, "space"),
+        Some(A::StageFile),
+        "the loser keeps its default"
+    );
+}
+
+#[test]
+fn a_rejected_entry_whose_default_is_also_taken_ends_up_unbound_and_says_so() {
+    let (map, issues) = from_toml("[keys.files]\nstage_all = \"space\"\nstage_file = \"d\"\n");
+    assert_eq!(issues.len(), 2, "{issues:?}");
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.contains("its default `space` is taken too")),
+        "{issues:?}"
+    );
+    assert_eq!(resolve(&map, C::Files, "space"), Some(A::StageAll));
+    assert_eq!(
+        map.bindings()
+            .filter(|&(_, _, a)| a == A::StageFile)
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn each_kind_of_bad_entry_is_reported_once_and_the_rest_still_applies() {
+    let (map, issues) = from_toml(
+        "[keys.global]\nquit = \"Q\"\nhelp = \"not a key at all\"\nrefresh = \"ctrl-c\"\nno_such_action = \"z\"\n\n\
+         [keys.nowhere]\nquit = \"z\"\n\n[keys.files]\nquit = \"z\"\n",
+    );
+    assert_eq!(issues.len(), 5, "{issues:?}");
+    let has = |needle: &str| issues.iter().any(|i| i.contains(needle));
+    assert!(
+        has("`keys.global.help`") && has("is not a key"),
+        "{issues:?}"
+    );
+    assert!(has("ctrl-c always quits"), "{issues:?}");
+    assert!(
+        has("`keys.global.no_such_action`") && has("unknown action"),
+        "{issues:?}"
+    );
+    assert!(has("`keys.nowhere`"), "{issues:?}");
+    assert!(has("not an action of the `files` context"), "{issues:?}");
+    assert_eq!(
+        resolve(&map, C::Global, "Q"),
+        Some(A::Quit),
+        "the valid entry applied"
+    );
+    assert_eq!(
+        resolve(&map, C::Global, "?"),
+        Some(A::Help),
+        "a bad key keeps the default"
+    );
+    assert_eq!(resolve(&map, C::Global, "r"), Some(A::Refresh));
+}
+
+#[test]
+fn ctrl_c_is_never_in_the_keymap() {
+    let (map, _) = from_toml("[keys.global]\nquit = [\"ctrl-c\", \"Q\"]\n");
+    assert!(
+        map.bindings()
+            .all(|(_, binding, _)| binding != key("ctrl-c"))
+    );
+    assert_eq!(
+        resolve(&map, C::Global, "q"),
+        Some(A::Quit),
+        "the whole entry was rejected"
+    );
+}
+
+#[test]
+fn a_keys_section_of_the_wrong_shape_is_dropped_whole_and_named() {
+    let (config, issues) = Config::parse("[keys]\nglobal = 5\n");
+    assert!(config.keys.is_empty());
+    assert!(
+        issues.iter().any(|i| i.starts_with("[keys] ignored")),
+        "{issues:?}"
+    );
 }
