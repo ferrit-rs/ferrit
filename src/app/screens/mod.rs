@@ -12,6 +12,7 @@ use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
+use crate::app::hints::{self, Bar};
 use crate::app::{App, DiffView, PANES, Pane, PopupView};
 use crate::app::{mock, theme};
 use crate::components::ui::key_bar::KeyBar;
@@ -90,7 +91,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     }
 
     if show_help {
-        popups::draw_help(frame, area, app.theme_config.color());
+        let lines = app.help_lines();
+        let rows = popups::draw_help(
+            frame,
+            area,
+            app.theme_config.color(),
+            &lines,
+            app.help_scroll(),
+        );
+        app.set_help_rows(rows);
     }
     let accent = app.theme_config.color();
     match app.popup_view() {
@@ -638,29 +647,28 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     }
 }
 
-/// The bottom key-hint bar, or — while a discard or branch-delete has a
-/// confirm pending — a `message  y yes  n / Esc cancel` prompt in its place
-/// (the phase 6 "small popup, or a one-line prompt in the keybar region"
-/// fallback, since there is no popup primitive for a plain yes/no yet).
-/// Context-sensitive per focus (`docs/PLAN_8_BRANCHES.md`): the Branches
-/// pane's own keys share letters with the default bar's (`d` deletes a
-/// branch there, not a file's worktree change), so it swaps in
-/// `mock::BRANCHES_KEYBAR` instead of silently keeping the wrong hints on
-/// screen; so does Stash (`mock::STASH_KEYBAR`, `docs/PLAN_10_STASH.md`).
+/// The bottom key-hint bar, or, while a discard or branch-delete has a
+/// confirm pending, a `message  y yes  n / Esc cancel` prompt in its place.
+/// The hints are generated from the live keymap (`app::hints`), so a remapped
+/// key shows as remapped, and are cut to the terminal's width. Context
+/// sensitive: an operation stopped mid-way wins, then the focused pane's own
+/// keys (`d` means delete, discard or drop depending on the pane).
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let text = if app.operation.is_some() {
-        mock::OPERATION_KEYBAR
+    let bar = if app.operation.is_some() {
+        Bar::Operation
     } else if app.focus == Pane::Branches && !app.branches_drilled() {
-        mock::BRANCHES_KEYBAR
+        Bar::Branches
     } else if app.focus == Pane::Stash {
-        mock::STASH_KEYBAR
+        Bar::Stash
     } else if app.focus == Pane::Commits && !app.commits_drilled() {
-        mock::COMMITS_KEYBAR
+        Bar::Commits
     } else {
-        mock::KEYBAR
+        Bar::Default
     };
-    match app.confirm_message() {
-        Some(message) => KeyBar::confirm(message).render(frame, area),
-        None => KeyBar::hints(text).render(frame, area),
+    if let Some(message) = app.confirm_message() {
+        KeyBar::confirm(message).render(frame, area);
+        return;
     }
+    let text = hints::keybar_text(&app.keymap, bar, usize::from(area.width));
+    KeyBar::hints(&text).render(frame, area);
 }

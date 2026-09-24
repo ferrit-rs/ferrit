@@ -26,7 +26,7 @@ pub fn confirm_line(message: &str) -> Line<'static> {
     ])
 }
 
-pub fn keybar_line(raw: &'static str) -> Line<'static> {
+pub fn keybar_line(raw: &str) -> Line<'static> {
     let mut spans = Vec::new();
     for (i, segment) in raw.split(" | ").enumerate() {
         if i > 0 {

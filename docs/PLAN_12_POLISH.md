@@ -92,6 +92,26 @@ when the app builds its keymap. `App::is_quitting` is a test seam. The help
 screen and keybars still print the default keys: P3 generates them from the
 keymap.
 
+**Note (P3): what the sketch left open.** A bar is a list of segments
+(`Label: key`, or `Fetch/Pull/Push: f/p/P` for a group) plus two pinned ones,
+`Help` and `Quit`. Too narrow: body segments go from the end first, then
+`Quit`, then `Help`; the pinned pair is what the old bars kept by hand-trimming
+(the Commits bar had lost its fetch group to fit 120 columns; it now returns at
+140). A segment shows the first key of each action; an action the user unbound
+contributes nothing, and a group with all three unbound disappears. The default
+bars at 120 columns read character for character as the hand-written ones did
+(`the_default_bars_read_exactly_as_the_hand_written_ones_did`). Help lists the
+focused pane's context (and the diff cursor's while it is up), then `Global`,
+then `Fixed keys (not remappable)`, in the order of the defaults so it never
+depends on hashing. Actions carry a label and a description in `hints.rs` (an
+`impl Action` beside the tables, not in `keymap.rs`). A description must fit
+the 80-column dialog: a first version cut `commit; nothing staged asks ...` off
+on screen, so `no_help_text_is_longer_than_the_dialog_can_show` pins 50
+characters and shortened five descriptions. Help scrolling keys are fixed, like
+the other overlays'. The `hint: bool` flag and priority list of the sketch became
+the explicit segment tables: which actions earn a hint is a per-bar decision, not
+a property of the action.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -492,7 +512,13 @@ terminal-lifecycle work with its own failure modes, not a config line.
   test when broken: removing the overridden defaults, the clash check, the
   ctrl-c rule, the "only where it lives" rule, restoring a rejected entry's
   defaults.
-- **P3** generated keybars and scrollable help.
+- ✅ **P3** generated keybars and scrollable help (`src/app/hints.rs`).
+  `tests/hints.rs` (13) plus every existing render and keybar test passing
+  unmodified (the hand-written `KEYBAR`, `BRANCHES_KEYBAR`, `STASH_KEYBAR`,
+  `COMMITS_KEYBAR`, `OPERATION_KEYBAR` and `HELP` constants are gone). Each of
+  these fails a test when broken: the bar reading the live keymap, fitting the
+  width, dropping `Help` / `Quit` last, the help scrolling, the help reading the
+  live keymap.
 - **P4** `x` menu with the six seeded entries, right-click, clickable hints.
 - **P5** `Palette`, `dark` / `light`, `[theme.colors]`.
 - **P6** commit and remaining knobs.

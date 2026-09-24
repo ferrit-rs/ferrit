@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod events;
+pub mod hints;
 pub mod keymap;
 pub mod mock;
 pub mod screens;
@@ -478,6 +479,10 @@ pub struct App {
     pub selection: EnumMap<Pane, usize>,
     /// Whether the help overlay is up.
     pub show_help: bool,
+    /// First visible line of the help screen, and how many lines it shows
+    /// (set by the renderer), so scroll keys can stop at the end.
+    help_scroll: usize,
+    help_rows: usize,
     should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
@@ -697,6 +702,8 @@ impl App {
             focus: Pane::default(),
             selection: EnumMap::default(),
             show_help: false,
+            help_scroll: 0,
+            help_rows: 0,
             should_quit: false,
             repo,
             repo_name,
@@ -789,6 +796,20 @@ impl App {
             app.report_error(format!("config{location}: {}", issues.join("; ")));
         }
         Ok(app)
+    }
+
+    /// The help screen's content for the focused pane, from the live keymap.
+    pub(crate) fn help_lines(&self) -> Vec<hints::HelpLine> {
+        hints::help_lines(&self.keymap, &self.key_contexts())
+    }
+
+    pub(crate) fn help_scroll(&self) -> usize {
+        self.help_scroll
+    }
+
+    /// Called by the renderer with how many help lines fit.
+    pub(crate) fn set_help_rows(&mut self, rows: usize) {
+        self.help_rows = rows;
     }
 
     /// `[ui] mouse`: should the terminal capture the mouse?

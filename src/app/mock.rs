@@ -141,48 +141,6 @@ pub fn mock_stashes() -> Vec<StashEntry> {
 /// Bottom box: the commands a real run would have shelled out.
 pub const COMMAND_LOG: &[&str] = &["$ git status --porcelain", "$ git diff src/main.rs"];
 
-/// Bottom line: lazygit-style key hints, `Label: key | ...`. Every segment
-/// here is real (`docs/PLAN_6_STAGING.md`, `docs/PLAN_7_COMMIT.md`,
-/// `docs/PLAN_9_REMOTE.md`). Kept short enough to fit a 120-column
-/// terminal alongside every other segment (`tests/render.rs`) — `l` (also
-/// focuses the diff, alongside `Enter`), `Scroll: J/K` and `Hunk: ]/[` are
-/// documented in `HELP` instead of spending a keybar segment on a binding
-/// already listed there or squeezed out to make room for `f`/`p`/`P`
-/// (`Fetch/Pull/Push: f/p/P`, one combined segment rather than three,
-/// since all three are new in the same phase and none is worth a whole
-/// segment of its own). The default keybar, shown for every pane except
-/// Branches, which swaps in `BRANCHES_KEYBAR` (`ui::draw_keybar`) — its
-/// own keys share letters with these (`d` means something different per
-/// pane) and would otherwise be undiscoverable short of opening `HELP`.
-pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Amend: A | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
-
-/// Bottom line while the Branches pane is focused (and not drilled into a
-/// branch's own commit log, where the default keybar applies instead —
-/// see `App::branches_drilled`). `docs/PLAN_8_BRANCHES.md`,
-/// `docs/PLAN_9_REMOTE.md`: `f`/`p`/`P` work regardless of focus, so they
-/// belong here too, not just in the default bar.
-pub const BRANCHES_KEYBAR: &str = "Checkout: <space> | New: n | Delete: d | Fast-forward: u | \
-     Merge: M | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
-
-/// Bottom line while the Stash pane is focused. `docs/PLAN_10_STASH.md`.
-/// `s` (stash from Files) lives in `HELP`: the default bar has no room left
-/// at 120 columns.
-pub const STASH_KEYBAR: &str =
-    "Apply: <space> | Pop: g | Drop: d | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
-
-/// Bottom line while the Commits pane is focused (and not drilled into a
-/// commit's files). `docs/PLAN_11_REBASE.md` R4: these keys share letters with
-/// the default bar's (`d`, `s`), so the pane swaps its own in. `f` / `p` / `P`
-/// (fetch, pull, push) still work there; the default bar and `HELP` list them,
-/// and this bar has no room left at 120 columns.
-pub const COMMITS_KEYBAR: &str = "Reword: w | Drop: d | Squash: s | Fixup: S | Edit: e | \
-     New fixup!: F | Autosquash: a | Help: ? | Quit: q";
-
-/// Bottom line while a merge, rebase, cherry-pick or revert is stopped mid-way,
-/// on every pane: `m` is the way out (`docs/PLAN_11_REBASE.md` R2).
-pub const OPERATION_KEYBAR: &str =
-    "Continue / skip / abort: m | Stage: <space> | All: a | Commit: c | Help: ? | Quit: q";
-
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
 @@ -1,3 +1,7 @@
@@ -213,42 +171,3 @@ diff --git a/docs/PLAN_1_LAYOUT.md b/docs/PLAN_1_LAYOUT.md
 
 /// Right pane when Stash is focused.
 pub const RIGHT_STASH: &str = "(no stash entries)";
-
-/// Help overlay body, toggled with `?`.
-pub const HELP: &str = "1 .. 5            focus that pane
-Tab / Right       focus next pane; Shift-Tab / Left previous pane
-j / k, Down / Up  move selection down / up
-J K / PgUp PgDn   scroll the diff: line / page (Ctrl-u/d: half page)
-< / >             diff pane to top / bottom
-] / [             next / previous hunk or file
-<space>           stage / unstage the file, or a hunk/lines in the diff
-a                 stage / unstage every changed file
-Enter / l         focus the diff, to stage within it
-h / Esc           (in the diff) back to the file list
-V                 start / clear a line selection
-d                 discard the change under the cursor (asks first)
-c                 open commit popup; with no staged files, ask to stage all
-A                 amend HEAD, message pre-filled
-w                 reword HEAD's message only (Commits: the selected commit)
-d s S e F a       (Commits) drop (asks), squash, fixup, edit; F new fixup!, a autosquash
-Enter: commit Summary; Tab: switch; Enter: body newline
-Meta/Ctrl-Enter: commit body; Ctrl-S: commit alias
-Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify
-Esc               (in the commit popup) cancel, keeping the draft
-<space>           (Branches) checkout the selected branch
-n                 (Branches) new branch from HEAD, named in a popup
-d                 (Branches) delete the selected branch (asks first;
-                  an unmerged one asks a second time, to force it)
-u                 (Branches) fast-forward the selected branch to its
-                  upstream, checked out or not
-M                 (Branches) merge the selected branch into the current one
-Enter / Esc       (new-branch popup) create / cancel, no draft kept
-s                 (Files) stash every change, with a message
-<space> / g / d   (Stash) apply / pop / drop the entry (drop asks)
-f / p / P         fetch / pull / push (Pushing appears on the current branch)
-Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
-Enter / Esc       (remote picker) push to the highlighted one / cancel
-wheel / click     scroll the pane under it / focus a row there
-m                 (merge, rebase, ... stopped) continue / skip / abort
-? / @             toggle this help / the command log
-q / Ctrl-c        quit";

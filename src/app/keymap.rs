@@ -37,6 +37,18 @@ pub enum Context {
 }
 
 impl Context {
+    /// A heading for the help screen.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Global => "Global",
+            Self::Files => "Files",
+            Self::Diff => "Diff cursor",
+            Self::Branches => "Branches",
+            Self::Commits => "Commits",
+            Self::Stash => "Stash",
+        }
+    }
+
     /// The `[keys.<name>]` table name.
     pub fn name(self) -> &'static str {
         match self {
@@ -578,6 +590,38 @@ impl Keymap {
             }
         }
         (Self { bindings: map }, issues)
+    }
+
+    /// The keys `action` has in `context`, in the order the defaults list them
+    /// and then by name, so the order never depends on hashing.
+    pub fn keys(&self, context: Context, action: Action) -> Vec<KeyBinding> {
+        let mut keys: Vec<KeyBinding> = self
+            .bindings
+            .iter()
+            .filter(|&(&(c, _), &a)| c == context && a == action)
+            .map(|(&(_, key), _)| key)
+            .collect();
+        let rank = |key: KeyBinding| {
+            DEFAULTS
+                .iter()
+                .position(|&(c, text, a)| {
+                    c == context && a == action && KeyBinding::parse(text) == Some(key)
+                })
+                .unwrap_or(usize::MAX)
+        };
+        keys.sort_by_key(|&key| (rank(key), key.to_string()));
+        keys
+    }
+
+    /// The actions that live in `context`, in the order the defaults list them.
+    pub fn actions_of(context: Context) -> Vec<Action> {
+        let mut actions: Vec<Action> = Vec::new();
+        for &(c, _, action) in DEFAULTS {
+            if c == context && !actions.contains(&action) {
+                actions.push(action);
+            }
+        }
+        actions
     }
 
     /// Every binding, for help and tests.

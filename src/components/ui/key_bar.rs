@@ -7,7 +7,7 @@ use ratatui::widgets::Paragraph;
 pub struct KeyBar(Line<'static>);
 
 impl KeyBar {
-    pub fn hints(raw: &'static str) -> Self {
+    pub fn hints(raw: &str) -> Self {
         Self(crate::components::ui::style::keybar_line(raw))
     }
 

@@ -11,7 +11,7 @@ use super::{App, Mode, PANES, Pane, events, git};
 impl App {
     /// The contexts a key is looked up in, most specific first: the diff
     /// cursor while it is up, then the focused pane, then everything.
-    fn key_contexts(&self) -> Vec<Context> {
+    pub(super) fn key_contexts(&self) -> Vec<Context> {
         let mut contexts = Vec::with_capacity(3);
         if self.mode == Mode::Diff {
             contexts.push(Context::Diff);

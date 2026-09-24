@@ -58,9 +58,7 @@ impl App {
         }
 
         if self.show_help {
-            if matches!(key.code, KeyCode::Char('?' | 'q') | KeyCode::Esc) {
-                self.show_help = false;
-            }
+            self.help_key(key);
             return;
         }
 
@@ -164,6 +162,32 @@ impl App {
         // Everything else is a keymap lookup (`app::keymap`): the diff cursor
         // keys, the right-pane scroll keys, then the per-pane and global ones.
         self.dispatch_key(key);
+    }
+
+    /// Every key while the help screen is up: `j` / `k` and the arrows scroll,
+    /// `PgUp` / `PgDn` a page, `Home` / `End` the ends; `?`, `q` and `Esc`
+    /// close it. Not remappable, like the other overlays.
+    fn help_key(&mut self, key: KeyEvent) {
+        let total = self.help_lines().len();
+        let max = total.saturating_sub(self.help_rows.max(1));
+        let page = self.help_rows.saturating_sub(1).max(1);
+        match key.code {
+            KeyCode::Char('?' | 'q') | KeyCode::Esc => {
+                self.show_help = false;
+                self.help_scroll = 0;
+            },
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.help_scroll = (self.help_scroll + 1).min(max);
+            },
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.help_scroll = self.help_scroll.saturating_sub(1);
+            },
+            KeyCode::PageDown => self.help_scroll = (self.help_scroll + page).min(max),
+            KeyCode::PageUp => self.help_scroll = self.help_scroll.saturating_sub(page),
+            KeyCode::Home | KeyCode::Char('g') => self.help_scroll = 0,
+            KeyCode::End | KeyCode::Char('G') => self.help_scroll = max,
+            _ => {},
+        }
     }
 
     fn request_author_selection(
@@ -360,6 +384,7 @@ impl App {
 
         if self.show_help {
             self.show_help = false; // any click dismisses the overlay
+            self.help_scroll = 0;
             return;
         }
 

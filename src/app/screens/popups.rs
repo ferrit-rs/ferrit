@@ -6,8 +6,9 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
+use crate::app::hints::HelpLine;
+use crate::app::theme;
 use crate::app::{CommandLogView, CommitPopupView, MenuView};
-use crate::app::{mock, theme};
 use crate::components::tui_overlay::anchor::Anchor;
 use crate::components::tui_overlay::backdrop::Backdrop;
 use crate::components::tui_overlay::overlay::Overlay;
@@ -15,6 +16,7 @@ use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
+use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
 
 const CONFIRM_DIALOG_WIDTH_PERCENT: u16 = 70;
@@ -22,17 +24,73 @@ const CONFIRM_DIALOG_HEIGHT_PERCENT: u16 = 34;
 const CONFIRM_DIALOG_TITLE: &str = " Confirm identity change? ";
 const CONFIRM_DIALOG_HINT: &str = "Y: Confirm · N / Esc: Cancel";
 
-pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, accent: ratatui::style::Color) {
-    let width = 55.min(area.width);
-    let body_rows = u16::try_from(mock::HELP.lines().count())
-        .unwrap_or(area.height)
-        .max(1);
+/// The help screen: one line per binding of the focused pane and of the global
+/// context, scrolled to `scroll`. Returns how many lines fit, so the scroll
+/// keys know where the end is.
+pub(super) fn draw_help(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    accent: ratatui::style::Color,
+    lines: &[HelpLine],
+    scroll: usize,
+) -> usize {
+    let width = 80.min(area.width);
+    let height = area
+        .height
+        .min(u16::try_from(lines.len() + 3).unwrap_or(u16::MAX));
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(" keybindings ", focused))
-        .fit_content(width, body_rows, 0)
+        .size(width, height)
+        .footer_rows(1)
         .border_style(focused)
         .render(frame, area);
-    frame.render_widget(Paragraph::new(mock::HELP), dialog.body);
+    let rows = usize::from(dialog.body.height);
+    let max = lines.len().saturating_sub(rows);
+    let start = scroll.min(max);
+    let key_width = lines
+        .iter()
+        .filter_map(|line| match line {
+            HelpLine::Entry { keys, .. } => Some(keys.chars().count()),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0)
+        .min(24);
+    let rendered: Vec<Line<'static>> = lines
+        .iter()
+        .skip(start)
+        .take(rows)
+        .map(|line| match line {
+            HelpLine::Heading(text) => Line::styled(
+                text.clone(),
+                Style::new().fg(accent).add_modifier(Modifier::BOLD),
+            ),
+            HelpLine::Entry { keys, text } => Line::from(vec![
+                Span::styled(format!("{keys:<key_width$}  "), Style::new().fg(theme::KEY)),
+                Span::raw(text.clone()),
+            ]),
+            HelpLine::Blank => Line::raw(""),
+        })
+        .collect();
+    let [text_area, bar_area] =
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(dialog.body);
+    frame.render_widget(Paragraph::new(rendered), text_area);
+    ScrollBar::new(lines.len(), rows, start)
+        .style(Style::new().fg(theme::IDLE))
+        .render(frame, bar_area);
+    let position = if max == 0 {
+        String::new()
+    } else {
+        format!(" \u{b7} {}/{}", start + rows.min(lines.len()), lines.len())
+    };
+    frame.render_widget(
+        Paragraph::new(Line::styled(
+            format!("j/k scroll \u{b7} ? / Esc close{position}"),
+            Style::new().fg(theme::IDLE),
+        )),
+        dialog.footer,
+    );
+    rows
 }
 
 /// Shared editor popup for commit messages and branch names.
