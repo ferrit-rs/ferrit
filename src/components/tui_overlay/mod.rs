@@ -42,9 +42,9 @@
 //! }
 //! ```
 //!
-//! Call [`OverlayState::tick`] with elapsed time each frame to drive slide animation.
+//! Call [`OverlayState::tick`](state::OverlayState::tick) with elapsed time each frame to drive slide animation.
 //!
-//! For click-outside-to-dismiss, use [`OverlayState::overlay_rect`] for hit testing.
+//! For click-outside-to-dismiss, use [`OverlayState::overlay_rect`](state::OverlayState::overlay_rect) for hit testing.
 //!
 //! [Ratatui]: https://ratatui.rs
 

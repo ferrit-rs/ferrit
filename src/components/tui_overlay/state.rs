@@ -48,11 +48,13 @@ impl OverlayState {
         }
     }
 
+    #[must_use]
     pub fn with_duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
+    #[must_use]
     pub fn with_easing(mut self, easing: Easing) -> Self {
         self.easing = easing;
         self

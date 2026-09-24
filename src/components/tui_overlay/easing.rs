@@ -14,8 +14,8 @@ impl Easing {
         match self {
             Self::Linear => t,
             Self::EaseIn => t * t,
-            Self::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
-            Self::EaseInOut => 3.0 * t * t - 2.0 * t * t * t,
+            Self::EaseOut => (1.0 - t).mul_add(-(1.0 - t), 1.0),
+            Self::EaseInOut => (2.0 * t * t).mul_add(-t, 3.0 * t * t),
         }
     }
 }

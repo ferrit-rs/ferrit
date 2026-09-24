@@ -6,7 +6,7 @@ use ratatui_core::style::Color;
 ///
 /// Sets `bg` to `base` and `fg` to a derived (or explicit) dim color
 /// for all cells outside the overlay rect. Symbols are preserved.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Backdrop {
     base: Color,
     fg: Option<Color>,
@@ -17,13 +17,14 @@ impl Backdrop {
         Self { base, fg: None }
     }
 
+    #[must_use]
     pub fn fg(mut self, color: Color) -> Self {
         self.fg = Some(color);
         self
     }
 
     /// Dim all cells in `area` except those inside `exclude`.
-    pub(crate) fn apply(&self, buf: &mut Buffer, area: Rect, exclude: Rect) {
+    pub(crate) fn apply(self, buf: &mut Buffer, area: Rect, exclude: Rect) {
         let fg = self.resolved_fg();
 
         for y in area.top()..area.bottom() {
@@ -43,7 +44,7 @@ impl Backdrop {
         }
     }
 
-    fn resolved_fg(&self) -> Color {
+    fn resolved_fg(self) -> Color {
         self.fg.unwrap_or_else(|| derive_fg(self.base))
     }
 }

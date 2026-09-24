@@ -53,41 +53,49 @@ impl<'a> Overlay<'a> {
         }
     }
 
+    #[must_use]
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = anchor;
         self
     }
 
+    #[must_use]
     pub fn width(mut self, width: Constraint) -> Self {
         self.width = width;
         self
     }
 
+    #[must_use]
     pub fn height(mut self, height: Constraint) -> Self {
         self.height = height;
         self
     }
 
+    #[must_use]
     pub fn offset(mut self, x: i16, y: i16) -> Self {
         self.offset = (x, y);
         self
     }
 
+    #[must_use]
     pub fn slide(mut self, slide: Slide) -> Self {
         self.slide = Some(slide);
         self
     }
 
+    #[must_use]
     pub fn backdrop(mut self, backdrop: Backdrop) -> Self {
         self.backdrop = Some(backdrop);
         self
     }
 
+    #[must_use]
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self
     }
 
+    #[must_use]
     pub fn bg(mut self, color: Color) -> Self {
         self.bg = Some(color);
         self
@@ -157,25 +165,37 @@ fn clip_by_slide(rect: Rect, slide: Option<Slide>, visibility: f32) -> Rect {
 
     match slide {
         Slide::Right => {
-            let w = (visibility * rect.width as f32).round() as u16;
+            let w = visible_cells(rect.width, visibility);
             Rect::new(rect.right().saturating_sub(w), rect.y, w, rect.height)
         },
 
         Slide::Left => {
-            let w = (visibility * rect.width as f32).round() as u16;
+            let w = visible_cells(rect.width, visibility);
             Rect::new(rect.x, rect.y, w, rect.height)
         },
 
         Slide::Bottom => {
-            let h = (visibility * rect.height as f32).round() as u16;
+            let h = visible_cells(rect.height, visibility);
             Rect::new(rect.x, rect.bottom().saturating_sub(h), rect.width, h)
         },
 
         Slide::Top => {
-            let h = (visibility * rect.height as f32).round() as u16;
+            let h = visible_cells(rect.height, visibility);
             Rect::new(rect.x, rect.y, rect.width, h)
         },
     }
+}
+
+/// `visibility * extent` rounded half up, as a whole number of cells in
+/// `0..=extent`. Found by search rather than a float to integer `as` cast, so
+/// a NaN or out of range `visibility` yields `0` or `extent`, never a wrapped
+/// value.
+fn visible_cells(extent: u16, visibility: f32) -> u16 {
+    let target = visibility.mul_add(f32::from(extent), 0.5);
+    (0..=extent)
+        .rev()
+        .find(|&cells| f32::from(cells) <= target)
+        .unwrap_or(0)
 }
 
 fn clear_region(buf: &mut Buffer, area: Rect) {
@@ -191,5 +211,26 @@ fn fill_bg(buf: &mut Buffer, area: Rect, color: Color) {
         for x in area.left()..area.right() {
             buf[(x, y)].bg = color;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::visible_cells;
+
+    #[test]
+    fn visible_cells_rounds_half_up() {
+        assert_eq!(visible_cells(10, 0.0), 0);
+        assert_eq!(visible_cells(10, 1.0), 10);
+        assert_eq!(visible_cells(10, 0.25), 3);
+        assert_eq!(visible_cells(10, 0.24), 2);
+    }
+
+    #[test]
+    fn visible_cells_stays_within_the_extent() {
+        assert_eq!(visible_cells(10, 5.0), 10);
+        assert_eq!(visible_cells(10, -1.0), 0);
+        assert_eq!(visible_cells(10, f32::NAN), 0);
+        assert_eq!(visible_cells(0, 0.5), 0);
     }
 }
