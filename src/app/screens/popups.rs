@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::app::CommitPopupView;
+use crate::app::{CommandLogView, CommitPopupView};
 use crate::app::{mock, theme};
 use crate::components::tui_overlay::anchor::Anchor;
 use crate::components::tui_overlay::backdrop::Backdrop;
@@ -270,6 +270,52 @@ pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str) {
     frame.render_widget(
         Paragraph::new(Line::styled(
             "Esc / Enter to dismiss",
+            Style::new().fg(theme::IDLE),
+        )),
+        dialog.footer,
+    );
+}
+
+/// The `@` viewer: every recorded command, newest at the bottom, scrolled up
+/// by `view.from_bottom` rows (clamped to what exists).
+pub(super) fn draw_command_log_view(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &CommandLogView,
+    accent: ratatui::style::Color,
+) {
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
+    let dialog = Dialog::new(Line::styled(" command log ", focused))
+        .size(
+            (area.width * 4 / 5).max(40.min(area.width)),
+            (area.height * 4 / 5).max(8.min(area.height)),
+        )
+        .footer_rows(1)
+        .border_style(focused)
+        .render(frame, area);
+    let rows = usize::from(dialog.body.height);
+    let total = view.records.len();
+    let end = total.saturating_sub(view.from_bottom.min(total.saturating_sub(rows)));
+    let start = end.saturating_sub(rows);
+    let lines: Vec<Line<'static>> = view
+        .records
+        .get(start..end)
+        .unwrap_or_default()
+        .iter()
+        .map(theme::command_line)
+        .collect();
+    let body = if lines.is_empty() {
+        vec![Line::styled(
+            "no git command run yet",
+            Style::new().fg(theme::IDLE),
+        )]
+    } else {
+        lines
+    };
+    frame.render_widget(Paragraph::new(body), dialog.body);
+    frame.render_widget(
+        Paragraph::new(Line::styled(
+            format!("{end}/{total} \u{b7} j/k scroll \u{b7} g/G oldest/newest \u{b7} Esc close"),
             Style::new().fg(theme::IDLE),
         )),
         dialog.footer,

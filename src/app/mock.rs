@@ -238,5 +238,5 @@ Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
 Enter / Esc       (remote picker) push to the highlighted one / cancel
 mouse wheel       scroll the pane under the pointer
 click a row       focus that pane, move the cursor there
-?                 toggle this help
+? / @             toggle this help / the command log
 q / Ctrl-c        quit";

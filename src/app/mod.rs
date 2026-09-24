@@ -111,8 +111,17 @@ pub enum PopupView<'a> {
     CommitAllConfirm(&'a mut OverlayState),
     NewBranch(CommitPopupView<'a>),
     Stash(CommitPopupView<'a>),
+    CommandLog(CommandLogView),
     Upstream(CommitPopupView<'a>),
     Note(&'a str),
+}
+
+/// The `@` viewer's render data: every recorded command and how far the view
+/// is scrolled up from the newest.
+#[derive(Debug)]
+pub struct CommandLogView {
+    pub records: Vec<git::command_log::CommandRecord>,
+    pub from_bottom: usize,
 }
 
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
@@ -352,6 +361,12 @@ enum Popup {
     Stash(TextInput),
     /// `P` with no upstream: edit `<remote> <branch>` before first push.
     Upstream(TextInput),
+    /// `@`: every recorded `git` command, newest last (`docs/PLAN_12_POLISH.md`
+    /// P0). `from_bottom` is how many rows the view is scrolled up from the
+    /// newest entry; the renderer clamps it to what fits.
+    CommandLog {
+        from_bottom: usize,
+    },
     /// A dismissible message: a commit failure, "empty commit message", a
     /// branch-op failure, or a merge conflict.
     Note(String),

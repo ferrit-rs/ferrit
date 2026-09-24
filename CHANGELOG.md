@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The command log panel now shows the `git` commands ferrit really ran (the two newest writes, failures in red with their exit code) instead of two hard-coded sample lines. `@` opens a scrollable viewer with every recorded command, reads included (`j`/`k`, `PgUp`/`PgDn`, `g`/`G`, `Esc`). URL credentials are redacted; the log keeps the newest 200.
 - Fixed: `<space>` and `a` no longer stage a conflicted file that still contains merge conflict markers (`<<<<<<<` and `>>>>>>>`). Before, `git add` marked it resolved with the markers inside. `<space>` now says which file to fix; `a` stages everything else and lists what it left. A resolved file, or one that only has a Markdown `=======` underline, stages normally.
 - Stash pane now works: `s` on Files stashes every change (untracked included) with an optional message; on Stash, `<space>` applies, `g` pops, `d` drops after a confirm. The right pane previews the selected entry's diff. A conflicting apply or pop keeps the stash and says so.
 

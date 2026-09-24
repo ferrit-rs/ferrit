@@ -1,6 +1,25 @@
 //! New-branch, upstream-input and note popup state / key handling.
 
-use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInputMode};
+use super::{
+    App, CommandLogView, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInputMode,
+};
+
+/// Rows a `PageUp` / `PageDown` moves the command log viewer.
+const COMMAND_LOG_PAGE: usize = 10;
+
+/// The viewer's scroll offset (rows up from the newest entry) after `key`.
+/// `usize::MAX` means "as far up as it goes"; the renderer clamps it.
+fn scrolled_command_log(from_bottom: usize, key: KeyCode) -> usize {
+    match key {
+        KeyCode::Char('k') | KeyCode::Up => from_bottom.saturating_add(1),
+        KeyCode::Char('j') | KeyCode::Down => from_bottom.saturating_sub(1),
+        KeyCode::PageUp => from_bottom.saturating_add(COMMAND_LOG_PAGE),
+        KeyCode::PageDown => from_bottom.saturating_sub(COMMAND_LOG_PAGE),
+        KeyCode::Home | KeyCode::Char('g') => usize::MAX,
+        KeyCode::End | KeyCode::Char('G') => 0,
+        _ => from_bottom,
+    }
+}
 
 #[derive(Clone, Copy)]
 enum PopupKind {
@@ -8,6 +27,7 @@ enum PopupKind {
     CommitAllConfirm,
     NewBranch,
     Stash,
+    CommandLog,
     Upstream,
     Note,
 }
@@ -20,6 +40,7 @@ impl App {
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
             Popup::Stash(_) => PopupKind::Stash,
+            Popup::CommandLog { .. } => PopupKind::CommandLog,
             Popup::Upstream(_) => PopupKind::Upstream,
             Popup::Note(_) => PopupKind::Note,
         };
@@ -30,6 +51,7 @@ impl App {
             },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
+            PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
@@ -83,6 +105,24 @@ impl App {
             toggles: None,
             hints: "Stash: Enter | Cancel: Esc",
         })
+    }
+
+    /// The `@` viewer's render data: the whole ring, reads included.
+    pub fn command_log_popup(&self) -> Option<CommandLogView> {
+        let Some(Popup::CommandLog { from_bottom }) = &self.popup else {
+            return None;
+        };
+        Some(CommandLogView {
+            records: crate::domain::git::command_log::recent(usize::MAX, true),
+            from_bottom: *from_bottom,
+        })
+    }
+
+    /// `@`: open the command log viewer, scrolled to the newest entry.
+    pub(super) fn open_command_log(&mut self) {
+        if self.popup.is_none() {
+            self.popup = Some(Popup::CommandLog { from_bottom: 0 });
+        }
     }
 
     /// A dismissible note's message (`ui::draw_note_popup`), or `None` when
@@ -150,6 +190,10 @@ impl App {
                     buf.handle_key_event(key, TextInputMode::SingleLine);
                 },
             },
+            Some(Popup::CommandLog { from_bottom }) => match key.code {
+                KeyCode::Esc | KeyCode::Char('@' | 'q') => dismiss = true,
+                other => *from_bottom = scrolled_command_log(*from_bottom, other),
+            },
             Some(Popup::Stash(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => stash_now = true,
@@ -178,5 +222,38 @@ impl App {
         if let Some(value) = submit_upstream {
             self.submit_upstream(&value);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMMAND_LOG_PAGE, KeyCode, scrolled_command_log};
+
+    #[test]
+    fn k_and_j_move_one_row_and_stop_at_the_newest() {
+        assert_eq!(scrolled_command_log(3, KeyCode::Char('k')), 4);
+        assert_eq!(scrolled_command_log(3, KeyCode::Char('j')), 2);
+        assert_eq!(scrolled_command_log(0, KeyCode::Char('j')), 0);
+    }
+
+    #[test]
+    fn pages_jump_and_the_ends_snap() {
+        assert_eq!(scrolled_command_log(0, KeyCode::PageUp), COMMAND_LOG_PAGE);
+        assert_eq!(scrolled_command_log(4, KeyCode::PageDown), 0);
+        assert_eq!(scrolled_command_log(7, KeyCode::Char('g')), usize::MAX);
+        assert_eq!(scrolled_command_log(7, KeyCode::Char('G')), 0);
+    }
+
+    #[test]
+    fn scrolling_up_from_the_far_end_does_not_wrap() {
+        assert_eq!(
+            scrolled_command_log(usize::MAX, KeyCode::Char('k')),
+            usize::MAX
+        );
+    }
+
+    #[test]
+    fn other_keys_leave_the_offset_alone() {
+        assert_eq!(scrolled_command_log(5, KeyCode::Char('x')), 5);
     }
 }

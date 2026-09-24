@@ -9,6 +9,19 @@ as seven independently mergeable slices, P0 to P6 (P7 is the closing polish),
 each with its own tests and changelog line. Stopping after any of them leaves
 ferrit working.
 
+**Deviation (P0): the choke point is `exec::git` / `output` / `track`, not
+one `run` function.** The sketch below has every site call
+`run(workdir, args, env)`. The eight sites do not all fit that shape: two pipe
+a patch or message through stdin, one polls a cancellable child in its own
+process group. So `src/domain/git/exec.rs` offers `git(workdir)` (the only
+constructor of a git `Command`), `output(&mut Command)` (run and record) and
+`track(&Command)` (a handle that records when dropped, with the exit code if
+`finish` was called and `None` otherwise, so a spawn failure or a cancellation
+is still logged exactly once). `tests/git_exec.rs` scans the sources so a new
+`Command::new("git")`, or a child driven without `exec::`, fails the build.
+Logged argv comes from `Command::get_args`, so the recorded line is the one
+that ran.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -368,11 +381,16 @@ terminal-lifecycle work with its own failure modes, not a config line.
 
 ## Milestones
 
-- **P0a** `exec.rs` and the ring buffer, no callers changed. Unit tests.
-- **P0b** the eight call sites move to `exec::run`, one commit per module,
-  suite green after each.
-- **P0c** `draw_command_log` reads the ring; `@` viewer; `[log] show_reads`
-  waits for P1 and defaults to off meanwhile.
+- ✅ **P0a** `exec.rs`, `command_log.rs` (ring of 200, `recent`, redaction,
+  read / write classification). Unit tests.
+- ✅ **P0b** every `git` subprocess site moved onto `exec` (`apply`,
+  `branch`, `commit`, `diff`, `remote`, `stash`), plus the source-scan test.
+  `tests/git_exec.rs` (9 cases); removing `track` from the stdin or network
+  path, or adding a stray `Command::new("git")`, fails it.
+- ✅ **P0c** `draw_command_log` reads the ring (writes only, failures marked
+  `(exit N)`), the author label no longer depends on a command existing,
+  `@` opens `Popup::CommandLog`. `tests/app_command_log.rs` (7 cases).
+  `[log] show_reads` waits for P1; the panel hides reads until then.
 - **P1a** `Config` with today's `theme` section only, error surfacing, merging
   save, `App::open` versus `open_with`, `--config-path`. Behaviour identical.
 - **P1b** `[ui]`, `[diff]`, `[commit]`, `[log]` sections parsed and wired to

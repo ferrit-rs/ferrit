@@ -18,6 +18,7 @@ use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
+use crate::domain::git::command_log;
 use crate::domain::image::preview::Preview;
 
 mod diff;
@@ -105,6 +106,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             popups::draw_commit_all_confirm(frame, area, state, accent);
         },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
+        Some(PopupView::CommandLog(view)) => {
+            popups::draw_command_log_view(frame, area, &view, accent);
+        },
         None => {},
     }
     if let Some(message) = app.confirm_dialog_message().map(str::to_owned) {
@@ -594,31 +598,42 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let [first, second] =
         Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(inner);
     app.set_author_click_area(Rect::ZERO);
-    if let Some(command) = mock::COMMAND_LOG.first() {
-        let line = theme::log_line(command);
-        if let Some(name) = git_user_name {
-            let name = format!("👤 {name}");
-            let name_width =
-                u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
-            let [command_area, name_area] = Layout::horizontal([
-                Constraint::Min(0),
-                Constraint::Length(name_width.min(first.width)),
-            ])
-            .areas(first);
-            frame.render_widget(Paragraph::new(line), command_area);
-            frame.render_widget(
-                Paragraph::new(name)
-                    .alignment(Alignment::Right)
-                    .style(Style::new().fg(theme::IDLE)),
-                name_area,
-            );
-            app.set_author_click_area(name_area);
-        } else {
-            frame.render_widget(Paragraph::new(line), first);
-        }
+
+    // The two newest commands ferrit ran (writes only; `@` lists everything),
+    // oldest on top. A repo-free `App::mock()` keeps its fixed sample.
+    let lines: Vec<Line<'static>> = if app.is_mock() {
+        mock::COMMAND_LOG
+            .iter()
+            .map(|command| theme::log_line(command))
+            .collect()
+    } else {
+        command_log::recent(2, false)
+            .iter()
+            .map(theme::command_line)
+            .collect()
+    };
+    let first_line = lines.first().cloned().unwrap_or_default();
+    if let Some(name) = git_user_name {
+        let name = format!("👤 {name}");
+        let name_width = u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
+        let [command_area, name_area] = Layout::horizontal([
+            Constraint::Min(0),
+            Constraint::Length(name_width.min(first.width)),
+        ])
+        .areas(first);
+        frame.render_widget(Paragraph::new(first_line), command_area);
+        frame.render_widget(
+            Paragraph::new(name)
+                .alignment(Alignment::Right)
+                .style(Style::new().fg(theme::IDLE)),
+            name_area,
+        );
+        app.set_author_click_area(name_area);
+    } else {
+        frame.render_widget(Paragraph::new(first_line), first);
     }
-    if let Some(command) = mock::COMMAND_LOG.get(1) {
-        frame.render_widget(Paragraph::new(theme::log_line(command)), second);
+    if let Some(line) = lines.get(1) {
+        frame.render_widget(Paragraph::new(line.clone()), second);
     }
 }
 

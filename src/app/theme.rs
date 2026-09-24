@@ -12,6 +12,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
+use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
 use crate::domain::git::model::FileEntry;
 use crate::domain::git::model::RemoteEntry;
@@ -695,6 +696,30 @@ pub fn log_line(raw: &'static str) -> Line<'static> {
         Some(cmd) => Line::from(vec![Span::styled("$ ", fg(IDLE)), Span::raw(cmd)]),
         None => Line::styled(raw, fg(IDLE)),
     }
+}
+
+/// Command-log line for a recorded subprocess: dim `$`, the command, and a
+/// red note when it failed. Reads (only listed in the full viewer) are dim.
+pub fn command_line(record: &CommandRecord) -> Line<'static> {
+    let command_style = if record.failed() {
+        fg(DEL)
+    } else if record.kind == CommandKind::Read {
+        fg(IDLE)
+    } else {
+        Style::new()
+    };
+    let mut spans = vec![
+        Span::styled("$ ", fg(IDLE)),
+        Span::styled(record.argv.clone(), command_style),
+    ];
+    if record.failed() {
+        let note = match record.exit {
+            Some(code) => format!("  (exit {code})"),
+            None => "  (not completed)".to_owned(),
+        };
+        spans.push(Span::styled(note, fg(DEL)));
+    }
+    Line::from(spans)
 }
 
 /// A `d` discard confirmation, shown in the keybar region in place of the
