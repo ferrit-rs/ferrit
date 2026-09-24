@@ -22,6 +22,24 @@ is still logged exactly once). `tests/git_exec.rs` scans the sources so a new
 Logged argv comes from `Command::get_args`, so the recorded line is the one
 that ran.
 
+**Deviation (P1a): a section that does not fit falls back alone, and saving
+writes only the section being saved.** The sketch said a file that does not
+parse starts ferrit on the defaults. That is kept for text that is not TOML at
+all; a section of the wrong shape (a bad `[theme]` value) falls back to its own
+defaults and the other sections still apply, with the fallback reported so
+nothing is silent. `Config::save_theme` replaces `[theme]` in the file and
+touches nothing else, rather than writing every owned section: writing them all
+would copy every default into the user's file. It refuses a file that is not
+valid TOML (saving would destroy it) and writes beside the target then renames,
+so a crash cannot truncate it. The loader finds unknown keys by serialising
+the loaded `Config` back and diffing key paths, so the list of known keys is the
+struct itself and cannot drift. `ThemeMode` (drawer state) stays with the theme
+module. `App::open_with` takes a `ConfigLoad` (config, file, issues) instead of
+a bare `Config`, so the save location and the startup issues travel with it.
+The test suite's dependence on the developer's own config directory is gone:
+`App::open` reads and writes no file, and a source scan keeps `Config::load`
+and `default_path` in `main.rs` and `config/mod.rs` only.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -391,8 +409,12 @@ terminal-lifecycle work with its own failure modes, not a config line.
   `(exit N)`), the author label no longer depends on a command existing,
   `@` opens `Popup::CommandLog`. `tests/app_command_log.rs` (7 cases).
   `[log] show_reads` waits for P1; the panel hides reads until then.
-- **P1a** `Config` with today's `theme` section only, error surfacing, merging
-  save, `App::open` versus `open_with`, `--config-path`. Behaviour identical.
+- ✅ **P1a** `Config` (`src/app/config/mod.rs`) with today's `theme` section
+  only, per-section error surfacing, merging save, `App::open` versus
+  `open_with`, `--config-path`. `tests/config.rs` (16); each of these fails a
+  test when broken: the merging save, the refusal to overwrite a non-TOML
+  file, `App::open` reading the real file, unknown-key reporting. See the
+  note below for what differs from the sketch.
 - **P1b** `[ui]`, `[diff]`, `[commit]`, `[log]` sections parsed and wired to
   the constants they replace.
 - **P2a** `Action`, `Context`, `Keymap::default()` and the table test, no

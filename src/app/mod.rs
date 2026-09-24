@@ -5,12 +5,13 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+pub mod config;
 pub mod events;
 pub mod mock;
 pub mod screens;
 pub mod terminal;
 pub mod theme;
-pub(super) mod theme_config;
+pub mod theme_config;
 
 use std::collections::HashSet;
 use std::fmt::{self, Display, Write as _};
@@ -500,6 +501,8 @@ pub struct App {
     theme_palette_selected: usize,
     theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
     theme_saved_config: theme_config::ThemeConfig,
+    /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
+    config_file: Option<PathBuf>,
     profile_hit_areas: screens::profile::ProfileHitAreas,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
@@ -704,6 +707,7 @@ impl App {
             theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
             ),
             theme_saved_config,
+            config_file: None,
             profile_hit_areas: screens::profile::ProfileHitAreas::default(),
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
@@ -753,14 +757,37 @@ impl App {
         }
     }
 
-    /// Open the repo at or above `path`, then take one snapshot.
+    /// Open the repo at or above `path` with the default configuration, then
+    /// take one snapshot. Reads no config file and writes none: the seam tests
+    /// and examples use. The binary uses `open_with` and `Config::load`.
     pub fn open(path: &Path) -> GitResult<Self> {
-        let mut app = Self::base(
-            Some(git::Repo::open(path)?),
-            theme_config::ThemeConfig::load(),
-        );
+        Self::open_with(path, config::ConfigLoad::default())
+    }
+
+    /// Open the repo at or above `path` with a loaded configuration. Whatever
+    /// was wrong with the file is reported once, as an error toast.
+    pub fn open_with(path: &Path, load: config::ConfigLoad) -> GitResult<Self> {
+        let config::ConfigLoad {
+            config,
+            file,
+            issues,
+        } = load;
+        let mut app = Self::base(Some(git::Repo::open(path)?), config.theme);
+        app.config_file = file;
         app.refresh();
+        if !issues.is_empty() {
+            let location = app
+                .config_file
+                .as_deref()
+                .map_or_else(String::new, |f| format!(" {}", f.display()));
+            app.report_error(format!("config{location}: {}", issues.join("; ")));
+        }
         Ok(app)
+    }
+
+    /// Where a settings save writes, if anywhere.
+    pub fn config_file(&self) -> Option<&Path> {
+        self.config_file.as_deref()
     }
 
     /// Repo-free instance backed by `mock` data, for the render tests.

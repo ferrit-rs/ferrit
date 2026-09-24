@@ -1,9 +1,6 @@
-//! User-selected accent theme, persisted in the platform config directory.
+//! User-selected accent theme: the `[theme]` section of `config.toml`
+//! (`app::config`) and the state of the drawer that edits it.
 
-use std::fs;
-use std::path::PathBuf;
-
-use directories::ProjectDirs;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +13,7 @@ pub(super) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
 /// the RGB editor never run together, so one mode replaces two flags that
 /// could otherwise disagree.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) enum ThemeMode {
+pub enum ThemeMode {
     #[default]
     Idle,
     Palette,
@@ -25,7 +22,7 @@ pub(super) enum ThemeMode {
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum Preset {
+pub enum Preset {
     #[default]
     Green,
     Blue,
@@ -34,7 +31,7 @@ pub(super) enum Preset {
 }
 
 impl Preset {
-    pub(super) const fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Green => "Green",
             Self::Blue => "Blue",
@@ -43,7 +40,7 @@ impl Preset {
         }
     }
 
-    pub(super) const fn color(self) -> Color {
+    pub const fn color(self) -> Color {
         match self {
             Self::Green => Color::Green,
             Self::Blue => Color::Cyan,
@@ -52,7 +49,8 @@ impl Preset {
         }
     }
 
-    pub(super) const fn next(self) -> Self {
+    #[must_use]
+    pub const fn next(self) -> Self {
         match self {
             Self::Green => Self::Blue,
             Self::Blue => Self::Purple,
@@ -64,10 +62,10 @@ impl Preset {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default)]
-pub(super) struct ThemeConfig {
-    pub(super) preset: Preset,
+pub struct ThemeConfig {
+    pub preset: Preset,
     /// Optional RGB override; TOML uses Ratatui's `#RRGGBB` serde format.
-    pub(super) accent: Option<Color>,
+    pub accent: Option<Color>,
 }
 
 impl Default for ThemeConfig {
@@ -80,42 +78,7 @@ impl Default for ThemeConfig {
 }
 
 impl ThemeConfig {
-    pub(super) fn color(&self) -> Color {
+    pub fn color(&self) -> Color {
         self.accent.unwrap_or_else(|| self.preset.color())
     }
-
-    fn path() -> Option<PathBuf> {
-        ProjectDirs::from("dev", "Ferrit", "Ferrit")
-            .map(|dirs| dirs.config_dir().join("config.toml"))
-    }
-
-    pub(super) fn load() -> Self {
-        let Some(path) = Self::path() else {
-            return Self::default();
-        };
-        fs::read_to_string(path)
-            .ok()
-            .and_then(|raw| toml::from_str::<ConfigFile>(&raw).ok())
-            .map(|file| file.theme)
-            .unwrap_or_default()
-    }
-
-    pub(super) fn save(&self) -> std::io::Result<()> {
-        let Some(path) = Self::path() else {
-            return Ok(());
-        };
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let body = toml::to_string_pretty(&ConfigFile {
-            theme: self.clone(),
-        })
-        .map_err(std::io::Error::other)?;
-        fs::write(path, body)
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-struct ConfigFile {
-    theme: ThemeConfig,
 }

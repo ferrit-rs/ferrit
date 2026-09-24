@@ -1,9 +1,11 @@
+use std::io::Write;
 use std::path::PathBuf;
 
 use clap::Parser;
 use color_eyre::Result;
 
 use ferrit::app::App;
+use ferrit::app::config::Config;
 use ferrit::app::terminal as tui;
 
 /// A lazygit-style terminal UI for git, written in Rust.
@@ -13,15 +15,28 @@ struct Cli {
     /// Path to the git repository to open.
     #[arg(short, long, default_value = ".")]
     path: PathBuf,
+
+    /// Print where the configuration file is (or would be) and exit.
+    #[arg(long)]
+    config_path: bool,
 }
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
+    if cli.config_path {
+        let location = Config::default_path().map_or_else(
+            || "no config directory".to_owned(),
+            |p| p.display().to_string(),
+        );
+        writeln!(std::io::stdout(), "{location}")?;
+        return Ok(());
+    }
+
     // Open the repo before touching the terminal, so a non-repo path is a
     // plain one-line message and a non-zero exit, no alt-screen garbage.
-    let mut app = match App::open(&cli.path) {
+    let mut app = match App::open_with(&cli.path, Config::load()) {
         Ok(app) => app,
         Err(e) => {
             // The TUI has not taken the screen yet: stderr is the only channel,

@@ -294,7 +294,13 @@ impl App {
         if self.theme_config == self.theme_saved_config {
             return;
         }
-        match self.theme_config.save() {
+        // No file (tests, no config directory): there is nowhere to write, and
+        // that is not an error. The unsaved marker clears either way.
+        let saved = match &self.config_file {
+            Some(path) => super::config::Config::save_theme(path, &self.theme_config),
+            None => Ok(()),
+        };
+        match saved {
             Ok(()) => {
                 self.theme_saved_config = self.theme_config.clone();
                 self.report_notice("Theme saved".to_owned());
