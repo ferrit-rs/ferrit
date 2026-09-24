@@ -317,17 +317,13 @@ an unchanged selection", which the oid key gives for free).
   (`keybar_swaps_for_the_stash_pane`, `stash_popup_renders_title_and_hints`),
   `CHANGELOG.md` line (this also adds the `## [Unreleased]` heading, which
   0.5.0 had consumed), `PLAN_0` status flipped to done.
-- 🟡 **S5** polish: `cargo fmt --check` clean, `src/domain/git/` has no
-  `ratatui` import, the new code adds no clippy diagnostic (the 5 errors and
-  78 warnings `cargo clippy --all-targets` reports were already there before
-  this phase: `unreachable!` / `expect` / indexing in `popups.rs`,
-  `screens/popups.rs` and the colour picker). Two tests were already red on
-  a clean `main` and stay red: `app_remote`
-  `capital_p_with_two_remotes_prefills_editable_upstream` (expects a `master`
-  default branch, this machine's git says `main`) and `scrollbar`
-  `right_pane_thumb_reaches_the_bottom_at_max_scroll`. Edge cases without a
-  test: stash on a detached HEAD or unborn branch, and a stash dropped from
-  another shell between selection and `d` (covered at the backend by
+- 🟡 **S5** polish: `cargo fmt --check` clean, `cargo test` green (199
+  tests), `cargo clippy --all-targets` reports no error (the 5 it had before
+  this phase were fixed in separate commits; 78 warnings remain, pedantic
+  lints in code this phase did not touch), `src/domain/git/` has no
+  `ratatui` import. Still open: edge cases without a test, namely stash on a
+  detached HEAD or an unborn branch, and a stash dropped from another shell
+  between selection and `d` (covered at the backend by
   `an_unknown_oid_is_a_vanished_entry`, not through `App`).
 
 ## Definition of done (phase 10)
