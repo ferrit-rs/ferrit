@@ -503,6 +503,7 @@ pub struct App {
     /// Everything loaded from `config.toml`. Its `theme` is only the value
     /// read at startup: the theme being edited lives in `theme_config`.
     config: config::Config,
+    keymap: keymap::Keymap,
     profile_hit_areas: screens::profile::ProfileHitAreas,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
@@ -634,6 +635,7 @@ mod tree;
 mod branch_actions;
 mod commit;
 pub mod diff_query;
+mod dispatch;
 mod drill_nav;
 mod error;
 pub mod image_query;
@@ -709,6 +711,7 @@ impl App {
             ),
             theme_saved_config,
             config,
+            keymap: keymap::Keymap::default(),
             config_file: None,
             profile_hit_areas: screens::profile::ProfileHitAreas::default(),
             header: git::model::StatusHeader::default(),

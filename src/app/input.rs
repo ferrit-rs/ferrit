@@ -3,7 +3,7 @@
 use super::theme_config::ThemeMode;
 use super::{
     App, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
-    Pane, Position, events, git,
+    Pane, Position,
 };
 
 const KEY_THEME_PALETTE: char = 'p';
@@ -161,110 +161,9 @@ impl App {
             return;
         }
 
-        // `Mode::Diff` keys (Files pane, cursor focused into the diff) take
-        // priority; unhandled ones fall through to the ordinary scroll block
-        // and the generic match below, same as `Mode::Nav`.
-        if self.on_diff_key(key) {
-            self.update_right_pane();
-            return;
-        }
-
-        // Right-pane diff scroll, lazygit's "scroll the main view without
-        // leaving the side panel": J / K by a line, PageUp / PageDown by a
-        // page, Ctrl-u / Ctrl-d by a half page, < / > to the ends, ] / [
-        // between hunks (or files, for a commit). Steps come from the tracked
-        // viewport height. None of these change the selection, so they skip
-        // the `update_right_pane` rebuild and its diff subprocess. Inert unless
-        // the right pane is a real diff.
-        if self.right_is_diff() {
-            let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-            let half = isize::try_from((self.right_viewport / 2).max(1)).unwrap_or(isize::MAX);
-            let page =
-                isize::try_from(self.right_viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
-            match key.code {
-                KeyCode::Char('d') if ctrl => return self.scroll_right(half),
-                KeyCode::Char('u') if ctrl => return self.scroll_right(-half),
-                KeyCode::Char('J') => return self.scroll_right(1),
-                KeyCode::Char('K') => return self.scroll_right(-1),
-                KeyCode::PageDown => return self.scroll_right(page),
-                KeyCode::PageUp => return self.scroll_right(-page),
-                KeyCode::Char('>') => return self.scroll_right(isize::MAX),
-                KeyCode::Char('<') => return self.scroll_right(isize::MIN),
-                KeyCode::Char(']') => return self.jump_diff_anchor(1),
-                KeyCode::Char('[') => return self.jump_diff_anchor(-1),
-                _ => {},
-            }
-        }
-
-        match key.code {
-            KeyCode::Char('q') => self.should_quit = true,
-            KeyCode::Char('?') => self.show_help = true,
-            KeyCode::Char('@') => self.open_command_log(),
-            KeyCode::Char('m') => self.open_operation_menu(),
-            KeyCode::Esc => {
-                self.right_focused = false;
-                if let Some(drill) = self.branch_drill.take() {
-                    self.selection[Pane::Branches] = drill.return_index;
-                }
-                if let Some(drill) = self.commit_drill.take() {
-                    self.selection[Pane::Commits] = drill.return_index;
-                }
-            },
-            KeyCode::Enter => {
-                self.enter_branch_log();
-                self.enter_commit_files();
-                self.toggle_files_dir();
-                self.toggle_commit_dir();
-                self.enter_diff_mode();
-            },
-            KeyCode::Char('l') => self.enter_diff_mode(),
-            KeyCode::Char(' ') if self.focus == Pane::Branches => self.checkout_selected_branch(),
-            KeyCode::Char(' ') if self.focus == Pane::Stash => self.restore_selected_stash(false),
-            KeyCode::Char('g') if self.focus == Pane::Stash => self.restore_selected_stash(true),
-            KeyCode::Char('d') if self.focus == Pane::Stash => self.drop_stash_prompt(),
-            KeyCode::Char('s') if self.focus == Pane::Files => self.open_stash_popup(),
-            KeyCode::Char(' ') => self.stage_selected_file(),
-            KeyCode::Char('a') if self.focus == Pane::Commits => self.autosquash_from_selected(),
-            KeyCode::Char('a') => self.stage_all_files(),
-            KeyCode::Char('n') if self.focus == Pane::Branches => self.open_new_branch_popup(),
-            KeyCode::Char('u') if self.focus == Pane::Branches => {
-                self.fast_forward_selected_branch();
-            },
-            KeyCode::Char('M') if self.focus == Pane::Branches => self.merge_selected_branch(),
-            KeyCode::Char('w') if self.focus == Pane::Commits => self.reword_selected_commit(),
-            KeyCode::Char('d') if self.focus == Pane::Commits => self.drop_commit_prompt(),
-            KeyCode::Char('s') if self.focus == Pane::Commits => self.fold_selected_commit(false),
-            KeyCode::Char('S') if self.focus == Pane::Commits => self.fold_selected_commit(true),
-            KeyCode::Char('e') if self.focus == Pane::Commits => self.edit_selected_commit(),
-            KeyCode::Char('F') if self.focus == Pane::Commits => self.create_fixup_commit(),
-            KeyCode::Char('d') if self.focus == Pane::Branches && self.mode == Mode::Nav => {
-                self.delete_branch_prompt();
-            },
-            KeyCode::Char('d') => self.discard_prompt(),
-            KeyCode::Char('c') => self.open_commit(git::commit::CommitKind::Normal),
-            KeyCode::Char('A') => self.open_commit(git::commit::CommitKind::Amend),
-            KeyCode::Char('w') => self.open_commit(git::commit::CommitKind::Reword),
-            KeyCode::Char('r') => self.request_refresh(),
-            KeyCode::Char('f') => self.trigger_remote_op(events::RemoteOp::Fetch),
-            KeyCode::Char('p') => self.trigger_remote_op(events::RemoteOp::Pull),
-            KeyCode::Char('P') => self.push_current_branch(),
-            KeyCode::Char(c @ '1'..='5') => {
-                if let Some(&pane) = PANES.get(c as usize - '1' as usize) {
-                    self.focus = pane;
-                }
-            },
-            KeyCode::Right | KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.toggle_branches_tab();
-            },
-            KeyCode::Tab | KeyCode::Right => self.focus = self.pane_offset(1),
-            KeyCode::BackTab | KeyCode::Left => self.focus = self.pane_offset(PANES.len() - 1),
-            KeyCode::Char('j') | KeyCode::Down => self.select_down(),
-            KeyCode::Char('k') | KeyCode::Up => self.select_up(),
-            _ => {},
-        }
-
-        // Focus or selection may have moved; keep the right-pane preview in sync.
-        self.update_right_pane();
+        // Everything else is a keymap lookup (`app::keymap`): the diff cursor
+        // keys, the right-pane scroll keys, then the per-pane and global ones.
+        self.dispatch_key(key);
     }
 
     fn request_author_selection(

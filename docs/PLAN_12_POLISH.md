@@ -65,6 +65,18 @@ is what the old arm order (`Right | Left if ctrl` before `Tab | Right`) encoded.
 but ended in methods that returned at once off Files, so the behaviour is the
 same.
 
+**Note (P2b): one flaky test, found by the refactor's full runs.**
+`the_viewer_scrolls_from_the_newest_to_the_oldest` asserted that `log-scroll-30`
+was absent from a frame that also shows the repository's temporary directory
+name, which carries the process id: a pid starting with 30 made it match.
+Reproduced by running the test binary 25 times (1 failure), fixed by using a
+marker (`scrollmark-`) that cannot occur in a directory name, 0 failures in 40
+runs after. Not a keymap effect. The dispatch keeps the old ordering exactly:
+the diff-cursor context first (it consumed a key and returned), then the scroll
+keys (which return without rebuilding the preview), then the pane and global
+bindings, every non-scroll key ending in `update_right_pane`. A scroll key over
+something that is not a diff falls through to the resync, as before.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -453,8 +465,12 @@ terminal-lifecycle work with its own failure modes, not a config line.
   the context fall-through. No behaviour change: `input.rs` does not use it yet.
   Changing one default, adding one, matching modifiers loosely, or moving a
   default to another context each fails a test.
-- **P2b** `input.rs` routes through the keymap; every existing test unmodified
-  and green.
+- ✅ **P2b** `input.rs` routes through the keymap (`src/app/dispatch.rs`:
+  `dispatch_key`, `run_action`, `run_scroll`); `on_diff_key` and the three-stage
+  `match` are gone. Every existing test passes unmodified (one flaky assertion
+  was fixed, see below). `tests/app_keys.rs` (7) pins the deliberate change and
+  the context order; putting `Global` first, dropping the preview resync or
+  dropping the diff context fails 9, 4 and 6 tests.
 - **P2c** `[keys]` parsing, validation, fallbacks.
 - **P3** generated keybars and scrollable help.
 - **P4** `x` menu with the six seeded entries, right-click, clickable hints.

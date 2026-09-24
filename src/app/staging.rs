@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use super::{
     App, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide, DiffView,
-    FileRow, GitResult, Granule, KeyCode, KeyEvent, Mode, Pane, Range, events, git,
-    hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
+    FileRow, GitResult, Granule, Mode, Pane, Range, events, git, hunk_content_id, hunk_id_at,
+    hunk_lines_for, selectable_lines,
 };
 
 impl App {
@@ -503,27 +503,5 @@ impl App {
             },
             None => format!("hunk {}/{total}", current + 1),
         })
-    }
-
-    /// Keys meaningful only in `Mode::Diff`. Returns whether `key` was one
-    /// of them, so `on_key` falls through to the ordinary right-pane scroll
-    /// keys (`J`/`K`/`PageUp`/`PageDown`/`Ctrl-d`/`u`/`<`/`>`) otherwise —
-    /// those still just scroll the shared viewport, unchanged from phase 3.
-    pub(super) fn on_diff_key(&mut self, key: KeyEvent) -> bool {
-        if self.mode != Mode::Diff {
-            return false;
-        }
-        match key.code {
-            KeyCode::Esc | KeyCode::Char('h') => self.leave_diff_mode(),
-            KeyCode::Char('j') | KeyCode::Down => self.move_diff_cursor(1),
-            KeyCode::Char('k') | KeyCode::Up => self.move_diff_cursor(-1),
-            KeyCode::Char(']') => self.jump_diff_cursor_hunk(1),
-            KeyCode::Char('[') => self.jump_diff_cursor_hunk(-1),
-            KeyCode::Char('V') => self.toggle_diff_anchor(),
-            KeyCode::Char(' ') => self.stage_diff_cursor(),
-            KeyCode::Char('d') => self.discard_prompt(),
-            _ => return false,
-        }
-        true
     }
 }

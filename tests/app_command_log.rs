@@ -209,28 +209,31 @@ fn the_viewer_scrolls_from_the_newest_to_the_oldest() {
     let (dir, mut app) = dirty_app("log-scroll");
     let repo = Repo::open(dir.path()).unwrap();
     for i in 0..60 {
-        let _ = repo.checkout(&format!("log-scroll-{i:02}"));
+        let _ = repo.checkout(&format!("scrollmark-{i:02}"));
     }
     app.feed_key(char_key('@'));
 
+    // The marker is not part of the temp directory name, which the Status pane
+    // shows and which carries the process id (a pid starting with 30 once made
+    // `log-scroll-30` match it).
     // The panel behind the viewer always shows the two newest commands
     // (58 and 59), so these checks use entries only the viewer can show.
     let newest = frame(&mut app, 100, 24);
-    assert!(newest.contains("log-scroll-50"), "{newest}");
-    assert!(!newest.contains("log-scroll-30"), "{newest}");
+    assert!(newest.contains("scrollmark-50"), "{newest}");
+    assert!(!newest.contains("scrollmark-30"), "{newest}");
 
     for _ in 0..25 {
         app.feed_key(char_key('k'));
     }
     let scrolled = frame(&mut app, 100, 24);
-    assert!(scrolled.contains("log-scroll-30"), "{scrolled}");
-    assert!(!scrolled.contains("log-scroll-50"), "{scrolled}");
+    assert!(scrolled.contains("scrollmark-30"), "{scrolled}");
+    assert!(!scrolled.contains("scrollmark-50"), "{scrolled}");
 
     app.feed_key(char_key('G'));
-    assert!(frame(&mut app, 100, 24).contains("log-scroll-50"));
+    assert!(frame(&mut app, 100, 24).contains("scrollmark-50"));
     app.feed_key(char_key('g'));
     let oldest = frame(&mut app, 100, 24);
-    assert!(!oldest.contains("log-scroll-50"), "{oldest}");
+    assert!(!oldest.contains("scrollmark-50"), "{oldest}");
 }
 
 #[test]
