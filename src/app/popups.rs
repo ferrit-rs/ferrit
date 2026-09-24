@@ -141,8 +141,8 @@ impl App {
                     dismiss = true;
                 }
             },
-            Some(Popup::Commit(_)) => unreachable!("commit popup routed above"),
-            Some(Popup::CommitAllConfirm) => unreachable!("commit confirmation routed above"),
+            // Both are routed to their own handlers above.
+            Some(Popup::Commit(_) | Popup::CommitAllConfirm) => {},
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => create_branch_now = true,
