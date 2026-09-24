@@ -43,14 +43,11 @@ impl Activity {
             let week_offset = i64::try_from(week_index).unwrap_or(0);
             let week_start = start.saturating_add(week_offset * 7);
             let (_, month, _) = civil_date(week_start + 3);
+            let month_changed = month != previous_month;
+            previous_month = month;
             let week = ActivityWeek {
                 days: [0; DAYS_PER_WEEK],
-                month_label: if month != previous_month {
-                    previous_month = month;
-                    Some(month_name(month))
-                } else {
-                    None
-                },
+                month_label: month_changed.then(|| month_name(month)),
             };
             weeks.push(week);
         }

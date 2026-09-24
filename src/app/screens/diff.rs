@@ -55,7 +55,7 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
     app.set_right_viewport(viewport);
 }
 
-/// One-sided file changes use a single full-width panel, matching LazyGit's
+/// One-sided file changes use a single full-width panel, matching lazygit's
 /// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
 pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     app.set_right_area(area);

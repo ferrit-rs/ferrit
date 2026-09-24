@@ -20,18 +20,13 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
             .lines(width)
     };
     let mut lines = divider("Repository activity · local and remote branches");
-    if width < COMPACT_ACTIVITY_WIDTH {
-        lines.push(Line::from(format!(
-            "{} commits in the past year",
-            activity.commit_count
-        )));
-    } else {
+    if width >= COMPACT_ACTIVITY_WIDTH {
         lines.extend(heatmap_lines(activity));
-        lines.push(Line::from(format!(
-            "{} commits in the past year",
-            activity.commit_count
-        )));
     }
+    lines.push(Line::from(format!(
+        "{} commits in the past year",
+        activity.commit_count
+    )));
     lines.extend(divider("Contributors · past year"));
     if activity.contributors.is_empty() {
         lines.push(Line::from("No contributors in the past year"));

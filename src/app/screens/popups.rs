@@ -51,7 +51,7 @@ pub(super) fn draw_commit(
             .title(Line::styled(format!(" {} ", view.title), focused));
         // The commit editor always carries its overlay state; without it
         // there is nothing to anchor, so draw nothing.
-        let Some(mut overlay_state) = view.overlay_state.take() else {
+        let Some(overlay_state) = view.overlay_state.take() else {
             return;
         };
         frame.render_stateful_widget(
@@ -64,7 +64,7 @@ pub(super) fn draw_commit(
                 )
                 .block(block),
             area,
-            &mut overlay_state,
+            overlay_state,
         );
         let Some(inner) = overlay_state.inner_area() else {
             return;
@@ -74,7 +74,7 @@ pub(super) fn draw_commit(
         let [summary_area, description_area] =
             Layout::vertical([Constraint::Length(3), Constraint::Min(5)]).areas(body_area);
         let summary_style = if view.summary_focused { focused } else { idle };
-        let description_style = if !view.summary_focused { focused } else { idle };
+        let description_style = if view.summary_focused { idle } else { focused };
         let summary_block = Panel::new()
             .title(Line::styled(" Summary ", summary_style))
             .border_style(summary_style)
