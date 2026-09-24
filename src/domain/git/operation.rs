@@ -7,7 +7,29 @@ use std::fs;
 
 use git2::{Repository, RepositoryState};
 
+use crate::domain::git::diff::workdir;
+use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::exec;
 use crate::domain::git::model::Operation;
+
+/// What the user asks of a stopped operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    Continue,
+    /// Not available for a merge: git has no `merge --skip`.
+    Skip,
+    Abort,
+}
+
+/// Where the repository is after a step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationOutcome {
+    /// No operation in progress any more.
+    Done,
+    /// Git stopped again and waits for the user: on a conflict, or, for a
+    /// rebase, at an `edit` step.
+    Stopped { conflicted: bool },
+}
 
 /// The operation in progress, or `None` for a clean repository. Bisect and
 /// mailbox (`git am`) states map to `None`: ferrit has no flow for them, and
@@ -43,5 +65,65 @@ fn rebase_progress(repo: &Repository, dir: &str, step_file: &str, total_file: &s
     Operation::Rebase {
         step: read(step_file),
         total: read(total_file),
+    }
+}
+
+/// Run `git <operation> --continue|--skip|--abort` for whatever operation is
+/// in progress, with the editor neutralised (`GIT_EDITOR=true`: ferrit owns the
+/// terminal, an editor would hang).
+///
+/// The outcome comes from the repository afterwards, not the exit code: a
+/// `--continue` that reaches the next conflicting commit exits non-zero and
+/// is `Stopped`, while git refusing to continue over an unresolved file also
+/// exits non-zero and is an error. The two are told apart by git's
+/// `CONFLICT (` report, which only a fresh conflict prints.
+pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome> {
+    let Some(operation) = current(repo) else {
+        return Err(GitError::OperationFailed(
+            "no operation in progress".to_owned(),
+        ));
+    };
+    let (command, flag) = match (operation, step) {
+        (Operation::Merge, Step::Skip) => {
+            return Err(GitError::OperationFailed(
+                "a merge cannot be skipped".to_owned(),
+            ));
+        },
+        (Operation::Merge, _) => ("merge", flag(step)),
+        (Operation::Rebase { .. }, _) => ("rebase", flag(step)),
+        (Operation::CherryPick, _) => ("cherry-pick", flag(step)),
+        (Operation::Revert, _) => ("revert", flag(step)),
+    };
+    let mut cmd = exec::git(workdir(repo)?);
+    cmd.env("GIT_EDITOR", "true").arg(command).arg(flag);
+    let out = exec::output(&mut cmd)
+        .map_err(|e| GitError::OperationFailed(format!("cannot run git: {e}")))?;
+
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let conflicted = repo.index().is_ok_and(|mut index| {
+        // The subprocess rewrote the index; drop the cached copy.
+        index.read(true).is_ok() && index.has_conflicts()
+    });
+    if out.status.success() {
+        return Ok(match current(repo) {
+            None => OperationOutcome::Done,
+            Some(_) => OperationOutcome::Stopped { conflicted },
+        });
+    }
+    if text.contains("CONFLICT (") && current(repo).is_some() {
+        return Ok(OperationOutcome::Stopped { conflicted: true });
+    }
+    Err(GitError::OperationFailed(text.trim().to_owned()))
+}
+
+fn flag(step: Step) -> &'static str {
+    match step {
+        Step::Continue => "--continue",
+        Step::Skip => "--skip",
+        Step::Abort => "--abort",
     }
 }

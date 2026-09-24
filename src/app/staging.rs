@@ -447,6 +447,9 @@ impl App {
                 }
             },
             ConfirmAction::DropStash { oid } => self.drop_stash(&oid),
+            ConfirmAction::AbortOperation => {
+                self.apply_operation_step(git::operation::Step::Abort);
+            },
             ConfirmAction::ForcePush => {
                 if let Some(sender) = self.event_sender.clone() {
                     self.start_remote_op_with_force(

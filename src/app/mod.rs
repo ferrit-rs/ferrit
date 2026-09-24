@@ -112,6 +112,7 @@ pub enum PopupView<'a> {
     NewBranch(CommitPopupView<'a>),
     Stash(CommitPopupView<'a>),
     CommandLog(CommandLogView),
+    Menu(MenuView),
     Upstream(CommitPopupView<'a>),
     Note(&'a str),
 }
@@ -122,6 +123,20 @@ pub enum PopupView<'a> {
 pub struct CommandLogView {
     pub records: Vec<git::command_log::CommandRecord>,
     pub from_bottom: usize,
+}
+
+/// A menu's render data: the title, one line per row, and the highlighted
+/// row.
+#[derive(Debug)]
+pub struct MenuView {
+    pub title: String,
+    pub rows: Vec<String>,
+    pub selected: usize,
+}
+
+/// `Operation::noun` as a function pointer for `Option::map_or`.
+fn operation_noun(operation: git::model::Operation) -> &'static str {
+    operation.noun()
 }
 
 /// A branch's own commit log for the passive `DiffView::BranchLog` preview.
@@ -266,6 +281,8 @@ enum ConfirmAction {
     /// is `false` on the first confirm, `true` on the second one offered
     /// after an unmerged-branch refusal (`App::run_confirm`).
     DeleteBranch { name: String, force: bool },
+    /// Abort the merge, rebase, cherry-pick or revert in progress (`m` menu).
+    AbortOperation,
     /// `d` on the Stash pane: `git stash drop`, resolved by oid.
     DropStash { oid: String },
     /// Push a branch known to be behind its upstream, using a lease guard.
@@ -361,6 +378,9 @@ enum Popup {
     Stash(TextInput),
     /// `P` with no upstream: edit `<remote> <branch>` before first push.
     Upstream(TextInput),
+    /// A list of actions to pick from (`app::menu`): the `m` menu for an
+    /// operation stopped mid-way, and later the `x` menu.
+    Menu(menu::MenuState),
     /// `@`: every recorded `git` command, newest last (`docs/PLAN_12_POLISH.md`
     /// P0). `from_bottom` is how many rows the view is scrolled up from the
     /// newest entry; the renderer clamps it to what fits.
@@ -613,6 +633,7 @@ mod drill_nav;
 mod error;
 pub mod image_query;
 mod input;
+mod menu;
 mod popups;
 mod remote;
 mod staging;

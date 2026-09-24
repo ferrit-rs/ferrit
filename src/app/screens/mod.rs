@@ -106,6 +106,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             popups::draw_commit_all_confirm(frame, area, state, accent);
         },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
+        Some(PopupView::Menu(view)) => popups::draw_menu(frame, area, &view, accent),
         Some(PopupView::CommandLog(view)) => {
             popups::draw_command_log_view(frame, area, &view, accent);
         },
@@ -647,7 +648,9 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// `mock::BRANCHES_KEYBAR` instead of silently keeping the wrong hints on
 /// screen; so does Stash (`mock::STASH_KEYBAR`, `docs/PLAN_10_STASH.md`).
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let text = if app.focus == Pane::Branches && !app.branches_drilled() {
+    let text = if app.operation.is_some() {
+        mock::OPERATION_KEYBAR
+    } else if app.focus == Pane::Branches && !app.branches_drilled() {
         mock::BRANCHES_KEYBAR
     } else if app.focus == Pane::Stash {
         mock::STASH_KEYBAR

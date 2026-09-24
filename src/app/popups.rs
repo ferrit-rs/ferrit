@@ -1,7 +1,8 @@
 //! New-branch, upstream-input and note popup state / key handling.
 
 use super::{
-    App, CommandLogView, CommitPopupView, KeyCode, KeyEvent, Popup, PopupView, TextInputMode,
+    App, CommandLogView, CommitPopupView, KeyCode, KeyEvent, MenuView, Popup, PopupView,
+    TextInputMode,
 };
 
 /// Rows a `PageUp` / `PageDown` moves the command log viewer.
@@ -28,6 +29,7 @@ enum PopupKind {
     NewBranch,
     Stash,
     CommandLog,
+    Menu,
     Upstream,
     Note,
 }
@@ -41,6 +43,7 @@ impl App {
             Popup::NewBranch(_) => PopupKind::NewBranch,
             Popup::Stash(_) => PopupKind::Stash,
             Popup::CommandLog { .. } => PopupKind::CommandLog,
+            Popup::Menu(_) => PopupKind::Menu,
             Popup::Upstream(_) => PopupKind::Upstream,
             Popup::Note(_) => PopupKind::Note,
         };
@@ -52,6 +55,7 @@ impl App {
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
             PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
+            PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
@@ -118,6 +122,22 @@ impl App {
         })
     }
 
+    /// The menu's render data: each row is `label (shortcut)`.
+    pub fn menu_popup(&self) -> Option<MenuView> {
+        let Some(Popup::Menu(menu)) = &self.popup else {
+            return None;
+        };
+        Some(MenuView {
+            title: menu.title.clone(),
+            rows: menu
+                .items
+                .iter()
+                .map(|item| format!("{}  ({})", item.label, item.shortcut))
+                .collect(),
+            selected: menu.selected,
+        })
+    }
+
     /// `@`: open the command log viewer, scrolled to the newest entry.
     pub(super) fn open_command_log(&mut self) {
         if self.popup.is_none() {
@@ -169,6 +189,10 @@ impl App {
             self.commit_all_confirm_key(key);
             return;
         }
+        if matches!(self.popup, Some(Popup::Menu(_))) {
+            self.menu_key(key);
+            return;
+        }
         let mut dismiss = false;
         let mut create_branch_now = false;
         let mut stash_now = false;
@@ -182,7 +206,7 @@ impl App {
                 }
             },
             // Both are routed to their own handlers above.
-            Some(Popup::Commit(_) | Popup::CommitAllConfirm) => {},
+            Some(Popup::Commit(_) | Popup::CommitAllConfirm | Popup::Menu(_)) => {},
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => create_branch_now = true,

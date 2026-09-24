@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::app::{CommandLogView, CommitPopupView};
+use crate::app::{CommandLogView, CommitPopupView, MenuView};
 use crate::app::{mock, theme};
 use crate::components::tui_overlay::anchor::Anchor;
 use crate::components::tui_overlay::backdrop::Backdrop;
@@ -15,6 +15,7 @@ use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::panel::Panel;
+use crate::components::ui::select_list::SelectList;
 
 const CONFIRM_DIALOG_WIDTH_PERCENT: u16 = 70;
 const CONFIRM_DIALOG_HEIGHT_PERCENT: u16 = 34;
@@ -316,6 +317,42 @@ pub(super) fn draw_command_log_view(
     frame.render_widget(
         Paragraph::new(Line::styled(
             format!("{end}/{total} \u{b7} j/k scroll \u{b7} g/G oldest/newest \u{b7} Esc close"),
+            Style::new().fg(theme::IDLE),
+        )),
+        dialog.footer,
+    );
+}
+
+/// A list of actions with the highlighted row filled, `Enter` or a row's own
+/// letter to run it.
+pub(super) fn draw_menu(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &MenuView,
+    accent: ratatui::style::Color,
+) {
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
+    let rows = u16::try_from(view.rows.len()).unwrap_or(u16::MAX).max(1);
+    let dialog = Dialog::new(Line::styled(format!(" {} ", view.title), focused))
+        .fit_content(44.min(area.width), rows, 1)
+        .border_style(focused)
+        .render(frame, area);
+    let lines: Vec<Line<'static>> = view
+        .rows
+        .iter()
+        .map(|row| Line::from(format!(" {row}")))
+        .collect();
+    SelectList::new(&lines, view.selected)
+        .selection_style(
+            Style::new()
+                .fg(theme::SELECTION_FG)
+                .bg(theme::SELECTION)
+                .add_modifier(Modifier::BOLD),
+        )
+        .render(frame, dialog.body);
+    frame.render_widget(
+        Paragraph::new(Line::styled(
+            "Enter / letter run \u{b7} Esc close",
             Style::new().fg(theme::IDLE),
         )),
         dialog.footer,

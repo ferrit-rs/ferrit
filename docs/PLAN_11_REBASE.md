@@ -1,5 +1,21 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Deviation (R2): all four operations, one outcome type.** The milestone said
+"a merge in progress". The menu is generic and the four command lines are one
+each, so rebase, cherry-pick and revert ship with it, and their `--continue`,
+`--skip` and `--abort` are tested here (R1 had promised the cherry-pick and
+revert rows would be tested; they are, in `tests/git_rebase.rs`). The outcome
+type is `OperationOutcome { Done, Stopped { conflicted } }` in
+`domain/git/operation.rs`, not `RebaseOutcome` in `rebase.rs`, because a merge
+continue is not a rebase; R3 reuses it. `Repo::operation_step(step)` takes no
+operation argument: it reads the current state itself, so a stale value cannot
+pick the wrong command. Checked: `git merge --skip` does not exist ("unknown
+option"), and a `--continue` over an unresolved file prints no `CONFLICT (`
+line while one that reaches a new conflict does, which is how the two are told
+apart. While an operation is stopped, the `Continue / skip / abort: m` keybar
+replaces the default one on every pane, Branches and Stash included, since
+most of their keys are refused mid-operation anyway.
+
 **Deviation (R1): the keybar hint ships with the menu, in R2.** R1 was
 planned to add a `Menu: m` hint. `m` does nothing until R2 builds the menu,
 so the hint would point at a dead key. R1 ships the state read and the
@@ -372,8 +388,13 @@ swap.
   revert mapping, the badge position or the refresh assignment fails them.
   The keybar `Menu: m` hint moved to R2 (see the note at the top): showing it
   before `m` does anything would advertise a dead key.
-- **R2** `Popup::Menu` primitive and the `m` menu for a merge in progress
-  (continue, abort with confirm). Closes phase 8's dangling note.
+- ✅ **R2** `Popup::Menu` primitive (`src/app/menu.rs`, `SelectList` inside a
+  `Dialog`) and the `m` menu. Covers all four operations, not only a merge
+  (see the note at the top). `tests/git_rebase.rs` (18) and
+  `tests/app_menu.rs` (14) green; each of these fails a test when broken: the
+  skip flag, the `CONFLICT (` check, the abort confirm, a merge row for skip.
+  Closes phase 8's dangling note: the conflicted-merge popup now points at
+  `m`.
 - **R3** `rebase.rs`: `build_todo`, `rebase_edit`, `autosquash`, outcomes,
   errors. Backend tests green, no UI yet.
 - **R4** Commits pane keys `w` / `d` / `s` / `S` / `e`, reword popup with

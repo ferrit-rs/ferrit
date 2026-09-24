@@ -82,6 +82,11 @@ pub enum GitError {
     /// `NothingStaged` next to the generic `CommitFailed`.
     #[error("no upstream configured for the current branch")]
     NoUpstream,
+    /// `git <operation> --continue|--skip|--abort` was refused, or asked of
+    /// an operation that has no such step (a merge cannot be skipped). Holds
+    /// git's own message. See `docs/PLAN_11_REBASE.md`.
+    #[error("git operation failed: {0}")]
+    OperationFailed(String),
     /// A `git stash` subprocess exited non-zero (apply onto a dirty
     /// worktree it would clobber, a stash entry that vanished). Holds
     /// stderr. See `docs/PLAN_10_STASH.md`.

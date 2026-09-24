@@ -198,8 +198,8 @@ impl App {
             Ok(git::branch::MergeOutcome::Conflicted) => {
                 let files = self.conflicted_paths().join(", ");
                 self.popup = Some(Popup::Note(format!(
-                    "merge conflict in {files}. Resolve and commit, or `git merge --abort` \
-                     from the shell — conflict resolution UI is phase 11."
+                    "merge conflict in {files}. Fix the files and stage them with <space>, \
+                     then press m and choose Continue, or Abort."
                 )));
             },
             Err(e) => self.report_error(e),

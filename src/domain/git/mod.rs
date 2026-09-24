@@ -20,7 +20,7 @@ pub mod error;
 mod exec;
 pub mod log;
 pub mod model;
-mod operation;
+pub mod operation;
 pub mod refs;
 pub mod remote;
 pub mod stash;
@@ -407,6 +407,11 @@ impl Repo {
     /// The entry's patch, for the right pane.
     pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
         diff::stash_diff(&self.inner, oid, opts)
+    }
+
+    /// Continue, skip or abort the operation git is stopped in.
+    pub fn operation_step(&self, step: operation::Step) -> GitResult<operation::OperationOutcome> {
+        operation::step(&self.inner, step)
     }
 
     /// The merge, rebase, cherry-pick or revert git is stopped in, if any.

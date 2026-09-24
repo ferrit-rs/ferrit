@@ -333,5 +333,5 @@ fn m_on_a_conflicting_merge_shows_a_dismissible_note() {
 
     let note = app.note_popup().expect("a conflict shows a note");
     assert!(note.contains("a.txt"), "names the conflicted file: {note}");
-    assert!(note.contains("phase 11"));
+    assert!(note.contains("press m"), "{note}");
 }

@@ -170,6 +170,11 @@ pub const BRANCHES_KEYBAR: &str = "Checkout: <space> | New: n | Delete: d | Fast
 pub const STASH_KEYBAR: &str =
     "Apply: <space> | Pop: g | Drop: d | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
 
+/// Bottom line while a merge, rebase, cherry-pick or revert is stopped mid-way,
+/// on every pane: `m` is the way out (`docs/PLAN_11_REBASE.md` R2).
+pub const OPERATION_KEYBAR: &str =
+    "Continue / skip / abort: m | Stage: <space> | All: a | Commit: c | Help: ? | Quit: q";
+
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
 @@ -1,3 +1,7 @@
@@ -236,7 +241,7 @@ s                 (Files) stash every change, with a message
 f / p / P         fetch / pull / push (Pushing appears on the current branch)
 Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
 Enter / Esc       (remote picker) push to the highlighted one / cancel
-mouse wheel       scroll the pane under the pointer
-click a row       focus that pane, move the cursor there
+wheel / click     scroll the pane under it / focus a row there
+m                 (merge, rebase, ... stopped) continue / skip / abort
 ? / @             toggle this help / the command log
 q / Ctrl-c        quit";

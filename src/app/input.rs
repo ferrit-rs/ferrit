@@ -200,6 +200,7 @@ impl App {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('@') => self.open_command_log(),
+            KeyCode::Char('m') => self.open_operation_menu(),
             KeyCode::Esc => {
                 self.right_focused = false;
                 if let Some(drill) = self.branch_drill.take() {

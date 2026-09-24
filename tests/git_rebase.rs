@@ -18,7 +18,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::domain::git::Repo;
+use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::model::Operation;
+use ferrit::domain::git::operation::{OperationOutcome, Step};
 use git2::{IndexAddOption, Repository, Signature};
 
 struct TempDir(PathBuf);
@@ -294,4 +296,208 @@ fn labels_are_stable() {
         "REBASING 1/4"
     );
     assert_eq!(Operation::Rebase { step: 0, total: 0 }.label(), "REBASING");
+}
+
+fn step(dir: &TempDir, step: Step) -> Result<OperationOutcome, GitError> {
+    Repo::open(dir.path())?.operation_step(step)
+}
+
+fn conflicted_merge(dir: &TempDir) {
+    git(dir.path(), &["checkout", "-q", "-b", "side", "HEAD~2"]);
+    fs::write(dir.path().join("f"), "side\n").unwrap();
+    git(dir.path(), &["commit", "-qam", "side"]);
+    git(dir.path(), &["checkout", "-q", "main"]);
+    assert!(!try_git(dir.path(), &["merge", "side"], &[]));
+}
+
+fn resolve(dir: &TempDir, content: &str) {
+    fs::write(dir.path().join("f"), format!("{content}\n")).unwrap();
+    git(dir.path(), &["add", "f"]);
+}
+
+fn assert_failed_with(result: Result<OperationOutcome, GitError>, needle: &str) {
+    match result {
+        Err(GitError::OperationFailed(message)) => {
+            assert!(message.contains(needle), "{message:?} lacks {needle:?}");
+        },
+        other => panic!("expected OperationFailed containing {needle:?}, got {other:?}"),
+    }
+}
+
+#[test]
+fn no_operation_means_no_step() {
+    let dir = history("step-none");
+    assert_failed_with(step(&dir, Step::Abort), "no operation in progress");
+}
+
+#[test]
+fn a_merge_continues_once_resolved_and_refuses_before() {
+    let dir = history("step-merge");
+    conflicted_merge(&dir);
+
+    assert_failed_with(step(&dir, Step::Continue), "unmerged files");
+    assert_eq!(operation(&dir), Some(Operation::Merge), "nothing changed");
+
+    resolve(&dir, "merged");
+    assert_eq!(step(&dir, Step::Continue).unwrap(), OperationOutcome::Done);
+    assert_eq!(operation(&dir), None);
+    assert_eq!(
+        git(dir.path(), &["rev-list", "--parents", "-n1", "HEAD"])
+            .split(' ')
+            .count(),
+        3,
+        "a merge commit: hash plus two parents"
+    );
+}
+
+#[test]
+fn a_merge_aborts_and_cannot_be_skipped() {
+    let dir = history("step-merge-abort");
+    conflicted_merge(&dir);
+    let before = git(dir.path(), &["rev-parse", "HEAD"]);
+
+    assert_failed_with(step(&dir, Step::Skip), "cannot be skipped");
+    assert_eq!(operation(&dir), Some(Operation::Merge));
+
+    assert_eq!(step(&dir, Step::Abort).unwrap(), OperationOutcome::Done);
+    assert_eq!(operation(&dir), None);
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), before);
+}
+
+#[test]
+fn a_rebase_refuses_to_continue_over_an_unresolved_file() {
+    let dir = history("step-rebase-refuse");
+    assert!(!interactive_rebase(
+        dir.path(),
+        "drop %1\npick %2\npick %3\n"
+    ));
+
+    assert_failed_with(step(&dir, Step::Continue), "needs merge");
+    assert_eq!(
+        operation(&dir),
+        Some(Operation::Rebase { step: 2, total: 3 }),
+        "state unchanged"
+    );
+}
+
+#[test]
+fn a_resolved_rebase_continues_to_the_end() {
+    let dir = history("step-rebase-done");
+    assert!(!interactive_rebase(
+        dir.path(),
+        "drop %1\npick %2\npick %3\n"
+    ));
+    resolve(&dir, "two");
+
+    assert_eq!(step(&dir, Step::Continue).unwrap(), OperationOutcome::Done);
+    assert_eq!(operation(&dir), None);
+    assert_eq!(
+        git(dir.path(), &["log", "--format=%s"])
+            .lines()
+            .collect::<Vec<_>>(),
+        ["three", "two", "base"],
+        "`one` was dropped"
+    );
+}
+
+#[test]
+fn skipping_can_land_on_the_next_conflict_and_abort_restores_everything() {
+    let dir = history("step-rebase-skip");
+    let before = git(dir.path(), &["rev-parse", "HEAD"]);
+    assert!(!interactive_rebase(
+        dir.path(),
+        "drop %1\npick %2\npick %3\n"
+    ));
+
+    // Skipping `two` leaves `three` to apply on `base`: it conflicts too.
+    assert_eq!(
+        step(&dir, Step::Skip).unwrap(),
+        OperationOutcome::Stopped { conflicted: true }
+    );
+    assert_eq!(
+        operation(&dir),
+        Some(Operation::Rebase { step: 3, total: 3 })
+    );
+
+    assert_eq!(step(&dir, Step::Abort).unwrap(), OperationOutcome::Done);
+    assert_eq!(operation(&dir), None);
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), before);
+}
+
+#[test]
+fn a_continue_that_hits_the_next_conflict_is_stopped_not_an_error() {
+    let dir = history("step-rebase-next");
+    assert!(!interactive_rebase(
+        dir.path(),
+        "drop %1\npick %2\npick %3\n"
+    ));
+    resolve(&dir, "resolved differently"); // `three` will not apply on this
+
+    assert_eq!(
+        step(&dir, Step::Continue).unwrap(),
+        OperationOutcome::Stopped { conflicted: true }
+    );
+    assert_eq!(
+        operation(&dir),
+        Some(Operation::Rebase { step: 3, total: 3 })
+    );
+}
+
+#[test]
+fn an_edit_stop_continues_to_the_end() {
+    let dir = history("step-edit");
+    assert!(interactive_rebase(
+        dir.path(),
+        "pick %1\nedit %2\npick %3\n"
+    ));
+    assert_eq!(step(&dir, Step::Continue).unwrap(), OperationOutcome::Done);
+    assert_eq!(operation(&dir), None);
+}
+
+#[test]
+fn cherry_pick_and_revert_take_all_three_steps() {
+    let dir = history("step-pick");
+    git(dir.path(), &["checkout", "-q", "-b", "other", "HEAD~3"]);
+    fs::write(dir.path().join("f"), "other\n").unwrap();
+    git(dir.path(), &["commit", "-qam", "other"]);
+
+    for (name, action, expect_commit) in [
+        ("abort", Step::Abort, false),
+        ("skip", Step::Skip, false),
+        ("continue", Step::Continue, true),
+    ] {
+        let before = git(dir.path(), &["rev-list", "--count", "HEAD"]);
+        assert!(
+            !try_git(dir.path(), &["cherry-pick", "main"], &[]),
+            "{name}"
+        );
+        assert_eq!(operation(&dir), Some(Operation::CherryPick));
+        if action == Step::Continue {
+            resolve(&dir, "picked");
+        }
+        assert_eq!(
+            step(&dir, action).unwrap(),
+            OperationOutcome::Done,
+            "{name}"
+        );
+        assert_eq!(operation(&dir), None, "{name}");
+        let grew = git(dir.path(), &["rev-list", "--count", "HEAD"]) != before;
+        assert_eq!(grew, expect_commit, "{name}");
+        git(dir.path(), &["reset", "-q", "--hard", "HEAD"]);
+    }
+
+    git(dir.path(), &["checkout", "-q", "main"]);
+    for (name, action) in [("abort", Step::Abort), ("skip", Step::Skip)] {
+        assert!(
+            !try_git(dir.path(), &["revert", "--no-edit", "HEAD~1"], &[]),
+            "{name}"
+        );
+        assert_eq!(operation(&dir), Some(Operation::Revert));
+        assert_eq!(
+            step(&dir, action).unwrap(),
+            OperationOutcome::Done,
+            "{name}"
+        );
+        assert_eq!(operation(&dir), None, "{name}");
+    }
 }

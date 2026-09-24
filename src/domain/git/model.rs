@@ -20,6 +20,16 @@ pub enum Operation {
 }
 
 impl Operation {
+    /// The lower-case name, for sentences ("abort the rebase?").
+    pub fn noun(self) -> &'static str {
+        match self {
+            Self::Merge => "merge",
+            Self::Rebase { .. } => "rebase",
+            Self::CherryPick => "cherry-pick",
+            Self::Revert => "revert",
+        }
+    }
+
     /// The badge shown in the Status pane.
     pub fn label(self) -> String {
         match self {
