@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Fixed: `<space>` and `a` no longer stage a conflicted file that still contains merge conflict markers (`<<<<<<<` and `>>>>>>>`). Before, `git add` marked it resolved with the markers inside. `<space>` now says which file to fix; `a` stages everything else and lists what it left. A resolved file, or one that only has a Markdown `=======` underline, stages normally.
 - Stash pane now works: `s` on Files stashes every change (untracked included) with an optional message; on Stash, `<space>` applies, `g` pops, `d` drops after a confirm. The right pane previews the selected entry's diff. A conflicting apply or pop keeps the stash and says so.
 
 ## [0.5.0] - 2026-09-21

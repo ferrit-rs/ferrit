@@ -366,7 +366,7 @@ one `git` call, reversible, and every git TUI has it. Keybar gains
 | CRLF / `core.autocrlf` | not our problem: the patch is git's own diff output fed back to git's own apply |
 | submodule change | `--submodule` (phase 3) already summarizes it; `<space>` stages the pointer via `git add`, no line granule |
 | apply fails (context drift after an external edit mid-action) | `ApplyFailed` -> Status pane red line -> auto `refresh()` so the diff re-reads and the user retries |
-| conflicted file (`UU`) | `<space>` inert in phase 6; resolving conflicts is phase 11 |
+| conflicted file (`UU`) | `<space>` refuses while conflict markers remain and stages once they are gone; `a` skips such files (`docs/PLAN_11_REBASE.md` R0, which fixed a bug: this row said "inert" but `git add` ran) |
 | empty selection (`V` over only context lines) | `<space>` is a no-op, brief keybar note "nothing to stage" |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)

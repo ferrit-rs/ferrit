@@ -1,5 +1,7 @@
 //! Diff-cursor navigation and hunk/line staging (`Mode::Diff`).
 
+use std::path::{Path, PathBuf};
+
 use super::{
     App, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide, DiffView,
     FileRow, GitResult, Granule, KeyCode, KeyEvent, Mode, Pane, Range, events, git,
@@ -250,11 +252,43 @@ impl App {
             return;
         };
         let path = entry.path.clone();
+        let conflicted = entry.staged == git::model::Change::Conflicted
+            || entry.worktree == git::model::Change::Conflicted;
+        // `git add` on an unmerged path marks it resolved whatever the file
+        // holds; refuse while conflict markers remain.
+        if dir == ApplyDir::Forward && conflicted && self.has_markers(&path) {
+            self.report_error(format!(
+                "{} still has conflict markers, resolve them before staging",
+                path.display()
+            ));
+            return;
+        }
         let Some(repo) = &self.repo else {
             return;
         };
         let result = repo.stage_file(&path, dir);
         self.finish_apply(result);
+    }
+
+    /// Conflict markers still in `path`. A file that cannot be read counts as
+    /// "has markers": refusing to stage is the safe side of an unknown.
+    fn has_markers(&self, path: &Path) -> bool {
+        self.repo
+            .as_ref()
+            .is_some_and(|repo| repo.has_conflict_markers(path).unwrap_or(true))
+    }
+
+    /// Conflicted paths that still hold markers, in Files order.
+    fn unresolved_conflicts(&self) -> Vec<PathBuf> {
+        self.files
+            .iter()
+            .filter(|f| {
+                f.staged == git::model::Change::Conflicted
+                    || f.worktree == git::model::Change::Conflicted
+            })
+            .filter(|f| self.has_markers(&f.path))
+            .map(|f| f.path.clone())
+            .collect()
     }
 
     /// `<space>` in `Mode::Diff`: stage/unstage the hunk under the cursor,
@@ -294,11 +328,27 @@ impl App {
         } else {
             return;
         };
+        let blocked = if dir == ApplyDir::Forward {
+            self.unresolved_conflicts()
+        } else {
+            Vec::new()
+        };
         let Some(repo) = &self.repo else {
             return;
         };
-        let result = repo.stage_all(dir);
+        let result = if blocked.is_empty() {
+            repo.stage_all(dir)
+        } else {
+            repo.stage_all_except(&blocked)
+        };
         self.finish_apply(result);
+        if !blocked.is_empty() {
+            let names: Vec<String> = blocked.iter().map(|p| p.display().to_string()).collect();
+            self.report_error(format!(
+                "not staged, still has conflict markers: {}",
+                names.join(", ")
+            ));
+        }
     }
 
     /// `d`: ask before discarding a worktree change, at the file granularity

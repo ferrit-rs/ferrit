@@ -38,7 +38,7 @@ merge-commit handling.
   pane has selected.
 - The Status pane (`App::status_lines`) prints a conflict count but does not
   know that a merge or rebase is in progress.
-- **A bug in shipped code, found while planning.** `docs/PLAN_6_STAGING.md`
+- **A bug in shipped code, found while planning (fixed by R0).** `docs/PLAN_6_STAGING.md`
   says `<space>` on a conflicted file is inert. It is not:
   `App::stage_selected_file` sees `worktree != Change::None` and runs
   `git add -- <path>`. Checked with a throwaway test on a fresh `UU` file:
@@ -207,12 +207,17 @@ items with a label, a shortcut letter and an action, `j` / `k`, `Enter`,
 ### Conflict markers guard (R0)
 
 `<space>` and `a` on a conflicted path scan the file for a line starting
-with `<<<<<<<`, `=======` or `>>>>>>>` at column 0. Markers present: refuse
-with a note (`file still has conflict markers`), stage nothing. No markers:
-`git add`, which is what marks it resolved. `a` skips conflicted files it
-must refuse and stages the rest, then says how many it left. A whole-file
-"take ours / take theirs" is out of scope (see below), so the user edits the
-file elsewhere and comes back.
+with `<<<<<<<` **and** a line starting with `>>>>>>>`. A lone `=======` does
+not count: it is also a Markdown heading underline, and treating it as a
+marker would make such a file impossible to stage. Markers present: refuse
+with an error naming the file, stage nothing. No markers: `git add`, which is
+what marks it resolved. `a` runs `git add -A -- . ':(exclude,literal)<path>'`
+for the files it must refuse (checked: an excluded unmerged path stays `UU`,
+and a path such as `we ird [1].txt` still stages), then names what it left. A
+file that no longer exists (deleted on one side of the conflict) has no
+markers. A file that cannot be read counts as having them: refusing is the
+safe side of an unknown. A whole-file "take ours / take theirs" is out of
+scope (see below), so the user edits the file elsewhere and comes back.
 
 ## State on `App`
 
@@ -343,8 +348,11 @@ swap.
 
 ## Milestones
 
-- **R0** conflict-marker guard on `<space>` and `a`, with its regression
-  tests. No new feature. Ships alone, before anything else here.
+- ✅ **R0** conflict-marker guard on `<space>` and `a`
+  (`Repo::has_conflict_markers`, `Repo::stage_all_except`,
+  `App::has_markers` / `unresolved_conflicts`). `tests/git_conflict.rs` (7)
+  and `tests/app_conflict.rs` (6) green; disabling the guard makes the two
+  regression tests fail, so they do guard the bug. Shipped alone.
 - **R1** state read: `Operation`, `Snapshot.operation`, Status line and
   keybar hint. `tests/git_rebase.rs` state-mapping cases green.
 - **R2** `Popup::Menu` primitive and the `m` menu for a merge in progress

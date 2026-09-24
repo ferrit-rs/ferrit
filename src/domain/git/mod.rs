@@ -291,6 +291,16 @@ impl Repo {
         apply::stage_all(&self.inner, dir)
     }
 
+    /// Stage everything except `excluded` (paths that must stay unstaged).
+    pub fn stage_all_except(&self, excluded: &[std::path::PathBuf]) -> GitResult<()> {
+        apply::stage_all_except(&self.inner, excluded)
+    }
+
+    /// Does the file still contain merge conflict markers?
+    pub fn has_conflict_markers(&self, path: &Path) -> GitResult<bool> {
+        apply::has_conflict_markers(&self.inner, path)
+    }
+
     /// Discard a whole file's worktree change, never the index. `untracked`
     /// picks `git clean` (nothing to restore *to*) over `git restore
     /// --worktree`.

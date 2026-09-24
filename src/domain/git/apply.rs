@@ -8,7 +8,7 @@
 
 use std::collections::HashSet;
 use std::io::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use git2::Repository;
@@ -73,6 +73,45 @@ pub(super) fn stage_all(repo: &Repository, dir: ApplyDir) -> GitResult<()> {
             ApplyDir::Reverse => cmd.arg("restore").arg("--staged").arg("."),
         };
     })
+}
+
+/// `git add -A` for everything except `excluded`, each matched literally
+/// (no glob or magic in a path such as `we ird [1].txt`). An excluded path
+/// that is unmerged stays unmerged. See `has_conflict_markers`.
+pub(super) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitResult<()> {
+    let workdir = workdir(repo)?;
+    run_git(workdir, |cmd| {
+        cmd.arg("add").arg("-A").arg("--").arg(".");
+        for path in excluded {
+            let mut spec = std::ffi::OsString::from(":(exclude,literal)");
+            spec.push(path.as_os_str());
+            cmd.arg(spec);
+        }
+    })
+}
+
+/// Does `path` still hold merge conflict markers? True when the file has a
+/// line starting `<<<<<<<` and a line starting `>>>>>>>`. A lone `=======`
+/// is not enough: it is also a Markdown heading underline. A file that no
+/// longer exists (deleted on one side of the conflict) has none.
+///
+/// `git add` on an unmerged path marks it resolved whatever the file holds,
+/// so ferrit checks this first (`docs/PLAN_11_REBASE.md` R0).
+pub(super) fn has_conflict_markers(repo: &Repository, path: &Path) -> GitResult<bool> {
+    let full = workdir(repo)?.join(path);
+    let bytes = match std::fs::read(&full) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => {
+            return Err(GitError::ApplyFailed(format!(
+                "cannot read {}: {e}",
+                path.display()
+            )));
+        },
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let starts = |marker: &str| text.lines().any(|line| line.starts_with(marker));
+    Ok(starts("<<<<<<<") && starts(">>>>>>>"))
 }
 
 /// Discard a whole file's worktree change: `git restore --worktree` for a
