@@ -403,6 +403,8 @@ fn capital_p_with_two_remotes_prefills_editable_upstream() {
     configure_identity(dir.path());
     fs::write(dir.path().join("a.txt"), "one\n").unwrap();
     commit_all(&repo, "init");
+    // `init.defaultBranch` varies by machine; the assertion below names it.
+    git(dir.path(), &["branch", "-m", "master"]);
     git(
         dir.path(),
         &["remote", "add", "origin", "https://example.com/o.git"],
