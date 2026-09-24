@@ -95,6 +95,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         Some(
             PopupView::Commit(mut view)
             | PopupView::NewBranch(mut view)
+            | PopupView::Stash(mut view)
             | PopupView::Upstream(mut view),
         ) => {
             popups::draw_commit(frame, area, &mut view, accent);
@@ -447,7 +448,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // gets its own two-column split (`draw_files_columns`) before this
     // function is even called.
     let scroll = app.right_scroll();
-    if let DiffView::Commit(_, diff) = app.diff_view() {
+    if let DiffView::Commit(_, diff) | DiffView::Stash(_, diff) = app.diff_view() {
         let diff_area = block.inner(area);
         let anchors = diff.file_lines();
         let raw_total = diff.text.lines().count();
@@ -628,10 +629,12 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// pane's own keys share letters with the default bar's (`d` deletes a
 /// branch there, not a file's worktree change), so it swaps in
 /// `mock::BRANCHES_KEYBAR` instead of silently keeping the wrong hints on
-/// screen.
+/// screen; so does Stash (`mock::STASH_KEYBAR`, `docs/PLAN_10_STASH.md`).
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let text = if app.focus == Pane::Branches && !app.branches_drilled() {
         mock::BRANCHES_KEYBAR
+    } else if app.focus == Pane::Stash {
+        mock::STASH_KEYBAR
     } else {
         mock::KEYBAR
     };

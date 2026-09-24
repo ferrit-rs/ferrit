@@ -495,3 +495,29 @@ fn busy_and_status_note_render_on_the_status_pane_and_are_exclusive() {
         "busy label cleared:\n{done_out}"
     );
 }
+
+/// `docs/PLAN_10_STASH.md` S4: the keybar swaps for the Stash pane, same as
+/// Branches.
+#[test]
+fn keybar_swaps_for_the_stash_pane() {
+    let mut app = App::mock();
+    app.focus = Pane::Stash;
+    let out = frame(&mut app, 120, 40);
+    assert!(out.contains("Apply:"), "{out}");
+    assert!(out.contains("Drop:"), "{out}");
+    assert!(!out.contains("Stage:"), "{out}");
+}
+
+/// `docs/PLAN_10_STASH.md` S4: the stash popup reuses the single-input
+/// popup shape, with its own title and hints.
+#[test]
+fn stash_popup_renders_title_and_hints() {
+    let mut app = App::mock();
+    app.focus = Pane::Files;
+    app.feed_key(KeyEvent::from(KeyCode::Char('s')));
+
+    let out = frame(&mut app, 120, 40);
+    assert!(out.contains("Stash changes"), "popup title shows:\n{out}");
+    assert!(out.contains("Stash: Enter"), "hints show:\n{out}");
+    assert!(out.contains("Cancel: Esc"), "hints show:\n{out}");
+}

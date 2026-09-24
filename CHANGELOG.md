@@ -5,6 +5,10 @@ All notable changes to ferrit are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Stash pane now works: `s` on Files stashes every change (untracked included) with an optional message; on Stash, `<space>` applies, `g` pops, `d` drops after a confirm. The right pane previews the selected entry's diff. A conflicting apply or pop keeps the stash and says so.
+
 ## [0.5.0] - 2026-09-21
 
 - Profile drawer now shows machine-global Git users as selectable radio cards. Choosing an author requires confirmation and applies to Ferrit commits without modifying Git config.

@@ -164,6 +164,12 @@ pub const KEYBAR: &str = "Stage: <space> | All: a | Discard: d | Commit: c | Ame
 pub const BRANCHES_KEYBAR: &str = "Checkout: <space> | New: n | Delete: d | Fast-forward: u | \
      Merge: M | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
 
+/// Bottom line while the Stash pane is focused. `docs/PLAN_10_STASH.md`.
+/// `s` (stash from Files) lives in `HELP`: the default bar has no room left
+/// at 120 columns.
+pub const STASH_KEYBAR: &str =
+    "Apply: <space> | Pop: g | Drop: d | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
+
 /// Right pane when Files is focused.
 pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
 @@ -1,3 +1,7 @@
@@ -198,8 +204,7 @@ pub const RIGHT_STASH: &str = "(no stash entries)";
 /// Help overlay body, toggled with `?`.
 pub const HELP: &str = "1 .. 5            focus that pane
 Tab / Right       focus next pane; Shift-Tab / Left previous pane
-j / Down          move selection down
-k / Up            move selection up
+j / k, Down / Up  move selection down / up
 J / K             scroll the diff pane
 PgUp / PgDn       scroll the diff pane a page
 Ctrl-u / Ctrl-d   scroll the diff pane a half page
@@ -225,8 +230,9 @@ d                 (Branches) delete the selected branch (asks first;
 u                 (Branches) fast-forward the selected branch to its
                   upstream, checked out or not
 M                 (Branches) merge the selected branch into the current one
-Enter             (new-branch popup) create the branch
-Esc               (new-branch popup) cancel, no draft kept
+Enter / Esc       (new-branch popup) create / cancel, no draft kept
+s                 (Files) stash every change, with a message
+<space> / g / d   (Stash) apply / pop / drop the entry (drop asks)
 f / p / P         fetch / pull / push (Pushing appears on the current branch)
 Ctrl-Right/Left   (Branches) switch its Local branches / Remotes tab
 Enter / Esc       (remote picker) push to the highlighted one / cancel

@@ -396,6 +396,7 @@ impl App {
                     Err(e) => self.report_error(e),
                 }
             },
+            ConfirmAction::DropStash { oid } => self.drop_stash(&oid),
             ConfirmAction::ForcePush => {
                 if let Some(sender) = self.event_sender.clone() {
                     self.start_remote_op_with_force(

@@ -54,7 +54,7 @@ into its own crate remains deferred.
 | 7 | `PLAN_7_COMMIT.md` | commit popup (message input), amend, fixup | ✅ done (C0-C2; C3 fixup/squash UI open, C4/C5 polish open) |
 | 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | ✅ done |
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | ✅ done |
-| 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | 📅 planned |
+| 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | ✅ done (S0-S4; S5 edge-case polish open) |
 | 11 | `PLAN_11_REBASE.md` | interactive rebase todo editor, continue / abort / skip, conflict flow | 👉 todo |
 | 12 | `PLAN_12_POLISH.md` | config file, themes, keymap customization, real command-log capture, help | 👉 todo |
 

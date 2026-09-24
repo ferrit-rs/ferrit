@@ -7,6 +7,7 @@ enum PopupKind {
     Commit,
     CommitAllConfirm,
     NewBranch,
+    Stash,
     Upstream,
     Note,
 }
@@ -18,6 +19,7 @@ impl App {
             Popup::Commit(_) => PopupKind::Commit,
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
+            Popup::Stash(_) => PopupKind::Stash,
             Popup::Upstream(_) => PopupKind::Upstream,
             Popup::Note(_) => PopupKind::Note,
         };
@@ -27,6 +29,7 @@ impl App {
                 Some(PopupView::CommitAllConfirm(&mut self.commit_overlay))
             },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
+            PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
@@ -61,6 +64,24 @@ impl App {
             cursor: buf.cursor(),
             toggles: None,
             hints: "Create: Enter | Cancel: Esc",
+        })
+    }
+
+    /// The stash popup's render data, same shape as the new-branch one.
+    pub fn stash_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Stash(buf)) = &self.popup else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: "Stash changes",
+            input: buf,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: buf.lines(),
+            cursor: buf.cursor(),
+            toggles: None,
+            hints: "Stash: Enter | Cancel: Esc",
         })
     }
 
@@ -110,6 +131,7 @@ impl App {
         }
         let mut dismiss = false;
         let mut create_branch_now = false;
+        let mut stash_now = false;
         let mut submit_upstream = None;
 
         match &mut self.popup {
@@ -128,6 +150,13 @@ impl App {
                     buf.handle_key_event(key, TextInputMode::SingleLine);
                 },
             },
+            Some(Popup::Stash(buf)) => match key.code {
+                KeyCode::Esc => dismiss = true,
+                KeyCode::Enter => stash_now = true,
+                _ => {
+                    buf.handle_key_event(key, TextInputMode::SingleLine);
+                },
+            },
             Some(Popup::Upstream(input)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => submit_upstream = Some(input.text()),
@@ -142,6 +171,9 @@ impl App {
         }
         if create_branch_now {
             self.do_create_branch();
+        }
+        if stash_now {
+            self.do_stash_push();
         }
         if let Some(value) = submit_upstream {
             self.submit_upstream(&value);

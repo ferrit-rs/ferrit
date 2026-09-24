@@ -63,6 +63,9 @@ pub enum DiffView {
     /// Commits pane, or a drilled branch's log: one commit's metadata and
     /// `git show` diff.
     Commit(git::model::CommitEntry, git::diff::Diff),
+    /// Stash pane: the selected entry's `git stash show -p`, scrolled and
+    /// rendered like a commit diff (`docs/PLAN_10_STASH.md`).
+    Stash(git::model::StashEntry, git::diff::Diff),
     /// Branches pane, not drilled in: the selected branch's own log, shown
     /// passively (no Enter needed), lazygit's live branch -> log preview.
     BranchLog(BranchLog),
@@ -107,6 +110,7 @@ pub enum PopupView<'a> {
     Commit(CommitPopupView<'a>),
     CommitAllConfirm(&'a mut OverlayState),
     NewBranch(CommitPopupView<'a>),
+    Stash(CommitPopupView<'a>),
     Upstream(CommitPopupView<'a>),
     Note(&'a str),
 }
@@ -253,6 +257,8 @@ enum ConfirmAction {
     /// is `false` on the first confirm, `true` on the second one offered
     /// after an unmerged-branch refusal (`App::run_confirm`).
     DeleteBranch { name: String, force: bool },
+    /// `d` on the Stash pane: `git stash drop`, resolved by oid.
+    DropStash { oid: String },
     /// Push a branch known to be behind its upstream, using a lease guard.
     ForcePush,
 }
@@ -341,6 +347,9 @@ enum Popup {
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextInput` outright.
     NewBranch(TextInput),
+    /// Stash message input, `s` on Files (`docs/PLAN_10_STASH.md`). `Enter`
+    /// submits; an empty message lets git write its own.
+    Stash(TextInput),
     /// `P` with no upstream: edit `<remote> <branch>` before first push.
     Upstream(TextInput),
     /// A dismissible message: a commit failure, "empty commit message", a
@@ -592,6 +601,7 @@ mod input;
 mod popups;
 mod remote;
 mod staging;
+mod stash_actions;
 
 pub(crate) use error::AppError;
 
@@ -1041,7 +1051,7 @@ impl App {
                 .lines()
                 .count()
                 .max(f.staged.text.lines().count()),
-            DiffView::Commit(_, d) => d.text.lines().count(),
+            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.text.lines().count(),
             DiffView::BranchLog(log) => log.commits.len() * theme::BRANCH_LOG_BLOCK_LINES,
             DiffView::None | DiffView::Note(_) => 0,
         }
@@ -1081,7 +1091,10 @@ impl App {
     fn right_is_diff(&self) -> bool {
         matches!(
             self.diff,
-            DiffView::Files(_) | DiffView::Commit(..) | DiffView::BranchLog(_)
+            DiffView::Files(_)
+                | DiffView::Commit(..)
+                | DiffView::Stash(..)
+                | DiffView::BranchLog(_)
         )
     }
 
@@ -1091,7 +1104,7 @@ impl App {
     /// list to jump through.
     fn jump_diff_anchor(&mut self, dir: isize) {
         let anchors = match &self.diff {
-            DiffView::Commit(_, d) => d.file_lines(),
+            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.file_lines(),
             DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
                 return;
             },
@@ -1136,7 +1149,7 @@ impl App {
         let key = &self.right_key;
         let cache = &mut self.rendered_diff;
         match &self.diff {
-            DiffView::Commit(_, diff) => {
+            DiffView::Commit(_, diff) | DiffView::Stash(_, diff) => {
                 let cache_hit = cache.as_ref().is_some_and(|cached| {
                     cached.key.as_ref() == key.as_ref()
                         && cached.source == diff.text

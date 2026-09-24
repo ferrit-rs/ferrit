@@ -25,6 +25,7 @@ pub(crate) enum RightKey {
     File { path: PathBuf },
     Commit { full_hash: String },
     BranchLog { branch: String },
+    Stash { oid: String },
 }
 
 #[derive(Debug)]
@@ -35,6 +36,7 @@ pub(crate) enum DiffQueryResult {
     },
     Commit(git::diff::Diff),
     BranchLog(Vec<git::model::CommitEntry>),
+    Stash(git::diff::Diff),
 }
 
 /// Hidden event payload for a selected-diff worker completion.
@@ -64,6 +66,10 @@ pub(crate) fn load(repo: &git::Repo, key: &RightKey) -> Result<DiffQueryResult, 
         RightKey::BranchLog { branch } => repo
             .branch_log(branch)
             .map(DiffQueryResult::BranchLog)
+            .map_err(|error| error.to_string()),
+        RightKey::Stash { oid } => repo
+            .stash_diff(oid, opts)
+            .map(DiffQueryResult::Stash)
             .map_err(|error| error.to_string()),
     }
 }
@@ -230,7 +236,13 @@ impl App {
                     })
                 }
             },
-            _ => None,
+            Pane::Stash => {
+                let entry = self.stashes.get(self.selected(Pane::Stash))?;
+                Some(RightKey::Stash {
+                    oid: entry.oid.clone(),
+                })
+            },
+            Pane::Status => None,
         }
     }
 
@@ -273,6 +285,12 @@ impl App {
                     branch: branch.clone(),
                     commits,
                 })
+            },
+            (RightKey::Stash { oid }, DiffQueryResult::Stash(diff)) => {
+                match self.stashes.iter().find(|entry| &entry.oid == oid) {
+                    Some(entry) => DiffView::Stash(entry.clone(), diff),
+                    None => DiffView::Note("stash entry no longer exists".into()),
+                }
             },
             _ => DiffView::Note("diff result did not match selection".into()),
         }

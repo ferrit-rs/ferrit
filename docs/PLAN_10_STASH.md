@@ -1,5 +1,18 @@
 # Plan: phase 10, stash
 
+**Deviation: `Stash: s` is not in the default keybar.** The bindings section
+below planned to add it to `mock::KEYBAR`. That bar is 116 columns and
+`Stash: s` makes it 127, over the 120 columns `tests/render.rs` holds it to.
+`s` is documented in `HELP` (two lines, with the Stash pane keys); the
+Stash pane gets its own `mock::STASH_KEYBAR`. To fit the help overlay at 40
+rows, three existing `HELP` lines were merged (`j` / `k`, and the new-branch
+popup `Enter` / `Esc`).
+
+**Deviation: the conflict note does not list paths.** `App::files` is stale
+until the background refresh lands, so naming conflicted paths right after
+the command would show the previous state. The note says the stash was kept
+and to resolve in Files.
+
 ## Goal
 
 Make the Stash pane (`[5]`) do something. Since phase 2 (G6) it lists
@@ -140,7 +153,7 @@ s (Files focused, Nav)
 <space> / g (Stash focused, Nav, entry selected)
   '-- repo.stash_apply|pop(oid)
         |-- Ok(Done)       -> request_refresh
-        |-- Ok(Conflicted) -> request_refresh + Popup::Note("stash applied with conflicts in <paths>. The stash was kept.")
+        |-- Ok(Conflicted) -> request_refresh + Popup::Note("stash applied with conflicts. The stash was kept. ...")
         '-- Err            -> report_error
 
 d (Stash focused, Nav, entry selected)
@@ -217,8 +230,8 @@ reference`, and `git stash push` on a clean tree exits 0 printing
 rename lives there, deferred). Keybar: a `mock::STASH_KEYBAR`
 (`"Apply: <space> | Pop: g | Drop: d | Help: ? | Quit: q"`) swapped in by
 `draw_keybar` for the Stash pane, exactly like `BRANCHES_KEYBAR`
-(`src/app/screens/mod.rs:630`), and `Stash: s` added to `mock::KEYBAR`.
-`mock::HELP` gets the four lines.
+(`src/app/screens/mod.rs:630`), and `mock::HELP` documents `s` and the three Stash keys (see the deviation note
+up top for why `mock::KEYBAR` is unchanged).
 
 ### Right pane
 
@@ -294,17 +307,28 @@ an unchanged selection", which the oid key gives for free).
   `StashOutcome`, `GitError::{StashFailed, NothingToStash}`, `stash_diff`
   (`DiffCmd::after_subcommand`). `tests/git_stash.rs` green (10 cases),
   existing tests untouched.
-- **S1** right pane: `RightKey::Stash`, `DiffView::Stash`, worker wiring,
+- ✅ **S1** right pane: `RightKey::Stash`, `DiffView::Stash`, worker wiring,
   scroll and refresh behaviour. Empty state kept.
-- **S2** Stash pane actions: `stash_actions.rs`, `<space>` / `g` / `d` arms,
+- ✅ **S2** Stash pane actions: `stash_actions.rs`, `<space>` / `g` / `d` arms,
   `ConfirmAction::DropStash`, conflict note.
-- **S3** Files `s` popup: `Popup::Stash`, `PopupView::Stash`, submit and
-  failure rules.
-- **S4** keybar, `HELP`, `mock::KEYBAR` / `STASH_KEYBAR`, `tests/render.rs`
-  snapshots, `CHANGELOG.md` line, `PLAN_0` status flipped to done.
-- **S5** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
-  layering held (`src/domain/git/` has no `ratatui`), every prior phase test
-  green, edge-case table each has a test or an explicit inert path.
+- ✅ **S3** Files `s` popup: `Popup::Stash`, `PopupView::Stash`, submit and
+  failure rules. `tests/app_stash.rs` green (12 cases).
+- ✅ **S4** `mock::STASH_KEYBAR`, `HELP`, `tests/render.rs` cases
+  (`keybar_swaps_for_the_stash_pane`, `stash_popup_renders_title_and_hints`),
+  `CHANGELOG.md` line (this also adds the `## [Unreleased]` heading, which
+  0.5.0 had consumed), `PLAN_0` status flipped to done.
+- 🟡 **S5** polish: `cargo fmt --check` clean, `src/domain/git/` has no
+  `ratatui` import, the new code adds no clippy diagnostic (the 5 errors and
+  78 warnings `cargo clippy --all-targets` reports were already there before
+  this phase: `unreachable!` / `expect` / indexing in `popups.rs`,
+  `screens/popups.rs` and the colour picker). Two tests were already red on
+  a clean `main` and stay red: `app_remote`
+  `capital_p_with_two_remotes_prefills_editable_upstream` (expects a `master`
+  default branch, this machine's git says `main`) and `scrollbar`
+  `right_pane_thumb_reaches_the_bottom_at_max_scroll`. Edge cases without a
+  test: stash on a detached HEAD or unborn branch, and a stash dropped from
+  another shell between selection and `d` (covered at the backend by
+  `an_unknown_oid_is_a_vanished_entry`, not through `App`).
 
 ## Definition of done (phase 10)
 
