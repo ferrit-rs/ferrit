@@ -73,16 +73,19 @@ impl ColorPicker {
         }
     }
 
+    #[must_use]
     pub fn selected(mut self, selected: usize) -> Self {
         self.selected = selected;
         self
     }
 
+    #[must_use]
     pub fn active(mut self, active: bool) -> Self {
         self.active = active;
         self
     }
 
+    #[must_use]
     pub fn display(mut self, display: ColorPickerDisplay) -> Self {
         self.display = display;
         self

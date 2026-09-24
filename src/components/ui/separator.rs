@@ -23,7 +23,7 @@ pub struct Separator {
 }
 
 impl Separator {
-    pub fn new(label: impl Into<String>) -> Self {
+    pub fn new<L: Into<String>>(label: L) -> Self {
         Self {
             label: label.into(),
             style: Style::new().fg(Color::DarkGray),
@@ -33,23 +33,27 @@ impl Separator {
         }
     }
 
+    #[must_use]
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
+    #[must_use]
     pub fn glyph(mut self, glyph: char) -> Self {
         self.glyph = glyph;
         self
     }
 
     /// Set equal left and right margins, measured in terminal cells.
+    #[must_use]
     pub fn margin_x(mut self, cells: u16) -> Self {
         self.margin_x = cells;
         self
     }
 
     /// Set equal top and bottom margins, measured in terminal rows.
+    #[must_use]
     pub fn margin_y(mut self, rows: u16) -> Self {
         self.margin_y = rows;
         self

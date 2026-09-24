@@ -11,6 +11,7 @@ const SPECTRUM_LENGTH: usize = SPECTRUM_COLUMNS * SPECTRUM_ROWS;
 const SPECTRUM_INDEX_STEP: usize = 1;
 const HUE_CIRCLE_DEGREES: f32 = 360.0;
 const HUE_SECTOR_DEGREES: f32 = 60.0;
+const HUE_SECTORS: usize = 6;
 const CHANNEL_MAX: f32 = 255.0;
 const HIGHLIGHT_THRESHOLD: u32 = 128;
 const SPECTRUM_CELL_WIDTH: usize = 2;
@@ -120,14 +121,16 @@ pub(super) fn move_selection(selected: usize, direction: PaletteDirection) -> us
 }
 
 fn spectrum_color(column: usize, row: usize) -> Color {
-    let hue = (column as f32 * HUE_CIRCLE_DEGREES / SPECTRUM_COLUMNS as f32)
+    let hue = (small_to_f32(column) * HUE_CIRCLE_DEGREES / small_to_f32(SPECTRUM_COLUMNS))
         .rem_euclid(HUE_CIRCLE_DEGREES);
     // Past the last row: the full-strength shade, never a panic.
     let (saturation, value) = SHADE_LEVELS.get(row).copied().unwrap_or((1.0, 1.0));
     let chroma = value * saturation;
     let hue_sector = hue / HUE_SECTOR_DEGREES;
     let secondary = chroma * (1.0 - (hue_sector.rem_euclid(2.0) - 1.0).abs());
-    let (red, green, blue) = match hue_sector as u8 {
+    // The same sector as `hue_sector`, from integers: no float to integer cast.
+    let sector = column % SPECTRUM_COLUMNS * HUE_SECTORS / SPECTRUM_COLUMNS;
+    let (red, green, blue) = match sector {
         0 => (chroma, secondary, 0.0),
         1 => (secondary, chroma, 0.0),
         2 => (0.0, chroma, secondary),
@@ -143,8 +146,27 @@ fn spectrum_color(column: usize, row: usize) -> Color {
     )
 }
 
+/// A grid index as `f32`. Grid indices are tiny; anything past `u16` cannot
+/// happen and would saturate rather than wrap.
+fn small_to_f32(index: usize) -> f32 {
+    f32::from(u16::try_from(index).unwrap_or(u16::MAX))
+}
+
+/// `value` in `0.0..=1.0` as a channel byte, rounded half up. Bisects the byte
+/// range instead of casting a float to an integer, so NaN and out of range
+/// input give `0` or `255`, never a wrapped value.
 fn channel(value: f32) -> u8 {
-    (value * CHANNEL_MAX).round().clamp(0.0, CHANNEL_MAX) as u8
+    let target = value.mul_add(CHANNEL_MAX, 0.5);
+    let (mut low, mut high) = (0_u16, u16::from(u8::MAX));
+    while low < high {
+        let mid = low + (high - low).div_ceil(2);
+        if f32::from(mid) <= target {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    u8::try_from(low).unwrap_or(u8::MAX)
 }
 
 fn brightness(color: Color) -> u32 {
@@ -153,4 +175,24 @@ fn brightness(color: Color) -> u32 {
         + u32::from(green) * GREEN_LUMINANCE_WEIGHT
         + u32::from(blue) * BLUE_LUMINANCE_WEIGHT)
         / LUMINANCE_WEIGHT_TOTAL
+}
+
+#[cfg(test)]
+mod tests {
+    use super::channel;
+
+    #[test]
+    fn channel_rounds_half_up_across_the_byte_range() {
+        assert_eq!(channel(0.0), 0);
+        assert_eq!(channel(1.0), 255);
+        assert_eq!(channel(0.5), 128);
+        assert_eq!(channel(0.1), 26);
+    }
+
+    #[test]
+    fn channel_saturates_instead_of_wrapping() {
+        assert_eq!(channel(-1.0), 0);
+        assert_eq!(channel(2.0), 255);
+        assert_eq!(channel(f32::NAN), 0);
+    }
 }

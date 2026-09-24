@@ -33,7 +33,7 @@ pub struct RadioCard {
 impl RadioCard {
     pub const HEIGHT: usize = 4;
 
-    pub fn new(title: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>, D: Into<String>>(title: T, description: D) -> Self {
         Self {
             key: String::new(),
             title: title.into(),
@@ -45,7 +45,7 @@ impl RadioCard {
     }
 
     #[must_use]
-    pub fn key(mut self, key: impl Into<String>) -> Self {
+    pub fn key<K: Into<String>>(mut self, key: K) -> Self {
         self.key = key.into();
         self
     }
