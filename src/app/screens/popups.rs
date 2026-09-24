@@ -70,8 +70,11 @@ pub(super) fn draw_commit(
         let Some(inner) = overlay_state.inner_area() else {
             return;
         };
+        // The sign-off / no-verify line only exists when the toggles do (not
+        // for a rebase reword, which runs the amend itself).
+        let footer_rows = if view.toggles.is_some() { 2 } else { 1 };
         let [body_area, footer_area] =
-            Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).areas(inner);
+            Layout::vertical([Constraint::Min(1), Constraint::Length(footer_rows)]).areas(inner);
         let [summary_area, description_area] =
             Layout::vertical([Constraint::Length(3), Constraint::Min(5)]).areas(body_area);
         let summary_style = if view.summary_focused { focused } else { idle };
@@ -100,27 +103,22 @@ pub(super) fn draw_commit(
             description.render(frame, description_inner);
         }
 
-        let sign_off = if view.toggles.is_some_and(|(enabled, _)| enabled) {
-            "on"
-        } else {
-            "off"
+        let hints = KeyBar::hints(view.hints).line();
+        let footer = match view.toggles {
+            Some((sign_off, no_verify)) => {
+                let on_off = |enabled: bool| if enabled { "on" } else { "off" };
+                let status = Line::from(vec![
+                    Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
+                    Span::styled(on_off(sign_off), Style::new().fg(theme::ADD)),
+                    Span::raw("   "),
+                    Span::styled("no-verify: ", Style::new().fg(theme::IDLE)),
+                    Span::styled(on_off(no_verify), Style::new().fg(theme::DEL)),
+                ]);
+                vec![status, hints]
+            },
+            None => vec![hints],
         };
-        let no_verify = if view.toggles.is_some_and(|(_, enabled)| enabled) {
-            "on"
-        } else {
-            "off"
-        };
-        let status = Line::from(vec![
-            Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
-            Span::styled(sign_off, Style::new().fg(theme::ADD)),
-            Span::raw("   "),
-            Span::styled("no-verify: ", Style::new().fg(theme::IDLE)),
-            Span::styled(no_verify, Style::new().fg(theme::DEL)),
-        ]);
-        frame.render_widget(
-            Paragraph::new(vec![status, KeyBar::hints(view.hints).line()]),
-            footer_area,
-        );
+        frame.render_widget(Paragraph::new(footer), footer_area);
         return;
     }
 

@@ -170,6 +170,12 @@ pub const BRANCHES_KEYBAR: &str = "Checkout: <space> | New: n | Delete: d | Fast
 pub const STASH_KEYBAR: &str =
     "Apply: <space> | Pop: g | Drop: d | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
 
+/// Bottom line while the Commits pane is focused (and not drilled into a
+/// commit's files). `docs/PLAN_11_REBASE.md` R4: these keys share letters with
+/// the default bar's (`d`, `s`), so the pane swaps its own in.
+pub const COMMITS_KEYBAR: &str = "Reword: w | Drop: d | Squash: s | Fixup: S | Edit: e | \
+     Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
+
 /// Bottom line while a merge, rebase, cherry-pick or revert is stopped mid-way,
 /// on every pane: `m` is the way out (`docs/PLAN_11_REBASE.md` R2).
 pub const OPERATION_KEYBAR: &str =
@@ -210,9 +216,7 @@ pub const RIGHT_STASH: &str = "(no stash entries)";
 pub const HELP: &str = "1 .. 5            focus that pane
 Tab / Right       focus next pane; Shift-Tab / Left previous pane
 j / k, Down / Up  move selection down / up
-J / K             scroll the diff pane
-PgUp / PgDn       scroll the diff pane a page
-Ctrl-u / Ctrl-d   scroll the diff pane a half page
+J K / PgUp PgDn   scroll the diff: line / page (Ctrl-u/d: half page)
 < / >             diff pane to top / bottom
 ] / [             next / previous hunk or file
 <space>           stage / unstage the file, or a hunk/lines in the diff
@@ -223,7 +227,8 @@ V                 start / clear a line selection
 d                 discard the change under the cursor (asks first)
 c                 open commit popup; with no staged files, ask to stage all
 A                 amend HEAD, message pre-filled
-w                 reword HEAD's message only, index untouched
+w                 reword HEAD's message only (Commits: the selected commit)
+d s S e           (Commits) drop (asks) / squash / fixup / edit the selected commit
 Enter: commit Summary; Tab: switch; Enter: body newline
 Meta/Ctrl-Enter: commit body; Ctrl-S: commit alias
 Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify

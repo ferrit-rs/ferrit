@@ -447,6 +447,7 @@ impl App {
                 }
             },
             ConfirmAction::DropStash { oid } => self.drop_stash(&oid),
+            ConfirmAction::DropCommit { hash } => self.drop_commit(&hash),
             ConfirmAction::AbortOperation => {
                 self.apply_operation_step(git::operation::Step::Abort);
             },

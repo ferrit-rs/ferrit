@@ -1,5 +1,20 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Deviation (R4): the reword popup for an older commit hides sign-off and
+no-verify.** Found by a render test: the commit editor always drew
+`sign-off: off   no-verify: off` and its `Ctrl-O/N` hint, but a rebase reword
+runs `git commit --amend -F` itself and neither applies, so the line was
+false and the keys toggled nothing visible. For a reword target the footer is
+the hints line alone, the hints say `Enter: reword`, `Ctrl-O/N` are ignored,
+and cancelling does not save the text as the next `c`'s draft (it would have
+come back as a new commit's message). The refusal rule follows the new-branch
+popup: a refused reword (dirty worktree) keeps the popup and the typed text
+for a retry, a stop or success closes it. `s` / `S` / `e` / `d` act at once
+except `d`, which asks; squashing the oldest commit is an error message (git
+has nothing below it), not an inert key, so the user learns why. While an
+operation is stopped the keys answer `finish or abort the operation in
+progress first (m)` in the Status line instead of doing nothing silently.
+
 **Deviation (R3): a reword is `pick` plus `exec git commit --amend -F`, not a
 `reword` line with `GIT_EDITOR=cp`.** The table below planned the editor
 route. It loses the message when the rebase stops on a conflict earlier in the
@@ -417,8 +432,12 @@ swap.
   these fails a test when broken: the squash anchor, the reword exec line, the
   merge-commit guard, the idle guard, keeping the scratch file while stopped.
   No UI yet (R4).
-- **R4** Commits pane keys `w` / `d` / `s` / `S` / `e`, reword popup with
-  `target`, `finish_rebase`, the rebase entries of the `m` menu.
+- ✅ **R4** Commits pane keys `w` / `d` / `s` / `S` / `e` (`src/app/rebase_actions.rs`),
+  the reword popup with a `RewordTarget` (`commit.rs`), `finish_operation`
+  shared with the `m` menu (`menu.rs`), a Commits keybar. `tests/app_rewrite.rs`
+  (13) green; each of these fails a test when broken: the in-progress guard,
+  the drill guard, not saving an older reword as the next draft, hiding the
+  sign-off line. The rebase entries of the `m` menu shipped with R2.
 - **R5** `F` (fixup commit, closes `PLAN_7` C3), `a` autosquash.
 - **R6** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
   layering held (`src/domain/git/` has no `ratatui`), every prior test

@@ -230,6 +230,11 @@ impl App {
                 self.fast_forward_selected_branch();
             },
             KeyCode::Char('M') if self.focus == Pane::Branches => self.merge_selected_branch(),
+            KeyCode::Char('w') if self.focus == Pane::Commits => self.reword_selected_commit(),
+            KeyCode::Char('d') if self.focus == Pane::Commits => self.drop_commit_prompt(),
+            KeyCode::Char('s') if self.focus == Pane::Commits => self.fold_selected_commit(false),
+            KeyCode::Char('S') if self.focus == Pane::Commits => self.fold_selected_commit(true),
+            KeyCode::Char('e') if self.focus == Pane::Commits => self.edit_selected_commit(),
             KeyCode::Char('d') if self.focus == Pane::Branches && self.mode == Mode::Nav => {
                 self.delete_branch_prompt();
             },

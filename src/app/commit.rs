@@ -12,11 +12,20 @@ pub(super) enum CommitField {
     Description,
 }
 
+/// The older commit a reword popup will rewrite with `git rebase -i`, instead
+/// of amending `HEAD`.
+pub(super) struct RewordTarget {
+    pub(super) hash: String,
+    pub(super) title: String,
+}
+
 pub(super) struct CommitDraft {
     pub(super) summary: TextInput,
     pub(super) description: TextInput,
     pub(super) focus: CommitField,
     pub(super) kind: git::commit::CommitKind,
+    /// `Some` when rewording a commit other than `HEAD`.
+    pub(super) reword: Option<RewordTarget>,
     pub(super) sign_off: bool,
     pub(super) no_verify: bool,
     history_index: Option<usize>,
@@ -56,23 +65,37 @@ impl App {
         let Some(Popup::Commit(draft)) = popup else {
             return None;
         };
-        let hints = match draft.focus {
-            CommitField::Summary => {
+        let hints = match (draft.reword.is_some(), draft.focus) {
+            (false, CommitField::Summary) => {
                 "Enter: commit | Tab: description | ↑/↓: history | Ctrl-O/N: options | Esc: cancel"
             },
-            CommitField::Description => {
+            (false, CommitField::Description) => {
                 "Enter: newline | Tab: summary | Meta/Ctrl-Enter: commit | Ctrl-O/N: options | Esc: cancel"
+            },
+            // A rebase reword has no sign-off / no-verify to toggle.
+            (true, CommitField::Summary) => {
+                "Enter: reword | Tab: description | ↑/↓: history | Esc: cancel"
+            },
+            (true, CommitField::Description) => {
+                "Enter: newline | Tab: summary | Meta/Ctrl-Enter: reword | Esc: cancel"
             },
         };
         Some(CommitPopupView {
-            title: draft.kind.title(),
+            title: draft
+                .reword
+                .as_ref()
+                .map_or_else(|| draft.kind.title(), |target| target.title.as_str()),
             input: &draft.summary,
             description: Some(&draft.description),
             summary_focused: draft.focus == CommitField::Summary,
             overlay_state: Some(commit_overlay),
             lines: draft.summary.lines(),
             cursor: draft.summary.cursor(),
-            toggles: Some((draft.sign_off, draft.no_verify)),
+            // A rebase reword runs the amend itself: neither toggle applies.
+            toggles: draft
+                .reword
+                .is_none()
+                .then_some((draft.sign_off, draft.no_verify)),
             hints,
         })
     }
@@ -116,12 +139,22 @@ impl App {
         self.open_commit_editor(kind, prefill);
     }
 
+    /// Open the editor to reword the older commit `hash` (a rebase, not an
+    /// amend), pre-filled with its message.
+    pub(super) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
+        self.open_commit_editor(git::commit::CommitKind::Reword, Some(message.to_owned()));
+        if let Some(Popup::Commit(draft)) = &mut self.popup {
+            draft.reword = Some(RewordTarget { hash, title });
+        }
+    }
+
     fn open_commit_editor(&mut self, kind: git::commit::CommitKind, prefill: Option<String>) {
         let mut draft = CommitDraft {
             summary: TextInput::default(),
             description: TextInput::default(),
             focus: CommitField::Summary,
             kind,
+            reword: None,
             sign_off: false,
             no_verify: false,
             history_index: None,
@@ -217,8 +250,12 @@ impl App {
             },
             KeyCode::Enter if ctrl || meta => commit = true,
             KeyCode::Char('s') if ctrl => commit = true,
-            KeyCode::Char('o') if ctrl => draft.sign_off = !draft.sign_off,
-            KeyCode::Char('n') if ctrl => draft.no_verify = !draft.no_verify,
+            KeyCode::Char('o') if ctrl && draft.reword.is_none() => {
+                draft.sign_off = !draft.sign_off;
+            },
+            KeyCode::Char('n') if ctrl && draft.reword.is_none() => {
+                draft.no_verify = !draft.no_verify;
+            },
             KeyCode::Enter if draft.focus == CommitField::Summary => commit = true,
             KeyCode::Enter => {
                 draft
@@ -240,7 +277,11 @@ impl App {
         }
 
         if cancel {
-            if let Some(Popup::Commit(draft)) = &self.popup {
+            // A reword of an older commit is not a half-written new commit:
+            // its text must not come back as the next `c`'s draft.
+            if let Some(Popup::Commit(draft)) = &self.popup
+                && draft.reword.is_none()
+            {
                 self.commit_draft = Some(draft.message());
             }
             self.popup = None;
@@ -259,6 +300,21 @@ impl App {
         if !matches!(draft.kind, git::commit::CommitKind::Fixup { .. }) && draft.summary.is_blank()
         {
             self.report_error(AppError::EmptyCommitMessage);
+            return;
+        }
+        if let Some(target) = &draft.reword {
+            let hash = target.hash.clone();
+            let Some(repo) = &self.repo else { return };
+            let result = repo.rebase_edit(&hash, &git::rebase::RebaseEdit::Reword(message));
+            // Like the new-branch popup: a refusal keeps the popup and the
+            // text for a retry; a stop or success closes it.
+            if let Err(error) = result {
+                self.report_error(error);
+                return;
+            }
+            self.popup = None;
+            self.commit_overlay.close();
+            self.finish_operation(result);
             return;
         }
         let opts = git::commit::CommitOpts {

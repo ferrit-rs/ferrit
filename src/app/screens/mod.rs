@@ -654,6 +654,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
         mock::BRANCHES_KEYBAR
     } else if app.focus == Pane::Stash {
         mock::STASH_KEYBAR
+    } else if app.focus == Pane::Commits && !app.commits_drilled() {
+        mock::COMMITS_KEYBAR
     } else {
         mock::KEYBAR
     };

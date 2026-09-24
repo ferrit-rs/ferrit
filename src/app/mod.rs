@@ -86,7 +86,7 @@ pub struct FilesDiff {
 /// Borrows the draft's lines, so it is cheap to build fresh every frame
 /// rather than cached.
 pub struct CommitPopupView<'a> {
-    pub title: &'static str,
+    pub title: &'a str,
     /// Commit subject, or the whole single-field input for another popup.
     pub input: &'a TextInput,
     /// Commit body editor; absent for the new-branch input.
@@ -283,6 +283,8 @@ enum ConfirmAction {
     DeleteBranch { name: String, force: bool },
     /// Abort the merge, rebase, cherry-pick or revert in progress (`m` menu).
     AbortOperation,
+    /// `d` on the Commits pane: drop that commit with `git rebase -i`.
+    DropCommit { hash: String },
     /// `d` on the Stash pane: `git stash drop`, resolved by oid.
     DropStash { oid: String },
     /// Push a branch known to be behind its upstream, using a lease guard.
@@ -635,6 +637,7 @@ pub mod image_query;
 mod input;
 mod menu;
 mod popups;
+mod rebase_actions;
 mod remote;
 mod staging;
 mod stash_actions;
@@ -1521,6 +1524,13 @@ impl App {
     /// misleading while drilled in.
     pub fn branches_drilled(&self) -> bool {
         self.branch_drill.is_some()
+    }
+
+    /// Is the Commits pane showing one commit's changed files instead of the
+    /// commit list? The commit rewrite keys and their keybar apply only to the
+    /// list.
+    pub fn commits_drilled(&self) -> bool {
+        self.commit_drill.is_some()
     }
 
     /// Commits pane rows: the commit list, or one commit's own changed-file

@@ -122,11 +122,16 @@ impl App {
         }
     }
 
-    /// Run one step and say where git stopped. Refreshes either way: a
-    /// refusal changes nothing, a step changes a lot.
+    /// Run one step and say where git stopped.
     pub(super) fn apply_operation_step(&mut self, step: Step) {
         let Some(repo) = &self.repo else { return };
-        let result: GitResult<OperationOutcome> = repo.operation_step(step);
+        let result = repo.operation_step(step);
+        self.finish_operation(result);
+    }
+
+    /// Refresh and report where git stopped after a step or a rewrite.
+    /// Refreshes either way: a refusal changes nothing, a step changes a lot.
+    pub(super) fn finish_operation(&mut self, result: GitResult<OperationOutcome>) {
         self.request_refresh();
         match result {
             Ok(OperationOutcome::Done) => {},
