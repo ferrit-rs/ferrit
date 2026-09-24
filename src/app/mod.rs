@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod events;
+pub mod keymap;
 pub mod mock;
 pub mod screens;
 pub mod terminal;

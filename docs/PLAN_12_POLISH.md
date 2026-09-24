@@ -50,6 +50,21 @@ checks the ranges after parsing. `mouse = false` skips `EnableMouseCapture`;
 never enabled. Hover on the author label needs mouse events, so it is
 inactive too when the mouse is off.
 
+**Note (P2a): where it lives, and two decisions.** The types are in
+`src/app/keymap.rs`, not `config/keys.rs`: the keymap exists without a config
+file, and P2c will add the `[keys]` parsing to `config/`. The sketch's `Menu`
+context is gone: the `m` menu and every popup own their keys (`Esc`, `Enter`,
+`j` / `k`, a row's letter), the same "not remappable" rule as text entry.
+Modifiers must match exactly. `on_key` ignored them for characters, so `Ctrl-p`
+pulled and `Ctrl-d` on Files opened the discard prompt; that stops. A letter
+with `ctrl` or `alt` is folded to lower case (a terminal reports `Ctrl-D` as
+`d` or as `D` with shift), and a bare character keeps its case, since `J` and
+`j` are different bindings. `Right` and `Ctrl-Right` are different keys, which
+is what the old arm order (`Right | Left if ctrl` before `Tab | Right`) encoded.
+`Space`, `a`, `d` and `s` are Files-context bindings: the old arms were global
+but ended in methods that returned at once off Files, so the behaviour is the
+same.
+
 ## Goal
 
 Make ferrit configurable and self-explaining without growing the default
@@ -432,8 +447,12 @@ terminal-lifecycle work with its own failure modes, not a config line.
   unit test for the poll; each of these fails a test when broken: the diff
   options, the wheel step, the sign-off default, `show_reads`, the range
   checks, the poll interval.
-- **P2a** `Action`, `Context`, `Keymap::default()` and the table test, no
-  behaviour change yet.
+- ✅ **P2a** `Action`, `Context`, `KeyBinding` (with `parse` and `Display`),
+  `Keymap::default()` in `src/app/keymap.rs`, and `tests/keymap.rs` (9): a table
+  written from the old `on_key` arms, a check that nothing else is bound, and
+  the context fall-through. No behaviour change: `input.rs` does not use it yet.
+  Changing one default, adding one, matching modifiers loosely, or moving a
+  default to another context each fails a test.
 - **P2b** `input.rs` routes through the keymap; every existing test unmodified
   and green.
 - **P2c** `[keys]` parsing, validation, fallbacks.
