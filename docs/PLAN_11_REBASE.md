@@ -1,5 +1,21 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Deviation (R3): a reword is `pick` plus `exec git commit --amend -F`, not a
+`reword` line with `GIT_EDITOR=cp`.** The table below planned the editor
+route. It loses the message when the rebase stops on a conflict earlier in the
+range: the later `--continue` runs with `GIT_EDITOR=true`, so the reword step
+keeps the old message silently. An `exec` line sits in git's own copy of the
+todo and still runs after any number of stops (checked: drop, conflict,
+resolve, continue, and the amend still fired). The message file therefore
+outlives the run and is removed only once no rebase is in progress.
+`GIT_EDITOR=true` for everything else, `GIT_SEQUENCE_EDITOR="cp '<todo>'"`
+for the todo, both quoted for paths with spaces or quotes (tested in a
+directory called `sp ace's`). Also: the "operation already in progress" guard
+runs before anything else, because mid-rebase `HEAD` is a half-rewritten
+history and the other checks would answer with a misleading message (found by
+a test). A commit-msg hook rejecting the amend leaves the rebase stopped and
+returns the hook's output as `RebaseFailed`; the badge and `m` are the way out.
+
 **Deviation (R2): all four operations, one outcome type.** The milestone said
 "a merge in progress". The menu is generic and the four command lines are one
 each, so rebase, cherry-pick and revert ship with it, and their `--continue`,
@@ -395,8 +411,12 @@ swap.
   skip flag, the `CONFLICT (` check, the abort confirm, a merge row for skip.
   Closes phase 8's dangling note: the conflicted-merge popup now points at
   `m`.
-- **R3** `rebase.rs`: `build_todo`, `rebase_edit`, `autosquash`, outcomes,
-  errors. Backend tests green, no UI yet.
+- ✅ **R3** `rebase.rs`: `build_todo`, `rebase_edit`, `autosquash`,
+  `commit_message`, `GitError::RebaseFailed`, and `operation::settle` shared
+  with `step`. 24 new cases in `tests/git_rebase.rs` (38 in the file); each of
+  these fails a test when broken: the squash anchor, the reword exec line, the
+  merge-commit guard, the idle guard, keeping the scratch file while stopped.
+  No UI yet (R4).
 - **R4** Commits pane keys `w` / `d` / `s` / `S` / `e`, reword popup with
   `target`, `finish_rebase`, the rebase entries of the `m` menu.
 - **R5** `F` (fixup commit, closes `PLAN_7` C3), `a` autosquash.

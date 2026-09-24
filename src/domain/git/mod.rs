@@ -21,6 +21,7 @@ mod exec;
 pub mod log;
 pub mod model;
 pub mod operation;
+pub mod rebase;
 pub mod refs;
 pub mod remote;
 pub mod stash;
@@ -407,6 +408,27 @@ impl Repo {
     /// The entry's patch, for the right pane.
     pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
         diff::stash_diff(&self.inner, oid, opts)
+    }
+
+    /// Reword, drop, edit, squash or fixup the commit `hash` with one
+    /// `git rebase -i`. See `docs/PLAN_11_REBASE.md`.
+    pub fn rebase_edit(
+        &self,
+        hash: &str,
+        edit: &rebase::RebaseEdit,
+    ) -> GitResult<operation::OperationOutcome> {
+        rebase::rebase_edit(&self.inner, hash, edit)
+    }
+
+    /// Fold every `fixup!` / `squash!` commit after `hash`'s parent into its
+    /// target.
+    pub fn autosquash(&self, hash: &str) -> GitResult<operation::OperationOutcome> {
+        rebase::autosquash(&self.inner, hash)
+    }
+
+    /// The full message of a commit, for pre-filling a reword.
+    pub fn commit_message(&self, hash: &str) -> GitResult<String> {
+        rebase::commit_message(&self.inner, hash)
     }
 
     /// Continue, skip or abort the operation git is stopped in.

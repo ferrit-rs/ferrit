@@ -99,6 +99,22 @@ pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome>
     let out = exec::output(&mut cmd)
         .map_err(|e| GitError::OperationFailed(format!("cannot run git: {e}")))?;
 
+    settle(repo, &out).map_err(GitError::OperationFailed)
+}
+
+/// Where the repository stands after a subprocess that may have started or
+/// advanced an operation, or the refusal text. Shared by `step` and by
+/// `rebase`, so both read the same signals.
+///
+/// A failure is `Stopped` only when git reported a fresh `CONFLICT (` and an
+/// operation is in progress. Any other failure is the refusal text, even if an
+/// operation is still in progress (a rejecting hook, a `--continue` over an
+/// unresolved file): the caller shows it, and the Status badge and `m` menu
+/// are how the user leaves that state.
+pub(super) fn settle(
+    repo: &Repository,
+    out: &std::process::Output,
+) -> Result<OperationOutcome, String> {
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -117,7 +133,7 @@ pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome>
     if text.contains("CONFLICT (") && current(repo).is_some() {
         return Ok(OperationOutcome::Stopped { conflicted: true });
     }
-    Err(GitError::OperationFailed(text.trim().to_owned()))
+    Err(text.trim().to_owned())
 }
 
 fn flag(step: Step) -> &'static str {

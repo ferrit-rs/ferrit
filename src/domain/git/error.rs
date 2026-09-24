@@ -82,6 +82,13 @@ pub enum GitError {
     /// `NothingStaged` next to the generic `CommitFailed`.
     #[error("no upstream configured for the current branch")]
     NoUpstream,
+    /// A history rewrite (`git rebase -i` with a todo ferrit generated) was
+    /// refused before it started, or failed without leaving a conflict:
+    /// a merge commit in the range, a dirty worktree, a `pre-rebase` hook, a
+    /// commit that is not on the current branch. Holds git's own message
+    /// where git said it. See `docs/PLAN_11_REBASE.md`.
+    #[error("git rebase failed: {0}")]
+    RebaseFailed(String),
     /// `git <operation> --continue|--skip|--abort` was refused, or asked of
     /// an operation that has no such step (a merge cannot be skipped). Holds
     /// git's own message. See `docs/PLAN_11_REBASE.md`.
