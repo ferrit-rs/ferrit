@@ -1,5 +1,18 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Deviation (R1): the keybar hint ships with the menu, in R2.** R1 was
+planned to add a `Menu: m` hint. `m` does nothing until R2 builds the menu,
+so the hint would point at a dead key. R1 ships the state read and the
+Status badge only.
+
+**Checked while implementing R1.** In a stopped interactive rebase
+`rebase-merge/msgnum` is the current step and `end` the total, and a `drop`
+counts as a step: dropping the oldest of three commits and conflicting on the
+next one gives `2/3`. The `--apply` backend uses `rebase-apply/next` and
+`last`. Bisect leaves `BISECT_LOG` and maps to no operation; a stopped
+`git am` (`ApplyMailbox`) also maps to none, since libgit2 cannot tell
+`ApplyMailboxOrRebase` from a rebase.
+
 ## Goal
 
 Let a user rewrite recent history and get out of a stopped operation without
@@ -353,8 +366,12 @@ swap.
   `App::has_markers` / `unresolved_conflicts`). `tests/git_conflict.rs` (7)
   and `tests/app_conflict.rs` (6) green; disabling the guard makes the two
   regression tests fail, so they do guard the bug. Shipped alone.
-- **R1** state read: `Operation`, `Snapshot.operation`, Status line and
-  keybar hint. `tests/git_rebase.rs` state-mapping cases green.
+- ✅ **R1** state read: `Operation` (`model.rs`), `operation.rs`,
+  `Snapshot.operation`, the Status badge. `tests/git_rebase.rs` (9) and
+  `tests/app_operation.rs` (6) green; mutating the progress file names, the
+  revert mapping, the badge position or the refresh assignment fails them.
+  The keybar `Menu: m` hint moved to R2 (see the note at the top): showing it
+  before `m` does anything would advertise a dead key.
 - **R2** `Popup::Menu` primitive and the `m` menu for a merge in progress
   (continue, abort with confirm). Closes phase 8's dangling note.
 - **R3** `rebase.rs`: `build_todo`, `rebase_edit`, `autosquash`, outcomes,

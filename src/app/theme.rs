@@ -679,6 +679,12 @@ pub fn error_line(raw: &str) -> Line<'static> {
     Line::styled(raw.to_owned(), fg(DEL))
 }
 
+/// The "git is stopped mid-operation" badge (`REBASING 2/4`, `MERGING`):
+/// bold in the warning colour, since the repository is waiting on the user.
+pub fn operation_line(label: &str) -> Line<'static> {
+    Line::styled(label.to_owned(), fg(WARN).add_modifier(Modifier::BOLD))
+}
+
 /// A background fetch/pull/push in flight, shown under the main status
 /// line while `App::remote_busy_label` is `Some`. Dim, matching `Note`
 /// diff view's dim style — not an error, not a success, just "wait".

@@ -502,6 +502,8 @@ pub struct App {
     /// shows the commit list.
     commit_drill: Option<CommitDrill>,
     stashes: Vec<git::model::StashEntry>,
+    /// A merge, rebase, cherry-pick or revert stopped mid-way (`Snapshot`).
+    operation: Option<git::model::Operation>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<String>,
     /// Optional worktree watcher failure; polling remains active as fallback.
@@ -689,6 +691,7 @@ impl App {
             commits: Vec::new(),
             commit_drill: None,
             stashes: Vec::new(),
+            operation: None,
             last_error: None,
             watch_error: None,
             picker: Picker::halfblocks(),
@@ -873,6 +876,7 @@ impl App {
                 self.remotes = snap.remotes;
                 self.commits = snap.commits;
                 self.stashes = snap.stashes;
+                self.operation = snap.operation;
                 self.last_error = None;
             },
             Err(error) => self.report_error(AppError::Refresh(error)),
@@ -1422,6 +1426,11 @@ impl App {
             }
             lines
         };
+        if let Some(operation) = self.operation {
+            // Right under the first line, error or header, so it is the
+            // first thing read while git waits on the user.
+            out.insert(out.len().min(1), theme::operation_line(&operation.label()));
+        }
         if let Some(label) = self.remote_busy_label() {
             out.push(theme::busy_line(label));
         } else if self.last_error.is_none()

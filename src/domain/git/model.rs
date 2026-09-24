@@ -3,6 +3,35 @@
 
 use std::path::PathBuf;
 
+/// A multi-step operation git has stopped in the middle of, waiting for the
+/// user. Read from the repository state, so it is also true for one started
+/// from another shell. See `docs/PLAN_11_REBASE.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operation {
+    Merge,
+    /// `step` of `total` commits; both `0` when git's progress files are
+    /// missing or unreadable.
+    Rebase {
+        step: usize,
+        total: usize,
+    },
+    CherryPick,
+    Revert,
+}
+
+impl Operation {
+    /// The badge shown in the Status pane.
+    pub fn label(self) -> String {
+        match self {
+            Self::Merge => "MERGING".to_owned(),
+            Self::Rebase { step, total } if total > 0 => format!("REBASING {step}/{total}"),
+            Self::Rebase { .. } => "REBASING".to_owned(),
+            Self::CherryPick => "CHERRY-PICKING".to_owned(),
+            Self::Revert => "REVERTING".to_owned(),
+        }
+    }
+}
+
 /// One-glance summary of repository state.
 #[derive(Debug, Clone, Default)]
 pub struct StatusHeader {

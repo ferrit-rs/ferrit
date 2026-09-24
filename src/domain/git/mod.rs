@@ -20,6 +20,7 @@ pub mod error;
 mod exec;
 pub mod log;
 pub mod model;
+mod operation;
 pub mod refs;
 pub mod remote;
 pub mod stash;
@@ -149,6 +150,8 @@ pub struct Snapshot {
     pub stashes: Vec<StashEntry>,
     /// Feeds the Branches pane's Remotes tab. `docs/PLAN_9_REMOTE.md`.
     pub remotes: Vec<RemoteEntry>,
+    /// A merge, rebase, cherry-pick or revert stopped mid-way, if any.
+    pub operation: Option<model::Operation>,
 }
 
 /// Abbreviated hash, the 7 hex chars `git` shows by default. Shared by
@@ -249,6 +252,7 @@ impl Repo {
             commits: log::commits(&self.inner, COMMITS_LIMIT)?,
             stashes: stash::stashes(&mut self.inner)?,
             remotes: remote::remotes(&self.inner)?,
+            operation: operation::current(&self.inner),
         })
     }
 
@@ -403,6 +407,11 @@ impl Repo {
     /// The entry's patch, for the right pane.
     pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
         diff::stash_diff(&self.inner, oid, opts)
+    }
+
+    /// The merge, rebase, cherry-pick or revert git is stopped in, if any.
+    pub fn operation(&self) -> Option<model::Operation> {
+        operation::current(&self.inner)
     }
 
     /// Configured remotes, alphabetical. See `docs/PLAN_9_REMOTE.md`.
