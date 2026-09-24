@@ -849,3 +849,163 @@ fn commit_message_returns_subject_and_body() {
         Err(GitError::NoSuchCommit(_))
     ));
 }
+
+// ------------------------------------------------------------ edge cases (R6)
+
+#[test]
+fn a_detached_head_can_be_rewritten() {
+    let dir = history("edge-detached");
+    git(dir.path(), &["checkout", "-q", "--detach"]);
+    let outcome = edit(&dir, "HEAD~1", &RebaseEdit::Reword("detached".to_owned())).unwrap();
+
+    assert_eq!(outcome, OperationOutcome::Done);
+    assert_eq!(subjects(&dir), ["three", "detached", "one", "base"]);
+    assert!(
+        !try_git(dir.path(), &["symbolic-ref", "-q", "HEAD"], &[]),
+        "still detached"
+    );
+}
+
+/// `r`, `s`, `t` each add their own file, so dropping `r` (the root) leaves
+/// nothing for `s` to conflict with.
+fn independent_history(tag: &str) -> TempDir {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    git(dir.path(), &["checkout", "-q", "-b", "main"]);
+    for name in ["r", "s", "t"] {
+        fs::write(dir.path().join(format!("{name}.txt")), "x\n").unwrap();
+        commit_all(&repo, name);
+    }
+    dir
+}
+
+#[test]
+fn the_root_commit_can_be_dropped_when_nothing_depends_on_it() {
+    let dir = independent_history("edge-root-drop");
+    let outcome = edit(&dir, "HEAD~2", &RebaseEdit::Drop).unwrap();
+    assert_eq!(outcome, OperationOutcome::Done);
+    assert_eq!(subjects(&dir), ["t", "s"]);
+    assert!(!dir.path().join("r.txt").exists());
+}
+
+#[test]
+fn the_root_commit_can_be_edited() {
+    let dir = independent_history("edge-root-edit");
+    let outcome = edit(&dir, "HEAD~2", &RebaseEdit::Edit).unwrap();
+    assert_eq!(outcome, OperationOutcome::Stopped { conflicted: false });
+    assert_eq!(git(dir.path(), &["log", "-1", "--format=%s"]), "r");
+    assert_eq!(step(&dir, Step::Continue).unwrap(), OperationOutcome::Done);
+    assert_eq!(subjects(&dir), ["t", "s", "r"]);
+}
+
+/// Configured editors that would hang or record a call, if git ever ran them.
+fn poison_editors(dir: &TempDir) -> PathBuf {
+    let marker = dir.path().join(".git").join("editor-ran");
+    let script = dir.path().join(".git").join("poison.sh");
+    fs::write(
+        &script,
+        format!("#!/bin/sh\ntouch '{}'\nexit 1\n", marker.display()),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    for key in ["core.editor", "sequence.editor"] {
+        git(dir.path(), &["config", key, script.to_str().unwrap()]);
+    }
+    marker
+}
+
+#[test]
+fn no_rewrite_ever_opens_the_users_editor() {
+    let dir = history("edge-editor");
+    let marker = poison_editors(&dir);
+
+    edit(&dir, "HEAD~1", &RebaseEdit::Reword("no editor".to_owned())).unwrap();
+    edit(&dir, "HEAD~1", &RebaseEdit::Squash).unwrap();
+    edit(&dir, "HEAD~1", &RebaseEdit::Fixup).unwrap();
+    edit(&dir, "HEAD~1", &RebaseEdit::Edit).unwrap();
+    step(&dir, Step::Continue).unwrap();
+    let target = hash_of(&dir, "HEAD~1");
+    Repo::open(dir.path()).unwrap().autosquash(&target).unwrap();
+    fs::write(dir.path().join("f"), "conflicting\n").unwrap();
+    git(dir.path(), &["commit", "-qam", "extra"]);
+    edit(&dir, "HEAD~1", &RebaseEdit::Drop).unwrap();
+
+    assert!(!marker.exists(), "an editor was launched");
+}
+
+/// A bare `origin` and a clone with `history`'s four commits pushed.
+fn pushed_history(tag: &str) -> (TempDir, TempDir) {
+    let origin = TempDir::new(&format!("{tag}-origin"));
+    git(origin.path(), &["init", "-q", "--bare", "-b", "main"]);
+    let work = TempDir::new(&format!("{tag}-work"));
+    git(
+        Path::new("."),
+        &[
+            "clone",
+            "-q",
+            origin.path().to_str().unwrap(),
+            work.path().to_str().unwrap(),
+        ],
+    );
+    configure_identity(work.path());
+    git(work.path(), &["checkout", "-q", "-b", "main"]);
+    let repo = Repository::open(work.path()).unwrap();
+    for content in ["base", "one", "two", "three"] {
+        fs::write(work.path().join("f"), format!("{content}\n")).unwrap();
+        commit_all(&repo, content);
+    }
+    git(work.path(), &["push", "-q", "-u", "origin", "main"]);
+    (origin, work)
+}
+
+#[test]
+fn rewriting_pushed_commits_leaves_the_branch_ahead_and_behind() {
+    let (_origin, work) = pushed_history("edge-pushed");
+    edit(&work, "HEAD~1", &RebaseEdit::Reword("rewritten".to_owned())).unwrap();
+
+    let header = Repo::open(work.path()).unwrap().snapshot().unwrap().header;
+    assert_eq!((header.ahead, header.behind), (2, 2), "{header:?}");
+}
+
+#[test]
+fn a_pull_that_starts_a_rebase_and_conflicts_is_a_stopped_rebase() {
+    let (origin, work) = pushed_history("edge-pull");
+    // Another clone changes `f`'s last line upstream ...
+    let other = TempDir::new("edge-pull-other");
+    git(
+        Path::new("."),
+        &[
+            "clone",
+            "-q",
+            origin.path().to_str().unwrap(),
+            other.path().to_str().unwrap(),
+        ],
+    );
+    configure_identity(other.path());
+    fs::write(other.path().join("f"), "upstream\n").unwrap();
+    git(other.path(), &["commit", "-qam", "upstream change"]);
+    git(other.path(), &["push", "-q", "origin", "main"]);
+    // ... while `work` changes the same line locally.
+    fs::write(work.path().join("f"), "local\n").unwrap();
+    git(work.path(), &["commit", "-qam", "local change"]);
+    git(work.path(), &["config", "pull.rebase", "true"]);
+
+    let repo = Repo::open(work.path()).unwrap();
+    assert!(repo.pull().is_err(), "the conflict is a failed pull");
+    assert!(
+        matches!(repo.operation(), Some(Operation::Rebase { .. })),
+        "{:?}",
+        repo.operation()
+    );
+
+    assert_eq!(step(&work, Step::Abort).unwrap(), OperationOutcome::Done);
+    assert_eq!(
+        git(work.path(), &["log", "-1", "--format=%s"]),
+        "local change"
+    );
+}

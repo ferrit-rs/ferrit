@@ -1,5 +1,10 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Status: done (R0 to R6).** The prompt after rewriting pushed commits now
+says `diverged (ahead N, behind M)`: the phase 9 guard already fired (it keys
+on `behind > 0`), but its text said only "behind upstream", which is false
+for a branch that is also ahead.
+
 **Deviation (R5): `a` checks before it rewrites, and the Commits keybar drops
 `f/p/P`.** `git rebase -i --autosquash` over a range with no foldable commit
 succeeds and changes nothing, which would look like a broken key. So `a` first
@@ -454,10 +459,35 @@ swap.
 - ✅ **R5** `F` (fixup commit, closes `PLAN_7` C3), `a` autosquash.
   `tests/app_rewrite.rs` now 20 cases; each of these fails a test when
   broken: the fold pre-check, its range bound, the fixup's target.
-- **R6** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
-  layering held (`src/domain/git/` has no `ratatui`), every prior test
-  green, every edge-case row has a test or an explicit inert path,
-  `CHANGELOG.md` lines, `PLAN_0` and `PLAN_7` C3 flipped.
+- ✅ **R6** polish: `cargo fmt --check`, clippy `-D warnings` and rustdoc
+  `-D warnings` clean, `src/domain/git/` has no `ratatui` import, 333 tests
+  green, `CHANGELOG.md` lines, `PLAN_0` and `PLAN_7` C3 flipped. Every row of
+  the edge-case table has a test:
+  - conflict during a rewrite, `edit` stop, unresolved continue, skip onto a
+    new conflict, abort: `tests/git_rebase.rs` (`step-*`, `rw-drop`,
+    `rw-edit`) and `tests/app_menu.rs`;
+  - a rejecting hook: `a_rejecting_hook_leaves_the_rebase_stopped_...`;
+  - detached HEAD: `a_detached_head_can_be_rewritten`;
+  - the root commit: reword, drop (`the_root_commit_can_be_dropped_...`),
+    edit, and squash / fixup refused with `no commit below`;
+  - rewriting pushed commits: `rewriting_pushed_commits_leaves_the_branch_
+    ahead_and_behind` (backend, `2` ahead and `2` behind) and
+    `pushing_after_rewriting_pushed_commits_asks_for_force_with_lease` (`P`
+    asks, `n` pushes nothing);
+  - a rebase started from another shell: `rewrite_keys_are_inert_while_
+    another_shell_has_a_rebase_running`;
+  - the pull-that-starts-a-rebase note from phase 9:
+    `a_pull_that_starts_a_rebase_and_conflicts_is_a_stopped_rebase`, then
+    aborted from the same state machine;
+  - Commits drilled: `rewrite_keys_are_inert_inside_a_commit_...`.
+  The definition of done's "never opens `$EDITOR`" is
+  `no_rewrite_ever_opens_the_users_editor`, with `core.editor` and
+  `sequence.editor` pointing at a script that records a call. Note for
+  whoever runs it: this shell exports `GIT_EDITOR=true`, which hides a
+  regression, so the check is only meaningful with the variable unset
+  (`env -u GIT_EDITOR cargo test --test git_rebase`); under that condition
+  removing the override makes the suite hang on git's default editor rather
+  than fail cleanly.
 
 ## Definition of done (phase 11)
 

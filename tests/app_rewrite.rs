@@ -501,3 +501,95 @@ fn the_commits_keybar_lists_f_and_a() {
         "{out}"
     );
 }
+
+// ------------------------------------------------------------ edge cases (R6)
+
+/// A bare `origin` and a clone with `history`'s four commits pushed.
+fn pushed_history(tag: &str) -> (TempDir, TempDir) {
+    let origin = TempDir::new(&format!("{tag}-origin"));
+    git(origin.path(), &["init", "-q", "--bare", "-b", "main"]);
+    let work = TempDir::new(&format!("{tag}-work"));
+    git(
+        Path::new("."),
+        &[
+            "clone",
+            "-q",
+            origin.path().to_str().unwrap(),
+            work.path().to_str().unwrap(),
+        ],
+    );
+    configure_identity(work.path());
+    git(work.path(), &["checkout", "-q", "-b", "main"]);
+    let repo = Repository::open(work.path()).unwrap();
+    for content in ["base", "one", "two", "three"] {
+        fs::write(work.path().join("f"), format!("{content}\n")).unwrap();
+        commit_all(&repo, content);
+    }
+    git(work.path(), &["push", "-q", "-u", "origin", "main"]);
+    (origin, work)
+}
+
+#[test]
+fn pushing_after_rewriting_pushed_commits_asks_for_force_with_lease() {
+    let (origin, work) = pushed_history("rw-app-force");
+    let remote_tip = git(origin.path(), &["rev-parse", "main"]);
+    let mut app = commits_app(&work);
+    select_row(&mut app, 1);
+    app.feed_key(char_key('w'));
+    type_text(&mut app, "!");
+    enter(&mut app);
+    assert_eq!(subjects(&work), ["three", "two!", "one", "base"]);
+
+    app.feed_key(char_key('P'));
+    let prompt = app.confirm_message().expect("P asks first").to_owned();
+    assert!(prompt.contains("diverged"), "{prompt}");
+    assert!(prompt.contains("ahead 2, behind 2"), "{prompt}");
+    assert!(prompt.contains("--force-with-lease"), "{prompt}");
+
+    app.feed_key(char_key('n'));
+    assert!(app.confirm_message().is_none());
+    assert_eq!(
+        git(origin.path(), &["rev-parse", "main"]),
+        remote_tip,
+        "nothing was pushed"
+    );
+}
+
+#[test]
+fn rewrite_keys_are_inert_while_another_shell_has_a_rebase_running() {
+    let dir = history("rw-app-external");
+    let short = |rev: &str| git(dir.path(), &["rev-parse", "--short", rev]);
+    let todo = format!(
+        "pick {}\nedit {}\npick {}\n",
+        short("HEAD~2"),
+        short("HEAD~1"),
+        short("HEAD")
+    );
+    let file = dir.path().join(".git").join("ferrit-test-todo");
+    fs::write(&file, todo).unwrap();
+    let editor = format!("cp {}", file.display());
+    let started = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["rebase", "-i", "HEAD~3"])
+        .env("GIT_SEQUENCE_EDITOR", &editor)
+        .env("GIT_EDITOR", "true")
+        .output()
+        .unwrap();
+    assert!(started.status.success());
+    let head = git(dir.path(), &["rev-parse", "HEAD"]);
+
+    let mut app = App::open(dir.path()).unwrap();
+    assert!(status_lines(&app).contains(&"REBASING 2/3".to_owned()));
+    app.feed_key(char_key('4'));
+    for key in ['s', 'S', 'e', 'd', 'F', 'a'] {
+        app.feed_key(char_key(key));
+    }
+    assert!(app.confirm_message().is_none(), "no drop confirm opened");
+    assert_eq!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        head,
+        "nothing was rewritten"
+    );
+    assert!(status_lines(&app).join("\n").contains("finish or abort"));
+}

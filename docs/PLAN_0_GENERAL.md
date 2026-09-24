@@ -55,7 +55,7 @@ into its own crate remains deferred.
 | 8 | `PLAN_8_BRANCHES.md` | checkout, create, delete, fast-forward, merge | ✅ done |
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | ✅ done |
 | 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | ✅ done |
-| 11 | `PLAN_11_REBASE.md` | reword / drop / squash / fixup / edit on any commit, autosquash, in-progress operation menu (continue / skip / abort), conflict marking | 📅 planned |
+| 11 | `PLAN_11_REBASE.md` | reword / drop / squash / fixup / edit on any commit, autosquash, in-progress operation menu (continue / skip / abort), conflict marking | ✅ done |
 | 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (seven slices P0 to P6) | 📅 planned |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo

@@ -32,11 +32,22 @@ impl App {
         }
         if self.header.upstream.is_some() {
             if self.header.behind > 0 {
-                self.pending_confirm = Some(ConfirmPrompt {
-                    message: format!(
+                // Ahead and behind at once is what rewriting pushed commits
+                // leaves (`docs/PLAN_11_REBASE.md`): say so, not just "behind".
+                let message = if self.header.ahead > 0 {
+                    format!(
+                        "Branch has diverged from upstream (ahead {}, behind {}), as after \
+                         rewriting pushed commits. Push with --force-with-lease?",
+                        self.header.ahead, self.header.behind
+                    )
+                } else {
+                    format!(
                         "Branch is behind upstream by {} commit(s). Push with --force-with-lease?",
                         self.header.behind
-                    ),
+                    )
+                };
+                self.pending_confirm = Some(ConfirmPrompt {
+                    message,
                     action: ConfirmAction::ForcePush,
                 });
                 return;
