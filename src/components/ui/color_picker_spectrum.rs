@@ -122,7 +122,8 @@ pub(super) fn move_selection(selected: usize, direction: PaletteDirection) -> us
 fn spectrum_color(column: usize, row: usize) -> Color {
     let hue = (column as f32 * HUE_CIRCLE_DEGREES / SPECTRUM_COLUMNS as f32)
         .rem_euclid(HUE_CIRCLE_DEGREES);
-    let (saturation, value) = SHADE_LEVELS[row];
+    // Past the last row: the full-strength shade, never a panic.
+    let (saturation, value) = SHADE_LEVELS.get(row).copied().unwrap_or((1.0, 1.0));
     let chroma = value * saturation;
     let hue_sector = hue / HUE_SECTOR_DEGREES;
     let secondary = chroma * (1.0 - (hue_sector.rem_euclid(2.0) - 1.0).abs());

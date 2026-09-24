@@ -49,10 +49,11 @@ pub(super) fn draw_commit(
             .border_type(BorderType::Rounded)
             .border_style(focused)
             .title(Line::styled(format!(" {} ", view.title), focused));
-        let mut overlay_state: &mut OverlayState = view
-            .overlay_state
-            .take()
-            .expect("commit editor has overlay state");
+        // The commit editor always carries its overlay state; without it
+        // there is nothing to anchor, so draw nothing.
+        let Some(mut overlay_state) = view.overlay_state.take() else {
+            return;
+        };
         frame.render_stateful_widget(
             Overlay::new()
                 .anchor(Anchor::Center)

@@ -123,7 +123,9 @@ impl ColorPickerPalette {
             let mut spans = Vec::new();
             for col in 0..PALETTE_COLUMNS {
                 let index = row * PALETTE_COLUMNS + col;
-                let (name, color) = PALETTE[index];
+                let Some(&(name, color)) = PALETTE.get(index) else {
+                    continue;
+                };
                 let selected = index == self.selected;
                 spans.push(Span::styled(
                     if selected { "▣ " } else { "● " },
