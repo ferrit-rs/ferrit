@@ -224,6 +224,7 @@ impl App {
             KeyCode::Char('d') if self.focus == Pane::Stash => self.drop_stash_prompt(),
             KeyCode::Char('s') if self.focus == Pane::Files => self.open_stash_popup(),
             KeyCode::Char(' ') => self.stage_selected_file(),
+            KeyCode::Char('a') if self.focus == Pane::Commits => self.autosquash_from_selected(),
             KeyCode::Char('a') => self.stage_all_files(),
             KeyCode::Char('n') if self.focus == Pane::Branches => self.open_new_branch_popup(),
             KeyCode::Char('u') if self.focus == Pane::Branches => {
@@ -235,6 +236,7 @@ impl App {
             KeyCode::Char('s') if self.focus == Pane::Commits => self.fold_selected_commit(false),
             KeyCode::Char('S') if self.focus == Pane::Commits => self.fold_selected_commit(true),
             KeyCode::Char('e') if self.focus == Pane::Commits => self.edit_selected_commit(),
+            KeyCode::Char('F') if self.focus == Pane::Commits => self.create_fixup_commit(),
             KeyCode::Char('d') if self.focus == Pane::Branches && self.mode == Mode::Nav => {
                 self.delete_branch_prompt();
             },

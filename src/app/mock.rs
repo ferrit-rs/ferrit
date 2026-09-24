@@ -172,9 +172,11 @@ pub const STASH_KEYBAR: &str =
 
 /// Bottom line while the Commits pane is focused (and not drilled into a
 /// commit's files). `docs/PLAN_11_REBASE.md` R4: these keys share letters with
-/// the default bar's (`d`, `s`), so the pane swaps its own in.
+/// the default bar's (`d`, `s`), so the pane swaps its own in. `f` / `p` / `P`
+/// (fetch, pull, push) still work there; the default bar and `HELP` list them,
+/// and this bar has no room left at 120 columns.
 pub const COMMITS_KEYBAR: &str = "Reword: w | Drop: d | Squash: s | Fixup: S | Edit: e | \
-     Fetch/Pull/Push: f/p/P | Help: ? | Quit: q";
+     New fixup!: F | Autosquash: a | Help: ? | Quit: q";
 
 /// Bottom line while a merge, rebase, cherry-pick or revert is stopped mid-way,
 /// on every pane: `m` is the way out (`docs/PLAN_11_REBASE.md` R2).
@@ -228,7 +230,7 @@ d                 discard the change under the cursor (asks first)
 c                 open commit popup; with no staged files, ask to stage all
 A                 amend HEAD, message pre-filled
 w                 reword HEAD's message only (Commits: the selected commit)
-d s S e           (Commits) drop (asks) / squash / fixup / edit the selected commit
+d s S e F a       (Commits) drop (asks), squash, fixup, edit; F new fixup!, a autosquash
 Enter: commit Summary; Tab: switch; Enter: body newline
 Meta/Ctrl-Enter: commit body; Ctrl-S: commit alias
 Ctrl-O / Ctrl-N   (in the commit popup) toggle sign-off / no-verify

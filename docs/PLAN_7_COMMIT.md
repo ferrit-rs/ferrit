@@ -416,7 +416,9 @@ interactive rebase todo editing" if the version gap ever closes.
 - ✅ **C2** `A` amend (message pre-filled from `head_message`), `w` reword
   (`--amend --only`). Both disabled (a `last_error` line, not a popup note)
   with no commit yet to amend/reword.
-- ❌ **C3** not implemented: no fixup-pick on the Commits pane, no `s`
+- ✅ **C3** shipped in `docs/PLAN_11_REBASE.md` R5 as `F` on the Commits pane
+  (`f` is fetch since phase 9, so the plan's key changed; `--squash` has no
+  key). The original note follows: not implemented: no fixup-pick on the Commits pane, no `s`
   squash entry point. The backend (`CommitKind::Fixup`/`Squash`) is ready
   for it; this is UI work only, left for a follow-up.
 - 🟡 **C4** `Ctrl-O` / `Ctrl-N` toggles and their footer state (no-verify in

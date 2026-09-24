@@ -1,5 +1,18 @@
 # Plan: phase 11, rebase and conflict flow
 
+**Deviation (R5): `a` checks before it rewrites, and the Commits keybar drops
+`f/p/P`.** `git rebase -i --autosquash` over a range with no foldable commit
+succeeds and changes nothing, which would look like a broken key. So `a` first
+looks for a `fixup! <subject>` / `squash! <subject>` among the rows from the
+selected one up whose target subject is a row further down, still inside the
+range, and otherwise says `no fixup! or squash! commit above this one to
+fold`. Only `fixup!` is created (`F`); a `squash!` commit with its own message
+(`CommitKind::Squash`) stays without a key, since `s` on an existing commit
+covers the common case. The Commits keybar with `New fixup!: F` and
+`Autosquash: a` is 105 columns; adding the fetch / pull / push segment would
+make it 129, over the 120 the render tests hold, so those keys (still bound
+everywhere) are listed in the default bar and in `HELP` only.
+
 **Deviation (R4): the reword popup for an older commit hides sign-off and
 no-verify.** Found by a render test: the commit editor always drew
 `sign-off: off   no-verify: off` and its `Ctrl-O/N` hint, but a rebase reword
@@ -438,7 +451,9 @@ swap.
   (13) green; each of these fails a test when broken: the in-progress guard,
   the drill guard, not saving an older reword as the next draft, hiding the
   sign-off line. The rebase entries of the `m` menu shipped with R2.
-- **R5** `F` (fixup commit, closes `PLAN_7` C3), `a` autosquash.
+- ✅ **R5** `F` (fixup commit, closes `PLAN_7` C3), `a` autosquash.
+  `tests/app_rewrite.rs` now 20 cases; each of these fails a test when
+  broken: the fold pre-check, its range bound, the fixup's target.
 - **R6** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
   layering held (`src/domain/git/` has no `ratatui`), every prior test
   green, every edge-case row has a test or an explicit inert path,

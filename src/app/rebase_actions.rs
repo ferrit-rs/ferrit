@@ -2,7 +2,7 @@
 //! selected commit, each as one `git rebase -i`. See
 //! `docs/PLAN_11_REBASE.md` R4.
 
-use super::{App, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
+use super::{App, AppError, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
 use crate::domain::git::rebase::RebaseEdit;
 
 impl App {
@@ -85,6 +85,53 @@ impl App {
         self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Edit);
     }
 
+    /// `F` on Commits: `git commit --fixup=<selected>` with what is staged,
+    /// for a later autosquash. Nothing staged is an error, not an empty
+    /// commit.
+    pub(super) fn create_fixup_commit(&mut self) {
+        let Some(entry) = self.rewrite_target() else {
+            return;
+        };
+        let opts = git::commit::CommitOpts {
+            sign_off: false,
+            no_verify: false,
+            author: self.selected_author.as_ref().and_then(|identity| {
+                identity
+                    .email
+                    .as_ref()
+                    .map(|email| format!("{} <{email}>", identity.name))
+            }),
+        };
+        let kind = git::commit::CommitKind::Fixup {
+            target: entry.full_hash,
+        };
+        let Some(repo) = &self.repo else { return };
+        match repo.commit(&kind, "", opts) {
+            Ok(_) => self.request_refresh(),
+            Err(git::error::GitError::NothingStaged) => {
+                self.report_error(AppError::NothingStaged);
+            },
+            Err(error) => self.report_error(error),
+        }
+    }
+
+    /// `a` on Commits: fold every `fixup!` / `squash!` commit from the
+    /// selected commit up into its target. Skipped, with a note, when no such
+    /// commit has its target in that range (git would rewrite nothing).
+    pub(super) fn autosquash_from_selected(&mut self) {
+        let Some(entry) = self.rewrite_target() else {
+            return;
+        };
+        let selected = self.selected(Pane::Commits);
+        if !has_foldable_fixup(&self.commits, selected) {
+            self.report_notice("no fixup! or squash! commit above this one to fold");
+            return;
+        }
+        let Some(repo) = &self.repo else { return };
+        let result = repo.autosquash(&entry.full_hash);
+        self.finish_operation(result);
+    }
+
     /// Confirmed drop.
     pub(super) fn drop_commit(&mut self, hash: &str) {
         self.run_rebase_edit(hash, &RebaseEdit::Drop);
@@ -95,4 +142,26 @@ impl App {
         let result = repo.rebase_edit(hash, edit);
         self.finish_operation(result);
     }
+}
+
+/// Does any `fixup! <subject>` / `squash! <subject>` among `commits[..=selected]`
+/// (newest first) have a commit with that subject further down, still inside
+/// the range? Only then does an autosquash from `selected` change anything.
+fn has_foldable_fixup(commits: &[git::model::CommitEntry], selected: usize) -> bool {
+    let Some(range) = commits.get(..=selected) else {
+        return false;
+    };
+    range.iter().enumerate().any(|(index, commit)| {
+        let Some(target) = commit
+            .summary
+            .strip_prefix("fixup! ")
+            .or_else(|| commit.summary.strip_prefix("squash! "))
+        else {
+            return false;
+        };
+        range
+            .iter()
+            .skip(index + 1)
+            .any(|candidate| candidate.summary == target)
+    })
 }

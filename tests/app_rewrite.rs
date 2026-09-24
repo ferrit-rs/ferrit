@@ -393,3 +393,111 @@ fn the_keybar_lists_the_commit_keys_only_on_the_commits_pane() {
         "{out}"
     );
 }
+
+// ------------------------------------------------ F (fixup!) and a (autosquash)
+
+fn stage_new_file(dir: &TempDir, name: &str) {
+    fs::write(dir.path().join(name), "fix\n").unwrap();
+    git(dir.path(), &["add", name]);
+}
+
+#[test]
+fn capital_f_commits_what_is_staged_as_a_fixup_of_the_selected_commit() {
+    let dir = history("rw-app-fixup-new");
+    stage_new_file(&dir, "g");
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 1); // `two`
+    app.feed_key(char_key('F'));
+
+    assert_eq!(
+        subjects(&dir),
+        ["fixup! two", "three", "two", "one", "base"]
+    );
+    assert!(git(dir.path(), &["show", "--stat", "--format=", "HEAD"]).contains('g'));
+    assert_eq!(app.row_count(Pane::Commits), 5);
+}
+
+#[test]
+fn capital_f_with_nothing_staged_is_an_error_and_makes_no_commit() {
+    let dir = history("rw-app-fixup-empty");
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 1);
+    app.feed_key(char_key('F'));
+
+    assert_eq!(subjects(&dir).len(), 4);
+    assert!(
+        status_lines(&app).join("\n").contains("nothing staged"),
+        "{:?}",
+        status_lines(&app)
+    );
+}
+
+#[test]
+fn a_folds_a_fixup_into_its_target() {
+    let dir = history("rw-app-autosquash");
+    stage_new_file(&dir, "g");
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 2); // `one`
+    app.feed_key(char_key('F'));
+    select_row(&mut app, 3); // `one` again, now one row lower
+    app.feed_key(char_key('a'));
+
+    assert_eq!(subjects(&dir), ["three", "two", "one", "base"]);
+    assert!(git(dir.path(), &["show", "--stat", "--format=", "HEAD~2"]).contains('g'));
+    assert_eq!(app.row_count(Pane::Commits), 4);
+}
+
+#[test]
+fn a_says_so_when_there_is_nothing_to_fold_and_rewrites_nothing() {
+    let dir = history("rw-app-autosquash-none");
+    let head = git(dir.path(), &["rev-parse", "HEAD"]);
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 2);
+    app.feed_key(char_key('a'));
+
+    assert!(
+        status_lines(&app).join("\n").contains("no fixup!"),
+        "{:?}",
+        status_lines(&app)
+    );
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), head);
+}
+
+#[test]
+fn a_ignores_a_fixup_whose_target_is_outside_the_range() {
+    let dir = history("rw-app-autosquash-outside");
+    stage_new_file(&dir, "g");
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 3); // `base`, from where `one` is inside the range... 
+    app.feed_key(char_key('F')); // fixup! base at the top
+    let head = git(dir.path(), &["rev-parse", "HEAD"]);
+    select_row(&mut app, 0); // range = the fixup alone: its target is not in it
+    app.feed_key(char_key('a'));
+
+    assert!(status_lines(&app).join("\n").contains("no fixup!"));
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), head);
+}
+
+#[test]
+fn f_and_a_are_inert_off_the_commits_pane_and_a_still_stages_on_files() {
+    let dir = history("rw-app-fa-inert");
+    fs::write(dir.path().join("f"), "edited\n").unwrap();
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2')); // Files
+    app.feed_key(char_key('F'));
+    assert_eq!(subjects(&dir).len(), 4);
+
+    app.feed_key(char_key('a')); // stage all, as before
+    assert!(git(dir.path(), &["diff", "--cached", "--name-only"]).contains('f'));
+}
+
+#[test]
+fn the_commits_keybar_lists_f_and_a() {
+    let dir = history("rw-app-keybar-fa");
+    let mut app = commits_app(&dir);
+    let out = frame(&mut app);
+    assert!(
+        out.contains("New fixup!: F") && out.contains("Autosquash: a"),
+        "{out}"
+    );
+}
