@@ -225,4 +225,22 @@ impl App {
             Err(e) => self.report_error(e),
         }
     }
+
+    /// A right-click on a row: focus that pane, move its selection there, then
+    /// open its menu. Off any row it does nothing. (A left click also toggles a
+    /// directory; this one must not.)
+    pub(super) fn right_click(&mut self, column: u16, row: u16) {
+        if self.popup.is_some() || self.pending_confirm.is_some() || self.show_help {
+            return;
+        }
+        let Some(pane) = self.pane_at(column, row) else {
+            return;
+        };
+        self.right_focused = false;
+        self.mode = Mode::Nav;
+        if self.click_pane(pane, row) {
+            self.update_right_pane();
+            self.open_context_menu();
+        }
+    }
 }

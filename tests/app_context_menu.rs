@@ -16,9 +16,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::App;
+use ferrit::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+use ratatui::layout::Rect;
 
 struct TempDir(PathBuf);
 
@@ -402,4 +405,75 @@ fn a_file_that_is_not_conflicted_has_no_menu() {
 
     assert!(app.menu_popup().is_none());
     assert!(status_lines(&app).join("\n").contains("no extra actions"));
+}
+
+// -------------------------------------------------------------- right-click
+
+fn right_click(app: &mut App, column: u16, row: u16) {
+    app.feed_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    });
+}
+
+#[test]
+fn a_right_click_selects_the_row_and_opens_its_menu() {
+    let dir = history("x-rightclick");
+    git(dir.path(), &["branch", "topic"]);
+    let mut app = App::open(dir.path()).unwrap();
+    app.set_left_area(
+        Pane::Branches,
+        Rect {
+            x: 0,
+            y: 10,
+            width: 40,
+            height: 6,
+        },
+    );
+    app.set_list_offset(Pane::Branches, 0);
+    right_click(&mut app, 2, 12); // border row 10, first row 11, second row 12
+
+    assert_eq!(
+        app.selected(Pane::Branches),
+        1,
+        "the clicked row is selected"
+    );
+    let menu = app.menu_popup().expect("the menu opened");
+    assert_eq!(menu.title, "topic");
+    assert!(menu.rows[0].starts_with("Rename branch"));
+}
+
+#[test]
+fn a_right_click_off_any_row_does_nothing() {
+    let dir = history("x-rightclick-off");
+    let mut app = App::open(dir.path()).unwrap();
+    app.set_left_area(
+        Pane::Branches,
+        Rect {
+            x: 0,
+            y: 10,
+            width: 40,
+            height: 6,
+        },
+    );
+    right_click(&mut app, 90, 30);
+    assert!(app.menu_popup().is_none());
+}
+
+#[test]
+fn x_is_inert_while_a_popup_or_a_menu_is_up() {
+    let dir = history("x-modal");
+    git(dir.path(), &["branch", "topic"]);
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('3'));
+    app.feed_key(char_key('x'));
+    let before = rows(&app);
+    right_click(&mut app, 2, 2);
+    assert_eq!(rows(&app), before, "a second open did not replace the menu");
+    app.feed_key(char_key('r')); // into the rename popup
+    app.feed_key(char_key('x')); // typed as text, not a second menu
+    assert!(app.menu_popup().is_none());
+    assert!(app.name_popup().unwrap().lines.join("").ends_with('x'));
 }

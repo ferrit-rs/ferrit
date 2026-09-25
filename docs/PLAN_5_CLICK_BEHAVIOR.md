@@ -118,7 +118,7 @@ Dropped for phase 5:
   timer. Folds into phase 6 / 7 (nothing to activate read-only).
 - step 8, the `onClick` hook. First user is Files' Staged / Unstaged section
   headers in phase 6; no headers exist yet.
-- right-click (step order N/A): waits for the `x` context menu (phase 12).
+- right-click (step order N/A): opens the `x` context menu, built in phase 12 P4.
 
 ## What a click has to resolve
 

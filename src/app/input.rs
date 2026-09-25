@@ -306,8 +306,8 @@ impl App {
     /// list row, moves that pane's selection cursor there too (lazygit's
     /// `HandleClick`, steps 3 / 4 / 5 / 7); on a Files directory row, it
     /// also toggles it collapsed/expanded, same as `Enter`. Any click
-    /// dismisses the help overlay first. Right click, middle click, drag
-    /// and move are no-ops for now.
+    /// dismisses the help overlay first. A right click opens the row's `x`
+    /// menu; middle click, drag and move are no-ops.
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
         if matches!(ev.kind, MouseEventKind::Moved) {
             let over_author = self.author_overlay.is_closed()
@@ -378,8 +378,8 @@ impl App {
             MouseEventKind::ScrollDown => return self.wheel(ev, 1),
             MouseEventKind::ScrollUp => return self.wheel(ev, -1),
             MouseEventKind::Down(MouseButton::Left) => {},
-            MouseEventKind::Down(MouseButton::Right) => return, // phase 12: `x` context menu
-            _ => return,                                        // middle click, drag, move
+            MouseEventKind::Down(MouseButton::Right) => return self.right_click(ev.column, ev.row),
+            _ => return, // middle click, drag, move
         }
 
         if self.show_help {

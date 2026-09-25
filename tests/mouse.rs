@@ -153,7 +153,7 @@ fn any_click_dismisses_the_help_overlay_and_nothing_else() {
 }
 
 #[test]
-fn only_a_left_click_routes_to_a_pane() {
+fn middle_click_drag_and_move_do_not_route_to_a_pane() {
     let mut app = App::mock();
     let files = Rect {
         x: 0,
@@ -170,7 +170,6 @@ fn only_a_left_click_routes_to_a_pane() {
         modifiers: KeyModifiers::NONE,
     };
 
-    app.feed_mouse(ev(MouseEventKind::Down(MouseButton::Right)));
     app.feed_mouse(ev(MouseEventKind::Down(MouseButton::Middle)));
     app.feed_mouse(ev(MouseEventKind::Drag(MouseButton::Left)));
     app.feed_mouse(ev(MouseEventKind::Moved));
