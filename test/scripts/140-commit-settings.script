@@ -1,5 +1,5 @@
 # Phase 12 P6, commit settings: commit.template pre-fills a new commit, minus
-# its comments.
+# its comments, and the summary shows an n/50 length counter.
 fixture canonical
 size 200x50
 
@@ -10,4 +10,7 @@ key c
 expect-text "feat: "
 expect-text "Why:"
 expect-no-text "a comment"
+expect-text " 6/50 "                        # "feat: " is 6 characters
+type "a subject that is far longer than fifty characters, still fine"
+expect-text "/50 "
 key esc

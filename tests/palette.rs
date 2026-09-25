@@ -244,3 +244,12 @@ fn every_named_colour_is_reachable() {
         "the light flag is not a colour"
     );
 }
+
+#[test]
+fn the_subject_counter_turns_to_the_warning_colour_past_the_limit() {
+    let p = loud();
+    let at = |length| theme::subject_counter(&p, length);
+    assert_eq!(at(50).style.fg, Some(p.idle));
+    assert_eq!(at(51).style.fg, Some(p.warn));
+    assert_eq!(at(7).spans[0].content, " 7/50 ");
+}

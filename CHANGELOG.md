@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The commit editor's Summary shows its length as `n/50` on its bottom border, in the warning colour once the subject is longer than 50 characters. It never blocks: a longer subject commits as before.
 - `commit.template` (git config) pre-fills a new commit: the first line becomes the summary, the rest the description, and lines starting with `#` are dropped, as git does before committing. A draft kept by `Esc` still comes back first, and amend and reword keep showing `HEAD`'s message.
 - `[theme] base = "light"` in `config.toml` gives a palette for a light terminal: the added and removed line tints and the box around a hunk are pastel instead of near-black, the selected row's text is pure white, and a diff's syntax colours come from a light theme. `"dark"` (the default) is what ferrit always drew. An unknown base is reported and the `[theme]` section goes back to its defaults; the drawer's Save keeps the base.
 - `[theme.colors]` in `config.toml` overrides any of the palette's 14 colours by name (`focus`, `idle`, `selection`, `selection_fg`, `add`, `del`, `hunk`, `hash`, `author`, `warn`, `key`, `focus_box`, `add_line_bg`, `del_line_bg`) with `"#rrggbb"` or a colour name, over the dark or light base. An unknown name is reported once and only that entry is ignored; a value that is not a colour makes the whole `[theme]` section fall back to its defaults, reported. Saving from the drawer keeps the overrides.

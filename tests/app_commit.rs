@@ -458,3 +458,62 @@ fn the_template_also_fills_the_editor_reached_through_stage_all() {
     let view = app.commit_popup().expect("the editor opened after y");
     assert_eq!(view.lines.join("\n"), "feat: via stage all");
 }
+
+/// The `n/50` counter cell colours: the counter's own text, from a frame drawn
+/// after typing `subject`.
+fn counter_colour(dir: &Path, subject: &str) -> (bool, Option<Color>) {
+    let mut app = App::open(dir).unwrap();
+    app.feed_key(char_key('c'));
+    type_text(&mut app, subject);
+    let mut term = Terminal::new(TestBackend::new(140, 40)).unwrap();
+    term.draw(|f| ferrit::app::screens::draw(f, &mut app))
+        .unwrap();
+    let buffer = term.backend().buffer();
+    let label = format!(" {}/50 ", subject.chars().count());
+    let width = usize::from(buffer.area.width);
+    let text: Vec<String> = buffer
+        .content
+        .chunks(width)
+        .map(|row| row.iter().map(ratatui::buffer::Cell::symbol).collect())
+        .collect();
+    for (y, line) in text.iter().enumerate() {
+        if let Some(byte) = line.find(&label) {
+            let x = line[..byte].chars().count() + 1;
+            return (true, Some(buffer.content[y * width + x].fg));
+        }
+    }
+    (false, None)
+}
+
+#[test]
+fn the_summary_counts_its_length_and_warns_past_50() {
+    let dir = staged_repo_with_template("app-commit-counter", "\n");
+    // `commit.template` is a blank line: the editor starts empty.
+    let palette = ferrit::components::ui::palette::Palette::DARK;
+    let at_limit = "a".repeat(50);
+    let over = "a".repeat(51);
+    assert_eq!(
+        counter_colour(dir.path(), "feat: x"),
+        (true, Some(palette.idle))
+    );
+    assert_eq!(
+        counter_colour(dir.path(), &at_limit),
+        (true, Some(palette.idle))
+    );
+    assert_eq!(
+        counter_colour(dir.path(), &over),
+        (true, Some(palette.warn))
+    );
+}
+
+#[test]
+fn a_too_long_subject_can_still_be_committed() {
+    let dir = staged_repo_with_template("app-commit-counter-nonblocking", "\n");
+    let subject = "b".repeat(80);
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    type_text(&mut app, &subject);
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert!(app.commit_popup().is_none(), "no block, only a colour");
+    assert_eq!(head_summary(&mut app), subject);
+}

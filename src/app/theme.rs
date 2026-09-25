@@ -65,6 +65,20 @@ pub fn counter_line(p: &Palette, current: usize, total: usize) -> Line<'static> 
     Line::styled(format!(" {current} of {total} "), fg(p.idle)).right_aligned()
 }
 
+/// The commit subject length the counter measures against (the "50/72" rule).
+pub const SUBJECT_LIMIT: usize = 50;
+
+/// Bottom-right `n/50` counter of the commit summary: dim while the subject
+/// fits, the warning colour once it is longer. A hint, never a block.
+pub fn subject_counter(p: &Palette, length: usize) -> Line<'static> {
+    let colour = if length > SUBJECT_LIMIT {
+        p.warn
+    } else {
+        p.idle
+    };
+    Line::styled(format!(" {length}/{SUBJECT_LIMIT} "), fg(colour)).right_aligned()
+}
+
 /// Two spaces per tree depth, lazygit's own indent width.
 fn indent(depth: usize) -> String {
     "  ".repeat(depth)

@@ -145,6 +145,10 @@ pub(super) fn draw_commit(
         let description_style = if view.summary_focused { idle } else { focused };
         let summary_block = Panel::new()
             .title(Line::styled(" Summary ", summary_style))
+            .bottom_title(theme::subject_counter(
+                palette,
+                view.input.text().chars().count(),
+            ))
             .border_style(summary_style)
             .block();
         let summary_inner = summary_block.inner(summary_area);
