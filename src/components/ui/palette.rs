@@ -37,6 +37,10 @@ pub struct Palette {
     pub add_line_bg: Color,
     /// Full-line pastel background tint on a `-` line.
     pub del_line_bg: Color,
+    /// The terminal background is light: syntax colours in a diff come from a
+    /// light theme. Not a colour, so `[theme.colors]` cannot set it; `base`
+    /// does.
+    pub light: bool,
 }
 
 impl Palette {
@@ -57,6 +61,21 @@ impl Palette {
         focus_box: Color::DarkGray,
         add_line_bg: Color::Rgb(20, 45, 20),
         del_line_bg: Color::Rgb(55, 20, 20),
+        light: false,
+    };
+
+    /// `DARK` where it works on a light terminal too (the other colours are
+    /// ANSI names the terminal's own theme maps), and different where it
+    /// assumes a dark one: the diff line tints and the box around a hunk are
+    /// pastel instead of near-black, and the selection text is pure white
+    /// because the ANSI `White` of a light theme can be dark.
+    pub const LIGHT: Self = Self {
+        selection_fg: Color::Rgb(255, 255, 255),
+        focus_box: Color::Rgb(224, 224, 224),
+        add_line_bg: Color::Rgb(214, 245, 214),
+        del_line_bg: Color::Rgb(250, 214, 214),
+        light: true,
+        ..Self::DARK
     };
 }
 

@@ -83,7 +83,11 @@ fn commit_all(repo: &Repository, message: &str) {
 }
 
 fn theme(preset: Preset, accent: Option<Color>) -> ThemeConfig {
-    ThemeConfig { preset, accent }
+    ThemeConfig {
+        preset,
+        accent,
+        ..ThemeConfig::default()
+    }
 }
 
 #[test]
@@ -174,6 +178,20 @@ fn a_file_that_cannot_be_read_is_reported() {
         "{:?}",
         load.issues
     );
+}
+
+#[test]
+fn saving_from_the_drawer_keeps_the_base() {
+    let dir = TempDir::new("config-save-base");
+    let path = dir.path().join("config.toml");
+    fs::write(&path, "[theme]\nbase = \"light\"\npreset = \"green\"\n").unwrap();
+    let mut loaded = Config::load_from(&path).config.theme;
+    loaded.preset = Preset::Purple;
+    Config::save_theme(&path, &loaded).unwrap();
+
+    let reread = Config::load_from(&path).config.theme;
+    assert_eq!(reread.base, ferrit::app::theme_config::Base::Light);
+    assert_eq!(reread.preset, Preset::Purple);
 }
 
 #[test]

@@ -674,6 +674,7 @@ use tree::{FileRow, commit_drill_files, tree_rows};
 impl App {
     fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
         let theme_config = config.theme.clone();
+        let palette = theme_config.palette();
         let keymap = keymap::Keymap::from_overrides(&config.keys).0;
         let repo_name = repo
             .as_ref()
@@ -755,7 +756,7 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
-            palette: Palette::default(),
+            palette,
             keybar_area: Rect::ZERO,
             keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),

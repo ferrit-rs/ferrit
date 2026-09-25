@@ -126,6 +126,7 @@ fn the_scripts_cover_each_named_flow() {
         "110-keymap",
         "120-context-menu",
         "121-take-side",
+        "130-theme",
     ] {
         assert!(
             names.iter().any(|n| n == wanted),

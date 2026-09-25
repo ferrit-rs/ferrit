@@ -267,15 +267,21 @@ fn syntax_set() -> &'static SyntaxSet {
     SET.get_or_init(SyntaxSet::load_defaults_newlines)
 }
 
-/// A single bundled dark theme, close to lazygit's own dark default.
-fn syntax_theme() -> &'static SynTheme {
-    static THEME: OnceLock<SynTheme> = OnceLock::new();
-    THEME.get_or_init(|| {
-        ThemeSet::load_defaults()
-            .themes
-            .remove("base16-ocean.dark")
-            .unwrap_or_default()
-    })
+/// A bundled syntax theme: a dark one close to lazygit's own dark default, or
+/// a light one when the palette is for a light terminal.
+fn syntax_theme(light: bool) -> &'static SynTheme {
+    static THEMES: OnceLock<ThemeSet> = OnceLock::new();
+    static FALLBACK: OnceLock<SynTheme> = OnceLock::new();
+    let name = if light {
+        "InspiredGitHub"
+    } else {
+        "base16-ocean.dark"
+    };
+    THEMES
+        .get_or_init(ThemeSet::load_defaults)
+        .themes
+        .get(name)
+        .unwrap_or_else(|| FALLBACK.get_or_init(SynTheme::default))
 }
 
 fn to_color(c: SynColor) -> Color {
@@ -509,7 +515,7 @@ pub fn render_diff(
         .map_or(3, |n| n.to_string().len());
 
     let set = syntax_set();
-    let theme = syntax_theme();
+    let theme = syntax_theme(p.light);
 
     let mut out = Vec::with_capacity(diff.text.lines().count());
     for (i, line) in diff.text.lines().enumerate() {

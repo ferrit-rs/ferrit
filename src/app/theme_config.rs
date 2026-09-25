@@ -4,6 +4,8 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
+use crate::components::ui::palette::Palette;
+
 pub(super) const RGB_RED_CHANNEL: usize = 0;
 pub(super) const RGB_GREEN_CHANNEL: usize = 1;
 pub(super) const RGB_BLUE_CHANNEL: usize = 2;
@@ -60,9 +62,20 @@ impl Preset {
     }
 }
 
+/// `[theme] base`: the terminal the palette is meant for.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum Base {
+    #[default]
+    Dark,
+    Light,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ThemeConfig {
+    /// `"dark"` (default) or `"light"`.
+    pub base: Base,
     pub preset: Preset,
     /// Optional RGB override; TOML uses Ratatui's `#RRGGBB` serde format.
     pub accent: Option<Color>,
@@ -71,6 +84,7 @@ pub struct ThemeConfig {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
+            base: Base::Dark,
             preset: Preset::Green,
             accent: None,
         }
@@ -78,6 +92,14 @@ impl Default for ThemeConfig {
 }
 
 impl ThemeConfig {
+    /// The colours ferrit draws with under this theme.
+    pub fn palette(&self) -> Palette {
+        match self.base {
+            Base::Dark => Palette::DARK,
+            Base::Light => Palette::LIGHT,
+        }
+    }
+
     pub fn color(&self) -> Color {
         self.accent.unwrap_or_else(|| self.preset.color())
     }

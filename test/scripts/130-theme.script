@@ -1,0 +1,16 @@
+# Phase 12 P5, themes: a light base and colour overrides still draw every pane,
+# a diff included (its syntax theme is a different one on a light base), and a
+# wrong value is reported instead of silently ignored.
+fixture canonical
+size 200x50
+
+config "[theme]\nbase = \"light\"\n"
+key 2 j j j j j                            # src/main.rs
+expect-text "@@"
+expect-text "-    println!(\"ferrit\");"
+snapshot light
+
+config "[theme]\nbase = \"sepia\"\n"
+expect-text "[theme] ignored"
+key 2 j j j j j
+expect-text "@@"

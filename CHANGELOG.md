@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- `[theme] base = "light"` in `config.toml` gives a palette for a light terminal: the added and removed line tints and the box around a hunk are pastel instead of near-black, the selected row's text is pure white, and a diff's syntax colours come from a light theme. `"dark"` (the default) is what ferrit always drew. An unknown base is reported and the `[theme]` section goes back to its defaults; the drawer's Save keeps the base.
 - An `x` menu on the Branches, Commits, Stash and Files panes holds the actions that do not earn a key: rename a branch (`r`, a popup pre-filled with the name), merge with `--no-ff` (`n`), start a branch at any commit (`b`), stash keeping the index (`i`), rename a stash (`r`), and take ours (`o`) or theirs (`t`) for a conflicted file, which still has to be staged after.
 - A right click on a row selects it and opens its `x` menu (it did nothing before). Off any row, or while a popup or a confirm is up, it does nothing.
 - The key hints at the bottom are clickable: a click runs the hint's action (`Fetch`, `Pull` and `Push` are clicked by their own label). Clicks on the bar are ignored while a popup or a confirm is up.
