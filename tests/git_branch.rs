@@ -373,3 +373,63 @@ fn merge_branch_conflicting_reports_conflicted_and_leaves_the_conflict_visible()
     let status = git(dir.path(), &["status", "--porcelain=v2"]);
     assert!(status.contains("u "), "a conflict entry shows: {status}");
 }
+
+// ------------------------------------------------- P4: rename, branch-at, --no-ff
+
+#[test]
+fn rename_branch_moves_the_name_and_refuses_a_taken_one() {
+    let dir = two_branch_fixture("p4-rename");
+    let backend = Repo::open(dir.path()).unwrap();
+    backend.rename_branch("feat", "feature").unwrap();
+    let branches = git(dir.path(), &["branch", "--format=%(refname:short)"]);
+    assert!(
+        branches.contains("feature") && !branches.lines().any(|l| l == "feat"),
+        "{branches}"
+    );
+
+    let err = backend.rename_branch("feature", "base").unwrap_err();
+    assert!(matches!(err, GitError::BranchFailed(_)), "got {err:?}");
+    assert!(git(dir.path(), &["branch", "--format=%(refname:short)"]).contains("feature"));
+}
+
+#[test]
+fn a_branch_can_be_created_at_an_older_commit_and_is_checked_out() {
+    let dir = two_branch_fixture("p4-branch-at");
+    let first = git(dir.path(), &["rev-list", "--max-parents=0", "HEAD"]);
+    let backend = Repo::open(dir.path()).unwrap();
+    backend.create_branch_at("old-work", &first).unwrap();
+
+    assert_eq!(
+        git(dir.path(), &["symbolic-ref", "--short", "HEAD"]),
+        "old-work"
+    );
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), first);
+    assert!(
+        backend.create_branch_at("old-work", &first).is_err(),
+        "a taken name is refused"
+    );
+}
+
+#[test]
+fn no_ff_makes_a_merge_commit_where_a_plain_merge_would_fast_forward() {
+    let dir = two_branch_fixture("p4-noff");
+    let backend = Repo::open(dir.path()).unwrap();
+    // `base` is an ancestor of `feat`: a plain merge would fast-forward.
+    assert_eq!(
+        backend.merge_branch_no_ff("feat").unwrap(),
+        MergeOutcome::Merged
+    );
+    let parents = git(dir.path(), &["rev-list", "--parents", "-n1", "HEAD"]);
+    assert_eq!(parents.split(' ').count(), 3, "a merge commit: {parents}");
+    assert!(git(dir.path(), &["log", "-1", "--format=%s"]).starts_with("Merge branch 'feat'"));
+
+    let other = two_branch_fixture("p4-ff");
+    let backend = Repo::open(other.path()).unwrap();
+    assert_eq!(backend.merge_branch("feat").unwrap(), MergeOutcome::Merged);
+    let parents = git(other.path(), &["rev-list", "--parents", "-n1", "HEAD"]);
+    assert_eq!(
+        parents.split(' ').count(),
+        2,
+        "fast-forwarded, no merge commit: {parents}"
+    );
+}

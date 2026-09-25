@@ -79,6 +79,32 @@ pub(super) fn create_branch(repo: &Repository, name: &str) -> GitResult<()> {
     )
 }
 
+/// `git checkout -b <name> <hash>`: a new branch at an arbitrary commit, checked
+/// out, instead of always at `HEAD` (`docs/PLAN_12_POLISH.md` P4).
+pub(super) fn create_branch_at(repo: &Repository, name: &str, hash: &str) -> GitResult<()> {
+    let workdir = workdir(repo)?;
+    run_git(
+        workdir,
+        |cmd| {
+            cmd.arg("checkout").arg("-b").arg(name).arg(hash);
+        },
+        GitError::BranchFailed,
+    )
+}
+
+/// `git branch -m <old> <new>`. Git's own refusals (a name already taken, an
+/// invalid one) surface verbatim.
+pub(super) fn rename_branch(repo: &Repository, old: &str, new: &str) -> GitResult<()> {
+    let workdir = workdir(repo)?;
+    run_git(
+        workdir,
+        |cmd| {
+            cmd.arg("branch").arg("-m").arg(old).arg(new);
+        },
+        GitError::BranchFailed,
+    )
+}
+
 /// `git branch -d <name>` (or `-D` when `force`). Refuses the currently
 /// checked-out branch the same way `git` does; that error surfaces
 /// verbatim rather than being pre-checked here — `git` is the one source
@@ -167,9 +193,24 @@ pub(super) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
 /// `MERGE_HEAD` behind, unlike the assumption this plan started from) —
 /// `repo.state()` is what tells a conflict apart from any other failure.
 pub(super) fn merge_branch(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
+    merge(repo, name, false)
+}
+
+/// `git merge --no-ff`: always a merge commit, even when a fast-forward would do.
+pub(super) fn merge_branch_no_ff(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
+    merge(repo, name, true)
+}
+
+fn merge(repo: &Repository, name: &str, no_ff: bool) -> GitResult<MergeOutcome> {
     let workdir = workdir(repo)?;
     let message = format!("Merge branch '{name}'");
-    let out = exec::output(exec::git(workdir).args(["merge", "-m", &message, name]))
+    let mut cmd = exec::git(workdir);
+    cmd.arg("merge");
+    if no_ff {
+        cmd.arg("--no-ff");
+    }
+    cmd.args(["-m", &message, name]);
+    let out = exec::output(&mut cmd)
         .map_err(|e| GitError::MergeFailed(format!("cannot run git: {e}")))?;
     if out.status.success() {
         return Ok(MergeOutcome::Merged);

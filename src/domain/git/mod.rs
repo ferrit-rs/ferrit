@@ -380,6 +380,21 @@ impl Repo {
         branch::fast_forward(&self.inner, name)
     }
 
+    /// `git checkout -b <name> <hash>`.
+    pub fn create_branch_at(&self, name: &str, hash: &str) -> GitResult<()> {
+        branch::create_branch_at(&self.inner, name, hash)
+    }
+
+    /// `git branch -m <old> <new>`.
+    pub fn rename_branch(&self, old: &str, new: &str) -> GitResult<()> {
+        branch::rename_branch(&self.inner, old, new)
+    }
+
+    /// `git merge --no-ff <name>`: always a merge commit.
+    pub fn merge_branch_no_ff(&self, name: &str) -> GitResult<MergeOutcome> {
+        branch::merge_branch_no_ff(&self.inner, name)
+    }
+
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)
