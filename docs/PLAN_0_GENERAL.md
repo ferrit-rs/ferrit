@@ -45,7 +45,7 @@ into its own crate remains deferred.
 | --- | --- | --- | --- |
 | 0 | `PLAN_0_GENERAL.md` | this overview | living |
 | 1 | `PLAN_1_LAYOUT.md` | layout only, mock data, keyboard nav, no git | ✅ done |
-| 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data; blob reads + image preview | in progress (G0, G1, G3..G7 done; G2 partial) |
+| 2 | `PLAN_2_GIT_BACKEND.md` | read-only git via `git2`: feed Status, Files, Branches, Commits, Stash with real data; blob reads + image preview | ✅ done (G0, G1, G3..G7; G2 waits for the replay harness, `PLAN_SELF_TESTING.md`) |
 | 2.5 | (no file) | live refresh: `src/app/events.rs` multiplexes terminal input, a recursive fs-watch on the worktree and a 10s poll; a change from another shell re-snapshots on its own, lazygit style | ✅ done |
 | 3 | `PLAN_3_DIFF_VIEW.md` | real diffs in the right pane via `git diff` / `git show` subprocess (lazygit style, honours user `git config`), git-native colouring, hunk navigation, scrolling | ✅ done |
 | 4 | `PLAN_4_SCROLL_BEHAVIOR.md` | right-pane scroll keys (lazygit style, no left-pane fight), viewport-aware clamp, scrollbar widget, mouse wheel | ✅ done |
@@ -56,7 +56,7 @@ into its own crate remains deferred.
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | ✅ done |
 | 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | ✅ done |
 | 11 | `PLAN_11_REBASE.md` | reword / drop / squash / fixup / edit on any commit, autosquash, in-progress operation menu (continue / skip / abort), conflict marking | ✅ done |
-| 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (seven slices P0 to P6) | 📅 planned |
+| 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (seven slices P0 to P6) | 🔄 in progress (P0 command log, P1 config, P2 keymap, P3 generated help and keybars done; P4 `x` menu, P5 palette, P6 commit settings, P7 polish open) |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).
@@ -64,7 +64,10 @@ Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), �
 Cross-cutting:
 
 - `PLAN_SELF_TESTING.md` (headless snapshot tests + `vhs` screenshot tapes)
-  applies to every phase from 1 on.
+  applies to every phase from 1 on. Status: the `TestBackend` frame tests
+  (mechanism 1) and the `App` seam tests (`tests/app_*.rs`, `feed_key`) exist
+  and are what phases 3 to 12 were tested with; the replay harness
+  (`--replay`, scripts, `vhs` tapes, milestones ST0 to ST5) is being built.
 - Live refresh (`src/app/events.rs`) is already wired: every phase from 3 on that
   adds a cached, rebuilt-on-nav right-pane value must also rebuild it on a
   background `AppEvent::Refresh`, without discarding scroll or view state that
