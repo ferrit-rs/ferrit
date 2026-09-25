@@ -9,7 +9,6 @@ use crate::components::tui_overlay::backdrop::Backdrop;
 use crate::components::tui_overlay::overlay::Overlay;
 use crate::components::tui_overlay::slide::Slide;
 use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::style as theme;
 
 /// Right-side drawer shell. Returns its inner area for caller-owned content.
 #[must_use]
@@ -26,7 +25,7 @@ impl<'state, 'title> Drawer<'state, 'title> {
             state,
             title: title.into(),
             width: Constraint::Percentage(50),
-            border_style: Style::new().fg(theme::FOCUS),
+            border_style: Style::new(),
         }
     }
 

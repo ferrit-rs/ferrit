@@ -16,6 +16,7 @@ use crate::app::hints::{self, Bar};
 use crate::app::{App, DiffView, PANES, Pane, PopupView};
 use crate::app::{mock, theme};
 use crate::components::ui::key_bar::KeyBar;
+use crate::components::ui::palette::Palette;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
@@ -29,6 +30,7 @@ pub(super) mod profile;
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
+    let palette = app.palette();
 
     let [content, log, keybar] = Layout::vertical([
         Constraint::Min(0),
@@ -78,6 +80,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             palette_selected: app.theme_palette_selected,
             picker_display: app.theme_picker_display,
             dirty: app.theme_config != app.theme_saved_config,
+            colors: palette,
         };
         app.profile_hit_areas = profile::draw_author(
             frame,
@@ -98,6 +101,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             app.theme_config.color(),
             &lines,
             app.help_scroll(),
+            &palette,
         );
         app.set_help_rows(rows);
     }
@@ -110,15 +114,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             | PopupView::Name(mut view)
             | PopupView::Upstream(mut view),
         ) => {
-            popups::draw_commit(frame, area, &mut view, accent);
+            popups::draw_commit(frame, area, &mut view, accent, &palette);
         },
         Some(PopupView::CommitAllConfirm(state)) => {
-            popups::draw_commit_all_confirm(frame, area, state, accent);
+            popups::draw_commit_all_confirm(frame, area, state, accent, &palette);
         },
-        Some(PopupView::Note(message)) => popups::draw_note(frame, area, message),
-        Some(PopupView::Menu(view)) => popups::draw_menu(frame, area, &view, accent),
+        Some(PopupView::Note(message)) => popups::draw_note(frame, area, message, &palette),
+        Some(PopupView::Menu(view)) => popups::draw_menu(frame, area, &view, accent, &palette),
         Some(PopupView::CommandLog(view)) => {
-            popups::draw_command_log_view(frame, area, &view, accent);
+            popups::draw_command_log_view(frame, area, &view, accent, &palette);
         },
         None => {},
     }
@@ -129,11 +133,12 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             &message,
             &mut app.confirm_overlay,
             app.theme_config.color(),
+            &palette,
         );
     }
 
     if let Some(toast) = &mut app.toast {
-        toast.render(frame, area);
+        toast.render(frame, area, &palette);
     }
 }
 
@@ -150,6 +155,7 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
 }
 
 fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    let palette = &app.palette();
     // Status only ever shows 1 line, or 2 when there's a conflict to report
     // (`App::status_lines`): sized to that instead of a flat 4, so a short
     // terminal doesn't pay for a conflict line that (almost always) isn't
@@ -234,7 +240,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
                 .fg(app.theme_config.color())
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::new().fg(theme::IDLE)
+            Style::new().fg(palette.idle)
         };
         let title_text = if pane == Pane::Branches {
             app.branches_title()
@@ -250,13 +256,13 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
                     .fg(app.theme_config.color())
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::new().fg(theme::IDLE)
+                Style::new().fg(palette.idle)
             },
         );
 
         let mut panel = Panel::new().title(title).border_style(border);
         if let Some((cur, total)) = app.counter(pane) {
-            panel = panel.bottom_title(theme::counter_line(cur, total));
+            panel = panel.bottom_title(theme::counter_line(palette, cur, total));
         }
         let block = panel.block();
 
@@ -265,7 +271,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let offset = PaneList::new(lines, block)
             .selected((row_ct > 0).then(|| app.selected(pane).min(row_ct - 1)))
             .offset(app.list_offset(pane))
-            .highlight_style(theme::selection_style(focused))
+            .highlight_style(theme::selection_style(palette, focused))
             .scrollbar_style(border)
             .render(frame, row);
         // Ratatui may have moved the offset to keep the selection on screen;
@@ -347,7 +353,12 @@ const WORDMARK_LARGE: Wordmark = Wordmark {
 /// this renders identically in `App::mock()` and against a real repo. Below
 /// every tier's minimum area, the wordmark is dropped for a plain `ferrit`
 /// label instead of wrapping into noise.
-fn welcome_lines(width: u16, height: u16, accent: ratatui::style::Color) -> Vec<Line<'static>> {
+fn welcome_lines(
+    width: u16,
+    height: u16,
+    accent: ratatui::style::Color,
+    palette: &Palette,
+) -> Vec<Line<'static>> {
     let fits = |w: &Wordmark| width >= w.min_area.0 && height >= w.min_area.1;
     let wordmark = [WORDMARK_LARGE, WORDMARK_MEDIUM, WORDMARK_SMALL]
         .into_iter()
@@ -371,7 +382,7 @@ fn welcome_lines(width: u16, height: u16, accent: ratatui::style::Color) -> Vec<
     lines.push(Line::raw(""));
     lines.push(Line::raw(env!("CARGO_PKG_DESCRIPTION")).centered());
     lines.push(Line::raw(""));
-    let idle = Style::new().fg(theme::IDLE);
+    let idle = Style::new().fg(palette.idle);
     lines.push(
         Line::styled(
             format!(
@@ -391,6 +402,7 @@ fn welcome_lines(width: u16, height: u16, accent: ratatui::style::Color) -> Vec<
 }
 
 fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    let palette = &app.palette();
     // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
     // the diff, one over the left column moves the selection.
     app.set_right_area(area);
@@ -398,7 +410,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let focused = Style::new()
         .fg(app.theme_config.color())
         .add_modifier(Modifier::BOLD);
-    let idle = Style::new().fg(theme::IDLE);
+    let idle = Style::new().fg(palette.idle);
     // Branches normally previews nothing (" Log "); once drilled into a
     // branch's commit list, a selected row shows a real diff, so the title
     // matches what the Commits pane calls the same view: " Patch ".
@@ -502,7 +514,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     if let DiffView::Note(msg) = app.diff_view() {
         let panel = Paragraph::new(Line::styled(
             msg.clone(),
-            Style::new().fg(theme::IDLE).add_modifier(Modifier::DIM),
+            Style::new().fg(palette.idle).add_modifier(Modifier::DIM),
         ))
         .block(block)
         .wrap(Wrap { trim: false });
@@ -526,7 +538,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         } else {
             log.commits
                 .iter()
-                .flat_map(theme::branch_log_block)
+                .flat_map(|commit| theme::branch_log_block(palette, commit))
                 .collect()
         };
         let total = lines.len();
@@ -549,6 +561,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             area.width,
             area.height,
             app.theme_config.color(),
+            palette,
         ))
         .block(block)
         .wrap(Wrap { trim: false });
@@ -575,7 +588,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     };
 
     let text: Text<'_> = match app.focus {
-        Pane::Files | Pane::Commits => theme::diff_lines(body, None),
+        Pane::Files | Pane::Commits => theme::diff_lines(palette, body, None),
         _ => body.into(),
     };
 
@@ -592,16 +605,17 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
 fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    let palette = &app.palette();
     let git_user_name = app.git_user_name().map(str::to_owned);
     let [heading, panel_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
     frame.render_widget(
-        Paragraph::new("Infos").style(Style::new().fg(theme::IDLE)),
+        Paragraph::new("Infos").style(Style::new().fg(palette.idle)),
         heading,
     );
 
     let block = Panel::new()
-        .border_style(Style::new().fg(theme::IDLE))
+        .border_style(Style::new().fg(palette.idle))
         .block();
     let inner = block.inner(panel_area);
     frame.render_widget(block, panel_area);
@@ -615,12 +629,12 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let lines: Vec<Line<'static>> = if app.is_mock() {
         mock::COMMAND_LOG
             .iter()
-            .map(|command| theme::log_line(command))
+            .map(|command| theme::log_line(palette, command))
             .collect()
     } else {
         command_log::recent(2, app.config.log.show_reads)
             .iter()
-            .map(theme::command_line)
+            .map(|record| theme::command_line(palette, record))
             .collect()
     };
     let first_line = lines.first().cloned().unwrap_or_default();
@@ -636,7 +650,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         frame.render_widget(
             Paragraph::new(name)
                 .alignment(Alignment::Right)
-                .style(Style::new().fg(theme::IDLE)),
+                .style(Style::new().fg(palette.idle)),
             name_area,
         );
         app.set_author_click_area(name_area);
@@ -655,6 +669,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// sensitive: an operation stopped mid-way wins, then the focused pane's own
 /// keys (`d` means delete, discard or drop depending on the pane).
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
+    let palette = app.palette();
     let bar = if app.operation.is_some() {
         Bar::Operation
     } else if app.focus == Pane::Branches && !app.branches_drilled() {
@@ -667,10 +682,10 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Default
     };
     if let Some(message) = app.confirm_message() {
-        KeyBar::confirm(message).render(frame, area);
+        KeyBar::confirm(message, &palette).render(frame, area);
         return;
     }
     let layout = hints::keybar_layout(&app.keymap, bar, usize::from(area.width));
-    KeyBar::hints(&layout.text).render(frame, area);
+    KeyBar::hints(&layout.text, &palette).render(frame, area);
     app.set_keybar_hits(area, layout.hits);
 }

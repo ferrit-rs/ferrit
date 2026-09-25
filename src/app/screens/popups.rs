@@ -15,6 +15,7 @@ use crate::components::tui_overlay::overlay::Overlay;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
+use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
@@ -33,6 +34,7 @@ pub(super) fn draw_help(
     accent: ratatui::style::Color,
     lines: &[HelpLine],
     scroll: usize,
+    palette: &Palette,
 ) -> usize {
     let width = 80.min(area.width);
     let height = area
@@ -66,7 +68,10 @@ pub(super) fn draw_help(
                 Style::new().fg(accent).add_modifier(Modifier::BOLD),
             ),
             HelpLine::Entry { keys, text } => Line::from(vec![
-                Span::styled(format!("{keys:<key_width$}  "), Style::new().fg(theme::KEY)),
+                Span::styled(
+                    format!("{keys:<key_width$}  "),
+                    Style::new().fg(palette.key),
+                ),
                 Span::raw(text.clone()),
             ]),
             HelpLine::Blank => Line::raw(""),
@@ -76,7 +81,7 @@ pub(super) fn draw_help(
         Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(dialog.body);
     frame.render_widget(Paragraph::new(rendered), text_area);
     ScrollBar::new(lines.len(), rows, start)
-        .style(Style::new().fg(theme::IDLE))
+        .style(Style::new().fg(palette.idle))
         .render(frame, bar_area);
     let position = if max == 0 {
         String::new()
@@ -86,7 +91,7 @@ pub(super) fn draw_help(
     frame.render_widget(
         Paragraph::new(Line::styled(
             format!("j/k scroll \u{b7} ? / Esc close{position}"),
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )),
         dialog.footer,
     );
@@ -99,11 +104,12 @@ pub(super) fn draw_commit(
     area: Rect,
     view: &mut CommitPopupView<'_>,
     accent: ratatui::style::Color,
+    palette: &Palette,
 ) {
     let width = (area.width * 2 / 3).clamp(40.min(area.width), area.width);
     if let Some(description) = view.description {
         let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
-        let idle = Style::new().fg(theme::IDLE);
+        let idle = Style::new().fg(palette.idle);
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .border_style(focused)
@@ -161,16 +167,16 @@ pub(super) fn draw_commit(
             description.render(frame, description_inner);
         }
 
-        let hints = KeyBar::hints(view.hints).line();
+        let hints = KeyBar::hints(view.hints, palette).line();
         let footer = match view.toggles {
             Some((sign_off, no_verify)) => {
                 let on_off = |enabled: bool| if enabled { "on" } else { "off" };
                 let status = Line::from(vec![
-                    Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
-                    Span::styled(on_off(sign_off), Style::new().fg(theme::ADD)),
+                    Span::styled("sign-off: ", Style::new().fg(palette.idle)),
+                    Span::styled(on_off(sign_off), Style::new().fg(palette.add)),
                     Span::raw("   "),
-                    Span::styled("no-verify: ", Style::new().fg(theme::IDLE)),
-                    Span::styled(on_off(no_verify), Style::new().fg(theme::DEL)),
+                    Span::styled("no-verify: ", Style::new().fg(palette.idle)),
+                    Span::styled(on_off(no_verify), Style::new().fg(palette.del)),
                 ]);
                 vec![status, hints]
             },
@@ -189,27 +195,27 @@ pub(super) fn draw_commit(
         .render(frame, area);
     view.input.render(frame, dialog.body);
 
-    let hints = KeyBar::hints(view.hints).line();
+    let hints = KeyBar::hints(view.hints, palette).line();
     match view.toggles {
         Some((sign_off, no_verify)) => {
             let sign_off_span = if sign_off {
-                Span::styled("on", Style::new().fg(theme::ADD))
+                Span::styled("on", Style::new().fg(palette.add))
             } else {
-                Span::styled("off", Style::new().fg(theme::IDLE))
+                Span::styled("off", Style::new().fg(palette.idle))
             };
             let verify_span = if no_verify {
                 Span::styled(
                     "off",
-                    Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD),
+                    Style::new().fg(palette.del).add_modifier(Modifier::BOLD),
                 )
             } else {
-                Span::styled("on", Style::new().fg(theme::ADD))
+                Span::styled("on", Style::new().fg(palette.add))
             };
             let status = Line::from(vec![
-                Span::styled("sign-off: ", Style::new().fg(theme::IDLE)),
+                Span::styled("sign-off: ", Style::new().fg(palette.idle)),
                 sign_off_span,
                 Span::raw("   "),
-                Span::styled("verify: ", Style::new().fg(theme::IDLE)),
+                Span::styled("verify: ", Style::new().fg(palette.idle)),
                 verify_span,
             ]);
             frame.render_widget(Paragraph::new(vec![status, hints]), dialog.footer);
@@ -224,6 +230,7 @@ pub(super) fn draw_commit_all_confirm(
     area: Rect,
     state: &mut OverlayState,
     accent: ratatui::style::Color,
+    palette: &Palette,
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let block = Block::bordered()
@@ -253,7 +260,7 @@ pub(super) fn draw_commit_all_confirm(
     .areas(inner);
     frame.render_widget(
         Paragraph::new("No files staged")
-            .style(Style::new().fg(theme::ADD).add_modifier(Modifier::BOLD))
+            .style(Style::new().fg(palette.add).add_modifier(Modifier::BOLD))
             .alignment(Alignment::Center),
         heading,
     );
@@ -263,7 +270,7 @@ pub(super) fn draw_commit_all_confirm(
         question,
     );
     frame.render_widget(
-        Paragraph::new(KeyBar::hints("Y: Yes, stage all | N / Esc: No").line())
+        Paragraph::new(KeyBar::hints("Y: Yes, stage all | N / Esc: No", palette).line())
             .alignment(Alignment::Center),
         footer,
     );
@@ -275,6 +282,7 @@ pub(super) fn draw_confirmation(
     message: &str,
     state: &mut OverlayState,
     accent: ratatui::style::Color,
+    palette: &Palette,
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let block = Block::bordered()
@@ -304,18 +312,19 @@ pub(super) fn draw_confirmation(
         body,
     );
     frame.render_widget(
-        Paragraph::new(KeyBar::hints(CONFIRM_DIALOG_HINT).line()).alignment(Alignment::Center),
+        Paragraph::new(KeyBar::hints(CONFIRM_DIALOG_HINT, palette).line())
+            .alignment(Alignment::Center),
         footer,
     );
 }
 
-pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str) {
+pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str, palette: &Palette) {
     let width = 60.min(area.width);
     let content_lines = message.lines().count().max(1);
     let body_rows = u16::try_from(content_lines)
         .unwrap_or(u16::MAX)
         .saturating_add(1);
-    let warn = Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD);
+    let warn = Style::new().fg(palette.del).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(" commit ", warn))
         .fit_content(width, body_rows, 1)
         .border_style(warn)
@@ -327,7 +336,7 @@ pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str) {
     frame.render_widget(
         Paragraph::new(Line::styled(
             "Esc / Enter to dismiss",
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )),
         dialog.footer,
     );
@@ -340,6 +349,7 @@ pub(super) fn draw_command_log_view(
     area: Rect,
     view: &CommandLogView,
     accent: ratatui::style::Color,
+    palette: &Palette,
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(" command log ", focused))
@@ -359,12 +369,12 @@ pub(super) fn draw_command_log_view(
         .get(start..end)
         .unwrap_or_default()
         .iter()
-        .map(theme::command_line)
+        .map(|record| theme::command_line(palette, record))
         .collect();
     let body = if lines.is_empty() {
         vec![Line::styled(
             "no git command run yet",
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )]
     } else {
         lines
@@ -373,7 +383,7 @@ pub(super) fn draw_command_log_view(
     frame.render_widget(
         Paragraph::new(Line::styled(
             format!("{end}/{total} \u{b7} j/k scroll \u{b7} g/G oldest/newest \u{b7} Esc close"),
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )),
         dialog.footer,
     );
@@ -386,6 +396,7 @@ pub(super) fn draw_menu(
     area: Rect,
     view: &MenuView,
     accent: ratatui::style::Color,
+    palette: &Palette,
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let rows = u16::try_from(view.rows.len()).unwrap_or(u16::MAX).max(1);
@@ -401,15 +412,15 @@ pub(super) fn draw_menu(
     SelectList::new(&lines, view.selected)
         .selection_style(
             Style::new()
-                .fg(theme::SELECTION_FG)
-                .bg(theme::SELECTION)
+                .fg(palette.selection_fg)
+                .bg(palette.selection)
                 .add_modifier(Modifier::BOLD),
         )
         .render(frame, dialog.body);
     frame.render_widget(
         Paragraph::new(Line::styled(
             "Enter / letter run \u{b7} Esc close",
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )),
         dialog.footer,
     );

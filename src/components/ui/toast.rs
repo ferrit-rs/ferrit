@@ -13,7 +13,7 @@ use crate::components::tui_overlay::backdrop::Backdrop;
 use crate::components::tui_overlay::overlay::Overlay;
 use crate::components::tui_overlay::slide::Slide;
 use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::style as theme;
+use crate::components::ui::palette::Palette;
 
 const ANIMATION_TIME: Duration = Duration::from_millis(160);
 
@@ -72,8 +72,8 @@ impl Toast {
         true
     }
 
-    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let border = Style::new().fg(theme::DEL).add_modifier(Modifier::BOLD);
+    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect, palette: &Palette) {
+        let border = Style::new().fg(palette.del).add_modifier(Modifier::BOLD);
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .border_style(border)

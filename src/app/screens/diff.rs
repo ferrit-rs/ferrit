@@ -10,12 +10,14 @@ use ratatui::widgets::Paragraph;
 
 use crate::app::theme;
 use crate::app::{App, DiffView};
+use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git;
 
 pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     app.set_right_area(area);
+    let palette = app.palette();
 
     let DiffView::Files(files) = app.diff_view() else {
         return;
@@ -43,6 +45,7 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
         &unstaged,
         scroll,
         unstaged_cursor,
+        &palette,
     );
     let viewport = draw_diff_column(
         frame,
@@ -51,6 +54,7 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
         &staged,
         scroll,
         staged_cursor,
+        &palette,
     );
     app.set_right_viewport(viewport);
 }
@@ -59,6 +63,7 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
 /// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
 pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     app.set_right_area(area);
+    let palette = app.palette();
     let DiffView::Files(files) = app.diff_view() else {
         return;
     };
@@ -78,20 +83,23 @@ pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: 
     let cursor = diff_cursor_for(app.diff_cursor(), side);
     let scroll = app.right_scroll();
     let block = Panel::new()
-        .title(Line::styled(title, Style::new().fg(theme::IDLE)))
-        .border_style(Style::new().fg(theme::IDLE))
+        .title(Line::styled(title, Style::new().fg(palette.idle)))
+        .border_style(Style::new().fg(palette.idle))
         .block();
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
-    frame.render_widget(Paragraph::new(theme::stat_line(diff.stat())), stat_row);
+    frame.render_widget(
+        Paragraph::new(theme::stat_line(&palette, diff.stat())),
+        stat_row,
+    );
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || theme::render_diff(&diff, None, diff_area.width as usize),
+        || theme::render_diff(&palette, &diff, None, diff_area.width as usize),
         |formatted| theme::render_delta(&formatted, diff_area.width as usize),
     );
-    overlay_diff_cursor(&mut text, cursor, diff_area.width as usize);
+    overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, &palette);
     let total = text.lines.len();
     frame.render_widget(
         Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
@@ -138,23 +146,30 @@ fn draw_diff_column(
     diff: &git::diff::Diff,
     scroll: usize,
     cursor: Option<(usize, Option<Range<usize>>)>,
+    palette: &Palette,
 ) -> usize {
     let block = Panel::new()
-        .title(Line::styled(title.to_owned(), Style::new().fg(theme::IDLE)))
-        .border_style(Style::new().fg(theme::IDLE))
+        .title(Line::styled(
+            title.to_owned(),
+            Style::new().fg(palette.idle),
+        ))
+        .border_style(Style::new().fg(palette.idle))
         .block();
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
-    frame.render_widget(Paragraph::new(theme::stat_line(diff.stat())), stat_row);
+    frame.render_widget(
+        Paragraph::new(theme::stat_line(palette, diff.stat())),
+        stat_row,
+    );
 
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || theme::render_diff(diff, None, diff_area.width as usize),
+        || theme::render_diff(palette, diff, None, diff_area.width as usize),
         |formatted| theme::render_delta(&formatted, diff_area.width as usize),
     );
-    overlay_diff_cursor(&mut text, cursor, diff_area.width as usize);
+    overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, palette);
     let total = text.lines.len();
     let panel = Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0));
     frame.render_widget(panel, diff_area);
@@ -165,7 +180,7 @@ fn draw_diff_column(
 }
 
 /// Paint the `Mode::Diff` cursor onto an already-rendered diff body: a
-/// full-width reversed bar on the cursor line, and `theme::SELECTION`'s blue
+/// full-width reversed bar on the cursor line, and the palette's selection colour
 /// background across a V-selection. Applied after rendering, not woven into
 /// `theme::render_diff`, so it works identically over that native path and
 /// over delta's ANSI-derived one.
@@ -173,6 +188,7 @@ fn overlay_diff_cursor(
     text: &mut Text<'static>,
     cursor: Option<(usize, Option<Range<usize>>)>,
     width: usize,
+    palette: &Palette,
 ) {
     let Some((line, selection)) = cursor else {
         return;
@@ -182,7 +198,7 @@ fn overlay_diff_cursor(
             if let Some(l) = text.lines.get_mut(i) {
                 pad_line(l, width);
                 for span in &mut l.spans {
-                    span.style = span.style.bg(theme::SELECTION);
+                    span.style = span.style.bg(palette.selection);
                 }
             }
         }

@@ -1,7 +1,6 @@
-//! Colour palette and the span builders that give each kind of line its
-//! meaning-carrying colour. One flat palette tuned to match lazygit's default
-//! theme: green for the focused pane, a solid blue selection bar, green hashes,
-//! yellow keys. No config, no theme switching yet (that is phase 10).
+//! The span builders that give each kind of line its meaning-carrying colour.
+//! The colours come from the `Palette` each builder is handed (the app's own,
+//! `App::palette`), so a theme changes them all in one place.
 
 use std::ops::Range;
 use std::sync::OnceLock;
@@ -12,6 +11,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
+use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
 use crate::domain::git::model::FileEntry;
@@ -41,39 +41,6 @@ const META: &[&str] = &[
     "Merge:",
 ];
 
-/// Border and title of the focused left pane (lazygit `activeBorderColor`).
-pub const FOCUS: Color = Color::Green;
-/// Border of every unfocused pane and other low-priority chrome
-/// (lazygit `inactiveBorderColor`, roughly the default foreground).
-pub const IDLE: Color = Color::Gray;
-/// Background of the selected row (lazygit `selectedLineBgColor`).
-pub const SELECTION: Color = Color::Blue;
-/// Text on the selected row.
-pub const SELECTION_FG: Color = Color::White;
-/// Added diff line, checked-out branch.
-pub const ADD: Color = Color::Green;
-/// Removed diff line, deleted path.
-pub const DEL: Color = Color::Red;
-/// Hunk header (`@@ ... @@`).
-pub const HUNK: Color = Color::Cyan;
-/// Commit hash and the graph node.
-pub const HASH: Color = Color::Green;
-/// Author initials in the commit list.
-pub const AUTHOR: Color = Color::Magenta;
-/// Modified path, ahead/behind counts, the `N of M` counter.
-pub const WARN: Color = Color::Yellow;
-/// Key names in the keybind bar.
-pub const KEY: Color = Color::Yellow;
-/// Background tint boxing the hunk (or file, in a commit) a `]` / `[` jump
-/// last landed on.
-pub const FOCUS_BOX: Color = Color::DarkGray;
-/// Full-line pastel background tint on a `+` line, under its syntax-coloured
-/// text (`render_diff`).
-pub const ADD_LINE_BG: Color = Color::Rgb(20, 45, 20);
-/// Full-line pastel background tint on a `-` line, under its syntax-coloured
-/// text.
-pub const DEL_LINE_BG: Color = Color::Rgb(55, 20, 20);
-
 fn fg(color: Color) -> Style {
     Style::new().fg(color)
 }
@@ -82,11 +49,11 @@ fn fg(color: Color) -> Style {
 /// bar only in the focused pane, filled across the pane width by the `List`
 /// widget. Unfocused panes keep a cursor position but draw no bar, so only one
 /// selection reads as "live" at a time.
-pub fn selection_style(focused: bool) -> Style {
+pub fn selection_style(p: &Palette, focused: bool) -> Style {
     if focused {
         Style::new()
-            .bg(SELECTION)
-            .fg(SELECTION_FG)
+            .bg(p.selection)
+            .fg(p.selection_fg)
             .add_modifier(Modifier::BOLD)
     } else {
         Style::new()
@@ -94,8 +61,8 @@ pub fn selection_style(focused: bool) -> Style {
 }
 
 /// Bottom-right `N of M` counter shown on each list pane's border.
-pub fn counter_line(current: usize, total: usize) -> Line<'static> {
-    Line::styled(format!(" {current} of {total} "), fg(IDLE)).right_aligned()
+pub fn counter_line(p: &Palette, current: usize, total: usize) -> Line<'static> {
+    Line::styled(format!(" {current} of {total} "), fg(p.idle)).right_aligned()
 }
 
 /// Two spaces per tree depth, lazygit's own indent width.
@@ -108,16 +75,16 @@ fn indent(depth: usize) -> String {
 /// under the row's parent directory in the tree view (`App::file_lines`);
 /// when nested (`depth > 0`), only the file's own name shows, not the full
 /// path — the parent directory rows above it already say where it lives.
-pub fn file_line(entry: &FileEntry, depth: usize) -> Line<'static> {
+pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> {
     let code = format!("{}{}", entry.staged.code(), entry.worktree.code());
     let color = if code.contains('D') {
-        DEL
+        p.del
     } else if code.contains('?') {
-        IDLE
+        p.idle
     } else if code.contains('A') {
-        ADD
+        p.add
     } else {
-        WARN
+        p.warn
     };
     let name = if depth == 0 {
         entry.path.display().to_string()
@@ -138,11 +105,11 @@ pub fn file_line(entry: &FileEntry, depth: usize) -> Line<'static> {
 /// lazygit) then the directory's own name, indented to its depth. No status
 /// code — files carry their own, a directory's would need aggregating
 /// several and lazygit doesn't bother either.
-pub fn dir_line(name: &str, depth: usize, expanded: bool) -> Line<'static> {
+pub fn dir_line(p: &Palette, name: &str, depth: usize, expanded: bool) -> Line<'static> {
     let arrow = if expanded { "\u{25bc} " } else { "\u{25b6} " };
     Line::from(vec![
         Span::raw(indent(depth)),
-        Span::styled(arrow, fg(IDLE)),
+        Span::styled(arrow, fg(p.idle)),
         Span::styled(name.to_owned(), Style::new().add_modifier(Modifier::BOLD)),
     ])
 }
@@ -171,31 +138,41 @@ fn relative_age(tip_time: i64) -> String {
 /// lazygit branch row: `1d * main ↑2` for the checked-out branch (green,
 /// bold), `3d   feat/x` for the rest. Ahead/behind arrows in yellow when
 /// there is an upstream to compare against.
-pub fn branch_line(entry: &BranchEntry) -> Line<'static> {
-    branch_line_with_status(entry, None)
+pub fn branch_line(p: &Palette, entry: &BranchEntry) -> Line<'static> {
+    branch_line_with_status(p, entry, None)
 }
 
 /// Branch row with LazyGit-style inline operation status during remote work.
-pub fn branch_line_with_status(entry: &BranchEntry, operation: Option<&str>) -> Line<'static> {
+pub fn branch_line_with_status(
+    p: &Palette,
+    entry: &BranchEntry,
+    operation: Option<&str>,
+) -> Line<'static> {
     let marker = if entry.is_head { "* " } else { "  " };
     let name_style = if entry.is_head {
-        Style::new().fg(ADD).add_modifier(Modifier::BOLD)
+        Style::new().fg(p.add).add_modifier(Modifier::BOLD)
     } else {
         Style::new()
     };
     let mut spans = vec![
-        Span::styled(format!("{:<3}", relative_age(entry.tip_time)), fg(HUNK)),
-        Span::styled(marker, fg(ADD)),
+        Span::styled(format!("{:<3}", relative_age(entry.tip_time)), fg(p.hunk)),
+        Span::styled(marker, fg(p.add)),
         Span::styled(entry.name.clone(), name_style),
     ];
     if let Some(operation) = operation {
-        spans.push(Span::styled(format!(" {operation}"), fg(HUNK)));
+        spans.push(Span::styled(format!(" {operation}"), fg(p.hunk)));
     } else if entry.upstream.is_some() {
         if entry.ahead > 0 {
-            spans.push(Span::styled(format!(" \u{2191}{}", entry.ahead), fg(WARN)));
+            spans.push(Span::styled(
+                format!(" \u{2191}{}", entry.ahead),
+                fg(p.warn),
+            ));
         }
         if entry.behind > 0 {
-            spans.push(Span::styled(format!(" \u{2193}{}", entry.behind), fg(WARN)));
+            spans.push(Span::styled(
+                format!(" \u{2193}{}", entry.behind),
+                fg(p.warn),
+            ));
         }
     }
     Line::from(spans)
@@ -204,17 +181,17 @@ pub fn branch_line_with_status(entry: &BranchEntry, operation: Option<&str>) -> 
 /// Branches pane's Remotes tab row: `name  fetch: <url>  push: <url>`, the
 /// push URL omitted when it is identical to fetch (the common case).
 /// `docs/PLAN_9_REMOTE.md`; no selection styling, this tab has no cursor.
-pub fn remote_line(entry: &RemoteEntry) -> Line<'static> {
+pub fn remote_line(p: &Palette, entry: &RemoteEntry) -> Line<'static> {
     let mut spans = vec![
         Span::styled(
             entry.name.clone(),
-            Style::new().fg(HASH).add_modifier(Modifier::BOLD),
+            Style::new().fg(p.hash).add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  fetch: ", fg(IDLE)),
+        Span::styled("  fetch: ", fg(p.idle)),
         Span::raw(entry.fetch_url.clone()),
     ];
     if entry.push_url != entry.fetch_url {
-        spans.push(Span::styled("  push: ", fg(IDLE)));
+        spans.push(Span::styled("  push: ", fg(p.idle)));
         spans.push(Span::raw(entry.push_url.clone()));
     }
     Line::from(spans)
@@ -223,13 +200,13 @@ pub fn remote_line(entry: &RemoteEntry) -> Line<'static> {
 /// lazygit commit row: `<hash> <initials> <graph-node> <subject>`. Hash and
 /// node in green, author initials in magenta, subject plain. `graph` is the
 /// graph-column glyph, a plain `o` for linear history until phase 2 G4.
-pub fn commit_line(entry: &CommitEntry) -> Line<'static> {
+pub fn commit_line(p: &Palette, entry: &CommitEntry) -> Line<'static> {
     Line::from(vec![
-        Span::styled(entry.short_hash.clone(), fg(HASH)),
+        Span::styled(entry.short_hash.clone(), fg(p.hash)),
         Span::raw(" "),
-        Span::styled(entry.author_initials(), fg(AUTHOR)),
+        Span::styled(entry.author_initials(), fg(p.author)),
         Span::raw(" "),
-        Span::styled("o", fg(HASH)),
+        Span::styled("o", fg(p.hash)),
         Span::raw(" "),
         Span::raw(entry.summary.clone()),
     ])
@@ -245,14 +222,14 @@ pub const BRANCH_LOG_BLOCK_LINES: usize = 6;
 /// There is room for it since this is the passive Branches-pane preview
 /// (`DiffView::BranchLog`), which fills the whole right pane rather than a
 /// narrow list column.
-pub fn branch_log_block(entry: &CommitEntry) -> Vec<Line<'static>> {
-    let graph = fg(HUNK);
-    let label = fg(IDLE);
+pub fn branch_log_block(p: &Palette, entry: &CommitEntry) -> Vec<Line<'static>> {
+    let graph = fg(p.hunk);
+    let label = fg(p.idle);
     vec![
         Line::from(vec![
             Span::styled("* ", graph),
             Span::styled("commit ", label),
-            Span::styled(entry.short_hash.clone(), fg(HASH)),
+            Span::styled(entry.short_hash.clone(), fg(p.hash)),
         ]),
         Line::from(vec![
             Span::styled("| ", graph),
@@ -274,9 +251,9 @@ pub fn branch_log_block(entry: &CommitEntry) -> Vec<Line<'static>> {
 }
 
 /// lazygit stash row: `stash@{0}: message`.
-pub fn stash_line(entry: &StashEntry) -> Line<'static> {
+pub fn stash_line(p: &Palette, entry: &StashEntry) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("stash@{{{}}}", entry.index), fg(HASH)),
+        Span::styled(format!("stash@{{{}}}", entry.index), fg(p.hash)),
         Span::raw(": "),
         Span::raw(entry.message.clone()),
     ])
@@ -318,27 +295,27 @@ fn is_code_line(line: &str) -> bool {
 /// paints: hunk header cyan, `+`/`-` green/red, file/commit metadata bold,
 /// `\ No newline` and `Binary files` dim, everything else (context, message
 /// body) plain.
-fn diff_line_style(line: &str) -> Style {
+fn diff_line_style(p: &Palette, line: &str) -> Style {
     if line.starts_with("@@") {
-        fg(HUNK)
+        fg(p.hunk)
     } else if line.starts_with("Binary files") || line.starts_with('\\') {
-        Style::new().fg(IDLE).add_modifier(Modifier::DIM)
+        Style::new().fg(p.idle).add_modifier(Modifier::DIM)
     } else if META.iter().any(|p| line.starts_with(p)) {
-        Style::new().fg(IDLE).add_modifier(Modifier::BOLD)
+        Style::new().fg(p.idle).add_modifier(Modifier::BOLD)
     } else if line.starts_with('+') {
-        fg(ADD)
+        fg(p.add)
     } else if line.starts_with('-') {
-        fg(DEL)
+        fg(p.del)
     } else {
-        fg(IDLE)
+        fg(p.idle)
     }
 }
 
 /// A `git diff` / `git show` blob, coloured line by line. `focus`, when set, is
 /// a 0-based line index that gets `REVERSED` so a `]` / `[` jump lands visibly.
-pub fn diff_lines(raw: &str, focus: Option<usize>) -> Text<'static> {
+pub fn diff_lines(p: &Palette, raw: &str, focus: Option<usize>) -> Text<'static> {
     let lines = raw.lines().enumerate().map(|(i, line)| {
-        let mut style = diff_line_style(line);
+        let mut style = diff_line_style(p, line);
         if focus == Some(i) {
             style = style.add_modifier(Modifier::REVERSED);
         }
@@ -511,12 +488,17 @@ fn ansi_basic_color(index: u16, bright: bool) -> Color {
 /// pager style: a context line (not a file/commit header, hunk marker, or
 /// binary/no-newline notice) is tokenized by `syntect` for its per-language
 /// foreground colour on a plain background; a `+`/`-` line instead gets flat
-/// `ADD`/`DEL` foreground plus a full-line `ADD_LINE_BG`/`DEL_LINE_BG`
+/// `add`/`del` foreground plus a full-line `add_line_bg`/`del_line_bg`
 /// pastel background, no per-token colour. Everything else falls back to
-/// the flat `diff_line_style` colour. When `focus` is set, a `FOCUS_BOX`
+/// the flat `diff_line_style` colour. When `focus` is set, a `focus_box`
 /// background boxes every line of the hunk (or file, in a commit) a `]` /
 /// `[` jump last landed on, its header reversed.
-pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize) -> Text<'static> {
+pub fn render_diff(
+    p: &Palette,
+    diff: &Diff,
+    focus: Option<&Range<usize>>,
+    panel_width: usize,
+) -> Text<'static> {
     let numbers = diff.line_numbers();
     let extensions = diff.line_extensions();
     let width = numbers
@@ -535,7 +517,7 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
         let header = focus.is_some_and(|r| r.start == i);
         let overlay = |mut style: Style| -> Style {
             if boxed {
-                style = style.bg(FOCUS_BOX);
+                style = style.bg(p.focus_box);
             }
             if header {
                 style = style.add_modifier(Modifier::REVERSED);
@@ -543,7 +525,7 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
             style
         };
 
-        let gutter_style = overlay(Style::new().fg(IDLE).add_modifier(Modifier::DIM));
+        let gutter_style = overlay(Style::new().fg(p.idle).add_modifier(Modifier::DIM));
         let (old, new) = numbers.get(i).copied().unwrap_or((None, None));
         let gutter = format!(
             "{:>w$} {:>w$}│",
@@ -554,9 +536,9 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
         let mut spans = vec![Span::styled(gutter, gutter_style)];
 
         let changed = if line.starts_with('+') && !line.starts_with("+++") {
-            Some(ADD_LINE_BG)
+            Some(p.add_line_bg)
         } else if line.starts_with('-') && !line.starts_with("---") {
-            Some(DEL_LINE_BG)
+            Some(p.del_line_bg)
         } else {
             None
         };
@@ -565,7 +547,7 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
             // `+`/`-` line: flat marker/body colour on the full-line
             // background, no syntax tokenizing.
             let base = Style::new().bg(bg);
-            let text_fg = if line.starts_with('+') { ADD } else { DEL };
+            let text_fg = if line.starts_with('+') { p.add } else { p.del };
             spans.push(Span::styled(line.to_owned(), overlay(base.fg(text_fg))));
         } else {
             // Context (or header/hunk-marker/binary line): syntax colour
@@ -600,7 +582,7 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
                 None => {
                     spans.push(Span::styled(
                         line.to_owned(),
-                        overlay(diff_line_style(line)),
+                        overlay(diff_line_style(p, line)),
                     ));
                 },
             }
@@ -610,9 +592,9 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
         if changed.is_some() || boxed {
             let fill_style = if changed.is_some() {
                 let bg = if line.starts_with('+') {
-                    ADD_LINE_BG
+                    p.add_line_bg
                 } else {
-                    DEL_LINE_BG
+                    p.del_line_bg
                 };
                 overlay(Style::new().bg(bg))
             } else {
@@ -633,7 +615,7 @@ pub fn render_diff(diff: &Diff, focus: Option<&Range<usize>>, panel_width: usize
 /// `git --shortstat` style summary shown above a diff: `N file(s) changed, X
 /// insertion(s)(+), Y deletion(s)(-)`, insertions in green, deletions in red.
 /// A part is skipped when its count is zero, matching real `git` output.
-pub fn stat_line(stat: DiffStat) -> Line<'static> {
+pub fn stat_line(p: &Palette, stat: DiffStat) -> Line<'static> {
     let mut spans = vec![Span::raw(format!(
         "{} file{} changed",
         stat.files,
@@ -647,7 +629,7 @@ pub fn stat_line(stat: DiffStat) -> Line<'static> {
                 stat.insertions,
                 if stat.insertions == 1 { "" } else { "s" }
             ),
-            fg(ADD),
+            fg(p.add),
         ));
     }
     if stat.deletions > 0 {
@@ -658,64 +640,64 @@ pub fn stat_line(stat: DiffStat) -> Line<'static> {
                 stat.deletions,
                 if stat.deletions == 1 { "" } else { "s" }
             ),
-            fg(DEL),
+            fg(p.del),
         ));
     }
     Line::from(spans)
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.
-pub fn status_line(raw: &str) -> Line<'static> {
+pub fn status_line(p: &Palette, raw: &str) -> Line<'static> {
     let style = if raw.contains('\u{2191}') || raw.contains('\u{2193}') {
-        fg(WARN)
+        fg(p.warn)
     } else {
-        fg(ADD)
+        fg(p.add)
     };
     Line::styled(raw.to_owned(), style)
 }
 
 /// A `refresh()` failure, surfaced in the Status pane instead of a panic.
-pub fn error_line(raw: &str) -> Line<'static> {
-    Line::styled(raw.to_owned(), fg(DEL))
+pub fn error_line(p: &Palette, raw: &str) -> Line<'static> {
+    Line::styled(raw.to_owned(), fg(p.del))
 }
 
 /// The "git is stopped mid-operation" badge (`REBASING 2/4`, `MERGING`):
 /// bold in the warning colour, since the repository is waiting on the user.
-pub fn operation_line(label: &str) -> Line<'static> {
-    Line::styled(label.to_owned(), fg(WARN).add_modifier(Modifier::BOLD))
+pub fn operation_line(p: &Palette, label: &str) -> Line<'static> {
+    Line::styled(label.to_owned(), fg(p.warn).add_modifier(Modifier::BOLD))
 }
 
 /// A background fetch/pull/push in flight, shown under the main status
 /// line while `App::remote_busy_label` is `Some`. Dim, matching `Note`
 /// diff view's dim style — not an error, not a success, just "wait".
 /// See `docs/PLAN_9_REMOTE.md`.
-pub fn busy_line(label: &str) -> Line<'static> {
+pub fn busy_line(p: &Palette, label: &str) -> Line<'static> {
     Line::styled(
         label.to_owned(),
-        Style::new().fg(IDLE).add_modifier(Modifier::DIM),
+        Style::new().fg(p.idle).add_modifier(Modifier::DIM),
     )
 }
 
 /// Command-log line: dim the `$` prompt, leave the command bright.
-pub fn log_line(raw: &'static str) -> Line<'static> {
+pub fn log_line(p: &Palette, raw: &'static str) -> Line<'static> {
     match raw.strip_prefix("$ ") {
-        Some(cmd) => Line::from(vec![Span::styled("$ ", fg(IDLE)), Span::raw(cmd)]),
-        None => Line::styled(raw, fg(IDLE)),
+        Some(cmd) => Line::from(vec![Span::styled("$ ", fg(p.idle)), Span::raw(cmd)]),
+        None => Line::styled(raw, fg(p.idle)),
     }
 }
 
 /// Command-log line for a recorded subprocess: dim `$`, the command, and a
 /// red note when it failed. Reads (only listed in the full viewer) are dim.
-pub fn command_line(record: &CommandRecord) -> Line<'static> {
+pub fn command_line(p: &Palette, record: &CommandRecord) -> Line<'static> {
     let command_style = if record.failed() {
-        fg(DEL)
+        fg(p.del)
     } else if record.kind == CommandKind::Read {
-        fg(IDLE)
+        fg(p.idle)
     } else {
         Style::new()
     };
     let mut spans = vec![
-        Span::styled("$ ", fg(IDLE)),
+        Span::styled("$ ", fg(p.idle)),
         Span::styled(record.argv.clone(), command_style),
     ];
     if record.failed() {
@@ -723,7 +705,7 @@ pub fn command_line(record: &CommandRecord) -> Line<'static> {
             Some(code) => format!("  (exit {code})"),
             None => "  (not completed)".to_owned(),
         };
-        spans.push(Span::styled(note, fg(DEL)));
+        spans.push(Span::styled(note, fg(p.del)));
     }
     Line::from(spans)
 }

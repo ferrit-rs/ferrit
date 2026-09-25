@@ -27,6 +27,7 @@ use std::time::{Duration, Instant};
 
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::mouse_pointer::MousePointer;
+use crate::components::ui::palette::Palette;
 use crate::components::ui::toast::Toast;
 use crate::domain::profile::Profile;
 use crate::domain::profile::settings::Settings;
@@ -571,6 +572,8 @@ pub struct App {
     right_area: Rect,
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
+    /// The colours everything is drawn with (`[theme]` in `config.toml`).
+    palette: Palette,
     /// Where the keybar was drawn and what each part of it runs when clicked.
     keybar_area: Rect,
     keybar_hits: Vec<hints::KeybarHit>,
@@ -752,6 +755,7 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
+            palette: Palette::default(),
             keybar_area: Rect::ZERO,
             keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),
@@ -1283,7 +1287,7 @@ impl App {
                 });
                 if !cache_hit {
                     let text = diff.delta_output(width).map_or_else(
-                        || theme::render_diff(diff, focus, width),
+                        || theme::render_diff(&self.palette, diff, focus, width),
                         |formatted| theme::render_delta(&formatted, width),
                     );
                     *cache = Some(RenderedDiff {
@@ -1331,6 +1335,11 @@ impl App {
     /// Store the configured Git author's clickable cells for mouse routing.
     pub fn set_author_click_area(&mut self, area: Rect) {
         self.author_click_area = area;
+    }
+
+    /// The palette every screen and line builder colours with.
+    pub fn palette(&self) -> Palette {
+        self.palette
     }
 
     /// The keybar's rect and click targets, written by `ui::draw_keybar`
@@ -1574,7 +1583,7 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![theme::error_line(&format!("error: {err}"))]
+            vec![theme::error_line(&self.palette, &format!("error: {err}"))]
         } else {
             let h = &self.header;
             let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
@@ -1584,26 +1593,29 @@ impl App {
             if h.behind > 0 {
                 let _ = write!(line, " \u{2193}{}", h.behind);
             }
-            let mut lines = vec![theme::status_line(&line)];
+            let mut lines = vec![theme::status_line(&self.palette, &line)];
             if h.conflicts > 0 {
-                lines.push(theme::error_line(&format!(
-                    "\u{2717} {} merge conflict(s)",
-                    h.conflicts
-                )));
+                lines.push(theme::error_line(
+                    &self.palette,
+                    &format!("\u{2717} {} merge conflict(s)", h.conflicts),
+                ));
             }
             lines
         };
         if let Some(operation) = self.operation {
             // Right under the first line, error or header, so it is the
             // first thing read while git waits on the user.
-            out.insert(out.len().min(1), theme::operation_line(&operation.label()));
+            out.insert(
+                out.len().min(1),
+                theme::operation_line(&self.palette, &operation.label()),
+            );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(theme::busy_line(label));
+            out.push(theme::busy_line(&self.palette, label));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(theme::status_line(note));
+            out.push(theme::status_line(&self.palette, note));
         }
         out
     }
@@ -1627,13 +1639,21 @@ impl App {
             if drill.commits.is_empty() {
                 return vec![Line::raw("no commits yet")];
             }
-            return drill.commits.iter().map(theme::commit_line).collect();
+            return drill
+                .commits
+                .iter()
+                .map(|entry| theme::commit_line(&self.palette, entry))
+                .collect();
         }
         if self.branches_tab == BranchesTab::Remotes {
             if self.remotes.is_empty() {
                 return vec![Line::raw("no remotes configured")];
             }
-            return self.remotes.iter().map(theme::remote_line).collect();
+            return self
+                .remotes
+                .iter()
+                .map(|entry| theme::remote_line(&self.palette, entry))
+                .collect();
         }
         if self.branches.is_empty() {
             return vec![Line::raw("no local branches")];
@@ -1645,7 +1665,7 @@ impl App {
                     .is_head
                     .then(|| self.remote_branch_status())
                     .flatten();
-                theme::branch_line_with_status(branch, operation.as_deref())
+                theme::branch_line_with_status(&self.palette, branch, operation.as_deref())
             })
             .collect()
     }
@@ -1690,18 +1710,21 @@ impl App {
                         depth,
                         expanded,
                         ..
-                    } => Some(theme::dir_line(name, *depth, *expanded)),
+                    } => Some(theme::dir_line(&self.palette, name, *depth, *expanded)),
                     FileRow::File { index, depth } => drill
                         .files
                         .get(*index)
-                        .map(|entry| theme::file_line(entry, *depth)),
+                        .map(|entry| theme::file_line(&self.palette, entry, *depth)),
                 })
                 .collect();
         }
         if self.commits.is_empty() {
             return vec![Line::raw("no commits yet")];
         }
-        self.commits.iter().map(theme::commit_line).collect()
+        self.commits
+            .iter()
+            .map(|entry| theme::commit_line(&self.palette, entry))
+            .collect()
     }
 
     /// `[4] Commits - Reflog`, or `[4] Diff files (<hash> <summary>)` while
@@ -1719,7 +1742,10 @@ impl App {
         if self.stashes.is_empty() {
             return vec![Line::raw("(no stash entries)")];
         }
-        self.stashes.iter().map(theme::stash_line).collect()
+        self.stashes
+            .iter()
+            .map(|entry| theme::stash_line(&self.palette, entry))
+            .collect()
     }
 
     /// Porcelain-style `XY path` text for one Files tree row, or an empty
@@ -1752,11 +1778,11 @@ impl App {
                     depth,
                     expanded,
                     ..
-                } => Some(theme::dir_line(name, *depth, *expanded)),
+                } => Some(theme::dir_line(&self.palette, name, *depth, *expanded)),
                 FileRow::File { index, depth } => self
                     .files
                     .get(*index)
-                    .map(|entry| theme::file_line(entry, *depth)),
+                    .map(|entry| theme::file_line(&self.palette, entry, *depth)),
             })
             .collect()
     }

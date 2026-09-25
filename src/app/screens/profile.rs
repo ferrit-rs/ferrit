@@ -3,11 +3,11 @@
 mod activity;
 mod settings;
 
-use crate::app::theme;
 use crate::app::theme_config::{ThemeConfig, ThemeMode};
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::color_picker::ColorPickerDisplay;
 use crate::components::ui::drawer::Drawer;
+use crate::components::ui::palette::Palette;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::profile::Profile;
 use ratatui::Frame;
@@ -35,6 +35,8 @@ pub(super) struct ThemeView<'a> {
     pub(super) palette_selected: usize,
     pub(super) picker_display: ColorPickerDisplay,
     pub(super) dirty: bool,
+    /// The colours the drawer itself is drawn with.
+    pub(super) colors: Palette,
 }
 
 /// Draw the profile drawer and return where its clickable parts landed, or
@@ -48,6 +50,7 @@ pub(super) fn draw_author(
     theme: &ThemeView<'_>,
     selected_author: Option<&crate::domain::profile::settings::Identity>,
 ) -> ProfileHitAreas {
+    let palette = &theme.colors;
     let Some(inner) = Drawer::new(state, " Profile ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(theme.config.color()))
@@ -67,7 +70,7 @@ pub(super) fn draw_author(
     let save_width = settings_view.save_button_width;
     let author_cards = settings_view.author_cards;
     let mut lines = settings_view.lines;
-    lines.extend(activity::lines(&profile.activity, body.width));
+    lines.extend(activity::lines(&profile.activity, body.width, palette));
 
     let content_length = lines.len();
     let viewport = usize::from(body.height);
@@ -87,12 +90,12 @@ pub(super) fn draw_author(
         body,
     );
     ScrollBar::new(content_length, viewport, *scroll)
-        .style(Style::new().fg(theme::IDLE))
+        .style(Style::new().fg(palette.idle))
         .render(frame, track);
     frame.render_widget(
         Paragraph::new(Line::styled(
             "Click card / 1–9 choose · 0 Git · p picker · click color · s save",
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         )),
         hint,
     );

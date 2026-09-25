@@ -1,7 +1,6 @@
 //! Git and Ferrit settings shown in the profile drawer.
 
 use super::ThemeView;
-use crate::app::theme;
 use crate::app::theme_config::ThemeMode;
 use crate::components::ui::color_picker::{ColorPicker, ColorPickerGridMetrics, rgb};
 use crate::components::ui::radio_card::RadioCard;
@@ -40,12 +39,13 @@ pub(super) fn lines(
         palette_selected,
         picker_display,
         dirty: theme_dirty,
+        colors: palette,
     } = *theme_view;
     let editing = mode == ThemeMode::EditingRgb;
     let palette_open = mode == ThemeMode::Palette;
     let divider = |label| {
         Separator::new(label)
-            .style(Style::new().fg(theme::IDLE))
+            .style(Style::new().fg(palette.idle))
             .margin_x(SECTION_SEPARATOR_MARGIN_X)
             .margin_y(SECTION_SEPARATOR_MARGIN_Y)
             .lines(width)
@@ -75,7 +75,7 @@ pub(super) fn lines(
                 .email
                 .clone()
                 .unwrap_or_else(|| "Email not configured".to_owned()),
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         ));
     }
     let available = settings.available_identities();
@@ -83,7 +83,7 @@ pub(super) fn lines(
     if available.is_empty() {
         lines.push(Line::styled(
             "No configured identities",
-            Style::new().fg(theme::IDLE),
+            Style::new().fg(palette.idle),
         ));
     } else {
         for (index, identity) in available.iter().enumerate() {
@@ -104,7 +104,7 @@ pub(super) fn lines(
     }
     lines.push(Line::styled(
         "0 · use Git config identity",
-        Style::new().fg(theme::IDLE),
+        Style::new().fg(palette.idle),
     ));
     lines.extend(divider("Ferrit settings"));
     lines.push(Line::from(format!("Theme: {}", config.preset.name())));
@@ -131,7 +131,7 @@ pub(super) fn lines(
         } else {
             "p picker · e edit RGB · t preset · s save".to_owned()
         },
-        Style::new().fg(theme::IDLE),
+        Style::new().fg(palette.idle),
     ));
     let save_button_line = lines.len();
     let save_button_label = if theme_dirty {
@@ -147,7 +147,7 @@ pub(super) fn lines(
             .fg(if theme_dirty {
                 config.color()
             } else {
-                theme::IDLE
+                palette.idle
             })
             .add_modifier(if theme_dirty {
                 Modifier::BOLD

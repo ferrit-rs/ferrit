@@ -3,7 +3,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-use crate::app::theme;
+use crate::components::ui::palette::Palette;
 use crate::components::ui::separator::Separator;
 use crate::domain::profile::activity::Activity;
 
@@ -11,17 +11,17 @@ const COMPACT_ACTIVITY_WIDTH: u16 = 60;
 const SECTION_SEPARATOR_MARGIN_X: u16 = 1;
 const SECTION_SEPARATOR_MARGIN_Y: u16 = 1;
 
-pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
+pub(super) fn lines(activity: &Activity, width: u16, palette: &Palette) -> Vec<Line<'static>> {
     let divider = |label| {
         Separator::new(label)
-            .style(Style::new().fg(theme::IDLE))
+            .style(Style::new().fg(palette.idle))
             .margin_x(SECTION_SEPARATOR_MARGIN_X)
             .margin_y(SECTION_SEPARATOR_MARGIN_Y)
             .lines(width)
     };
     let mut lines = divider("Repository activity · local and remote branches");
     if width >= COMPACT_ACTIVITY_WIDTH {
-        lines.extend(heatmap_lines(activity));
+        lines.extend(heatmap_lines(activity, palette));
     }
     lines.push(Line::from(format!(
         "{} commits in the past year",
@@ -48,7 +48,7 @@ pub(super) fn lines(activity: &Activity, width: u16) -> Vec<Line<'static>> {
     lines
 }
 
-fn heatmap_lines(activity: &Activity) -> Vec<Line<'static>> {
+fn heatmap_lines(activity: &Activity, palette: &Palette) -> Vec<Line<'static>> {
     let colors = [
         Color::Rgb(22, 27, 34),
         Color::Rgb(14, 68, 41),
@@ -57,12 +57,12 @@ fn heatmap_lines(activity: &Activity) -> Vec<Line<'static>> {
         Color::Rgb(57, 211, 83),
     ];
     let labels = ["Mon", "   ", "Wed", "   ", "Fri", "   ", "   "];
-    let mut lines = vec![month_line(activity)];
+    let mut lines = vec![month_line(activity, palette)];
     for row in 0..7 {
         let mut spans = vec![
             Span::styled(
                 labels.get(row).copied().unwrap_or("   "),
-                Style::new().fg(theme::IDLE),
+                Style::new().fg(palette.idle),
             ),
             Span::raw(" "),
         ];
@@ -85,13 +85,13 @@ fn heatmap_lines(activity: &Activity) -> Vec<Line<'static>> {
     lines
 }
 
-fn month_line(activity: &Activity) -> Line<'static> {
+fn month_line(activity: &Activity, palette: &Palette) -> Line<'static> {
     let mut spans = vec![Span::raw("    ")];
     for week in &activity.weeks {
         if let Some(month) = week.month_label {
             spans.push(Span::styled(
                 format!("{month:<3}"),
-                Style::new().fg(theme::IDLE),
+                Style::new().fg(palette.idle),
             ));
         } else {
             spans.push(Span::raw(" "));
