@@ -1,7 +1,8 @@
 # Plan: phase 12, polish
 
-**Scripts so far:** `test/scripts/100-command-log.script` (P0) and
-`110-keymap.script` (P2, P3); each remaining slice adds its own.
+**Scripts so far:** `test/scripts/100-command-log.script` (P0),
+`110-keymap.script` (P2, P3), `120-context-menu.script` and
+`121-take-side.script` (P4); each remaining slice adds its own.
 
 **Shape: a bucket, cut into slices.** `docs/PLAN_0_GENERAL.md` lists five
 things under this phase (config file, themes, keymap customization, real
@@ -465,7 +466,7 @@ terminal-lifecycle work with its own failure modes, not a config line.
   segments instead of wrapping; help scrolls and shows its last line at 24
   rows; a remapped key appears in help and keybar; the `x` menu and the
   command-log popup render.
-- `tests/app_menu.rs` (P4): each seeded entry runs its command and refreshes;
+- `tests/app_context_menu.rs` (P4): each seeded entry runs its command and refreshes;
   right-click opens the menu for the clicked row; a keybar click dispatches.
 - `tests/render.rs` (P5): the `light` base changes the three colours and
   nothing else; an override applies.
@@ -522,7 +523,20 @@ terminal-lifecycle work with its own failure modes, not a config line.
   these fails a test when broken: the bar reading the live keymap, fitting the
   width, dropping `Help` / `Quit` last, the help scrolling, the help reading the
   live keymap.
-- **P4** `x` menu with the six seeded entries, right-click, clickable hints.
+- ✅ **P4** `x` menu with the six seeded entries, right-click, clickable hints
+  (`src/app/context_menu.rs`, `KeybarHit` in `src/app/hints.rs`).
+  `tests/app_context_menu.rs` (16), `tests/git_stash.rs` and `tests/git_branch.rs`
+  for the backend calls, `tests/hints.rs` for the click ranges, and the two
+  replay scripts. Deviations from the sketch: the keep-index shortcut is `i`,
+  not `k`, because `j` / `k` move in every menu; a group of hints
+  (`Fetch/Pull/Push`) is clickable per label only, since one key list cannot say
+  which action a click on the keys meant; a right click also focuses the pane
+  and selects the row before it opens the menu, and does so even when the row
+  has no menu (then it says so in the Status pane); clicks on the keybar are
+  ignored while a popup or a confirm is up. The script found a real bug the
+  unit tests missed: `git stash store` of the entry already on top writes no
+  reflog entry, so renaming the top stash failed on the `drop`; that entry is now
+  dropped first (`renaming_the_top_stash_works_alone_and_above_another`).
 - **P5** `Palette`, `dark` / `light`, `[theme.colors]`.
 - **P6** commit and remaining knobs.
 - **P7** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
