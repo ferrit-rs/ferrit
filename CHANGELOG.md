@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-25
+
 - With `[ui] mouse = false`, ferrit ignores mouse events even if the terminal still sends them; before, only mouse capture was left off.
 - The commit editor's Summary shows its length as `n/50` on its bottom border, in the warning colour once the subject is longer than 50 characters. It never blocks: a longer subject commits as before.
 - `commit.template` (git config) pre-fills a new commit: the first line becomes the summary, the rest the description, and lines starting with `#` are dropped, as git does before committing. A draft kept by `Esc` still comes back first, and amend and reword keep showing `HEAD`'s message.
@@ -327,7 +329,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.4.0
 [0.2.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.2.0
