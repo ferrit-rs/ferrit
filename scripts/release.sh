@@ -1,7 +1,7 @@
 #!/bin/sh
 # Publish the version in Cargo.toml: checks, the crate on crates.io, then the
-# release tag (named exactly like that version, 0.6.0, no "v"), with the tag's
-# message taken from that version's CHANGELOG.md section.
+# release tag, with the tag's message taken from that version's CHANGELOG.md
+# section.
 #
 #   scripts/release.sh              dry run: every check, nothing changes
 #   scripts/release.sh --execute    do it, after asking you to type the version
@@ -65,9 +65,8 @@ act() {
 
 version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 [ -n "$version" ] || fail "no version found in Cargo.toml"
-# The tag is the version in Cargo.toml, exactly: 0.6.0, no "v" prefix.
-tag="$version"
-printf 'Releasing ferrit %s, tag %s (%s)\n' "$version" "$tag" \
+tag="v$version"
+printf 'Releasing ferrit %s as %s (%s)\n' "$version" "$tag" \
     "$([ "$execute" -eq 1 ] && echo EXECUTE || echo 'dry run, nothing will change')"
 
 step "CHANGELOG.md has a section for $version"
