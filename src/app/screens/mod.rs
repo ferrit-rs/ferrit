@@ -654,7 +654,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// key shows as remapped, and are cut to the terminal's width. Context
 /// sensitive: an operation stopped mid-way wins, then the focused pane's own
 /// keys (`d` means delete, discard or drop depending on the pane).
-fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
+fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let bar = if app.operation.is_some() {
         Bar::Operation
     } else if app.focus == Pane::Branches && !app.branches_drilled() {
@@ -670,6 +670,7 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App) {
         KeyBar::confirm(message).render(frame, area);
         return;
     }
-    let text = hints::keybar_text(&app.keymap, bar, usize::from(area.width));
-    KeyBar::hints(&text).render(frame, area);
+    let layout = hints::keybar_layout(&app.keymap, bar, usize::from(area.width));
+    KeyBar::hints(&layout.text).render(frame, area);
+    app.set_keybar_hits(area, layout.hits);
 }

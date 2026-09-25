@@ -57,7 +57,7 @@ impl App {
         }
     }
 
-    fn run_action(&mut self, action: Action) {
+    pub(super) fn run_action(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
             Action::Help => self.show_help = true,

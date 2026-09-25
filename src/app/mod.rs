@@ -571,6 +571,9 @@ pub struct App {
     right_area: Rect,
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
+    /// Where the keybar was drawn and what each part of it runs when clicked.
+    keybar_area: Rect,
+    keybar_hits: Vec<hints::KeybarHit>,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
     /// Animated side sheet opened by clicking that author.
@@ -749,6 +752,8 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
+            keybar_area: Rect::ZERO,
+            keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),
             author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
             commit_overlay: OverlayState::new(),
@@ -1326,6 +1331,13 @@ impl App {
     /// Store the configured Git author's clickable cells for mouse routing.
     pub fn set_author_click_area(&mut self, area: Rect) {
         self.author_click_area = area;
+    }
+
+    /// The keybar's rect and click targets, written by `ui::draw_keybar`
+    /// each frame.
+    pub fn set_keybar_hits(&mut self, area: Rect, hits: Vec<hints::KeybarHit>) {
+        self.keybar_area = area;
+        self.keybar_hits = hits;
     }
 
     /// A left pane's bordered rect, written by `ui::draw_left_column` each

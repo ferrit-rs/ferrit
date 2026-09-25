@@ -19,8 +19,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::app::config::{Config, ConfigLoad};
-use ferrit::app::hints::{Bar, HelpLine, help_lines, keybar_text};
-use ferrit::app::keymap::{Context, Keymap};
+use ferrit::app::hints::{Bar, HelpLine, help_lines, keybar_layout};
+use ferrit::app::keymap::{Action, Context, Keymap};
 use ferrit::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
@@ -89,7 +89,7 @@ fn keymap_from(toml: &str) -> Keymap {
 }
 
 fn bar(map: &Keymap, bar: Bar, width: usize) -> String {
-    keybar_text(map, bar, width)
+    keybar_layout(map, bar, width).text
 }
 
 #[test]
@@ -354,4 +354,64 @@ fn no_help_text_is_longer_than_the_dialog_can_show() {
             );
         }
     }
+}
+
+fn hit_at(map: &Keymap, bar: Bar, width: usize, column: u16) -> Option<Action> {
+    keybar_layout(map, bar, width)
+        .hits
+        .iter()
+        .find(|hit| (hit.start..hit.end).contains(&column))
+        .map(|hit| hit.action)
+}
+
+#[test]
+fn a_single_hint_is_clickable_across_its_whole_text() {
+    let map = Keymap::default();
+    let text = bar(&map, Bar::Default, 120);
+    // "Stage: <space>" is the first 14 cells, then " | ".
+    assert!(text.starts_with("Stage: <space> | All: a"));
+    for column in [0, 6, 13] {
+        assert_eq!(
+            hit_at(&map, Bar::Default, 120, column),
+            Some(Action::StageFile)
+        );
+    }
+    assert_eq!(hit_at(&map, Bar::Default, 120, 14), None, "the separator");
+    assert_eq!(hit_at(&map, Bar::Default, 120, 17), Some(Action::StageAll));
+}
+
+#[test]
+fn a_group_is_clickable_by_label_and_not_on_its_keys() {
+    let map = Keymap::default();
+    let text = bar(&map, Bar::Branches, 200);
+    let start = u16::try_from(text.find("Fetch/Pull/Push").expect("the group")).unwrap();
+    let at = |offset: u16| hit_at(&map, Bar::Branches, 200, start + offset);
+    assert_eq!(at(0), Some(Action::Fetch));
+    assert_eq!(at(4), Some(Action::Fetch));
+    assert_eq!(at(5), None, "the slash between labels");
+    assert_eq!(at(6), Some(Action::Pull));
+    assert_eq!(at(11), Some(Action::Push));
+    assert_eq!(at(15), None, "the colon");
+    assert_eq!(at(18), None, "the keys of a group");
+}
+
+#[test]
+fn dropped_segments_are_not_clickable_and_the_pinned_ones_keep_their_place() {
+    let map = Keymap::default();
+    let layout = keybar_layout(&map, Bar::Default, 40);
+    assert!(
+        layout.text.ends_with("Help: ? | Quit: q"),
+        "{}",
+        layout.text
+    );
+    assert!(
+        layout
+            .hits
+            .iter()
+            .all(|h| usize::from(h.end) <= layout.text.len())
+    );
+    let quit = layout.hits.last().unwrap();
+    assert_eq!(quit.action, Action::Quit);
+    assert_eq!(usize::from(quit.end), layout.text.len());
+    assert!(!layout.hits.iter().any(|h| h.action == Action::Discard));
 }

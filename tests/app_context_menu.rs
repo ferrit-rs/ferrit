@@ -16,8 +16,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ferrit::app::screens as ui;
 use ferrit::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -111,6 +114,12 @@ fn history(tag: &str) -> TempDir {
 
 fn status_lines(app: &App) -> Vec<String> {
     app.status_lines().iter().map(ToString::to_string).collect()
+}
+
+fn frame(app: &mut App) -> String {
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal.draw(|f| ui::draw(f, app)).unwrap();
+    terminal.backend().to_string()
 }
 
 fn rows(app: &App) -> Vec<String> {
@@ -476,4 +485,54 @@ fn x_is_inert_while_a_popup_or_a_menu_is_up() {
     app.feed_key(char_key('x')); // typed as text, not a second menu
     assert!(app.menu_popup().is_none());
     assert!(app.name_popup().unwrap().lines.join("").ends_with('x'));
+}
+
+// ------------------------------------------------------------ keybar clicks
+
+fn left_click(app: &mut App, column: u16, row: u16) {
+    app.feed_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    });
+}
+
+/// The column of `label` on the last row of a 120x40 frame.
+fn keybar_column(app: &mut App, label: &str) -> u16 {
+    let text = frame(app);
+    let last = text.lines().last().expect("a keybar row");
+    let byte = last
+        .find(label)
+        .unwrap_or_else(|| panic!("{label} in {last:?}"));
+    u16::try_from(last[..byte].chars().count()).unwrap()
+}
+
+#[test]
+fn clicking_a_keybar_hint_runs_its_action() {
+    let dir = history("x-keybar-click");
+    let mut app = App::open(dir.path()).unwrap();
+    let column = keybar_column(&mut app, "Help: ?");
+    left_click(&mut app, column + 2, 39);
+    assert!(app.show_help, "the help screen opened");
+
+    let mut app = App::open(dir.path()).unwrap();
+    let column = keybar_column(&mut app, "Quit: q");
+    left_click(&mut app, column, 39);
+    assert!(app.is_quitting());
+}
+
+#[test]
+fn a_keybar_click_off_a_hint_or_under_a_popup_does_nothing() {
+    let dir = history("x-keybar-click-off");
+    let mut app = App::open(dir.path()).unwrap();
+    let column = keybar_column(&mut app, "Quit: q");
+    left_click(&mut app, 119, 39); // past the last hint
+    assert!(!app.is_quitting());
+
+    app.feed_key(char_key('3'));
+    app.feed_key(char_key('x')); // a menu is up; the keybar is behind it
+    left_click(&mut app, column, 39);
+    assert!(!app.is_quitting());
+    assert!(app.menu_popup().is_some());
 }

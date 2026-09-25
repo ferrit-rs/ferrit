@@ -190,44 +190,79 @@ fn hint_key(binding: KeyBinding) -> String {
     }
 }
 
+/// A hint segment as text, with where each of its actions' labels sit in it
+/// (byte offsets, all ASCII labels).
+struct Rendered {
+    text: String,
+    labels: Vec<(Action, usize, usize)>,
+}
+
 /// `Label: key`, or `Fetch/Pull/Push: f/p/P` for a group. `None` when none of
 /// its actions has a key (the user unbound them).
-fn segment_text(keymap: &Keymap, segment: Segment) -> Option<String> {
-    let parts: Vec<(&str, String)> = segment
+fn segment_text(keymap: &Keymap, segment: Segment) -> Option<Rendered> {
+    let parts: Vec<(Action, String)> = segment
         .iter()
         .filter_map(|&(context, action)| {
             keymap
                 .keys(context, action)
                 .first()
-                .map(|&key| (action.label(), hint_key(key)))
+                .map(|&key| (action, hint_key(key)))
         })
         .collect();
     if parts.is_empty() {
         return None;
     }
-    let labels: Vec<&str> = parts.iter().map(|(label, _)| *label).collect();
+    let mut labels = Vec::new();
+    let mut text = String::new();
+    for (i, (action, _)) in parts.iter().enumerate() {
+        if i > 0 {
+            text.push('/');
+        }
+        labels.push((*action, text.len(), text.len() + action.label().len()));
+        text.push_str(action.label());
+    }
     let keys: Vec<&str> = parts.iter().map(|(_, key)| key.as_str()).collect();
-    Some(format!("{}: {}", labels.join("/"), keys.join("/")))
+    text.push_str(": ");
+    text.push_str(&keys.join("/"));
+    Some(Rendered { text, labels })
+}
+
+/// The cells `[start, end)` of the hint line that run `action` when clicked.
+/// A single hint is clickable across its whole text (`Stage: <space>`); in a
+/// group only the label is, since the keys of the group are not per action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeybarHit {
+    pub start: u16,
+    pub end: u16,
+    pub action: Action,
+}
+
+/// The hint line and where to click on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Keybar {
+    pub text: String,
+    pub hits: Vec<KeybarHit>,
 }
 
 /// The hint line for `bar`, `Label: key | Label: key`, no wider than `width`
 /// cells: segments are dropped from the end of the body until it fits, then
 /// the pinned `Help` and `Quit` (last one first).
-pub fn keybar_text(keymap: &Keymap, bar: Bar, width: usize) -> String {
-    let mut segments: Vec<String> = body(bar)
+pub fn keybar_layout(keymap: &Keymap, bar: Bar, width: usize) -> Keybar {
+    const SEPARATOR: &str = " | ";
+    let mut segments: Vec<Rendered> = body(bar)
         .iter()
         .filter_map(|&segment| segment_text(keymap, segment))
         .collect();
-    let mut pinned: Vec<String> = PINNED
+    let mut pinned: Vec<Rendered> = PINNED
         .iter()
         .filter_map(|&segment| segment_text(keymap, segment))
         .collect();
-    let joined = |body: &[String], pinned: &[String]| -> String {
+    let joined = |body: &[Rendered], pinned: &[Rendered]| -> String {
         body.iter()
             .chain(pinned.iter())
-            .map(String::as_str)
+            .map(|r| r.text.as_str())
             .collect::<Vec<_>>()
-            .join(" | ")
+            .join(SEPARATOR)
     };
     while UnicodeWidthStr::width(joined(&segments, &pinned).as_str()) > width
         && !segments.is_empty()
@@ -238,7 +273,29 @@ pub fn keybar_text(keymap: &Keymap, bar: Bar, width: usize) -> String {
     {
         pinned.pop();
     }
-    joined(&segments, &pinned)
+    let mut hits = Vec::new();
+    let mut column = 0;
+    for rendered in segments.iter().chain(pinned.iter()) {
+        let cells = |bytes: usize| u16::try_from(bytes).unwrap_or(u16::MAX);
+        let group = rendered.labels.len() > 1;
+        for &(action, from, to) in &rendered.labels {
+            let (from, to) = if group {
+                (from, to)
+            } else {
+                (0, rendered.text.len())
+            };
+            hits.push(KeybarHit {
+                start: column + cells(from),
+                end: column + cells(to),
+                action,
+            });
+        }
+        column += cells(rendered.text.len() + SEPARATOR.len());
+    }
+    Keybar {
+        text: joined(&segments, &pinned),
+        hits,
+    }
 }
 
 /// One line of the help screen.
