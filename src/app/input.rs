@@ -310,6 +310,11 @@ impl App {
     /// action. A right click opens the row's `x` menu; middle click, drag and
     /// move are no-ops.
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
+        // `[ui] mouse = false` never enables mouse capture; a terminal that
+        // sends events anyway still gets no reaction from ferrit.
+        if !self.config.ui.mouse {
+            return;
+        }
         if matches!(ev.kind, MouseEventKind::Moved) {
             let over_author = self.author_overlay.is_closed()
                 && self

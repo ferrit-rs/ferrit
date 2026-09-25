@@ -674,3 +674,29 @@ fn mouse_and_poll_settings_reach_the_app() {
     config.ui.mouse = false;
     assert!(!with(config, dir.path()).mouse_enabled());
 }
+
+#[test]
+fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
+    use ferrit::app::Pane;
+    use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::layout::Rect;
+
+    let (dir, _repo) = repo_with_file("config-mouse-off", "a.txt", "one\n");
+    let click = |app: &mut App, kind| {
+        app.feed_mouse(MouseEvent {
+            kind,
+            column: 2,
+            row: 12,
+            modifiers: KeyModifiers::NONE,
+        });
+    };
+    for (mouse, expected_focus) in [(true, Pane::Branches), (false, Pane::Status)] {
+        let mut config = Config::default();
+        config.ui.mouse = mouse;
+        let mut app = with(config, dir.path());
+        app.set_left_area(Pane::Branches, Rect::new(0, 10, 40, 6));
+        click(&mut app, MouseEventKind::Down(MouseButton::Left));
+        click(&mut app, MouseEventKind::ScrollDown);
+        assert_eq!(app.focus, expected_focus, "mouse = {mouse}");
+    }
+}
