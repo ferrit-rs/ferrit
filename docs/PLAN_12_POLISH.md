@@ -565,9 +565,16 @@ terminal-lifecycle work with its own failure modes, not a config line.
   blocks). `tests/git_commit.rs` (4), `tests/app_commit.rs` (6),
   `tests/palette.rs` and `140-commit-settings.script`. Not done, as planned:
   opening `$EDITOR`.
-- **P7** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
-  layering held (`src/domain/git/` has no `ratatui`), every edge-case row
-  tested or explicitly inert, `CHANGELOG.md` lines, `PLAN_0` flipped.
+- ✅ **P7** polish. Each row of the edge-case table and of the definition of
+  done was traced to a test; two had none and got one (a command that never
+  spawned is recorded with no exit code and reads as an error line; nothing
+  under `src/domain/git/` uses `ratatui`, comments excepted), and one was
+  only half true (`mouse = false` left capture off but ferrit still reacted
+  to mouse events it was sent; now it does not). The mock strings that remain
+  outside `mock.rs` are all behind `App::is_mock()` (`draw_right_pane`,
+  `draw_command_log`, the image fallback), so a real repository never shows
+  them. A duplicated `CHANGELOG.md` line from the P4 split was removed.
+  `PLAN_0` flipped to done; the README gained a Configuration section.
 
 ## Definition of done (phase 12)
 

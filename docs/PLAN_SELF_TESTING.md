@@ -1,7 +1,7 @@
 # Plan: self-testing with screenshot proof
 
 **Status: built (ST0 to ST3 and ST6+ done, ST4 and ST5 partly).** The replay
-harness is `ferrit::replay` (`src/replay/`), 19 scripts in `test/scripts/` run
+harness is `ferrit::replay` (`src/replay/`), 23 scripts in `test/scripts/` run
 in `tests/replay.rs`, and the harness itself is tested in
 `tests/replay_harness.rs`. What differs from the sketch below, and why:
 

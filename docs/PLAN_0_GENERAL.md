@@ -56,7 +56,7 @@ into its own crate remains deferred.
 | 9 | `PLAN_9_REMOTE.md` | fetch, pull, push, upstream tracking, ahead/behind | ✅ done |
 | 10 | `PLAN_10_STASH.md` | stash push, pop, apply, drop, stash diff preview | ✅ done |
 | 11 | `PLAN_11_REBASE.md` | reword / drop / squash / fixup / edit on any commit, autosquash, in-progress operation menu (continue / skip / abort), conflict marking | ✅ done |
-| 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (seven slices P0 to P6) | 🔄 in progress (P0 command log, P1 config, P2 keymap, P3 generated help and keybars, P4 `x` menu, P5 palette and themes done; P6 commit settings, P7 polish open) |
+| 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (eight slices P0 to P7) | ✅ done |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).
@@ -67,7 +67,7 @@ Cross-cutting:
   applies to every phase from 1 on. Status: the `TestBackend` frame tests
   (mechanism 1) and the `App` seam tests (`tests/app_*.rs`, `feed_key`) exist
   and are what phases 3 to 12 were tested with; the replay harness
-  (`ferrit::replay`, `--replay`, 19 scripts in `test/scripts/`, run by
+  (`ferrit::replay`, `--replay`, 23 scripts in `test/scripts/`, run by
   `tests/replay.rs`) is built. `vhs` rendering and reference screenshots
   (ST4, ST5) are not.
 - Live refresh (`src/app/events.rs`) is already wired: every phase from 3 on that
