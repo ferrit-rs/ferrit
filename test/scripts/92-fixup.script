@@ -1,0 +1,28 @@
+# Phase 11, `F` and `a`: commit what is staged as a fixup! of the selected
+# commit, then fold it back with autosquash.
+fixture history
+size 200x50
+
+# Nothing staged: `F` is an error, not an empty commit.
+key 4 j j                                  # one
+key F
+expect-text "nothing staged"
+git log --format=%s => "three\ntwo\none\nbase"
+
+write g "the fix\n"
+exec add g
+refresh
+key F
+git log --format=%s => "fixup! one\nthree\ntwo\none\nbase"
+
+# `a` on the fixup itself has nothing to fold: its target is not in the range.
+key 4 k k k k
+key a
+expect-text "no fixup!"
+git log --format=%s -1 => "fixup! one"
+
+# From `one`, the fixup is above it: fold it in.
+key 4 j j j
+key a
+git log --format=%s => "three\ntwo\none\nbase"
+git show --stat --format= HEAD~2 -> "g"

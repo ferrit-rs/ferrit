@@ -1,0 +1,21 @@
+# Phase 11, skipping a step: after `one` is dropped, skipping the conflicting
+# `two` sends `three` onto `base`, where it conflicts too. Abort restores the
+# branch.
+fixture history
+size 200x50
+
+key 4 j j
+key d y
+key enter
+expect-text "REBASING 2/3"
+
+key m s
+expect-text "stopped on a conflict"        # the next commit conflicts as well
+key enter
+expect-text "REBASING 3/3"
+git status --porcelain -> "UU f"
+
+key m a y
+expect-no-text "REBASING"
+git log --format=%s => "three\ntwo\none\nbase"
+git status --porcelain => ""

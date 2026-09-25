@@ -1,0 +1,33 @@
+# Phase 3, diffs: the right pane shows the real `git diff` of the selected
+# file (unstaged beside staged) and the real `git show` of a selected commit.
+fixture canonical
+size 200x50
+
+# Select src/main.rs in the Files tree: /, Cargo.lock, docs, notes.md, src, main.rs.
+key 2 j j j j j
+expect-text "M main.rs"
+expect-text "@@"                           # a hunk header
+expect-text "-    println!(\"ferrit\");"
+expect-text "+    println!(\"ferrit {}\", 1);"
+expect-text "+fn step_50() { todo!() }"
+snapshot modified-file
+git diff -> "+fn step_50() { todo!() }"
+
+# A staged new file has a staged diff and no unstaged one.
+key k k k k                                # up to Cargo.lock
+expect-text "+# lock"
+snapshot staged-file
+
+# The Commits pane shows the selected commit, and follows the selection.
+key 4
+expect-text "docs: expand the layout plan"
+expect-text "diff --git a/docs/PLAN.md b/docs/PLAN.md"
+expect-text "+plan v3"
+key j
+expect-text "docs: add inspiration notes"
+expect-text "+++ b/docs/INSPIRATION.md"
+key j
+expect-text "-plan v1"
+expect-text "+plan v2"
+snapshot commit
+git show --format=%s HEAD~2 -> "docs: drop the arch stub"

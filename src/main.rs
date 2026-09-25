@@ -19,11 +19,40 @@ struct Cli {
     /// Print where the configuration file is (or would be) and exit.
     #[arg(long)]
     config_path: bool,
+
+    // Test-only harness flags (`ferrit::replay::cli`), hidden from `--help`.
+    #[arg(long, hide = true, value_name = "SCRIPT")]
+    replay: Option<PathBuf>,
+    #[arg(long, hide = true, value_name = "NAME")]
+    fixture: Option<String>,
+    #[arg(long, hide = true, value_name = "DIR")]
+    into: Option<PathBuf>,
+    #[arg(long, hide = true, value_name = "DIR")]
+    dump_frames: Option<PathBuf>,
+    #[arg(long, hide = true, value_name = "WxH")]
+    size: Option<String>,
+    #[arg(long, hide = true, value_name = "SCRIPT")]
+    tape: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
+
+    let harness = ferrit::replay::cli::Args {
+        replay: cli.replay,
+        fixture: cli.fixture,
+        into: cli.into,
+        dump_frames: cli.dump_frames,
+        size: cli.size,
+        tape: cli.tape,
+    };
+    if harness.any() {
+        let printed = ferrit::replay::cli::run(&harness)
+            .map_err(|message| color_eyre::eyre::eyre!(message))?;
+        writeln!(std::io::stdout(), "{}", printed.trim_end())?;
+        return Ok(());
+    }
 
     if cli.config_path {
         let location = Config::default_path().map_or_else(

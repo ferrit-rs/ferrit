@@ -1,0 +1,19 @@
+# Phase 8, merge: a branch with its own commit is merged into the current one.
+# main is an ancestor of `topic`, so git fast-forwards.
+fixture history
+size 200x50
+
+exec checkout -q -b topic
+write g "topic\n"
+exec add g
+exec commit -q -m topic
+exec checkout -q main
+refresh
+git log -1 --format=%s => "three"
+
+key 3
+expect-text "topic"
+key j                                      # main is first (HEAD), topic second
+key M
+git log -1 --format=%s => "topic"
+git branch --contains topic --format=%(refname:short) -> "main"

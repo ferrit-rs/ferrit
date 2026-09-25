@@ -1,0 +1,39 @@
+# Phase 12 P2 and P3, the keymap: a remap takes effect, the hint bar and the
+# help show it, the help scrolls, and a bad entry is reported and ignored.
+fixture canonical
+size 120x40
+
+config "[keys.global]\nhelp = \"H\"\n\n[keys.commits]\nsquash = \"S\"\nfixup = \"s\"\n"
+expect-text "Help: H"                      # the bar shows the remapped key
+key ?
+expect-no-text "toggle this help"          # the old key is unbound
+key H
+expect-text "toggle this help"
+expect-text "Global keys"
+key ?                                      # the help's own close key is fixed
+expect-no-text "toggle this help"
+
+# On the Commits pane the swap shows in the bar.
+key 4
+expect-text "Squash: S"
+expect-text "Fixup: s"
+
+# The help lists the focused pane first, and scrolls to its last line.
+resize 100x24
+key H
+expect-text "Commits keys"
+expect-no-text "wheel / click"             # below the fold at 24 rows
+key end
+expect-text "wheel / click"
+key home
+expect-no-text "wheel / click"
+snapshot help
+key ?
+
+# A bad entry is reported and the rest of the file still applies. A wide
+# terminal, so the Status pane shows the whole message.
+resize 200x50
+config "[keys.global]\nquit = \"ctrl-c\"\nhelp = \"H\"\n"
+expect-text "ctrl-c always quits"
+key H
+expect-text "toggle this help"

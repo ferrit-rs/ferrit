@@ -1,0 +1,46 @@
+# Phase 6, staging: whole files, hunks, everything, and discard. The golden
+# git output is the proof: the index changes exactly as the screen says.
+fixture canonical
+size 200x50
+
+# Whole file: stage the untracked notes, then unstage it.
+key 2 j j j                                # docs/notes.md
+git status --porcelain -> "?? docs/notes.md"
+key space
+git status --porcelain -> "A  docs/notes.md"
+expect-text "A  notes.md"
+key space
+git status --porcelain -> "?? docs/notes.md"
+
+# Stage the modified file whole.
+key j j                                    # src/main.rs
+key space
+git status --porcelain -> "M  src/main.rs"
+key space
+git status --porcelain -> " M src/main.rs"
+
+# One hunk: enter the diff, stage the first hunk only.
+key enter
+key space
+git diff --cached --stat -> "src/main.rs | 2 +-"
+git diff --stat -> "src/main.rs | 2 +-"     # the second hunk is still unstaged
+snapshot one-hunk-staged
+key esc
+
+# Everything at once, then everything back.
+key a
+git status --porcelain=v2 -> "M. N..."
+git status --porcelain -> "A  docs/notes.md"
+key a
+git status --porcelain -> "?? docs/notes.md"
+
+# Discard asks first: `n` keeps the change, `y` throws it away.
+key 2 k k k k k k k j j j j j              # back to src/main.rs
+expect-text "M main.rs"
+key d
+expect-text "discard all changes in src/main.rs?"
+key n
+git status --porcelain -> " M src/main.rs"
+key d y
+git status --porcelain => "?? Cargo.lock\n?? docs/notes.md"
+expect-no-text "M main.rs"

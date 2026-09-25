@@ -1,0 +1,41 @@
+# Phase 4, scroll behaviour: J / K / PageDown / Ctrl-d / < / > move the right
+# pane without touching the left selection, and stop at the ends. A short
+# terminal makes the two hunks of src/main.rs too tall to show at once, so
+# what is on screen tells where the viewport is (seven rows of diff at this
+# height: the first hunk's `-` line is visible, the last function is not).
+fixture canonical
+size 120x16
+
+key 2 j j j j j                            # src/main.rs
+expect-text "-    println!(\"ferrit\");"   # the top of the diff is on screen
+expect-no-text "fn step_50() { todo!() }"  # the second is below the fold
+expect-text "6 of 6"
+
+key >                                      # to the bottom
+expect-text "fn step_50() { todo!() }"
+expect-no-text "-    println!(\"ferrit\");"
+expect-text "6 of 6"                       # the selection did not move
+
+key <                                      # and back to the top
+expect-text "-    println!(\"ferrit\");"
+expect-no-text "fn step_50() { todo!() }"
+
+key J J J J J J J J                        # line by line
+expect-no-text "-    println!(\"ferrit\");"
+key K K K K K K K K
+expect-text "-    println!(\"ferrit\");"
+
+key pgdn
+snapshot page-down
+key pgup
+expect-text "-    println!(\"ferrit\");"
+
+key ctrl-d
+key ctrl-u
+expect-text "-    println!(\"ferrit\");"
+
+# Far past the end stays at the end, far before the start at the start.
+key > J J J J J
+expect-text "fn step_50() { todo!() }"
+key < K K K K K
+expect-text "-    println!(\"ferrit\");"

@@ -1,0 +1,38 @@
+# Phase 8, branches: checkout, create, delete, merge. `git branch` and
+# `rev-parse` are the golden.
+fixture canonical
+size 200x50
+
+# Checkout: select feat/tui-skeleton and press space.
+key 3 j
+key space
+git rev-parse --abbrev-ref HEAD => "feat/tui-skeleton"
+expect-text "canonical → feat/tui-skeleton"
+
+# New branch from HEAD, named in a popup.
+key n
+expect-text "New branch"
+type "wip/replay"
+key enter
+git rev-parse --abbrev-ref HEAD => "wip/replay"
+git branch --format=%(refname:short) -> "wip/replay"
+
+# Delete asks first. The list is HEAD first, then alphabetical: wip/replay,
+# feat/tui-skeleton, fix/parse-args, main. fix/parse-args is an ancestor of
+# main, so -d succeeds.
+key 3 k k k k j j
+expect-text "3 of 4"
+key d
+expect-text "delete branch fix/parse-args?"
+key n
+git branch --format=%(refname:short) -> "fix/parse-args"
+key d y
+git branch --format=%(refname:short) => "feat/tui-skeleton\nmain\nwip/replay"
+
+# The checked-out branch cannot be deleted, and there is no confirm for it.
+key k k
+expect-text "1 of 3"
+key d
+expect-no-text "delete branch wip/replay?"   # no confirm (git's refusal may name it)
+git branch --format=%(refname:short) -> "wip/replay"
+snapshot branches

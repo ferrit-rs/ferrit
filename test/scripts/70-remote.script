@@ -1,0 +1,33 @@
+# Phase 9, remote: fetch, pull and push against a local bare `origin`, each
+# waited for by `async-key` (no sleeping): ahead / behind come from git.
+fixture remote
+size 200x50
+
+git status -sb => "## main...origin/main"
+
+# Someone else pushes; fetch brings it in and the Status pane says behind 1.
+write {other}/g "elsewhere\n"
+exec -C {other} add g
+exec -C {other} commit -q -m elsewhere
+exec -C {other} push -q origin main
+async-key f
+git status -sb => "## main...origin/main [behind 1]"
+expect-text "↓1"
+
+# Pull fast-forwards.
+async-key p
+git status -sb => "## main...origin/main"
+git log -1 --format=%s => "elsewhere"
+expect-no-text "↓1"
+
+# A local commit is ahead 1; push sends it.
+write g "local\n"
+exec add g
+exec commit -q -m local
+refresh
+git status -sb => "## main...origin/main [ahead 1]"
+expect-text "↑1"
+async-key P
+git status -sb => "## main...origin/main"
+git --git-dir={origin} log -1 --format=%s => "local"
+expect-no-text "↑1"

@@ -264,6 +264,12 @@ fn every_git_subprocess_goes_through_exec() {
 
     for file in files {
         let text = fs::read_to_string(&file).unwrap();
+        // The replay harness builds and inspects fixture repositories; it does
+        // not operate one for the user, so its `git` calls are not the
+        // command log's business (`src/replay/mod.rs`). Nothing else is exempt.
+        if file.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/replay")) {
+            continue;
+        }
         let is_exec = file.ends_with("domain/git/exec.rs");
         if !is_exec {
             assert!(

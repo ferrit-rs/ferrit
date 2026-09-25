@@ -1379,6 +1379,49 @@ impl App {
         self.event_sender = Some(sender);
     }
 
+    /// The events a background worker or the watcher sends, as opposed to
+    /// terminal input. `run()` and `deliver_event` share this.
+    fn on_background_event(&mut self, event: AppEvent) {
+        match event {
+            AppEvent::Refresh => self.request_refresh(),
+            AppEvent::RefreshDone(completion) => self.on_refresh_done(*completion),
+            AppEvent::DiffDone(completion) => self.on_diff_done(completion),
+            AppEvent::ImageDone(completion) => self.on_image_done(completion),
+            AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+            AppEvent::Input(_) => {},
+        }
+    }
+
+    /// Deliver one event the way `run()` would, without a terminal. The replay
+    /// harness (`crate::replay`) uses it to complete background work
+    /// deterministically. Key presses go to `on_key`; other input is ignored.
+    #[doc(hidden)]
+    pub fn deliver_event(&mut self, event: AppEvent) {
+        match event {
+            AppEvent::Input(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                self.on_key(key);
+            },
+            other => self.on_background_event(other),
+        }
+    }
+
+    /// No refresh, diff, image or remote operation is running or queued. With
+    /// an event sender set, work finishes on a thread; a caller that delivers
+    /// events until this is `true` sees a settled screen with no sleeping.
+    #[doc(hidden)]
+    pub fn is_idle(&self) -> bool {
+        !self.refresh_query.in_flight
+            && !self.diff_query.in_flight
+            && !self.image_query.in_flight
+            && self.remote_busy.is_none()
+    }
+
+    /// Back to synchronous work (undo `set_event_sender`).
+    #[doc(hidden)]
+    pub fn clear_event_sender(&mut self) {
+        self.event_sender = None;
+    }
+
     /// Is the right pane currently a native-graphics image? `run` watches this
     /// across frames: when it flips back to `false` the sixel / iTerm2 / kitty
     /// pixels of the old frame outlive a normal buffer diff and need a full
@@ -1788,11 +1831,7 @@ impl App {
                         self.mouse_pointer.sync()?;
                     },
                     AppEvent::Input(_) => {},
-                    AppEvent::Refresh => self.request_refresh(),
-                    AppEvent::RefreshDone(completion) => self.on_refresh_done(*completion),
-                    AppEvent::DiffDone(completion) => self.on_diff_done(completion),
-                    AppEvent::ImageDone(completion) => self.on_image_done(completion),
-                    AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+                    background => self.on_background_event(background),
                 }
                 if self.should_quit {
                     break;

@@ -1,0 +1,42 @@
+# Phase 10, stash: push with a message, apply, pop, drop. `git stash list`
+# and the worktree are the golden.
+fixture canonical
+size 200x50
+
+key 2 s
+expect-text "Stash changes"
+type "parked"
+key enter
+git stash list -> "parked"
+git status --porcelain => ""              # tracked, staged and untracked all went
+expect-text "working tree clean"
+
+key 5
+expect-text "stash@{0}"
+expect-text "parked"
+expect-text "diff --git a/src/main.rs b/src/main.rs"   # the preview
+
+# Apply keeps the entry and brings the changes back.
+key space
+git status --porcelain -> " M src/main.rs"          # apply restores it unstaged
+git status --porcelain -> "?? docs/notes.md"
+git stash list -> "parked"
+
+# Drop asks first.
+key d
+expect-text "drop stash@{0}"
+key n
+git stash list -> "parked"
+
+# Pop needs a clean tree: put the changes back in the stash first.
+key 2 s
+type "second"
+key enter
+key 5 j
+git stash list -> "second"
+key g                                      # pops `parked`, the older one
+git stash list => "stash@{0}: On main: second"
+git status --porcelain -> "?? docs/notes.md"
+key d y
+git stash list => ""
+expect-text "(no stash entries)"

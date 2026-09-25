@@ -1,0 +1,56 @@
+# Phase 11, rewriting history from the Commits pane: reword, squash, fixup,
+# drop and edit, each one `git rebase -i` with a todo ferrit generates and no
+# editor opened. `git log` is the golden.
+fixture history
+size 200x50
+
+key 4
+expect-text "1 of 4"                       # three, two, one, base
+
+# Reword an older commit: the popup opens pre-filled with its message.
+key j w
+expect-text "Reword "
+expect-text "two"
+type "!"
+key enter
+git log --format=%s => "three\ntwo!\none\nbase"
+git status --porcelain => ""
+
+# Squash it into the commit below, keeping both messages.
+key k k k k j                              # top, then row 1 (two!)
+key s
+git log --format=%s => "three\none\nbase"
+git log -1 --format=%B HEAD~1 -> "two!"
+git show HEAD~1:f => "two"
+
+# Fixup the newest into the commit below, dropping its message.
+key k k k k
+key S
+git log --format=%s => "one\nbase"
+git show HEAD:f => "three"
+snapshot after-fixup
+
+# Drop asks first. A new commit nothing depends on can go cleanly.
+write g "extra\n"
+exec add g
+exec commit -q -m extra
+refresh
+key 4 k k k
+expect-text "extra"
+key d
+expect-text "drop "
+key n
+git log --format=%s => "extra\none\nbase"
+key d y
+git log --format=%s => "one\nbase"
+
+# Edit stops the rebase at that commit; the menu continues it.
+key k k
+key e
+expect-text "stopped for you to edit"
+key enter
+expect-text "REBASING 1/1"                # one commit in the range
+git status --porcelain => ""
+key m c
+expect-no-text "REBASING"
+git log --format=%s => "one\nbase"

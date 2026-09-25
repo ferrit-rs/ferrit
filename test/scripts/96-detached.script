@@ -1,0 +1,12 @@
+# A detached HEAD is a first-class state: the Status pane says so, and a
+# commit can still be reworded.
+fixture detached
+size 200x50
+
+git symbolic-ref -q HEAD => ""             # no branch: detached
+expect-text "detached → "
+key 4 j w
+type "!"
+key enter
+git log --format=%s => "three\ntwo!\none\nbase"
+git symbolic-ref -q HEAD => ""             # still detached

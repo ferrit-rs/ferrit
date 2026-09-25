@@ -1,0 +1,21 @@
+# Phase 12 P0, the command log: the Infos panel shows the git commands ferrit
+# really ran, failures are marked, and `@` opens the whole history, reads
+# included.
+fixture canonical
+size 200x50
+
+key 2 j j j space                          # stage docs/notes.md
+expect-text "$ git add -- docs/notes.md"
+expect-no-text "$ git diff"                # reads stay out of the panel
+
+key @
+expect-text "command log"
+expect-text "$ git diff"                   # ... but the viewer lists them
+snapshot viewer
+key esc
+expect-no-text "command log"
+
+# A failing command is marked with its exit code.
+key 3 d
+expect-text "$ git branch -d main"
+expect-text "(exit 1)"

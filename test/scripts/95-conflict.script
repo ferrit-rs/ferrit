@@ -1,0 +1,28 @@
+# Phase 11, conflict marking: `<space>` and `a` refuse a file that still has
+# conflict markers, stage it once they are gone, and the menu finishes the
+# merge.
+fixture conflict
+size 200x50
+
+expect-text "MERGING"
+expect-text "1 merge conflict"
+git status --porcelain -> "UU f"
+
+key 2 j                                    # the file row
+key space
+expect-text "still has conflict markers"
+git status --porcelain -> "UU f"           # not staged
+key a
+expect-text "not staged, still has conflict markers: f"
+git status --porcelain -> "UU f"
+
+write f "merged\n"
+refresh
+key space
+git status --porcelain -> "M  f"
+
+key m c
+expect-no-text "MERGING"
+git status --porcelain => ""
+git rev-list --parents -n1 HEAD -> " "     # a merge commit: hash plus two parents
+git show HEAD:f => "merged"

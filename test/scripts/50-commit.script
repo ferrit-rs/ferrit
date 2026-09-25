@@ -1,0 +1,46 @@
+# Phase 7, commit: the popup, HEAD moving, amend, reword, and the "nothing
+# staged" question. `git log` is the golden.
+fixture canonical
+size 200x50
+
+# Commit what is staged (only Cargo.lock in this fixture).
+key 2 c
+expect-text "Commit"
+type "test: replay commit"
+key enter
+git log -1 --format=%s => "test: replay commit"
+git log -1 --format=%P -> "8170cc5"          # its parent is the old HEAD
+git show --stat --format= HEAD -> "Cargo.lock"
+expect-text "test: replay commit"
+git status --porcelain -> " M src/main.rs"
+
+# Nothing staged: `c` asks to stage everything first.
+key c
+expect-text "stage"
+key n
+git log -1 --format=%s => "test: replay commit"
+key c y
+expect-text "Commit"
+type "second: with the rest"
+key enter
+git log -1 --format=%s => "second: with the rest"
+git status --porcelain => ""
+
+# Amend HEAD: the message comes pre-filled.
+key A
+expect-text "Amend HEAD"
+type " (amended)"
+key enter
+git log -1 --format=%s => "second: with the rest (amended)"
+git rev-list --count HEAD => "6"             # amending added no commit
+
+# Reword HEAD: message only.
+key w
+expect-text "Reword HEAD"
+type "!"
+key enter
+git log -1 --format=%s => "second: with the rest (amended)!"
+
+# An empty message is refused and no commit is made.
+key 2
+snapshot done

@@ -1,0 +1,38 @@
+# Phase 2, reading git: every pane shows the real state of the canonical
+# fixture, and the golden git output agrees with what the screen says.
+fixture canonical
+size 200x50
+
+expect-text "canonical → main"             # Status: repo and branch
+
+# Files: one staged, one untracked, one modified, as a tree.
+key 2
+expect-text "A  Cargo.lock"
+expect-text "? notes.md"
+expect-text "M main.rs"
+expect-text "1 of 6"
+
+# Branches.
+expect-text "* main"
+expect-text "feat/tui-skeleton"
+expect-text "fix/parse-args"
+expect-text "1 of 3"
+
+# Commits, newest first.
+expect-text "docs: expand the layout plan"
+expect-text "docs: add inspiration notes"
+expect-text "docs: drop the arch stub"
+expect-text "chore: initial commit"
+expect-text "1 of 4"
+
+# Stash is empty.
+expect-text "(no stash entries)"
+snapshot canonical
+
+git status --porcelain=v2 -> "A. N... 000000 100644 100644"
+git status --porcelain -> " M src/main.rs"
+git status --porcelain -> "?? docs/notes.md"
+git branch --format=%(refname:short) -> "feat/tui-skeleton"
+git log --format=%s => "docs: expand the layout plan\ndocs: add inspiration notes\ndocs: drop the arch stub\nchore: initial commit"
+git stash list => ""
+git rev-parse --abbrev-ref HEAD => "main"

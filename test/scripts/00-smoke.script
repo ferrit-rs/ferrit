@@ -1,0 +1,11 @@
+# The smallest end-to-end flow: build the canonical fixture, look at it,
+# stage a file, and check git agrees.
+fixture canonical
+size 120x40
+
+expect-text "canonical"           # the repo name in the Status pane
+key 2                             # focus Files
+expect-text "M main.rs"            # the Files pane is a tree
+expect-text "A  Cargo.lock"
+snapshot files
+git status --porcelain=v2 -> "Cargo.lock"

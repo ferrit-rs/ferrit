@@ -1,0 +1,39 @@
+# Phase 11, an operation stopped mid-way: the Status badge, the `m` menu, and
+# continue / skip / abort. Dropping `one` makes `two` conflict, because `two`
+# was written on top of it.
+fixture history
+size 200x50
+
+key 4 j j                                  # row 2: one
+key d y
+expect-text "stopped on a conflict"
+key enter
+expect-text "REBASING 2/3"
+expect-text "abort: m"                     # the keybar points at the menu
+git status --porcelain -> "UU f"
+
+# Abort asks first and puts the branch back exactly as it was.
+key m
+expect-text "Continue"
+expect-text "Skip this step"
+expect-text "Abort"
+key a
+expect-text "abort the rebase?"
+key n
+expect-text "REBASING 2/3"                 # `n` kept it
+key m a y
+expect-no-text "REBASING"
+git log --format=%s => "three\ntwo\none\nbase"
+git status --porcelain => ""
+
+# Again, this time resolve the file and continue: `three` still applies.
+key 4 k k k k j j
+key d y
+key enter
+write f "two\n"
+exec add f
+refresh
+key m c
+expect-no-text "REBASING"
+git log --format=%s => "three\ntwo\nbase"
+
