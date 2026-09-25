@@ -1,6 +1,8 @@
 //! User-selected accent theme: the `[theme]` section of `config.toml`
 //! (`app::config`) and the state of the drawer that edits it.
 
+use std::collections::BTreeMap;
+
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
@@ -79,6 +81,10 @@ pub struct ThemeConfig {
     pub preset: Preset,
     /// Optional RGB override; TOML uses Ratatui's `#RRGGBB` serde format.
     pub accent: Option<Color>,
+    /// `[theme.colors]`: any of the palette's colours by name, as `"#rrggbb"`
+    /// or a colour name (`"red"`, `"light-blue"`), over the base's.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub colors: BTreeMap<String, Color>,
 }
 
 impl Default for ThemeConfig {
@@ -86,6 +92,7 @@ impl Default for ThemeConfig {
         Self {
             base: Base::Dark,
             preset: Preset::Green,
+            colors: BTreeMap::new(),
             accent: None,
         }
     }
@@ -94,10 +101,38 @@ impl Default for ThemeConfig {
 impl ThemeConfig {
     /// The colours ferrit draws with under this theme.
     pub fn palette(&self) -> Palette {
-        match self.base {
+        let mut palette = match self.base {
             Base::Dark => Palette::DARK,
             Base::Light => Palette::LIGHT,
+        };
+        for (name, &color) in &self.colors {
+            if let Some(slot) = palette.color_mut(name) {
+                *slot = color;
+            }
         }
+        palette
+    }
+
+    /// Remove the `[theme.colors]` entries that name no colour, one message
+    /// each; the others still apply.
+    pub fn drop_unknown_colors(&mut self) -> Vec<String> {
+        let mut probe = Palette::DARK;
+        let unknown: Vec<String> = self
+            .colors
+            .keys()
+            .filter(|name| probe.color_mut(name).is_none())
+            .cloned()
+            .collect();
+        unknown
+            .into_iter()
+            .map(|name| {
+                self.colors.remove(&name);
+                format!(
+                    "`theme.colors.{name}` is not a colour of the palette (one of {}), ignored",
+                    Palette::NAMES
+                )
+            })
+            .collect()
     }
 
     pub fn color(&self) -> Color {

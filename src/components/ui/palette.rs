@@ -79,6 +79,34 @@ impl Palette {
     };
 }
 
+impl Palette {
+    /// The colour called `name` in `[theme.colors]`, to set it. `None` for a
+    /// name that is not one of the 14.
+    pub fn color_mut(&mut self, name: &str) -> Option<&mut Color> {
+        Some(match name {
+            "focus" => &mut self.focus,
+            "idle" => &mut self.idle,
+            "selection" => &mut self.selection,
+            "selection_fg" => &mut self.selection_fg,
+            "add" => &mut self.add,
+            "del" => &mut self.del,
+            "hunk" => &mut self.hunk,
+            "hash" => &mut self.hash,
+            "author" => &mut self.author,
+            "warn" => &mut self.warn,
+            "key" => &mut self.key,
+            "focus_box" => &mut self.focus_box,
+            "add_line_bg" => &mut self.add_line_bg,
+            "del_line_bg" => &mut self.del_line_bg,
+            _ => return None,
+        })
+    }
+
+    /// The names `color_mut` knows, for a message.
+    pub const NAMES: &'static str = "focus, idle, selection, selection_fg, add, del, hunk, hash, \
+         author, warn, key, focus_box, add_line_bg, del_line_bg";
+}
+
 impl Default for Palette {
     fn default() -> Self {
         Self::DARK

@@ -14,3 +14,9 @@ config "[theme]\nbase = \"sepia\"\n"
 expect-text "[theme] ignored"
 key 2 j j j j j
 expect-text "@@"
+
+# Overrides: a valid one applies, an unknown name is reported and only it is dropped.
+config "[theme.colors]\nadd_line_bg = \"#d6f5d6\"\nnot_a_colour = \"red\"\n"
+expect-text "`theme.colors.not_a_colour` is not a colour"
+key 2 j j j j j
+expect-text "@@"

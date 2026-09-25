@@ -181,6 +181,25 @@ fn a_file_that_cannot_be_read_is_reported() {
 }
 
 #[test]
+fn saving_from_the_drawer_keeps_the_colour_overrides() {
+    let dir = TempDir::new("config-save-colors");
+    let path = dir.path().join("config.toml");
+    fs::write(
+        &path,
+        "[theme]\npreset = \"green\"\n\n[theme.colors]\nadd_line_bg = \"#d6f5d6\"\nwarn = \"red\"\n",
+    )
+    .unwrap();
+    let mut loaded = Config::load_from(&path).config.theme;
+    assert_eq!(loaded.colors.len(), 2);
+    loaded.preset = Preset::Amber;
+    Config::save_theme(&path, &loaded).unwrap();
+
+    let reread = Config::load_from(&path);
+    assert!(reread.issues.is_empty(), "{:?}", reread.issues);
+    assert_eq!(reread.config.theme, loaded);
+}
+
+#[test]
 fn saving_from_the_drawer_keeps_the_base() {
     let dir = TempDir::new("config-save-base");
     let path = dir.path().join("config.toml");

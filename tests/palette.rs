@@ -187,3 +187,60 @@ fn a_diff_uses_the_light_tints_and_a_light_syntax_theme_on_a_light_base() {
     };
     assert_ne!(code_colours(&Palette::LIGHT), code_colours(&Palette::DARK));
 }
+
+#[test]
+fn colour_overrides_apply_over_the_base_by_name() {
+    let (config, issues) = Config::parse(
+        "[theme]\nbase = \"light\"\n\n[theme.colors]\nadd_line_bg = \"#010203\"\nwarn = \"red\"\n",
+    );
+    assert!(issues.is_empty(), "{issues:?}");
+    let palette = config.theme.palette();
+    assert_eq!(palette.add_line_bg, Color::Rgb(1, 2, 3));
+    assert_eq!(palette.warn, Color::Red);
+    let expected = Palette {
+        add_line_bg: Color::Rgb(1, 2, 3),
+        warn: Color::Red,
+        ..Palette::LIGHT
+    };
+    assert_eq!(
+        palette, expected,
+        "nothing else moved, and the base still applies"
+    );
+}
+
+#[test]
+fn an_unknown_colour_name_is_reported_and_the_valid_ones_still_apply() {
+    let (config, issues) =
+        Config::parse("[theme.colors]\nadd_line = \"#010203\"\nkey = \"#0a0b0c\"\n");
+    assert_eq!(config.theme.palette().key, Color::Rgb(10, 11, 12));
+    assert_eq!(issues.len(), 1, "reported once: {issues:?}");
+    assert!(issues[0].contains("`theme.colors.add_line`"), "{issues:?}");
+    assert!(
+        issues[0].contains("add_line_bg"),
+        "the message lists the names: {issues:?}"
+    );
+}
+
+#[test]
+fn an_unparseable_colour_value_reports_the_section_and_uses_the_defaults() {
+    let (config, issues) = Config::parse("[theme.colors]\nadd = \"not-a-colour\"\n");
+    assert_eq!(config.theme.palette(), Palette::DARK);
+    assert!(
+        issues.iter().any(|i| i.starts_with("[theme] ignored")),
+        "{issues:?}"
+    );
+}
+
+#[test]
+fn every_named_colour_is_reachable() {
+    let mut probe = Palette::DARK;
+    let names: Vec<&str> = Palette::NAMES.split(", ").collect();
+    assert_eq!(names.len(), 14);
+    for name in names {
+        assert!(probe.color_mut(name).is_some(), "{name}");
+    }
+    assert!(
+        probe.color_mut("light").is_none(),
+        "the light flag is not a colour"
+    );
+}
