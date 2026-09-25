@@ -59,8 +59,11 @@ fn resolve(repo: &mut Repository, oid: &str) -> GitResult<String> {
 
 /// `git stash push --include-untracked [-m <message>]`. An empty message
 /// lets git write its own `WIP on <branch>: ...`.
-pub(super) fn push(repo: &Repository, message: &str) -> GitResult<()> {
+pub(super) fn push(repo: &Repository, message: &str, keep_index: bool) -> GitResult<()> {
     let mut args = vec!["stash", "push", "--include-untracked"];
+    if keep_index {
+        args.push("--keep-index");
+    }
     if !message.is_empty() {
         args.extend(["-m", message]);
     }
@@ -101,12 +104,39 @@ pub(super) fn pop(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
     restore(repo, oid, "pop")
 }
 
+/// Give an entry a new message: `git stash store -m <message> <oid>` adds the
+/// same commit again at the top, then the old copy, now one further down, is
+/// dropped. The renamed entry ends up as `stash@{0}`; git has no in-place rename.
+/// Storing the commit that is already on top changes nothing (git sees the same
+/// value and writes no reflog entry), so that entry is dropped first; its commit
+/// stays in the object database for the `store`.
+pub(super) fn rename(repo: &mut Repository, oid: &str, message: &str) -> GitResult<()> {
+    let old = stashes(repo)?
+        .into_iter()
+        .find(|entry| entry.oid == oid)
+        .map(|entry| entry.index)
+        .ok_or_else(|| GitError::StashFailed("stash entry no longer exists".to_owned()))?;
+    if old == 0 {
+        run(repo, &["stash", "drop", "stash@{0}"])?;
+        run(repo, &["stash", "store", "-m", message, oid])
+    } else {
+        run(repo, &["stash", "store", "-m", message, oid])?;
+        run(repo, &["stash", "drop", &format!("stash@{{{}}}", old + 1)])
+    }
+}
+
+/// Run one `git stash` command, a non-zero exit being a `StashFailed`.
+fn run(repo: &Repository, args: &[&str]) -> GitResult<()> {
+    let out = git(repo, args)?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(GitError::StashFailed(stderr(&out)))
+    }
+}
+
 /// `git stash drop`.
 pub(super) fn drop_entry(repo: &mut Repository, oid: &str) -> GitResult<()> {
     let reference = resolve(repo, oid)?;
-    let out = git(repo, &["stash", "drop", &reference])?;
-    if !out.status.success() {
-        return Err(GitError::StashFailed(stderr(&out)));
-    }
-    Ok(())
+    run(repo, &["stash", "drop", &reference])
 }

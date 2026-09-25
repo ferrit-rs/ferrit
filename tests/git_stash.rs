@@ -281,3 +281,91 @@ fn push_on_an_unborn_branch_fails_with_gits_own_message() {
     );
     assert!(dir.path().join("a.txt").exists(), "nothing was touched");
 }
+
+// ------------------------------------------------------- P4: keep-index, rename
+
+#[test]
+fn push_keeping_the_index_leaves_staged_changes_staged() {
+    let dir = fixture("p4-keep-index");
+    fs::write(dir.path().join("a.txt"), "one\nstaged\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    fs::write(dir.path().join("a.txt"), "one\nstaged\nunstaged\n").unwrap();
+    let mut repo = Repo::open(dir.path()).unwrap();
+    repo.stash_push_keeping_index("kept").unwrap();
+
+    assert_eq!(repo.snapshot().unwrap().stashes.len(), 1);
+    let status = git(dir.path(), &["status", "--porcelain"]);
+    assert_eq!(
+        status, "M  a.txt",
+        "the staged change is still staged, the rest went: {status}"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+        "one\nstaged\n"
+    );
+}
+
+#[test]
+fn renaming_a_stash_keeps_its_commit_and_moves_it_to_the_top() {
+    let dir = fixture("p4-rename");
+    let mut repo = Repo::open(dir.path()).unwrap();
+    fs::write(dir.path().join("a.txt"), "one\nfirst\n").unwrap();
+    repo.stash_push("first").unwrap();
+    fs::write(dir.path().join("a.txt"), "one\nsecond\n").unwrap();
+    repo.stash_push("second").unwrap();
+    let before = repo.snapshot().unwrap().stashes;
+    assert_eq!(before.len(), 2);
+    let first = before
+        .iter()
+        .find(|e| e.message.contains("first"))
+        .unwrap()
+        .clone();
+
+    repo.stash_rename(&first.oid, "renamed").unwrap();
+
+    let after = repo.snapshot().unwrap().stashes;
+    assert_eq!(after.len(), 2, "one entry replaced, not added");
+    assert!(after[0].message.contains("renamed"), "{after:?}");
+    assert_eq!(after[0].oid, first.oid, "the same commit");
+    assert!(after[1].message.contains("second"), "{after:?}");
+    assert!(after.iter().all(|e| !e.message.contains("first")));
+}
+
+#[test]
+fn renaming_the_top_stash_works_alone_and_above_another() {
+    // `git stash store` of the commit already on top writes no reflog entry, so
+    // the top entry has to be dropped before it is stored again.
+    let dir = fixture("p4-rename-top");
+    let mut repo = Repo::open(dir.path()).unwrap();
+    fs::write(dir.path().join("a.txt"), "one\nfirst\n").unwrap();
+    repo.stash_push("first").unwrap();
+    let only = repo.snapshot().unwrap().stashes;
+    repo.stash_rename(&only[0].oid, "renamed").unwrap();
+    let after = repo.snapshot().unwrap().stashes;
+    assert_eq!(after.len(), 1, "{after:?}");
+    assert!(after[0].message.contains("renamed"), "{after:?}");
+    assert_eq!(after[0].oid, only[0].oid, "the same commit");
+
+    fs::write(dir.path().join("a.txt"), "one\nsecond\n").unwrap();
+    repo.stash_push("second").unwrap();
+    let top = repo.snapshot().unwrap().stashes[0].clone();
+    repo.stash_rename(&top.oid, "again").unwrap();
+    let after = repo.snapshot().unwrap().stashes;
+    assert_eq!(after.len(), 2, "{after:?}");
+    assert!(after[0].message.contains("again"), "{after:?}");
+    assert!(after[1].message.contains("renamed"), "{after:?}");
+}
+
+#[test]
+fn renaming_a_vanished_stash_is_an_error_and_changes_nothing() {
+    let dir = fixture("p4-rename-gone");
+    fs::write(dir.path().join("a.txt"), "one\nx\n").unwrap();
+    let mut repo = Repo::open(dir.path()).unwrap();
+    repo.stash_push("only").unwrap();
+    let err = repo.stash_rename(&"0".repeat(40), "nope").unwrap_err();
+    assert!(
+        matches!(&err, GitError::StashFailed(m) if m.contains("no longer exists")),
+        "{err:?}"
+    );
+    assert_eq!(repo.snapshot().unwrap().stashes.len(), 1);
+}

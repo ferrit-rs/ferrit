@@ -402,7 +402,17 @@ impl Repo {
 
     /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.
     pub fn stash_push(&self, message: &str) -> GitResult<()> {
-        stash::push(&self.inner, message)
+        stash::push(&self.inner, message, false)
+    }
+
+    /// Like `stash_push` but the index stays staged (`--keep-index`).
+    pub fn stash_push_keeping_index(&self, message: &str) -> GitResult<()> {
+        stash::push(&self.inner, message, true)
+    }
+
+    /// Give the stash entry with this oid a new message; it becomes `stash@{0}`.
+    pub fn stash_rename(&mut self, oid: &str, message: &str) -> GitResult<()> {
+        stash::rename(&mut self.inner, oid, message)
     }
 
     /// `git stash apply` for the entry with this oid; the entry stays.
