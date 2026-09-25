@@ -29,7 +29,44 @@ Requires Rust 1.85+ (edition 2024).
 ferrit          # open the TUI in the current repo
 ```
 
-Press `?` inside the app for the keybinding cheatsheet.
+Press `?` inside the app for the keybinding cheatsheet, `x` (or a right
+click) on a row for the less common actions, `@` for the git commands ferrit
+ran.
+
+## Configuration
+
+`ferrit --config-path` prints where the settings file lives. Everything is
+optional; a wrong value is reported at startup and only that part falls back
+to its default.
+
+```toml
+[theme]
+base = "dark"            # or "light"
+preset = "green"         # the accent: green, blue, purple, amber
+
+[theme.colors]           # any of the 14 palette colours, "#rrggbb" or a name
+add_line_bg = "#d6f5d6"
+
+[ui]
+mouse = true
+wheel_step = 3
+poll_secs = 10
+
+[diff]
+context = 3
+ignore_whitespace = false
+
+[commit]
+sign_off = false
+
+[log]
+show_reads = false
+
+[keys.global]            # remap any key but ctrl-c; also files, diff,
+quit = "Q"               # branches, commits and stash
+```
+
+The help screen and the key hints follow the remapped keys.
 
 ## Building from source
 

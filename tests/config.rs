@@ -700,3 +700,18 @@ fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
         assert_eq!(app.focus, expected_focus, "mouse = {mouse}");
     }
 }
+
+#[test]
+fn the_readme_example_is_a_valid_configuration() {
+    let readme =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md")).unwrap();
+    let block = readme
+        .split("```toml\n")
+        .nth(1)
+        .and_then(|rest| rest.split("```").next())
+        .expect("a toml block in the README");
+    let (config, issues) = Config::parse(block);
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(config.theme.colors.len(), 1);
+    assert!(config.keys.contains_key("global"));
+}
