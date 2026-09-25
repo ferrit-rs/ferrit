@@ -46,6 +46,7 @@ impl Action {
             Self::Help => "toggle this help",
             Self::CommandLog => "open the command log",
             Self::OperationMenu => "continue / skip / abort a stopped operation",
+            Self::ContextMenu => "more actions for this row (or right-click)",
             Self::Back => "back out of the diff or a drill",
             Self::Enter => "drill in, open a folder, or focus the diff",
             Self::EnterDiff => "focus the diff, to stage within it",

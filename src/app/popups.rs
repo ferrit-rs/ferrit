@@ -28,6 +28,7 @@ enum PopupKind {
     CommitAllConfirm,
     NewBranch,
     Stash,
+    Name,
     CommandLog,
     Menu,
     Upstream,
@@ -42,6 +43,7 @@ impl App {
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
             Popup::Stash(_) => PopupKind::Stash,
+            Popup::Name(..) => PopupKind::Name,
             Popup::CommandLog { .. } => PopupKind::CommandLog,
             Popup::Menu(_) => PopupKind::Menu,
             Popup::Upstream(_) => PopupKind::Upstream,
@@ -54,6 +56,7 @@ impl App {
             },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
+            PopupKind::Name => self.name_popup().map(PopupView::Name),
             PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
             PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
@@ -108,6 +111,24 @@ impl App {
             cursor: buf.cursor(),
             toggles: None,
             hints: "Stash: Enter | Cancel: Esc",
+        })
+    }
+
+    /// A name popup's render data, same shape as the new-branch one.
+    pub fn name_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Name(target, input)) = &self.popup else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: target.title.as_str(),
+            input,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: input.lines(),
+            cursor: input.cursor(),
+            toggles: None,
+            hints: target.hints(),
         })
     }
 
@@ -196,6 +217,7 @@ impl App {
         let mut dismiss = false;
         let mut create_branch_now = false;
         let mut stash_now = false;
+        let mut submit_name_now = false;
         let mut submit_upstream = None;
 
         match &mut self.popup {
@@ -217,6 +239,13 @@ impl App {
             Some(Popup::CommandLog { from_bottom }) => match key.code {
                 KeyCode::Esc | KeyCode::Char('@' | 'q') => dismiss = true,
                 other => *from_bottom = scrolled_command_log(*from_bottom, other),
+            },
+            Some(Popup::Name(_, input)) => match key.code {
+                KeyCode::Esc => dismiss = true,
+                KeyCode::Enter => submit_name_now = true,
+                _ => {
+                    input.handle_key_event(key, TextInputMode::SingleLine);
+                },
             },
             Some(Popup::Stash(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
@@ -242,6 +271,9 @@ impl App {
         }
         if stash_now {
             self.do_stash_push();
+        }
+        if submit_name_now {
+            self.submit_name();
         }
         if let Some(value) = submit_upstream {
             self.submit_upstream(&value);

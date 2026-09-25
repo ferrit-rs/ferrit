@@ -15,6 +15,14 @@ pub(super) enum MenuAction {
     Continue,
     Skip,
     Abort,
+    // The `x` menu (`docs/PLAN_12_POLISH.md` P4).
+    RenameBranch,
+    MergeNoFf,
+    BranchFromCommit,
+    StashKeepIndex,
+    RenameStash,
+    TakeOurs,
+    TakeTheirs,
 }
 
 /// One row: what it says, the key that runs it from anywhere in the menu, and
@@ -111,6 +119,13 @@ impl App {
         match action {
             MenuAction::Continue => self.apply_operation_step(Step::Continue),
             MenuAction::Skip => self.apply_operation_step(Step::Skip),
+            MenuAction::RenameBranch
+            | MenuAction::MergeNoFf
+            | MenuAction::BranchFromCommit
+            | MenuAction::StashKeepIndex
+            | MenuAction::RenameStash
+            | MenuAction::TakeOurs
+            | MenuAction::TakeTheirs => self.run_context_action(action),
             // Throws away the resolution work so far: ask first.
             MenuAction::Abort => {
                 let noun = self.operation.map_or("operation", operation_noun);

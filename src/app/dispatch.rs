@@ -63,6 +63,7 @@ impl App {
             Action::Help => self.show_help = true,
             Action::CommandLog => self.open_command_log(),
             Action::OperationMenu => self.open_operation_menu(),
+            Action::ContextMenu => self.open_context_menu(),
             Action::Back => {
                 self.right_focused = false;
                 if let Some(drill) = self.branch_drill.take() {

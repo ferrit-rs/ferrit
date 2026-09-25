@@ -94,6 +94,8 @@ pub enum Action {
     Help,
     CommandLog,
     OperationMenu,
+    /// The menu of extra actions for the selected row.
+    ContextMenu,
     /// Leave a drill or the right pane.
     Back,
     /// Drill into the selection, toggle a directory, or focus the diff.
@@ -166,6 +168,7 @@ impl Action {
             Self::Help => "help",
             Self::CommandLog => "command_log",
             Self::OperationMenu => "operation_menu",
+            Self::ContextMenu => "context_menu",
             Self::Back => "back",
             Self::Enter => "enter",
             Self::EnterDiff => "enter_diff",
@@ -366,6 +369,7 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Global, "?", Action::Help),
     (Context::Global, "@", Action::CommandLog),
     (Context::Global, "m", Action::OperationMenu),
+    (Context::Global, "x", Action::ContextMenu),
     (Context::Global, "esc", Action::Back),
     (Context::Global, "enter", Action::Enter),
     (Context::Global, "l", Action::EnterDiff),

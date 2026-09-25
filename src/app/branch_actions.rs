@@ -180,6 +180,11 @@ impl App {
     /// Files pane already renders `Change::Conflicted`, so the conflicted
     /// paths are visible without a dedicated flow.
     pub(super) fn merge_selected_branch(&mut self) {
+        self.merge_selected_branch_with(false);
+    }
+
+    /// `merge_selected_branch`, optionally with `--no-ff` (the `x` menu).
+    pub(super) fn merge_selected_branch_with(&mut self, no_ff: bool) {
         if self.focus != Pane::Branches
             || self.branch_drill.is_some()
             || self.branches_tab == BranchesTab::Remotes
@@ -191,7 +196,11 @@ impl App {
         };
         let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
-        let result = repo.merge_branch(&name);
+        let result = if no_ff {
+            repo.merge_branch_no_ff(&name)
+        } else {
+            repo.merge_branch(&name)
+        };
         self.request_refresh();
         match result {
             Ok(git::branch::MergeOutcome::Merged) => {},

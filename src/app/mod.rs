@@ -114,6 +114,7 @@ pub enum PopupView<'a> {
     CommitAllConfirm(&'a mut OverlayState),
     NewBranch(CommitPopupView<'a>),
     Stash(CommitPopupView<'a>),
+    Name(CommitPopupView<'a>),
     CommandLog(CommandLogView),
     Menu(MenuView),
     Upstream(CommitPopupView<'a>),
@@ -378,6 +379,9 @@ enum Popup {
     /// here, unlike the commit popup, where `Enter` inserts a newline —
     /// the only behavioural difference from reusing `TextInput` outright.
     NewBranch(TextInput),
+    /// A one-line name or message with a purpose: rename a branch or a stash,
+    /// a branch at a commit, a stash keeping the index (`app::context_menu`).
+    Name(context_menu::NameTarget, TextInput),
     /// Stash message input, `s` on Files (`docs/PLAN_10_STASH.md`). `Enter`
     /// submits; an empty message lets git write its own.
     Stash(TextInput),
@@ -639,6 +643,7 @@ mod tree;
 
 mod branch_actions;
 mod commit;
+mod context_menu;
 pub mod diff_query;
 mod dispatch;
 mod drill_nav;

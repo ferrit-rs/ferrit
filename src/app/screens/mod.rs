@@ -107,6 +107,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             PopupView::Commit(mut view)
             | PopupView::NewBranch(mut view)
             | PopupView::Stash(mut view)
+            | PopupView::Name(mut view)
             | PopupView::Upstream(mut view),
         ) => {
             popups::draw_commit(frame, area, &mut view, accent);
