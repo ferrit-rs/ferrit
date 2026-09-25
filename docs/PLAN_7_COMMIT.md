@@ -464,8 +464,10 @@ Deferred out of phase 7, their own phases or a follow-up:
   -i --autosquash`), phase 11.
 - a "this commit is already pushed, amend anyway?" guard, phase 9 (needs
   upstream tracking).
-- 50/72 subject/body lint, `commit.template` rendering, a conventional-commit
-  scaffold: phase 12 polish.
+- 50/72 subject/body lint, a conventional-commit scaffold: phase 12 polish.
+  Done there (P6): `commit.template` pre-fills a new commit, and the summary
+  shows an `n/50` counter that warns past 50. The 72-column body rule and the
+  scaffold stay unscheduled.
 - AI-generated commit messages (`INSPIRATION.md`: lazygitrs, gmsg): "Not
   scheduled" in `PLAN_0_GENERAL.md`, revisit after phase 12.
 - opening `$EDITOR` for the message instead of the in-TUI textarea: a config

@@ -2,7 +2,8 @@
 
 **Scripts so far:** `test/scripts/100-command-log.script` (P0),
 `110-keymap.script` (P2, P3), `120-context-menu.script` and
-`121-take-side.script` (P4) and `130-theme.script` (P5); each remaining slice adds its own.
+`121-take-side.script` (P4), `130-theme.script` (P5) and
+`140-commit-settings.script` (P6); each remaining slice adds its own.
 
 **Shape: a bucket, cut into slices.** `docs/PLAN_0_GENERAL.md` lists five
 things under this phase (config file, themes, keymap customization, real
@@ -554,7 +555,16 @@ terminal-lifecycle work with its own failure modes, not a config line.
   `theme::confirm_line` and `keybar_line` copies. Not verified: how `light`
   looks on a real light terminal (the tests check the values and that a diff
   renders, not the eye).
-- **P6** commit and remaining knobs.
+- ✅ **P6** commit and remaining knobs. Two commits, because most of the slice
+  was already done: `[commit] sign_off`, `[ui] mouse` / `wheel_step` /
+  `poll_secs`, `[diff]` and `[log] show_reads` were wired in P1 (checked by
+  reading their call sites, each has a test there), so what was left is
+  `commit.template` (read with git's own path handling, `#` lines removed since
+  ferrit commits with `-F`; a draft kept by `Esc` wins; amend and reword keep
+  `HEAD`'s message) and the `n/50` counter (boundary pinned at 50 / 51, never
+  blocks). `tests/git_commit.rs` (4), `tests/app_commit.rs` (6),
+  `tests/palette.rs` and `140-commit-settings.script`. Not done, as planned:
+  opening `$EDITOR`.
 - **P7** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
   layering held (`src/domain/git/` has no `ratatui`), every edge-case row
   tested or explicitly inert, `CHANGELOG.md` lines, `PLAN_0` flipped.
