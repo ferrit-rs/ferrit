@@ -2,6 +2,7 @@
 
 - Rapid iteration: commit and push straight to `main`, no branches, no PRs.
 - Every visible change adds a line under `## [Unreleased]` in `CHANGELOG.md`.
+- Releases: bump `Cargo.toml`, date the `CHANGELOG.md` section, commit `chore: release ferrit X.Y.Z`, then run `scripts/release.sh` (a dry run) and `scripts/release.sh --execute` to publish the crate and tag it. Never `cargo publish` or tag by hand.
 - If you change something related to `PLAN_N`, make sure to also change the content of the file.
 
 ## Before writing code
