@@ -124,6 +124,8 @@ fn the_scripts_cover_each_named_flow() {
         "95-conflict",
         "100-command-log",
         "110-keymap",
+        "120-context-menu",
+        "121-take-side",
     ] {
         assert!(
             names.iter().any(|n| n == wanted),

@@ -1,0 +1,17 @@
+# Phase 12 P4: on a conflicted file the `x` menu takes one side, and the file can
+# then be staged; a file that is no longer conflicted has no menu.
+fixture conflict
+size 200x50
+
+key 2 j                                    # the conflicted file
+key x
+expect-text "Take ours  (o)"
+expect-text "Take theirs  (t)"
+key t
+git status --porcelain -> "UU f"           # taking a side does not mark it resolved
+key space
+git status --porcelain => "M  f"
+git show :f => "side"                      # theirs
+
+key x
+expect-text "no extra actions for this row"

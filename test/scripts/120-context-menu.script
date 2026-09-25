@@ -1,0 +1,51 @@
+# Phase 12 P4, the `x` menu: rename a branch, start a branch at a commit, stash
+# keeping the index, rename a stash, and take a side of a conflict.
+fixture canonical
+size 200x50
+
+# Branches: the menu offers rename and --no-ff; rename pre-fills the name.
+key 3 j j                                  # fix/parse-args
+key x
+expect-text "Rename branch  (r)"
+expect-text "Merge with --no-ff  (n)"
+key r
+expect-text "Rename branch"
+type "-2"
+key enter
+git branch --format=%(refname:short) -> "fix/parse-args-2"
+git branch --format=%(refname:short) -> "feat/tui-skeleton"
+
+# A taken name keeps the popup for a retry and renames nothing.
+key 3 x r
+key backspace backspace backspace backspace backspace backspace backspace backspace
+key backspace backspace backspace backspace backspace backspace backspace backspace
+type "main"
+key enter
+expect-text "Rename branch"
+git branch --format=%(refname:short) -> "fix/parse-args-2"
+key esc
+
+# Commits: a branch starting at the second commit.
+key 4 j x b
+type "old-work"
+key enter
+git rev-parse --abbrev-ref HEAD => "old-work"
+git log -1 --format=%s => "docs: add inspiration notes"
+
+# Stash keeping the index: the staged Cargo.lock stays, the rest goes.
+key 5 x
+expect-text "Stash, keeping the index  (i)"
+key i
+type "kept"
+key enter
+git stash list -> "kept"
+git status --porcelain => "A  Cargo.lock"
+
+# Rename the stash: the message is pre-filled and the entry keeps its place.
+key x
+expect-text "Rename stash  (r)"
+key r
+type " v2"
+key enter
+git stash list -> "kept v2"
+git stash list => "stash@{0}: On old-work: kept v2"
