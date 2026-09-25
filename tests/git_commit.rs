@@ -364,3 +364,66 @@ fn head_message_and_staged_count() {
     git(dir.path(), &["add", "b.txt"]);
     assert_eq!(backend.staged_count().unwrap(), 1);
 }
+
+fn with_template(tag: &str, template: Option<(&str, &str)>) -> (TempDir, Repo) {
+    let dir = TempDir::new(tag);
+    Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    if let Some((setting, text)) = template {
+        fs::write(dir.path().join("tpl.txt"), text).unwrap();
+        let value = if setting == "absolute" {
+            dir.path().join("tpl.txt").display().to_string()
+        } else {
+            setting.to_owned()
+        };
+        git(dir.path(), &["config", "commit.template", &value]);
+    }
+    let repo = Repo::open(dir.path()).unwrap();
+    (dir, repo)
+}
+
+#[test]
+fn no_template_is_none() {
+    let (_dir, repo) = with_template("template-none", None);
+    assert_eq!(repo.commit_template(), None);
+}
+
+#[test]
+fn a_template_is_read_from_a_relative_or_an_absolute_path() {
+    for setting in ["tpl.txt", "absolute"] {
+        let (_dir, repo) = with_template(
+            &format!("template-{setting}"),
+            Some((setting, "feat: \n\nWhy:\n")),
+        );
+        assert_eq!(
+            repo.commit_template().as_deref(),
+            Some("feat: \n\nWhy:"),
+            "{setting}: trailing blank lines go, the rest stays"
+        );
+    }
+}
+
+#[test]
+fn comment_lines_are_dropped_as_git_would_before_committing() {
+    let (_dir, repo) = with_template(
+        "template-comments",
+        Some((
+            "tpl.txt",
+            "\n# Explain the change.\n# Lines starting with # are removed.\nBody: #1 stays\n",
+        )),
+    );
+    assert_eq!(
+        repo.commit_template().as_deref(),
+        Some("\nBody: #1 stays"),
+        "a # inside a line is text, a leading one is a comment"
+    );
+}
+
+#[test]
+fn a_template_of_only_comments_or_a_missing_file_is_none() {
+    let (_dir, repo) = with_template("template-only-comments", Some(("tpl.txt", "# a\n# b\n\n")));
+    assert_eq!(repo.commit_template(), None);
+    let (dir, repo) = with_template("template-missing", Some(("tpl.txt", "x")));
+    fs::remove_file(dir.path().join("tpl.txt")).unwrap();
+    assert_eq!(repo.commit_template(), None);
+}

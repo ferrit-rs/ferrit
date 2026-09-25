@@ -134,9 +134,17 @@ impl App {
                 let Some(repo) = &self.repo else { return };
                 repo.head_message().ok().flatten()
             },
+            git::commit::CommitKind::Normal => self.new_commit_prefill(),
             _ => self.commit_draft.take(),
         };
         self.open_commit_editor(kind, prefill);
+    }
+
+    /// What a new commit starts from: the draft a cancelled editor kept, else
+    /// the `commit.template` file, else nothing.
+    fn new_commit_prefill(&mut self) -> Option<String> {
+        let template = || self.repo.as_ref()?.commit_template();
+        self.commit_draft.take().or_else(template)
     }
 
     /// Open the editor to reword the older commit `hash` (a rebase, not an
@@ -180,7 +188,7 @@ impl App {
                         self.popup = None;
                         self.commit_overlay.close();
                         self.request_refresh();
-                        let prefill = self.commit_draft.take();
+                        let prefill = self.new_commit_prefill();
                         self.open_commit_editor(git::commit::CommitKind::Normal, prefill);
                     },
                     Some(Err(error)) => {

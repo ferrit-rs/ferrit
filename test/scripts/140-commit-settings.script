@@ -1,0 +1,13 @@
+# Phase 12 P6, commit settings: commit.template pre-fills a new commit, minus
+# its comments.
+fixture canonical
+size 200x50
+
+git config commit.template tpl.txt => ""
+write tpl.txt "feat: \n\nWhy:\n# a comment\n"
+key 2 j j j space                          # stage docs/notes.md
+key c
+expect-text "feat: "
+expect-text "Why:"
+expect-no-text "a comment"
+key esc

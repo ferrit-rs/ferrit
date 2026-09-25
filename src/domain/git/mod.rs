@@ -349,6 +349,12 @@ impl Repo {
         commit::commit(&self.inner, kind, message, opts)
     }
 
+    /// The `commit.template` file's message, comments removed (`None`: no
+    /// template, or an empty one).
+    pub fn commit_template(&self) -> Option<String> {
+        commit::template(&self.inner)
+    }
+
     /// `HEAD`'s current message, for pre-filling the Amend / Reword popup.
     pub fn head_message(&self) -> GitResult<Option<String>> {
         commit::head_message(&self.inner)

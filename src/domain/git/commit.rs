@@ -159,6 +159,27 @@ pub(super) fn head_message(repo: &Repository) -> GitResult<Option<String>> {
     }
 }
 
+/// The message `commit.template` names, for pre-filling a new commit, or
+/// `None` when no template is set, it cannot be read, or nothing is left of it.
+/// `~` is expanded by git's own path handling; a relative path is relative to
+/// the work tree, where `git commit` runs. Lines starting with `#` are
+/// dropped, as `git commit` does when it opens an editor (ferrit commits with
+/// `-F`, which would keep them), and so is trailing whitespace.
+pub(super) fn template(repo: &Repository) -> Option<String> {
+    let mut path = repo.config().ok()?.get_path("commit.template").ok()?;
+    if path.is_relative() {
+        path = repo.workdir()?.join(path);
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    let message = text
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let message = message.trim_end();
+    (!message.is_empty()).then(|| message.to_owned())
+}
+
 /// Count of paths staged relative to `HEAD`, the commit popup's
 /// precondition (`c` is disabled at 0).
 pub(super) fn staged_count(repo: &Repository) -> GitResult<usize> {

@@ -373,3 +373,88 @@ fn amend_prefills_the_current_message_and_keeps_the_parent() {
         "amend did not add a commit"
     );
 }
+
+/// A repo with one staged change and `commit.template` set to `template`.
+fn staged_repo_with_template(tag: &str, template: &str) -> TempDir {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    fs::write(dir.path().join("tpl.txt"), template).unwrap();
+    for args in [
+        vec!["config", "commit.template", "tpl.txt"],
+        vec!["add", "a.txt"],
+    ] {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+    }
+    dir
+}
+
+#[test]
+fn a_new_commit_starts_from_the_template_split_into_subject_and_body() {
+    let dir = staged_repo_with_template("app-commit-template", "feat: \n\nWhy:\n# comment\n");
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    let view = app.commit_popup().expect("c opened the popup");
+    assert_eq!(view.lines.join("\n"), "feat: ", "the subject line");
+    assert_eq!(
+        view.description.unwrap().text(),
+        "Why:",
+        "the body, comment gone"
+    );
+}
+
+#[test]
+fn a_kept_draft_wins_over_the_template_and_amend_ignores_it() {
+    let dir = staged_repo_with_template("app-commit-template-draft", "template subject\n");
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    for _ in 0.."template subject".chars().count() {
+        app.feed_key(KeyEvent::from(KeyCode::Backspace));
+    }
+    type_text(&mut app, "my draft");
+    app.feed_key(KeyEvent::from(KeyCode::Esc));
+
+    app.feed_key(char_key('c'));
+    let view = app.commit_popup().expect("reopened");
+    assert_eq!(view.lines.join("\n"), "my draft");
+    app.feed_key(KeyEvent::from(KeyCode::Esc));
+
+    app.feed_key(KeyEvent::from(KeyCode::Char('A')));
+    let view = app.commit_popup().expect("A opened the popup");
+    assert_eq!(view.lines.join("\n"), "init", "amend shows HEAD's message");
+}
+
+#[test]
+fn a_template_commit_is_committed_as_written_when_confirmed() {
+    let dir = staged_repo_with_template("app-commit-template-commit", "chore: from template\n");
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c'));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert_eq!(head_summary(&mut app), "chore: from template");
+}
+
+#[test]
+fn the_template_also_fills_the_editor_reached_through_stage_all() {
+    let dir = staged_repo_with_template("app-commit-template-all", "feat: via stage all\n");
+    let reset = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["reset", "-q"])
+        .output()
+        .unwrap();
+    assert!(reset.status.success());
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('c')); // nothing staged: asks first
+    app.feed_key(char_key('y'));
+    let view = app.commit_popup().expect("the editor opened after y");
+    assert_eq!(view.lines.join("\n"), "feat: via stage all");
+}
