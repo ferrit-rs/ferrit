@@ -249,10 +249,10 @@ Lands in the same commits as the features:
 - **G1** done. `status::files()`: working-tree entries, staged vs worktree,
   sorted, `binary` flag (always `false` until a later milestone). Files pane
   renders them via `theme::file_line`. Empty -> "working tree clean".
-- **G2** partial. `r` triggers `App::refresh()`; a `GitError` during
+- **G2** done. `r` triggers `App::refresh()`; a `GitError` during
   refresh lands in `last_error` and renders red in the Status pane instead
-  of propagating, old snapshot left in place. `20-status-files.script` and
-  its git golden wait on the replay harness (`PLAN_SELF_TESTING.md`).
+  of propagating, old snapshot left in place. `test/scripts/20-status-files.script`
+  and its git golden run in `tests/replay.rs` (`PLAN_SELF_TESTING.md`).
 - **G3** done. `git::refs::branches()`: local branches, HEAD first then
   alphabetical, upstream + ahead/behind via `graph_ahead_behind`. Branches
   pane renders them via `theme::branch_line`; folded into `Repo::snapshot()`

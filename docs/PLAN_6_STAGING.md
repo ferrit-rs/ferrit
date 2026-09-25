@@ -1,8 +1,8 @@
 # Plan: phase 6, staging
 
 **Status: S0-S4 implemented** (`src/domain/git/apply.rs`, `Mode::Diff` in `App`,
-`tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs`). S5's exhaustive
-edge-case sweep and the `40-stage.script` golden are still open, and three
+`tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs`). `test/scripts/40-stage.script` now exists. S5's exhaustive
+edge-case sweep is still open, and three
 deliberate deviations from the plan text below are called out in
 "Implementation notes" before "After phase 6".
 
@@ -372,8 +372,8 @@ one `git` call, reversible, and every git TUI has it. Keybar gains
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
 Same shape as phase 3: throwaway `git2` repos built in-test, then `git` run
-against them; the replay harness (`xtask fixture`, `--replay`, ST1..ST3) is
-still pending, so scripts wait.
+against them; the replay harness (`ferrit::replay`, `--replay`) runs
+`test/scripts/40-stage.script` against the `canonical` fixture.
 
 - `tests/apply_patch.rs`: unit-test the line transform in isolation. Feed a
   known hunk body + a line-index set, assert the produced patch string
@@ -439,8 +439,8 @@ still pending, so scripts wait.
   `tests/apply_patch.rs` / `git_stage.rs` / `app_stage.rs` all pass, but the
   edge-case table below is only spot-checked (untracked/binary/context-drift
   have tests; rename/mode-change/conflicted do not yet), there is no
-  `tests/render.rs` snapshot of the cursor bar, and `40-stage.script` still
-  waits on the replay harness like the rest of `PLAN_SELF_TESTING.md`.
+  `tests/render.rs` snapshot of the cursor bar. `test/scripts/40-stage.script`
+  (file, hunk, everything, discard) exists and passes.
 
 ## Definition of done (phase 6)
 

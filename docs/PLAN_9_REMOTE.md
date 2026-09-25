@@ -435,10 +435,12 @@ path) remote URL, no network, no real GitHub involved — the same trick
   git status --porcelain=v2  -> ""
   ```
 
-  (`wait-for` / `wait-for-not-busy`: new replay-script primitives this
-  phase needs that no earlier phase did, since every earlier action was
-  synchronous within one `key` step. `PLAN_SELF_TESTING.md` gains this once
-  the harness itself is built — noted here so it is not a surprise then.)
+  (This phase needed a replay primitive no earlier phase did, since every
+  earlier action was synchronous within one `key` step. The harness
+  (`PLAN_SELF_TESTING.md`) has it as `async-key`, which feeds the key, then
+  delivers the background events itself until the app reports it is idle:
+  no `wait-for`, no polling, no sleeping. `test/scripts/70-remote.script`
+  uses it.)
 
 ## Milestones
 
@@ -471,9 +473,9 @@ path) remote URL, no network, no real GitHub involved — the same trick
   and `cargo fmt --check` both clean on every file this phase touched;
   every edge case in the table has a test or an explicit inert path;
   `tests/render.rs` snapshots for the Remotes tab and the busy/note
-  lines. Not done: `70-remote.script` — still blocked on the replay
-  harness's `wait-for` primitive, exactly as this plan's own
-  "Self-testing" section already expected.
+  lines. `test/scripts/70-remote.script` (fetch, pull, push against a
+  local bare `origin`, with the `remote` fixture and `async-key`) runs in
+  `tests/replay.rs`.
 
 ## Definition of done (phase 9)
 

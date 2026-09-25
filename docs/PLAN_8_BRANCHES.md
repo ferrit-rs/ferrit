@@ -351,8 +351,8 @@ behaviour from phase 2 are unchanged.
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
 Same shape as phases 6 and 7: throwaway `git2` fixture repos, `git` run
-against them; the replay harness (`xtask fixture`, `--replay`) is still
-pending, so scripts wait.
+against them; the replay harness (`ferrit::replay`, `--replay`) runs
+`test/scripts/60-branches.script` and `65-merge.script`.
 
 - `tests/git_branch.rs`: fixture repo with two branches, then via `Repo`:
   - `checkout` switches `HEAD` (`git symbolic-ref HEAD`), and a dirty
@@ -414,13 +414,13 @@ pending, so scripts wait.
 - ✅ **S3** `d` delete with the two-step confirm flow. `n` +
   `Popup::NewBranch` reusing `TextInput`, `Enter` submits.
   `tests/app_branch.rs` green.
-- 🟡 **S4** keybar + `HELP` + `mock::KEYBAR` updated; `cargo clippy
-  --all-targets -- -D warnings` and `cargo fmt --check` both clean on
-  every file this phase touched; every edge case in the table has a test
-  or an explicit inert path; `tests/render.rs` snapshots for the
-  new-branch popup and the delete confirm. Not done: `60-branches.script`
-  — still blocked on the replay harness (`xtask fixture`, `--replay`),
-  exactly as this plan's own "Self-testing" section already expected.
+- ✅ **S4** keybar + `HELP` updated (both are generated from the keymap since
+  `PLAN_12_POLISH.md` P3, so the `mock::KEYBAR` constants this milestone named
+  are gone); `cargo clippy --all-targets -- -D warnings` and `cargo fmt
+  --check` both clean; every edge case in the table has a test or an explicit
+  inert path; `tests/render.rs` snapshots for the new-branch popup and the
+  delete confirm; `test/scripts/60-branches.script` (checkout, create, delete,
+  the checked-out branch) and `65-merge.script` run in `tests/replay.rs`.
 
 ## Definition of done (phase 8)
 

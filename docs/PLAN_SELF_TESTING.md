@@ -1,5 +1,65 @@
 # Plan: self-testing with screenshot proof
 
+**Status: built (ST0 to ST3 and ST6+ done, ST4 and ST5 partly).** The replay
+harness is `ferrit::replay` (`src/replay/`), 19 scripts in `test/scripts/` run
+in `tests/replay.rs`, and the harness itself is tested in
+`tests/replay_harness.rs`. What differs from the sketch below, and why:
+
+- **No `xtask` crate; the fixtures live in the library.** The binary's
+  `--fixture` must call the same code as the tests, and a separate crate would
+  make the binary depend on a dev tool. `ferrit::replay::fixture` builds
+  `canonical`, `history`, `conflict`, `detached` and `remote`; `--fixture NAME
+  [--into DIR]` builds one and prints where, for the tapes.
+- **The runner is in-process**, one function (`replay::runner::run`) that
+  `tests/replay.rs` and `ferrit --replay` both call. The hidden flags
+  (`--replay`, `--fixture`, `--into`, `--dump-frames`, `--size`, `--tape`) are
+  refused in a release build unless `FERRIT_TEST` is set, and do not appear in
+  `--help`.
+- **No `insta`.** The sketch's `snapshot` asserted a region against a
+  committed `.snap`. Not adopted: a new dependency for one feature, and full
+  frames are not stable anyway (the Branches pane prints each branch's age,
+  `266d`, which changes every day). `snapshot LABEL` keeps the frame under
+  `target/tmp/replay/<script>/NNN-label.txt` for a human or an agent; the
+  assertions are `expect-text`, `expect-no-text` and the git checks.
+- **Directives added** to make real flows scriptable: `fixture NAME`, `key A B
+  C` (several keys, `KeyBinding` syntax: `ctrl-d`, `space`, `pgdn`),
+  `async-key K`, `exec ARGS` (run `git` in the fixture, no assertion), `write
+  PATH "content"`, `config "toml"` (reopen the app with that configuration),
+  `refresh`, and `=>` (exact) beside `->` (contains). `{dir}`, `{origin}` and
+  `{other}` expand in `exec`, `write` and `git`.
+- **`async-key` replaces the `wait-for` of `PLAN_9_REMOTE.md`.** It gives the
+  app an event sender, feeds the key, then delivers events (`App::deliver_event`)
+  until `App::is_idle`, all on the calling thread. The only clock is a 30 s
+  safety limit that turns a hung script into a failure; a passing run never
+  waits on time.
+- **Deterministic fixtures.** Fixed author, commit dates one minute apart from
+  a fixed epoch, and local git config for every knob a user's own config could
+  change (`commit.gpgsign`, `pull.rebase`, `core.editor`, ...), so commit ids are
+  the same on every machine.
+- **A script must assert something.** `tests/replay.rs` fails a script with no
+  `expect-text`, `expect-no-text` or git check: a script that only presses keys
+  proves nothing. It also fails when a flow the plans name has lost its script.
+- **`git status` output keeps its leading space** (only the end is trimmed): the
+  first porcelain column is the index state.
+- **Not done:** `--ansi` frame dumps, rendering with `vhs` here (it is not
+  installed on this machine), `test/shots-ref/` and the tolerant comparison
+  (ST4), and any check that the CI `tapes` job (ST5) runs: it is wired, its
+  YAML parses, and it is `continue-on-error`, but it has not run.
+
+## Running it
+
+```
+cargo test --test replay                      # every script; the gate
+cargo test --test replay_harness              # the machinery itself
+cargo run -- --replay test/scripts/40-stage.script --dump-frames /tmp/frames
+cargo run -- --fixture canonical --into /tmp/fx   # a fixture to poke at
+test/gen-tapes.sh                             # tapes for vhs, in test/tapes
+```
+
+A failure prints the script line, what was expected and the frame the run saw;
+every run also leaves its snapshots (and, on a failure, `failure.txt`) under
+`target/tmp/replay/<script>/`.
+
 ## Goal
 
 Any agent working on `ferrit` (Claude included) can verify a feature works
@@ -219,21 +279,29 @@ test/
 
 ## Milestones
 
-- **ST0** `xtask fixture canonical` builds the repo; one mechanism-1
-  targeted snapshot of the phase 1 mock screen passes.
-- **ST1** `--replay --fixture --dump-frames` in the binary, synchronous
-  loop, one script runs green end to end.
-- **ST2** script parser covers `key` / `type` / `snapshot` /
-  `expect-text` / `git -> `; `tests/replay.rs` runs all of
-  `test/scripts/`.
-- **ST3** phase 1 fully covered by scripts: focus, clamp, scroll, resize,
-  overlay.
-- **ST4** `gen-tapes.sh` + `vhs` produce PNG / GIF from the same scripts;
-  `shots-ref/` seeded; tolerant comparison wired; a deliberate layout
-  change is caught.
-- **ST5** CI: `nextest` as the gate, `vhs` artifacts attached to PRs.
-- **ST6+** every later phase adds its script, git golden, and region
-  snapshot in the same PR as the feature.
+- ✅ **ST0** the `canonical` fixture builds (`ferrit --fixture canonical`;
+  `tests/replay_harness.rs`: same commit ids on every build, the screen of
+  `PLAN_1_LAYOUT.md`); `tests/render.rs` has the mechanism-1 snapshots.
+- ✅ **ST1** `--replay --fixture --dump-frames` (and `--size`, `--into`) in
+  the binary, synchronous loop; a script runs green end to end and a failing
+  one exits non-zero with its line and frame.
+- ✅ **ST2** the parser covers every directive above; `tests/replay.rs` runs
+  all of `test/scripts/`.
+- ✅ **ST3** phase 1 covered by `10-layout.script`: focus, clamp, Tab order,
+  resize `40x20` to `200x60`, the help overlay.
+- 🟡 **ST4** `test/gen-tapes.sh` and `ferrit --tape` produce `vhs` tapes from
+  the same scripts (12 of 19; the rest change the repository from outside the
+  terminal and say so); tested in `tests/replay_harness.rs`. Not done:
+  rendering PNG / GIF (no `vhs` here), `shots-ref/`, the tolerant comparison.
+- 🟡 **ST5** the CI gate already was `nextest`, which runs the replay tests; a
+  `tapes` job now generates the tapes and, best effort, renders one with
+  `vhs`, uploading both as artifacts. Unverified until it runs on GitHub.
+- ✅ **ST6+** the scripts for every phase, added retroactively:
+  `20-status-files` (2), `30-diff` (3), `35-scroll` (4), `40-stage` (6),
+  `50-commit` (7), `60-branches` and `65-merge` (8), `70-remote` (9),
+  `80-stash` (10), `90-rewrite`, `91-operation`, `92-fixup`, `93-skip`,
+  `95-conflict`, `96-detached` (11), `100-command-log` and `110-keymap` (12).
+  Each new feature from here adds its script in the same change.
 
 ## Definition of done (for the harness)
 

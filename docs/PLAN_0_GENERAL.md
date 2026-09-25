@@ -67,7 +67,9 @@ Cross-cutting:
   applies to every phase from 1 on. Status: the `TestBackend` frame tests
   (mechanism 1) and the `App` seam tests (`tests/app_*.rs`, `feed_key`) exist
   and are what phases 3 to 12 were tested with; the replay harness
-  (`--replay`, scripts, `vhs` tapes, milestones ST0 to ST5) is being built.
+  (`ferrit::replay`, `--replay`, 19 scripts in `test/scripts/`, run by
+  `tests/replay.rs`) is built. `vhs` rendering and reference screenshots
+  (ST4, ST5) are not.
 - Live refresh (`src/app/events.rs`) is already wired: every phase from 3 on that
   adds a cached, rebuilt-on-nav right-pane value must also rebuild it on a
   background `AppEvent::Refresh`, without discarding scroll or view state that

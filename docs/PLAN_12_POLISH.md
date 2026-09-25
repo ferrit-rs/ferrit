@@ -1,5 +1,8 @@
 # Plan: phase 12, polish
 
+**Scripts so far:** `test/scripts/100-command-log.script` (P0) and
+`110-keymap.script` (P2, P3); each remaining slice adds its own.
+
 **Shape: a bucket, cut into slices.** `docs/PLAN_0_GENERAL.md` lists five
 things under this phase (config file, themes, keymap customization, real
 command-log capture, help). The plan SOP (`__SOP/create-new-plan-file.md`)

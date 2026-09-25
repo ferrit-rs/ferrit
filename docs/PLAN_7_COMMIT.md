@@ -349,8 +349,8 @@ tree, which is what `git commit --amend` does.
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
-Throwaway `git2` fixture repos, `git` run against them; replay scripts wait on
-ST1..ST3 like phases 3 and 5.
+Throwaway `git2` fixture repos, `git` run against them; `test/scripts/50-commit.script`
+(commit, stage-all question, amend, reword) runs in `tests/replay.rs`.
 
 - `tests/git_commit.rs`: fixture repo, then via `Repo`:
   - `commit(Normal)` with a staged file: `git log -1 --format=%s` matches;
@@ -431,8 +431,7 @@ interactive rebase todo editing" if the version gap ever closes.
   spot-checked (hook rejection and unborn-branch root commit have tests;
   detached HEAD, merge-in-progress, and GPG-prompt paths do not); no
   `tests/render.rs` popup snapshot beyond the inline check in
-  `tests/app_commit.rs`; `50-commit.script` still waits on the replay
-  harness like the rest of `PLAN_SELF_TESTING.md`.
+  `tests/app_commit.rs`; `test/scripts/50-commit.script` exists and passes.
 
 ## Definition of done (phase 7)
 

@@ -1,5 +1,9 @@
 # Test strategy: what to steal from lazygit
 
+> The harness this file feeds now exists (`ferrit::replay`, `test/scripts/`,
+> `docs/PLAN_SELF_TESTING.md`); the backlog below is what is still worth
+> turning into scripts.
+
 Companion to [`PLAN_SELF_TESTING.md`](PLAN_SELF_TESTING.md) (the harness/mechanism
 design). This file is the *behavior backlog* side: what lazygit's own test
 suite covers, so `test/scripts/*.script` don't get invented from scratch per

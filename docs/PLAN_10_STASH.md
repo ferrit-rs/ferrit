@@ -299,7 +299,8 @@ an unchanged selection", which the oid key gives for free).
 - keys are no-ops with the popup up and on an empty Stash pane
 
 `tests/render.rs`: snapshot of the stash popup and of `STASH_KEYBAR`.
-`60`-style replay script stays blocked on the harness, as in phases 6 to 9.
+`test/scripts/80-stash.script` (push with a message, apply, drop asks, pop,
+drop) runs in `tests/replay.rs`.
 
 ## Milestones
 

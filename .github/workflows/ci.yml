@@ -57,3 +57,46 @@ jobs:
 
       - name: nextest
         run: cargo nextest run --all-features
+
+  # Human-facing proof, never a gate (`docs/PLAN_SELF_TESTING.md` ST5): tapes
+  # generated from the same scripts the `nextest` step above already ran, and,
+  # best effort, the screenshots `vhs` renders from them. A failure here does
+  # not fail the workflow.
+  tapes:
+    name: vhs tapes and screenshots (artifacts only)
+    runs-on: ubuntu-latest
+    needs: check
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (from rust-toolchain.toml)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Build a debug binary, the harness flags are test-only
+        run: cargo build
+
+      - name: Generate tapes from test/scripts
+        run: |
+          sh test/gen-tapes.sh
+          echo "$PWD/target/debug" >> "$GITHUB_PATH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vhs-tapes
+          path: test/tapes
+
+      - name: Render a screenshot set with vhs
+        continue-on-error: true
+        uses: charmbracelet/vhs-action@v2
+        with:
+          path: test/tapes/10-layout.tape
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vhs-shots
+          path: test/shots
+          if-no-files-found: ignore

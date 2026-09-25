@@ -1,6 +1,7 @@
 # Plan: phase 11, rebase and conflict flow
 
-**Status: done (R0 to R6).** The prompt after rewriting pushed commits now
+**Status: done (R0 to R6).** Scripts: `test/scripts/90-rewrite`, `91-operation`,
+`92-fixup`, `93-skip`, `95-conflict` and `96-detached`. The prompt after rewriting pushed commits now
 says `diverged (ahead N, behind M)`: the phase 9 guard already fired (it keys
 on `behind > 0`), but its text said only "behind upstream", which is false
 for a branch that is also ahead.
