@@ -245,6 +245,27 @@ fn recent_returns_the_newest_entries_oldest_first() {
 /// Nothing may build a `git` command or drive a child without `exec`, or the
 /// log would silently miss it.
 #[test]
+fn a_command_that_never_completed_reads_as_an_error_line() {
+    use ferrit::components::ui::palette::Palette;
+    let record = CommandRecord {
+        argv: "git zz-never-completed".to_owned(),
+        kind: CommandKind::Write,
+        exit: None,
+        took: std::time::Duration::ZERO,
+    };
+    let line = ferrit::app::theme::command_line(&Palette::DARK, &record);
+    let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    assert!(text.ends_with("(not completed)"), "{text}");
+    assert!(
+        line.spans
+            .iter()
+            .skip(1)
+            .all(|s| s.style.fg == Some(Palette::DARK.del)),
+        "the command and its note are in the error colour: {line:?}"
+    );
+}
+
+#[test]
 fn every_git_subprocess_goes_through_exec() {
     fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
         for entry in fs::read_dir(dir).unwrap() {
@@ -290,4 +311,32 @@ fn every_git_subprocess_goes_through_exec() {
             );
         }
     }
+}
+
+#[test]
+fn the_git_backend_knows_nothing_about_the_terminal() {
+    // `docs/PLAN_12_POLISH.md` definition of done: the domain layer stays free
+    // of the UI crates, so a screen change can never reach the git code.
+    fn scan(dir: &Path, offenders: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                scan(&path, offenders);
+            } else if path.extension().is_some_and(|ext| ext == "rs")
+                && fs::read_to_string(&path)
+                    .unwrap()
+                    .lines()
+                    .any(|line| !line.trim_start().starts_with("//") && line.contains("ratatui"))
+            {
+                // Comments may say "no ratatui"; code may not use it.
+                offenders.push(path);
+            }
+        }
+    }
+    let mut offenders = Vec::new();
+    scan(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/domain/git"),
+        &mut offenders,
+    );
+    assert!(offenders.is_empty(), "ratatui used in {offenders:?}");
 }

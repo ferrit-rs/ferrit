@@ -85,3 +85,27 @@ impl Drop for Tracked {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use super::output;
+    use crate::domain::git::command_log::recent;
+
+    #[test]
+    fn a_command_that_cannot_be_spawned_is_recorded_with_no_exit_code() {
+        let mut cmd = Command::new("ferrit-no-such-binary");
+        cmd.arg("zz-unspawnable-marker");
+        assert!(output(&mut cmd).is_err(), "the spawn failed");
+
+        let entries: Vec<_> = recent(usize::MAX, true)
+            .into_iter()
+            .filter(|entry| entry.argv.contains("zz-unspawnable-marker"))
+            .collect();
+        assert!(
+            matches!(entries.as_slice(), [entry] if entry.exit.is_none() && entry.failed()),
+            "one record, no exit code, counted as a failure: {entries:?}"
+        );
+    }
+}
