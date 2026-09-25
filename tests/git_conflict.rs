@@ -187,3 +187,43 @@ fn stage_all_except_takes_paths_literally() {
     assert!(status.contains("we ird [1].txt"), "{status}");
     assert!(status.contains("UU f"), "{status}");
 }
+
+// ------------------------------------------------------- P4: take ours / theirs
+
+#[test]
+fn taking_ours_or_theirs_replaces_the_file_and_clears_the_markers() {
+    for (ours, expected) in [(true, "main\n"), (false, "side\n")] {
+        let dir = conflict_repo(&format!("side-{ours}"));
+        let repo = Repo::open(dir.path()).unwrap();
+        assert!(repo.has_conflict_markers(Path::new("f")).unwrap());
+
+        repo.take_side(Path::new("f"), ours).unwrap();
+
+        assert_eq!(fs::read_to_string(dir.path().join("f")).unwrap(), expected);
+        assert!(!repo.has_conflict_markers(Path::new("f")).unwrap());
+        assert!(
+            git(dir.path(), &["status", "--porcelain"]).contains("UU f"),
+            "still unmerged until it is staged"
+        );
+        git(dir.path(), &["add", "f"]);
+        let status = git(dir.path(), &["status", "--porcelain"]);
+        assert!(!status.contains("UU"), "staging resolved it: {status}");
+        // Ours is what `HEAD` already has, so nothing is left to commit for it.
+        assert_eq!(status.contains("M  f"), !ours, "{status}");
+    }
+}
+
+#[test]
+fn taking_a_side_of_a_path_git_does_not_know_fails_and_a_merged_file_is_untouched() {
+    let dir = conflict_repo("side-unknown");
+    let repo = Repo::open(dir.path()).unwrap();
+    let err = repo.take_side(Path::new("no-such-file"), true).unwrap_err();
+    assert!(
+        matches!(err, ferrit::domain::git::error::GitError::ApplyFailed(_)),
+        "got {err:?}"
+    );
+
+    // A file that is not conflicted is left as it is: git treats it as a no-op.
+    repo.take_side(Path::new("n"), true).unwrap();
+    assert_eq!(fs::read_to_string(dir.path().join("n")).unwrap(), "n\n");
+}

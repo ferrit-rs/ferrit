@@ -395,6 +395,11 @@ impl Repo {
         branch::merge_branch_no_ff(&self.inner, name)
     }
 
+    /// Take one side of a conflicted file whole (`checkout --ours|--theirs`).
+    pub fn take_side(&self, path: &Path, ours: bool) -> GitResult<()> {
+        apply::take_side(&self.inner, path, ours)
+    }
+
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)

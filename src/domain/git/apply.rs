@@ -89,6 +89,19 @@ pub(super) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitRe
     })
 }
 
+/// `git checkout --ours|--theirs -- <path>`: take one side of a conflicted
+/// file whole. The path stays unmerged until it is staged, which the marker
+/// guard now allows because the markers are gone.
+pub(super) fn take_side(repo: &Repository, path: &Path, ours: bool) -> GitResult<()> {
+    let workdir = workdir(repo)?;
+    run_git(workdir, |cmd| {
+        cmd.arg("checkout")
+            .arg(if ours { "--ours" } else { "--theirs" })
+            .arg("--")
+            .arg(path);
+    })
+}
+
 /// Does `path` still hold merge conflict markers? True when the file has a
 /// line starting `<<<<<<<` and a line starting `>>>>>>>`. A lone `=======`
 /// is not enough: it is also a Markdown heading underline. A file that no
