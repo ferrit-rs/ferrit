@@ -2,7 +2,7 @@
 
 **Scripts so far:** `test/scripts/100-command-log.script` (P0),
 `110-keymap.script` (P2, P3), `120-context-menu.script` and
-`121-take-side.script` (P4); each remaining slice adds its own.
+`121-take-side.script` (P4) and `130-theme.script` (P5); each remaining slice adds its own.
 
 **Shape: a bucket, cut into slices.** `docs/PLAN_0_GENERAL.md` lists five
 things under this phase (config file, themes, keymap customization, real
@@ -468,8 +468,9 @@ terminal-lifecycle work with its own failure modes, not a config line.
   command-log popup render.
 - `tests/app_context_menu.rs` (P4): each seeded entry runs its command and refreshes;
   right-click opens the menu for the clicked row; a keybar click dispatches.
-- `tests/render.rs` (P5): the `light` base changes the three colours and
-  nothing else; an override applies.
+- `tests/palette.rs` (P5): every builder paints with the palette it is handed;
+  the `light` base changes only the values listed in P5 and nothing else; an
+  override applies over the base, an unknown name is reported once.
 - Prior phases stay green in every slice: the keymap refactor in particular is
   gated by the whole existing `tests/app_*.rs` suite passing unmodified.
 
@@ -537,7 +538,22 @@ terminal-lifecycle work with its own failure modes, not a config line.
   unit tests missed: `git stash store` of the entry already on top writes no
   reflog entry, so renaming the top stash failed on the `drop`; that entry is now
   dropped first (`renaming_the_top_stash_works_alone_and_above_another`).
-- **P5** `Palette`, `dark` / `light`, `[theme.colors]`.
+- ✅ **P5** `Palette`, `dark` / `light`, `[theme.colors]`
+  (`src/components/ui/palette.rs`, `ThemeConfig::palette`). Three commits: the
+  `Palette` value replacing the constants (no visible change; 90 or so call
+  sites, the whole existing render suite passing unmodified), the light base,
+  the overrides. `tests/palette.rs` (14), `tests/config.rs` (saves keep the base
+  and the overrides) and `130-theme.script`. Deviations from the sketch: `light`
+  changes four colours, not three (`focus_box` is a dark tint too, unreadable
+  behind text on a light terminal) and a diff's syntax theme (`InspiredGitHub`
+  instead of `base16-ocean.dark`), which is what `Palette::light` carries as a
+  flag; `Palette` lives in `components/ui` next to the widgets that take it, not
+  in `app`; overrides are a name-to-colour map, so an unknown name is reported
+  and dropped alone (a value that is not a colour still fails the whole
+  `[theme]` section, as `accent` always did). Also deleted: the unused
+  `theme::confirm_line` and `keybar_line` copies. Not verified: how `light`
+  looks on a real light terminal (the tests check the values and that a diff
+  renders, not the eye).
 - **P6** commit and remaining knobs.
 - **P7** polish: `cargo clippy --all-targets` clean, `cargo fmt --check`,
   layering held (`src/domain/git/` has no `ratatui`), every edge-case row
