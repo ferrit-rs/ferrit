@@ -6,7 +6,7 @@
 #   scripts/release.sh              dry run: every check, nothing changes
 #   scripts/release.sh --execute    do it, after asking you to type the version
 #   scripts/release.sh --execute --yes        ... without asking
-#   scripts/release.sh --skip-tests           skip `cargo test` (the slow check)
+#   scripts/release.sh --skip-tests           skip `cargo nextest run` (the slow check)
 #
 # Order, and why: checks, then push `main`, then `cargo publish`, then the tag.
 # Publishing is the one step that cannot be undone, so it comes last among the
@@ -124,10 +124,11 @@ cargo clippy --all-targets -- -D warnings
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps
 
 if [ "$skip_tests" -eq 1 ]; then
-    step "cargo test (skipped by --skip-tests)"
+    step "cargo nextest run (skipped by --skip-tests)"
 else
-    step "cargo test"
-    cargo test
+    step "cargo nextest run"
+    command -v cargo-nextest >/dev/null || cargo install cargo-nextest --locked
+    cargo nextest run
 fi
 
 step "cargo publish --dry-run (packages and builds the crate, uploads nothing)"
