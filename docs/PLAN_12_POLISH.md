@@ -191,6 +191,10 @@ What exists today, each read from the code:
 
 ## P0: real command log
 
+A record also keeps the first line git printed on stdout for a write (`[main 3cd9f42] summary`
+after a commit), and the Infos box shows it under the command, as lazygit does with "Git output";
+the `@` viewer does not draw it yet.
+
 **One choke point.** Every subprocess goes through one function in a new
 `src/domain/git/exec.rs`:
 

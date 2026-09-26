@@ -640,10 +640,14 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .map(|command| theme::log_line(palette, command))
             .collect()
     } else {
-        command_log::recent(2, app.config.log.show_reads)
+        // Each command may bring git's answer with it: the two newest lines fit.
+        let mut lines: Vec<Line<'static>> = command_log::recent(2, app.config.log.show_reads)
             .iter()
-            .map(|record| theme::command_line(palette, record))
-            .collect()
+            .flat_map(|record| theme::command_lines(palette, record))
+            .collect();
+        let extra = lines.len().saturating_sub(2);
+        lines.drain(..extra);
+        lines
     };
     let first_line = lines.first().cloned().unwrap_or_default();
     if let Some(name) = git_user_name {

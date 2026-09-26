@@ -252,6 +252,7 @@ fn a_command_that_never_completed_reads_as_an_error_line() {
         kind: CommandKind::Write,
         exit: None,
         took: std::time::Duration::ZERO,
+        output: None,
     };
     let line = ferrit::app::theme::command_line(&Palette::DARK, &record);
     let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();

@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- After a command that prints something on stdout (a commit: `[main 3cd9f42] docs: flow-compare demo`), the Infos box shows that first line under the command, as lazygit's command log does with git's output. Before, only `$ git commit -F -` showed, with no sign of what git answered.
+
 - `Space` on a directory row in Files stages every change under it, or unstages them all when none is left to stage, as in lazygit; before it did nothing on a directory. On the root row it is every file. Conflicted files that still hold markers block it, with the same message as for a single file.
 
 - In the Files pane, the staged letter is green and the unstaged one red, so staging a file changes its colour, and an untracked file shows as `??` in red, as in lazygit; before, a staged `M` and an unstaged `M` were both yellow and an untracked file was a white `?`.

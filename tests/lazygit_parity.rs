@@ -191,3 +191,43 @@ fn space_on_a_directory_stages_and_unstages_everything_under_it() {
     assert!(status.contains("?? docs/"), "unstaged again: {status}");
     assert!(!status.contains("A  docs"), "{status}");
 }
+
+/// Done when: after a commit made from ferrit, the command log's record of
+/// `git commit -F -` carries git's own answer, `[main abc1234] summary`, and the Infos
+/// box draws it under the command (step 6, 11). The log is process wide, so the record
+/// is looked up by its unique message rather than read off a frame other tests write to.
+#[test]
+fn a_commit_shows_git_s_own_answer_under_the_command() {
+    use ferrit::app::theme;
+    use ferrit::components::ui::palette::Palette;
+    use ferrit::domain::git::command_log;
+
+    let repo = Repo::new("commit-output");
+    repo.commit("a.txt", "one\n", "init");
+    repo.write("a.txt", "one\ntwo\n");
+    repo.git(&["add", "a.txt"]);
+    let mut app = repo.app();
+    key(&mut app, 'c');
+    for c in "zz answer marker".chars() {
+        key(&mut app, c);
+    }
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    let record = command_log::recent(200, false)
+        .into_iter()
+        .rev()
+        .find(|r| {
+            r.argv == "git commit -F -"
+                && r.output
+                    .as_deref()
+                    .is_some_and(|o| o.contains("zz answer marker"))
+        })
+        .expect("the commit's record has git's answer");
+    let answer = record.output.clone().unwrap();
+    assert!(answer.starts_with("[main "), "{answer}");
+
+    let lines = theme::command_lines(&Palette::DARK, &record);
+    assert_eq!(lines.len(), 2, "the command, then its answer");
+    let second: String = lines[1].spans.iter().map(|s| s.content.as_ref()).collect();
+    assert!(second.contains("zz answer marker"), "{second}");
+}

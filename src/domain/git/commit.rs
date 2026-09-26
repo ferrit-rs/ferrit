@@ -117,7 +117,7 @@ pub(super) fn commit(
     let out = child
         .wait_with_output()
         .map_err(|e| GitError::CommitFailed(format!("cannot run git: {e}")))?;
-    tracked.finish(out.status.code());
+    tracked.finish_with_stdout(out.status.code(), &out.stdout);
     if !out.status.success() {
         // "nothing to commit" / "no changes added to commit" land on
         // stdout, not stderr — `git commit` treats them as ordinary status

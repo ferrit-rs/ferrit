@@ -27,7 +27,10 @@ pub(super) fn git(workdir: &Path) -> Command {
 pub(super) fn output(cmd: &mut Command) -> io::Result<Output> {
     let tracked = track(cmd);
     let out = cmd.output();
-    tracked.finish(out.as_ref().ok().and_then(|o| o.status.code()));
+    match out.as_ref() {
+        Ok(o) => tracked.finish_with_stdout(o.status.code(), &o.stdout),
+        Err(_) => tracked.finish(None),
+    }
     out
 }
 
@@ -57,6 +60,7 @@ pub(super) fn track(cmd: &Command) -> Tracked {
         kind,
         started: Instant::now(),
         exit: None,
+        output: None,
     }
 }
 
@@ -66,12 +70,26 @@ pub(super) struct Tracked {
     kind: command_log::CommandKind,
     started: Instant,
     exit: Option<i32>,
+    output: Option<String>,
 }
 
 impl Tracked {
     /// Set the exit code and record now.
     pub(super) fn finish(mut self, exit: Option<i32>) {
         self.exit = exit;
+    }
+
+    /// `finish`, and keep the first line git wrote on stdout when this is a write:
+    /// it is the answer the command log shows under the command.
+    pub(super) fn finish_with_stdout(mut self, exit: Option<i32>, stdout: &[u8]) {
+        self.exit = exit;
+        if self.kind == command_log::CommandKind::Write {
+            self.output = String::from_utf8_lossy(stdout)
+                .lines()
+                .map(str::trim_end)
+                .find(|line| !line.is_empty())
+                .map(str::to_owned);
+        }
     }
 }
 
@@ -82,6 +100,7 @@ impl Drop for Tracked {
             kind: self.kind,
             exit: self.exit,
             took: self.started.elapsed(),
+            output: self.output.take(),
         });
     }
 }

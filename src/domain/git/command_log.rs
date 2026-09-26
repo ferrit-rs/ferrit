@@ -42,6 +42,9 @@ pub struct CommandRecord {
     /// `None` when git could not be spawned, was killed, or was cancelled.
     pub exit: Option<i32>,
     pub took: Duration,
+    /// The first line git printed on stdout, for a write that printed one
+    /// (`[main 3cd9f42] docs: flow-compare demo` after a commit).
+    pub output: Option<String>,
 }
 
 impl CommandRecord {

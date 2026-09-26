@@ -714,6 +714,17 @@ pub fn log_line(p: &Palette, raw: &'static str) -> Line<'static> {
     }
 }
 
+/// The lines a record takes in the Infos box: the command, then git's own answer to it
+/// when it printed one (`[branch hash] summary` after a commit), as lazygit's command log
+/// does under "Git output".
+pub fn command_lines(p: &Palette, record: &CommandRecord) -> Vec<Line<'static>> {
+    let mut lines = vec![command_line(p, record)];
+    if let Some(output) = &record.output {
+        lines.push(Line::styled(output.clone(), fg(p.idle)));
+    }
+    lines
+}
+
 /// Command-log line for a recorded subprocess: dim `$`, the command, and a
 /// red note when it failed. Reads (only listed in the full viewer) are dim.
 pub fn command_line(p: &Palette, record: &CommandRecord) -> Line<'static> {
