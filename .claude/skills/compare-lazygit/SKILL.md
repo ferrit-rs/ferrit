@@ -36,7 +36,7 @@ scripts cannot make.
 
 ## Fixing what the report found (the loop)
 
-Only when the user asks to act on the audit. The tooling (flows, scripts, this
+Only when the user asks to act on the audit (the user has said to fix everything without asking). The tooling (flows, scripts, this
 skill, the docs) is committed straight to `main`; a correction of ferrit's
 behaviour goes through a branch, because it may not pan out.
 
@@ -59,8 +59,13 @@ behaviour goes through a branch, because it may not pan out.
 4. Judge the result with the user. Fixed and green (`cargo test`, clippy): merge
    into `main` locally (`git merge --ff-only` when possible), delete the branch.
    Not fixed or worse: leave the branch, say so, do not merge.
-5. Start the next branch from the merged `main`. P3 rows are decisions: ask before
-   changing them, and record the answer in the row.
+5. Fix every open row in one go, without asking which first: one branch for the batch
+   (`fix/<batch>`), one atomic commit per row, each with its test and the CHANGELOG
+   line. Rows whose definition of done cannot be met (a decision that would break
+   users, a feature that does not exist) get "Kept on purpose: <reason>", said in the
+   final message, not asked. After the rerun, each row is checked against its own
+   "Done when": FIXED with the step where it now holds, or STILL DIFFERS with what is
+   missing, and only rows that hold are merged.
 
 ## Implementation report
 
@@ -100,9 +105,16 @@ separated by commas (`6, 8, 11`), rendered as links to those steps; anything
 else (a flow name) stays text. "Left out on purpose" rows have two cells:
 `| What | Why`.
 
-Keep cells short: name the thing in "What" (a noun phrase, not a sentence), give
-the visible fact on each side with its number or label in quotes, and make "To do"
-an action ("Show git's output line"), or "Decide" for P3 and "Look only" for P4.
+Keep cells short: name the thing in "What" (a noun phrase, not a sentence) and give
+the visible fact on each side with its number or label in quotes.
+
+"Done when" is the definition of done of the fix, and every row that is to be fixed
+has one. It is a sentence a rerun can confirm or refute by looking at one step:
+where (step number, panel), what must be on screen, in ferrit, and it names the
+lazygit screen it must match. Good: "Step 6, Command log: shows git's line
+`[branch hash] summary` and the stat line under the command, as lazygit's does".
+Bad: "Show git's output", "Improve the commit feedback". A row that is not to be
+fixed says "Kept on purpose: <reason>" instead. A row without either is unfinished.
 One row per gap: split a row if two fixes would be separate commits.
 
 Say when a cause or a source flow was not verified in "ferrit" or "To do". A

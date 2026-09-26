@@ -83,7 +83,7 @@ for step in steps:
     )
 
 BADGE = {"P1": "p1", "P2": "p2", "P3": "p3", "P4": "p4"}
-HEADS = ["What", "lazygit", "ferrit", "To do", "Seen in"]
+HEADS = ["What", "lazygit", "ferrit", "Done when", "Seen in"]
 
 
 def step_links(cell):
