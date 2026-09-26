@@ -332,6 +332,10 @@ command yourself would.
 `Enter` (drill into a branch's log) and the branch-log-preview-on-select
 behaviour from phase 2 are unchanged.
 
+The new-branch prompt is titled `New branch name (branch is off of '<current>')`, naming the
+branch it starts from, as lazygit's does. The list is the checked-out branch first, then the
+most recently committed to (tip time, newest first), as lazygit orders it; before, alphabetical.
+
 After `n` creates a branch, the selection moves to it (it is the checked-out
 one, first in the list), not the row the cursor was on. Found by running the
 same flow in lazygit and ferrit (`test/flows/feature-workflow.flow`). The row is

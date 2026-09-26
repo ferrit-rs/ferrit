@@ -10,8 +10,9 @@
 //! lazygit. Each test is one row's definition of done, on a real repository, read
 //! from the rendered frame.
 
+use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use ferrit::app::{App, Pane, screens};
@@ -115,7 +116,6 @@ fn an_empty_working_tree_gives_a_diff_pane_that_says_so() {
     let out = frame(&mut app);
     assert!(out.contains("Unstaged Changes"), "{out}");
     assert!(!out.contains("No changed files"), "{out}");
-    let _ = (Pane::Files, Path::new(""));
 }
 
 /// The foreground colour of the first cell of `text` where it appears on the frame.
@@ -329,7 +329,10 @@ fn r_rewords_the_selected_commit_and_w_still_does() {
     assert!(frame(&mut app).contains("Reword: r"), "the bar shows r");
     for reword_key in ['r', 'w'] {
         key(&mut app, reword_key);
-        assert!(app.commit_popup().is_some(), "{reword_key} opened the reword popup");
+        assert!(
+            app.commit_popup().is_some(),
+            "{reword_key} opened the reword popup"
+        );
         app.feed_key(KeyEvent::from(KeyCode::Esc));
     }
 }
@@ -344,7 +347,10 @@ fn the_new_branch_prompt_names_the_branch_it_starts_from() {
     key(&mut app, '3');
     key(&mut app, 'n');
     let out = frame(&mut app);
-    assert!(out.contains("New branch name (branch is off of 'main')"), "{out}");
+    assert!(
+        out.contains("New branch name (branch is off of 'main')"),
+        "{out}"
+    );
 }
 
 /// Done when: the branch list is the checked-out branch first, then the most recently
@@ -390,11 +396,13 @@ fn the_commit_counter_reads_the_real_total_beyond_200() {
     let repo = Repo::new("cap");
     let mut stream = String::new();
     for n in 0..260 {
-        stream.push_str(&format!(
+        write!(
+            stream,
             "commit refs/heads/main\ncommitter T <t@example.com> {} +0000\ndata 2\nc{}\n",
             1_700_000_000 + n,
             n % 10
-        ));
+        )
+        .unwrap();
         if n == 0 {
             stream.push_str("M 100644 inline f.txt\ndata 2\nx\n");
         }
