@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Selecting a directory row in Files shows the diff of the files under it in the right pane (`git diff -- <dir>`, on the staged or unstaged side), and the root row every file, as in lazygit; before the pane stayed empty. Untracked files under a directory are not in that diff yet.
+
 - The Commits pane lists up to 1,000 commits (its counter reads the real total up to there), where it stopped at 200 and read `1 of 200` on a longer history.
 
 - Branches are listed with the checked-out one first, then the most recently committed to, as in lazygit; before, alphabetically.

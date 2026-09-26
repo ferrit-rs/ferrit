@@ -437,3 +437,54 @@ fn the_stat_separator_is_not_drawn_as_a_removed_line() {
     let separator = colour_of(&mut app, "---").unwrap();
     assert_eq!(separator, plain, "the separator has the text colour");
 }
+
+/// Done when: selecting a directory row shows the diff of the files under it, on the side
+/// they are staged or unstaged, where the pane stayed empty (stage-directory flow).
+#[test]
+fn a_directory_row_shows_the_diff_of_what_is_under_it() {
+    let repo = Repo::new("dir-diff");
+    repo.commit("docs/a.md", "old\n", "init");
+    repo.commit("outside.txt", "keep\n", "second");
+    repo.write("docs/a.md", "old\nnew line under docs\n");
+    repo.write("outside.txt", "keep\nnot under docs\n");
+    let mut app = repo.app();
+    key(&mut app, '2');
+    let docs_row = (0..app.row_count(Pane::Files))
+        .find(|&i| app.file_lines()[i].to_string().contains("docs"))
+        .expect("a docs row");
+    app.select(Pane::Files, docs_row);
+    let out = frame(&mut app);
+    assert!(out.contains("new line under docs"), "{out}");
+    assert!(
+        !out.contains("not under docs"),
+        "only the directory's files\n{out}"
+    );
+
+    repo.git(&["add", "docs"]);
+    app.refresh();
+    app.select(Pane::Files, docs_row);
+    let out = frame(&mut app);
+    assert!(
+        out.contains("Staged Changes"),
+        "the staged side once staged\n{out}"
+    );
+    assert!(out.contains("new line under docs"), "{out}");
+}
+
+/// A directory row (the root row is selected at startup) must not split the right pane and
+/// squeeze the side column to a few cells, whatever is staged under it.
+#[test]
+fn a_directory_row_keeps_the_side_column_at_full_width() {
+    let repo = Repo::new("dir-width");
+    repo.commit("docs/a.md", "old\n", "init");
+    repo.write("docs/a.md", "old\nunstaged\n");
+    repo.git(&["add", "docs/a.md"]);
+    repo.write("docs/a.md", "old\nunstaged\nmore\n");
+    repo.write("docs/b.md", "b\n");
+    repo.git(&["add", "docs/b.md"]);
+    let mut app = repo.app();
+    key(&mut app, '2');
+    app.select(Pane::Files, 0); // the root row
+    let out = frame(&mut app);
+    assert!(out.contains("[2] Files - Worktrees - Submodules"), "{out}");
+}

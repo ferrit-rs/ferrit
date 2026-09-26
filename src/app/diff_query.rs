@@ -54,14 +54,22 @@ pub(crate) fn load(
     opts: DiffOpts,
 ) -> Result<DiffQueryResult, String> {
     match key {
-        RightKey::File { path } => Ok(DiffQueryResult::File {
-            unstaged: repo
-                .file_diff(path, DiffSide::Worktree, opts)
-                .map_err(|error| error.to_string())?,
-            staged: repo
-                .file_diff(path, DiffSide::Staged, opts)
-                .map_err(|error| error.to_string())?,
-        }),
+        RightKey::File { path } => {
+            // The root directory row has an empty path: `git diff -- .` is every file.
+            let path = if path.as_os_str().is_empty() {
+                std::path::Path::new(".")
+            } else {
+                path.as_path()
+            };
+            Ok(DiffQueryResult::File {
+                unstaged: repo
+                    .file_diff(path, DiffSide::Worktree, opts)
+                    .map_err(|error| error.to_string())?,
+                staged: repo
+                    .file_diff(path, DiffSide::Staged, opts)
+                    .map_err(|error| error.to_string())?,
+            })
+        },
         RightKey::Commit { full_hash } => repo
             .commit_diff(full_hash, opts)
             .map(DiffQueryResult::Commit)
@@ -201,13 +209,14 @@ impl App {
         match self.focus {
             Pane::Files => {
                 let rows = self.files_tree_rows();
-                let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
-                    return None;
-                };
-                let entry = self.files.get(*index)?;
-                Some(RightKey::File {
-                    path: entry.path.clone(),
-                })
+                match rows.get(self.selected(Pane::Files))? {
+                    FileRow::File { index, .. } => Some(RightKey::File {
+                        path: self.files.get(*index)?.path.clone(),
+                    }),
+                    // A directory row shows the diff of everything under it (`git diff --
+                    // <dir>`), as lazygit does; the root row, an empty path, is every file.
+                    FileRow::Dir { path, .. } => Some(RightKey::File { path: path.clone() }),
+                }
             },
             // Drilled: the selection indexes the file tree, not `self.commits`
             // (`commit_tree_rows`), so the diff stays keyed on the drilled

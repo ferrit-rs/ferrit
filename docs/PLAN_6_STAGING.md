@@ -98,7 +98,8 @@ from the `FileEntry` phase 2 already provides:
 
 On a directory row (`<space>` in the Files tree) the same rule runs over every file under
 it: any change left to stage means stage them all (`git add -- <dir>`), otherwise unstage
-them all (`git restore --staged -- <dir>`); the root row is every file. Found by running
+them all (`git restore --staged -- <dir>`); the root row is every file. Selecting a directory row shows `git diff -- <dir>` (and `--cached`) in the right pane, the root
+row `.`. Found by running
 the stage-directory flow in lazygit and ferrit.
 
 A partially-staged file (both sides non-`None`) stages the rest on `<space>`;

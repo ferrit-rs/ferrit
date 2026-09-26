@@ -41,7 +41,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     // LazyGit splits the diff only for partially staged files. One-sided
     // changes use the full-width diff pane.
+    // A directory row never splits (nor narrows the side column): it shows one side.
     let files_split = app.focus == Pane::Files
+        && !app.files_selection_is_dir()
         && matches!(app.diff_view(), DiffView::Files(files)
             if !files.unstaged.text.trim().is_empty() && !files.staged.text.trim().is_empty());
 

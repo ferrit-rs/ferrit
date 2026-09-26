@@ -1739,6 +1739,14 @@ impl App {
         self.branch_drill.is_some()
     }
 
+    /// Is the selected Files row a directory (the root row included)?
+    pub fn files_selection_is_dir(&self) -> bool {
+        matches!(
+            self.files_tree_rows().get(self.selected(Pane::Files)),
+            Some(FileRow::Dir { .. })
+        )
+    }
+
     /// Is the Commits pane showing one commit's changed files instead of the
     /// commit list? The commit rewrite keys and their keybar apply only to the
     /// list.
