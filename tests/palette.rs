@@ -64,9 +64,10 @@ fn a_file_row_takes_its_status_colour_from_the_palette() {
             .iter()
             .find(|f| f.display().starts_with(code))
             .unwrap_or_else(|| panic!("a mock file with status {code}"));
-        theme::file_line(&p, entry, 0).spans[1].style.fg
+        theme::file_line(&p, entry, 0).spans[2].style.fg
     };
-    assert_eq!(colour_of(" M"), Some(p.warn));
+    // The unstaged letter is red, whatever the letter (lazygit).
+    assert_eq!(colour_of(" M"), Some(p.del));
 }
 
 #[test]

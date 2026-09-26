@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- In the Files pane, the staged letter is green and the unstaged one red, so staging a file changes its colour, and an untracked file shows as `??` in red, as in lazygit; before, a staged `M` and an unstaged `M` were both yellow and an untracked file was a white `?`.
+
 - With nothing to commit, the Files pane's right side is titled `Diff` and says `No changed files`, as in lazygit; before it kept the title `Unstaged changes` over an empty box.
 
 - Inside a commit's files (Enter on a commit) or a branch's log (Enter on a branch), the key hint bar shows `Back: esc | Open: enter`; before, it kept the Files keys (`Stage`, `Commit`, `Amend`, `Reword`), none of which do anything on those rows.

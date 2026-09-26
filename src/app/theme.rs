@@ -14,6 +14,7 @@ use syntect::parsing::SyntaxSet;
 use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
+use crate::domain::git::model::Change;
 use crate::domain::git::model::FileEntry;
 use crate::domain::git::model::RemoteEntry;
 use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
@@ -84,21 +85,27 @@ fn indent(depth: usize) -> String {
     "  ".repeat(depth)
 }
 
-/// Files row, porcelain layout `XY path` (X = staged, Y = worktree): colour the
-/// two-char code by what it means, leave the path plain. `depth` indents
+/// Files row, porcelain layout `XY path` (X = staged, Y = worktree), coloured as
+/// lazygit does: the staged letter green, the unstaged one red, so a staged `M` and
+/// an unstaged `M` no longer look alike, and an untracked file is `??` in red. `depth` indents
 /// under the row's parent directory in the tree view (`App::file_lines`);
 /// when nested (`depth > 0`), only the file's own name shows, not the full
 /// path — the parent directory rows above it already say where it lives.
 pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> {
-    let code = format!("{}{}", entry.staged.code(), entry.worktree.code());
-    let color = if code.contains('D') {
-        p.del
-    } else if code.contains('?') {
-        p.idle
-    } else if code.contains('A') {
-        p.add
+    let untracked = entry.staged == Change::Untracked || entry.worktree == Change::Untracked;
+    let conflicted = entry.staged == Change::Conflicted || entry.worktree == Change::Conflicted;
+    let (staged, unstaged) = if untracked {
+        ("?".to_owned(), "?".to_owned())
     } else {
-        p.warn
+        (
+            entry.staged.code().to_string(),
+            entry.worktree.code().to_string(),
+        )
+    };
+    let staged_color = if untracked || conflicted {
+        p.del
+    } else {
+        p.add
     };
     let name = if depth == 0 {
         entry.path.display().to_string()
@@ -110,7 +117,8 @@ pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> 
     };
     Line::from(vec![
         Span::raw(indent(depth)),
-        Span::styled(code, fg(color)),
+        Span::styled(staged, fg(staged_color)),
+        Span::styled(unstaged, fg(p.del)),
         Span::raw(format!(" {name}")),
     ])
 }

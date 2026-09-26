@@ -117,3 +117,43 @@ fn an_empty_working_tree_gives_a_diff_pane_that_says_so() {
     assert!(!out.contains("No changed files"), "{out}");
     let _ = (Pane::Files, Path::new(""));
 }
+
+/// The foreground colour of the first cell of `text` where it appears on the frame.
+fn colour_of(app: &mut App, text: &str) -> Option<ratatui::style::Color> {
+    let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
+    terminal.draw(|f| screens::draw(f, app)).unwrap();
+    let cells = &terminal.backend().buffer().content;
+    let wanted: Vec<String> = text.chars().map(String::from).collect();
+    (0..cells.len().saturating_sub(wanted.len())).find_map(|start| {
+        let matches = wanted
+            .iter()
+            .enumerate()
+            .all(|(offset, ch)| cells[start + offset].symbol() == ch);
+        matches.then(|| cells[start].fg)
+    })
+}
+
+/// Done when: an untracked file is `??` in red, an unstaged change is red and a staged
+/// one green, so staging a file changes its colour (steps 2, 3). The first row is the
+/// selected one and takes the selection colours, so the rows compared are below it.
+#[test]
+fn file_markers_are_red_when_unstaged_and_green_when_staged() {
+    let repo = Repo::new("markers");
+    repo.commit("m.txt", "one\n", "init");
+    repo.write("m.txt", "one\ntwo\n");
+    repo.write("a_first.txt", "the selected row\n");
+    repo.write("u.txt", "fresh\n");
+    let mut app = repo.app();
+    key(&mut app, '2');
+    let out = frame(&mut app);
+    assert!(out.contains("?? u.txt"), "untracked shows as ??\n{out}");
+
+    let untracked = colour_of(&mut app, "?? u.txt").unwrap();
+    let unstaged = colour_of(&mut app, "M m.txt").unwrap();
+    assert_eq!(unstaged, untracked, "an unstaged M is red like ??");
+
+    repo.git(&["add", "m.txt"]);
+    app.refresh();
+    let staged = colour_of(&mut app, "M  m.txt").unwrap();
+    assert_ne!(staged, untracked, "a staged M is not red");
+}
