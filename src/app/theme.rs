@@ -374,6 +374,10 @@ fn diff_line_style(p: &Palette, line: &str) -> Style {
         Style::new().fg(p.idle).add_modifier(Modifier::BOLD)
     } else if line.starts_with('+') {
         fg(p.add)
+    } else if line == "---" {
+        // The bare separator `git show --stat -p` prints before the stat block: not a
+        // removal (a removed line of dashes would carry its own `-` and text).
+        fg(p.idle)
     } else if line.starts_with('-') {
         fg(p.del)
     } else {

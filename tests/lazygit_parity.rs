@@ -423,3 +423,17 @@ fn the_commit_counter_reads_the_real_total_beyond_200() {
     let out = frame(&mut app);
     assert!(out.contains("1 of 260"), "{out}");
 }
+
+/// Done when: the `---` line of a commit's Patch is drawn plain, not in the removed-line red
+/// (step 12).
+#[test]
+fn the_stat_separator_is_not_drawn_as_a_removed_line() {
+    let repo = Repo::new("stat-sep");
+    repo.commit("a.txt", "one\n", "first");
+    let mut app = repo.app();
+    key(&mut app, '4');
+    let plain = colour_of(&mut app, "1 file changed").unwrap();
+    // The first "---" on the frame is the separator: it comes before the diff's own.
+    let separator = colour_of(&mut app, "---").unwrap();
+    assert_eq!(separator, plain, "the separator has the text colour");
+}

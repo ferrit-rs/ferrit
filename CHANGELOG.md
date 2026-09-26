@@ -15,7 +15,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - `r` rewords the selected commit in Commits, as in lazygit; `w` still works and the key bar now shows `Reword: r`.
 
-- A commit's Patch has the `---` line and the per-file stat (`a.txt | 1 +`, `1 file changed, 1 insertion(+)`) between its message and the diff, as in lazygit; before it went straight from the message to the diff.
+- A commit's Patch has the `---` line and the per-file stat (`a.txt | 1 +`, `1 file changed, 1 insertion(+)`) between its message and the diff, as in lazygit (the `---` in the text colour, not the removed-line red); before it went straight from the message to the diff.
 - Commit names show where they point: `(HEAD -> main, tag: v0.6.0, origin/main)` on a commit's Patch and on the branch Log, and a commit's tags in the Commits list before its subject. Before, no tag or ref was shown anywhere.
 - In the Commits list the hash is red for a commit not pushed yet, yellow for one pushed, and green for one merged into `origin/main` (or `origin/master`), as in lazygit; before every hash was green.
 
