@@ -419,6 +419,10 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let right_title =
         if app.focus == Pane::Branches && matches!(app.diff_view(), DiffView::Commit(..)) {
             " Patch "
+        } else if app.focus == Pane::Files && !app.is_mock() && app.row_count(Pane::Files) == 0 {
+            // Nothing changed: lazygit's "Diff" pane says so, instead of keeping
+            // the "Unstaged changes" title over an empty box.
+            " Diff "
         } else {
             app.focus.right_title()
         };
@@ -574,7 +578,9 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // `App::mock()`: the sample text. A real repo with nothing selected (no
     // files, no commits) just leaves the pane blank.
     if !app.is_mock() {
-        frame.render_widget(Paragraph::new("").block(block), area);
+        let empty_files = app.focus == Pane::Files && app.row_count(Pane::Files) == 0;
+        let text = if empty_files { "No changed files" } else { "" };
+        frame.render_widget(Paragraph::new(text).block(block), area);
         return;
     }
 

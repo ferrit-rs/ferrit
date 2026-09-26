@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- With nothing to commit, the Files pane's right side is titled `Diff` and says `No changed files`, as in lazygit; before it kept the title `Unstaged changes` over an empty box.
+
 - Inside a commit's files (Enter on a commit) or a branch's log (Enter on a branch), the key hint bar shows `Back: esc | Open: enter`; before, it kept the Files keys (`Stage`, `Commit`, `Amend`, `Reword`), none of which do anything on those rows.
 
 - After creating a branch (`n`) the selection in Branches moves to it, and after a commit the selection in Commits moves to the new commit at the top, as in lazygit; before, each stayed on the row it was on, so the new branch could end up off screen and the right pane kept showing an older commit.
