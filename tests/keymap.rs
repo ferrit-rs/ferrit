@@ -87,6 +87,7 @@ const EXPECTED: &[(Context, &str, Action)] = &[
     (C::Branches, "M", A::Merge),
     (C::Branches, "d", A::DeleteBranch),
     // Arms guarded by `self.focus == Pane::Commits`.
+    (C::Commits, "r", A::RewordCommit),
     (C::Commits, "w", A::RewordCommit),
     (C::Commits, "d", A::DropCommit),
     (C::Commits, "s", A::Squash),

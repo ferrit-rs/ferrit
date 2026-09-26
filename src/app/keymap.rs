@@ -425,6 +425,7 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Branches, "u", Action::FastForward),
     (Context::Branches, "M", Action::Merge),
     (Context::Branches, "d", Action::DeleteBranch),
+    (Context::Commits, "r", Action::RewordCommit),
     (Context::Commits, "w", Action::RewordCommit),
     (Context::Commits, "d", Action::DropCommit),
     (Context::Commits, "s", Action::Squash),

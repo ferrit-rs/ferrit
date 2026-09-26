@@ -111,7 +111,7 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
     );
     assert_eq!(
         bar(&map, Bar::Commits, 120),
-        "Reword: w | Drop: d | Squash: s | Fixup: S | Edit: e | New fixup!: F | \
+        "Reword: r | Drop: d | Squash: s | Fixup: S | Edit: e | New fixup!: F | \
          Autosquash: a | Help: ? | Quit: q",
         "the fetch group no longer fits at 120 columns and goes first"
     );

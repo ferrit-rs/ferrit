@@ -316,3 +316,20 @@ fn a_commit_patch_has_the_stat_block_before_the_diff() {
         "message, ---, stat, totals, then the diff\n{out}"
     );
 }
+
+/// Done when: `r` in Commits opens the reword popup, and the key bar shows `Reword: r`
+/// (step 12); the older `w` still works.
+#[test]
+fn r_rewords_the_selected_commit_and_w_still_does() {
+    let repo = Repo::new("reword-r");
+    repo.commit("a.txt", "one\n", "first");
+    repo.commit("a.txt", "one\ntwo\n", "second");
+    let mut app = repo.app();
+    key(&mut app, '4');
+    assert!(frame(&mut app).contains("Reword: r"), "the bar shows r");
+    for reword_key in ['r', 'w'] {
+        key(&mut app, reword_key);
+        assert!(app.commit_popup().is_some(), "{reword_key} opened the reword popup");
+        app.feed_key(KeyEvent::from(KeyCode::Esc));
+    }
+}

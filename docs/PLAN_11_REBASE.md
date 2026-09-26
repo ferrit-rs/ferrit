@@ -263,7 +263,7 @@ not collide with the global keys (`f` / `p` / `P` remote, `c` / `A` commit):
 
 | Where | Key | Action |
 | --- | --- | --- |
-| Commits (Nav, not drilled) | `w` | reword the selected commit (HEAD keeps the phase 7 path, no rebase) |
+| Commits (Nav, not drilled) | `r`, `w` | reword the selected commit (HEAD keeps the phase 7 path, no rebase); `r` is lazygit's key and the one the key bar shows, `w` stays for existing users |
 | Commits | `d` | drop, asks first |
 | Commits | `s` | squash into the commit below, keeps both messages |
 | Commits | `S` | fixup into the commit below, drops this message |

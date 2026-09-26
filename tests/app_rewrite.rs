@@ -389,7 +389,7 @@ fn the_keybar_lists_the_commit_keys_only_on_the_commits_pane() {
     app.feed_key(char_key('4'));
     let out = frame(&mut app);
     assert!(
-        out.contains("Reword: w") && out.contains("Squash: s"),
+        out.contains("Reword: r") && out.contains("Squash: s"),
         "{out}"
     );
 }
