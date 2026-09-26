@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- `Space` on a directory row in Files stages every change under it, or unstages them all when none is left to stage, as in lazygit; before it did nothing on a directory. On the root row it is every file. Conflicted files that still hold markers block it, with the same message as for a single file.
+
 - In the Files pane, the staged letter is green and the unstaged one red, so staging a file changes its colour, and an untracked file shows as `??` in red, as in lazygit; before, a staged `M` and an unstaged `M` were both yellow and an untracked file was a white `?`.
 
 - With nothing to commit, the Files pane's right side is titled `Diff` and says `No changed files`, as in lazygit; before it kept the title `Unstaged changes` over an empty box.

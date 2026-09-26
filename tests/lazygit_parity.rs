@@ -157,3 +157,37 @@ fn file_markers_are_red_when_unstaged_and_green_when_staged() {
     let staged = colour_of(&mut app, "M  m.txt").unwrap();
     assert_ne!(staged, untracked, "a staged M is not red");
 }
+
+/// Done when: `Space` on a directory row stages every file under it, and the same key
+/// unstages them again, as lazygit does (the stage-directory flow).
+#[test]
+fn space_on_a_directory_stages_and_unstages_everything_under_it() {
+    let repo = Repo::new("stage-dir");
+    repo.commit("README.md", "top\n", "init");
+    repo.write("docs/a.md", "a\n");
+    repo.write("docs/deep/b.md", "b\n");
+    repo.write("outside.txt", "not under docs\n");
+    let mut app = repo.app();
+    key(&mut app, '2');
+    let docs_row = (0..app.row_count(Pane::Files))
+        .find(|&i| app.file_lines()[i].to_string().contains("docs"))
+        .expect("a docs row");
+    app.select(Pane::Files, docs_row);
+
+    key(&mut app, ' ');
+    app.refresh();
+    let status = repo.git(&["status", "--porcelain"]);
+    assert!(status.contains("A  docs/a.md"), "{status}");
+    assert!(status.contains("A  docs/deep/b.md"), "{status}");
+    assert!(
+        status.contains("?? outside.txt"),
+        "a file outside stays: {status}"
+    );
+
+    app.select(Pane::Files, docs_row);
+    key(&mut app, ' ');
+    app.refresh();
+    let status = repo.git(&["status", "--porcelain"]);
+    assert!(status.contains("?? docs/"), "unstaged again: {status}");
+    assert!(!status.contains("A  docs"), "{status}");
+}

@@ -241,6 +241,14 @@ impl App {
         if self.focus != Pane::Files {
             return;
         }
+        let directory = match self.files_tree_rows().get(self.selected(Pane::Files)) {
+            Some(FileRow::Dir { path, .. }) => Some(path.clone()),
+            _ => None,
+        };
+        if let Some(path) = directory {
+            self.stage_directory(&path);
+            return;
+        }
         let Some(entry) = self.selected_file() else {
             return;
         };
@@ -267,6 +275,51 @@ impl App {
             return;
         };
         let result = repo.stage_file(&path, dir);
+        self.finish_apply(result);
+    }
+
+    /// `<space>` on a directory row: stage every change under it, or unstage them
+    /// all when none is left to stage, as lazygit does. The root row (an empty
+    /// path) is every file. Conflicted files that still hold markers block it.
+    fn stage_directory(&mut self, directory: &Path) {
+        let under: Vec<&git::model::FileEntry> = self
+            .files
+            .iter()
+            .filter(|f| directory.as_os_str().is_empty() || f.path.starts_with(directory))
+            .collect();
+        let dir = if under.iter().any(|f| f.worktree != git::model::Change::None) {
+            ApplyDir::Forward
+        } else if under.iter().any(|f| f.staged != git::model::Change::None) {
+            ApplyDir::Reverse
+        } else {
+            return;
+        };
+        let blocked: Vec<PathBuf> = under
+            .iter()
+            .filter(|f| {
+                f.staged == git::model::Change::Conflicted
+                    || f.worktree == git::model::Change::Conflicted
+            })
+            .filter(|f| self.has_markers(&f.path))
+            .map(|f| f.path.clone())
+            .collect();
+        if dir == ApplyDir::Forward && !blocked.is_empty() {
+            self.report_error(format!(
+                "{} still has conflict markers, resolve them before staging",
+                blocked
+                    .first()
+                    .map_or_else(String::new, |p| p.display().to_string())
+            ));
+            return;
+        }
+        let Some(repo) = &self.repo else {
+            return;
+        };
+        let result = if directory.as_os_str().is_empty() {
+            repo.stage_all(dir)
+        } else {
+            repo.stage_file(directory, dir)
+        };
         self.finish_apply(result);
     }
 

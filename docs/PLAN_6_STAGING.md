@@ -96,6 +96,11 @@ from the `FileEntry` phase 2 already provides:
       && entry.staged != Change::None  ->  <space> unstages  (index -> worktree)
 ```
 
+On a directory row (`<space>` in the Files tree) the same rule runs over every file under
+it: any change left to stage means stage them all (`git add -- <dir>`), otherwise unstage
+them all (`git restore --staged -- <dir>`); the root row is every file. Found by running
+the stage-directory flow in lazygit and ferrit.
+
 A partially-staged file (both sides non-`None`) stages the rest on `<space>`;
 an explicit unstage key handles the other direction. lazygit uses `<space>` to
 stage and `u` is implicit in context; ferrit keeps `<space>` = toggle for the
