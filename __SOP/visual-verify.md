@@ -100,6 +100,12 @@ another flow. The report prints both first, and the analysis and the audit stay
 inside the focus (see the skill), so the interface's own behaviour is judged in
 `ui-mouse` once, not again in every git flow.
 
+After a fix, `flow-compare.sh` keeps the run it replaces under `before/`, and an audit
+row with a sixth cell (`8, 12`) shows ferrit's screen before and after for those
+steps. `flow-report.sh` opens each report as a copy under a new name and prints its
+path (`REPORT: ...`); screenshots are addressed by their mtime, so a browser never
+shows a previous run from its cache.
+
 Step keys are `tui-shot.sh` keys (`Enter`, `Space`, `C-x`, `text:<string>`).
 The file tree starts on the `/` root row, so the first `j` lands on the first
 entry. When ferrit deliberately uses another key, that step needs its own

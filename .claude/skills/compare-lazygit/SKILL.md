@@ -45,10 +45,17 @@ behaviour goes through a branch, because it may not pan out.
    `main` first, so the branch starts clean.
 2. Change ferrit on the branch, with tests, the CHANGELOG line and the plan file
    (AGENTS.md), and atomic commits. Never push the branch.
-3. Rerun the same flow (`flow-compare.sh` builds the current branch's binary), read
-   the pairs again and rewrite `analysis/` and `implementation.txt`. Mark each row
-   the fix touched FIXED with the step numbers where the screens now match, or
-   STILL DIFFERS with what remains. Say when a row was not re-checked.
+3. Rerun the same flow (`flow-compare.sh` builds the current branch's binary and
+   keeps the run it replaces as `before/`), read the pairs again and rewrite
+   `analysis/` and `implementation.txt`. Mark each row the fix touched FIXED with
+   the step numbers where the screens now match, or STILL DIFFERS with what remains.
+   Say when a row was not re-checked.
+   Give every FIXED or PARTLY row a sixth cell, the step numbers to show before and
+   after (`| ... | 8, 12 | 8, 12`): the report draws ferrit's old and new screen side
+   by side there, so the fix can be seen without reading a counter. Pick the steps
+   where the change is on screen, and name in the "ferrit" cell what to look at
+   ("1 of 8" instead of "7 of 7"). Only ferrit's screen is shown: lazygit does not
+   change between the two runs.
 4. Judge the result with the user. Fixed and green (`cargo test`, clippy): merge
    into `main` locally (`git merge --ff-only` when possible), delete the branch.
    Not fixed or worse: leave the branch, say so, do not merge.
@@ -86,7 +93,9 @@ One `## P1 - title` heading per section, then one row per gap, five cells:
 ```
 
 Rows start with `| ` and separate cells with ` | `; no closing pipe, and no `|`
-character inside a cell (write key bars with commas). "Seen in" is step numbers
+character inside a cell (write key bars and git stat lines with commas: a `|` in a
+cell shifts every column after it). An optional sixth cell, `Before / after`, holds
+step numbers (see the loop, step 3). "Seen in" is step numbers
 separated by commas (`6, 8, 11`), rendered as links to those steps; anything
 else (a flow name) stays text. "Left out on purpose" rows have two cells:
 `| What | Why`.
