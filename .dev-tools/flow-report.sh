@@ -149,6 +149,11 @@ print(title)
 PY
 
 echo "saved $out/report.html"
-# A query string makes the browser load the file again: `open <path>` on a page
-# that is already open in a tab shows the tab as it was, without the new analyses.
-[ "$show" = 0 ] || open "file://$out/report.html?v=$(date +%s)"
+# A page already open in a tab is not reloaded by `open`, so each build that opens
+# gets a copy under a new name: a new name is a new tab, showing this run.
+if [ "$show" = 1 ]; then
+  copy="$out/report-$(date +%H%M%S).html"
+  cp "$out/report.html" "$copy"
+  echo "REPORT: $copy"
+  open "$copy"
+fi
