@@ -58,3 +58,49 @@ captures around a keypress) before assuming the feature itself is broken.
   `.dev-tools/report-preview.html` (tracked in git) and opens it.
 - `.verify-shots/` — all output (`.txt`/`.html`/`.png`/notes/reports).
   Gitignored, ephemeral, safe to delete anytime.
+
+## Comparing with lazygit: `test/flows/*.flow`
+
+`.dev-tools/flow-compare.sh test/flows/<name>.flow` runs one flow (a fixture,
+then `step NAME KEYS...` lines) in lazygit and in ferrit, each in its own tmux
+session and Terminal.app window with an empty `HOME`, shoots every step with
+`tui-shot.sh` (`FERRIT_SHOT_SESSION` / `FERRIT_SHOT_CMD` pick the program) and
+builds `.verify-shots/flows/<name>/report.html` (it does not open it: the analyses are not there yet): lazygit | ferrit per step, plus
+a diff of the git state (status, log subjects, branches, stash, index) each one
+left. lazygit is the reference: "git state differs" is a workflow that does not
+behave the same, the screenshots are for judging the look. It fails nothing.
+
+Against a real repository: `--repo .` (or a `repo .` line) works on a throwaway
+copy (history, branches, stash, WIP; remotes pointed at nothing, your global git
+config kept), never the original. `sh "cmd"` runs in the copy: before the first
+step it is setup (`git reset --hard && git clean -fd` for a known start), after
+it is an edit behind the programs' back, followed by a 2 s wait because lazygit
+rereads the disk every `refreshInterval` (set to 1 s here). `note "text"` puts a
+line in the report for the next step. `test/flows/feature-workflow.flow` is the
+full round trip: edit, stage, commit, new branch, commit, review.
+
+The report has three columns per step: lazygit, ferrit, visual differences. The
+third is written after the run, by looking at each pair of screenshots: one
+`- ` bullet per difference in `.verify-shots/flows/<name>/analysis/<step>.txt`
+(layout, colours, wording, counters, key bars, what the selection does), then
+`.dev-tools/flow-report.sh <name>` rebuilds and opens the report. At the end of the page, `implementation.txt` is the report to act on, drawn as
+tables: differences sorted P1 (breaks the workflow) to P4 (look only), one row per
+gap (What, lazygit, ferrit, To do, Seen in, the steps being links), without what
+is not part of the lazygit experience, plus a "left out on purpose" table. A step without
+a file shows "no analysis written". A rerun wipes the run, analyses included,
+because they describe those screenshots.
+
+Mouse gestures are steps too, named after panels, not coordinates (`tui-mouse.py`):
+`click:commits:4`, `wheel:commits:down:3`, `scrollbar:commits:50`,
+`dragbar:commits:0:100`; `main` is the right pane. Each waits 1 s so a background
+load finishes before the shot. `test/flows/ui-mouse.flow` is the tour.
+
+Scope: `focus "..."` says what the flow checks and `not "..."` what it leaves to
+another flow. The report prints both first, and the analysis and the audit stay
+inside the focus (see the skill), so the interface's own behaviour is judged in
+`ui-mouse` once, not again in every git flow.
+
+Step keys are `tui-shot.sh` keys (`Enter`, `Space`, `C-x`, `text:<string>`).
+The file tree starts on the `/` root row, so the first `j` lands on the first
+entry. When ferrit deliberately uses another key, that step needs its own
+keys per program (not supported yet).

@@ -60,6 +60,32 @@ A failure prints the script line, what was expected and the frame the run saw;
 every run also leaves its snapshots (and, on a failure, `failure.txt`) under
 `target/tmp/replay/<script>/`.
 
+## Comparing with lazygit
+
+A fourth mechanism, next to the replay gate and the tapes: run one user flow in
+lazygit and in ferrit, side by side, on a throwaway copy of the real repository,
+and get a report of what differs. It is a development aid, not a gate: nothing
+here fails a build.
+
+```
+.dev-tools/flow-compare.sh --repo . test/flows/feature-workflow.flow
+.dev-tools/flow-report.sh feature-workflow      # rebuild and open, once the analyses are written (flow-compare.sh does not open it)
+```
+
+- A flow (`test/flows/*.flow`) is a list of `step NAME KEYS...`, with `sh "cmd"`
+  (setup, or an edit made behind the programs' back) and `note "text"`.
+- Each program runs in its own tmux session and Terminal.app window, with an empty
+  `HOME`, and is shot with `screencapture` at every step (`tui-shot.sh`).
+- The git state after each step (status, log subjects, branches, stash, index) is
+  compared between the two: that is the behaviour check. The screenshots are the
+  look check, read by a person or an agent (`/compare-lazygit`), who writes one
+  analysis per step and an implementation report by priority, drawn as tables.
+- The copy has its remotes pointed at nothing, so nothing can be fetched or pushed.
+- `test/flows/CATALOG.md` lists every workflow worth having, its status and the
+  tooling still missing (per-program keys, terminal size, mouse, start state).
+- Procedure and rules: `.claude/skills/compare-lazygit/SKILL.md`; mechanics:
+  `__SOP/visual-verify.md`.
+
 ## Goal
 
 Any agent working on `ferrit` (Claude included) can verify a feature works
