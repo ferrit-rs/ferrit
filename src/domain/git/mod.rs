@@ -44,9 +44,10 @@ use crate::domain::git::model::{
 };
 use crate::domain::profile::settings::{Identity, IdentitySource};
 
-/// How many commits `Repo::snapshot()` reads for the Commits pane. Plain
-/// constant until the pane grows real scrolling/paging.
-const COMMITS_LIMIT: usize = 200;
+/// How many commits `Repo::snapshot()` reads for the Commits pane. lazygit lists every
+/// commit; 1,000 covers all but the largest histories (the counter then reads `1 of
+/// 1000`) while the walk stays cheap. Plain constant until the pane pages.
+const COMMITS_LIMIT: usize = 1000;
 
 fn config_values(config: &git2::Config, key: &str) -> Vec<String> {
     let Ok(mut entries) = config.multivar(key, None) else {

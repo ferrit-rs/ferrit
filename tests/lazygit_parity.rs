@@ -382,3 +382,36 @@ fn branches_are_listed_current_first_then_most_recent_first() {
         .collect();
     assert_eq!(names, ["main", "zulu-new", "mid", "alpha-old"], "{lines:?}");
 }
+
+/// Done when: a history longer than 200 commits is counted in full, `1 of 260`, where it
+/// stopped at `1 of 200` (step 6, 11).
+#[test]
+fn the_commit_counter_reads_the_real_total_beyond_200() {
+    let repo = Repo::new("cap");
+    let mut stream = String::new();
+    for n in 0..260 {
+        stream.push_str(&format!(
+            "commit refs/heads/main\ncommitter T <t@example.com> {} +0000\ndata 2\nc{}\n",
+            1_700_000_000 + n,
+            n % 10
+        ));
+        if n == 0 {
+            stream.push_str("M 100644 inline f.txt\ndata 2\nx\n");
+        }
+        stream.push('\n');
+    }
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(&repo.dir)
+        .args(["fast-import", "--quiet"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    std::io::Write::write_all(&mut child.stdin.take().unwrap(), stream.as_bytes()).unwrap();
+    assert!(child.wait().unwrap().success());
+    repo.git(&["reset", "-q", "--hard"]);
+    let mut app = repo.app();
+    key(&mut app, '4');
+    let out = frame(&mut app);
+    assert!(out.contains("1 of 260"), "{out}");
+}
