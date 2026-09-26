@@ -34,6 +34,27 @@ scripts cannot make.
    user first sees it with the analyses and the audit in place. Give the
    user the P1 items first, the path of the report, then stop.
 
+## Fixing what the report found (the loop)
+
+Only when the user asks to act on the audit. The tooling (flows, scripts, this
+skill, the docs) is committed straight to `main`; a correction of ferrit's
+behaviour goes through a branch, because it may not pan out.
+
+1. One branch per fix, off an up-to-date `main`: `fix/<short-name>` (one row of the
+   audit, or a few that share a cause). Uncommitted tooling work is committed to
+   `main` first, so the branch starts clean.
+2. Change ferrit on the branch, with tests, the CHANGELOG line and the plan file
+   (AGENTS.md), and atomic commits. Never push the branch.
+3. Rerun the same flow (`flow-compare.sh` builds the current branch's binary), read
+   the pairs again and rewrite `analysis/` and `implementation.txt`. Mark each row
+   the fix touched FIXED with the step numbers where the screens now match, or
+   STILL DIFFERS with what remains. Say when a row was not re-checked.
+4. Judge the result with the user. Fixed and green (`cargo test`, clippy): merge
+   into `main` locally (`git merge --ff-only` when possible), delete the branch.
+   Not fixed or worse: leave the branch, say so, do not merge.
+5. Start the next branch from the merged `main`. P3 rows are decisions: ask before
+   changing them, and record the answer in the row.
+
 ## Implementation report
 
 Built from the analyses, not from memory. Keep only what is inherent to the
