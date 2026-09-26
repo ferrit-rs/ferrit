@@ -47,6 +47,12 @@ if focus or not_here:
     scope += "".join(f"<p><b>Does not look at:</b> {html.escape(n)}</p>" for n in not_here)
     scope += "</div>"
 
+def stamp(path):
+    """The screenshot's mtime: a browser keeps an image by its address, so a rerun
+    that overwrites 08_x.png would keep showing the old one without this."""
+    return int(path.stat().st_mtime) if path.exists() else 0
+
+
 rows, differing, analysed = [scope] if scope else [], 0, 0
 for step in steps:
     ref = (out / "lazygit" / f"{step}.git.txt").read_text().splitlines()
@@ -69,8 +75,8 @@ for step in steps:
         analysis = '<p class="muted">no analysis written for this step</p>'
     rows.append(
         f'<div class="step" id="{step}"><h2>{step}</h2>{note}{verdict}<div class="trio">'
-        f'<figure><figcaption>lazygit</figcaption><img src="lazygit/{step}.png"></figure>'
-        f'<figure><figcaption>ferrit</figcaption><img src="ferrit/{step}.png"></figure>'
+        f'<figure><figcaption>lazygit</figcaption><img src="lazygit/{step}.png?v={stamp(out / "lazygit" / f"{step}.png")}"></figure>'
+        f'<figure><figcaption>ferrit</figcaption><img src="ferrit/{step}.png?v={stamp(out / "ferrit" / f"{step}.png")}"></figure>'
         f'<div class="diffs"><div class="caption">visual differences</div>{analysis}</div>'
         f"</div></div>"
     )
