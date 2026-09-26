@@ -674,11 +674,15 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
     let bar = if app.operation.is_some() {
         Bar::Operation
-    } else if app.focus == Pane::Branches && !app.branches_drilled() {
+    } else if (app.focus == Pane::Branches && app.branches_drilled())
+        || (app.focus == Pane::Commits && app.commits_drilled())
+    {
+        Bar::Drilled
+    } else if app.focus == Pane::Branches {
         Bar::Branches
     } else if app.focus == Pane::Stash {
         Bar::Stash
-    } else if app.focus == Pane::Commits && !app.commits_drilled() {
+    } else if app.focus == Pane::Commits {
         Bar::Commits
     } else {
         Bar::Default

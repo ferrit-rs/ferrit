@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Inside a commit's files (Enter on a commit) or a branch's log (Enter on a branch), the key hint bar shows `Back: esc | Open: enter`; before, it kept the Files keys (`Stage`, `Commit`, `Amend`, `Reword`), none of which do anything on those rows.
+
 - After creating a branch (`n`) the selection in Branches moves to it, and after a commit the selection in Commits moves to the new commit at the top, as in lazygit; before, each stayed on the row it was on, so the new branch could end up off screen and the right pane kept showing an older commit.
 
 - The mouse wheel over a left pane scrolls that pane's list, whichever pane has the focus; before, it moved the focused pane's selection. The list scrolls two rows a tick and the selection stays where it was, even off screen, with the right pane still showing it, as in lazygit; any key or click that changes the selection brings the view back to it. Over the right pane the wheel scrolls the diff as before, and elsewhere it does nothing.

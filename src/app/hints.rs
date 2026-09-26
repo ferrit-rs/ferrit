@@ -35,6 +35,8 @@ impl Action {
             Self::NewFixup => "New fixup!",
             Self::Autosquash => "Autosquash",
             Self::OperationMenu => "Continue / skip / abort",
+            Self::Back => "Back",
+            Self::Enter => "Open",
             _ => "",
         }
     }
@@ -114,6 +116,9 @@ pub enum Bar {
     Branches,
     Stash,
     Commits,
+    /// Drilled into a branch's log or a commit's files: the list of commits or
+    /// files is read only there, so only the ways in and out are offered.
+    Drilled,
     /// A merge, rebase, cherry-pick or revert is stopped: `m` is the way out.
     Operation,
 }
@@ -168,6 +173,10 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Commits, Action::NewFixup)],
             &[(Context::Commits, Action::Autosquash)],
             FETCH_PULL_PUSH,
+        ],
+        Bar::Drilled => &[
+            &[(Context::Global, Action::Back)],
+            &[(Context::Global, Action::Enter)],
         ],
         Bar::Operation => &[
             &[(Context::Global, Action::OperationMenu)],

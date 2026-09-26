@@ -351,6 +351,10 @@ bindings or with a user's remaps.
   grouped, and **scrolls** (`j` / `k` / `PgUp` / `PgDn`) so a 24-row terminal
   reaches every line. This removes the clipping described above.
 - `App::mock()` keeps a fixed default keymap, so render tests are unchanged.
+- While Commits (a commit's files) or Branches (a branch's log) is drilled in, the
+  bar is its own `Bar::Drilled`: `Back: esc | Open: enter`, then `Help` and
+  `Quit`. The rows there are read only, so `Stage`, `Commit` or `Reword` would
+  do nothing. lazygit shows the sub-view's own keys (`tests/drilled_keybar.rs`).
 
 ## P4: `x` menu, right-click, clickable hints
 
