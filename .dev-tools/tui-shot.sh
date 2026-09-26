@@ -24,23 +24,33 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 shots="$root/.verify-shots"
+# FERRIT_SHOT_SESSION / FERRIT_SHOT_CMD let flow-compare.sh drive lazygit next
+# to ferrit: one tmux session and one Terminal.app window per program.
+session="${FERRIT_SHOT_SESSION:-ferrit}"
+cmd="${FERRIT_SHOT_CMD:-cd '$root' && FERRIT_NO_GRAPHICS=1 ./target/debug/ferrit}"
 winfile="$shots/.terminal_window_id"
+[ "$session" = ferrit ] || winfile="$winfile.$session"
 
 name="$1"
 shift
 mkdir -p "$shots/$(dirname "$name")"
 
-if ! tmux has-session -t ferrit 2>/dev/null; then
+if ! tmux has-session -t "$session" 2>/dev/null; then
+  # A new session needs a new window: the cached one is attached to a dead one.
+  if [ -f "$winfile" ]; then
+    osascript -e "tell application \"Terminal\" to close window id $(cat "$winfile")" >/dev/null 2>&1 || true
+    rm -f "$winfile"
+  fi
   # FERRIT_NO_GRAPHICS: skips the terminal graphics-capability query, which
   # blocks on stdio waiting for an answer no one sends under headless tmux
   # and leaves raw mode broken for the rest of the run once it gives up.
-  tmux new-session -d -s ferrit -x 200 -y 50 "cd '$root' && FERRIT_NO_GRAPHICS=1 ./target/debug/ferrit"
+  tmux new-session -d -s "$session" -x 200 -y 50 "$cmd"
   # Cold start (cargo-built binary, first paint): give it real time, then
   # poll until the alt-screen has actually drawn something instead of
   # trusting a fixed sleep (a blank first frame was the earlier bug here).
   for _ in $(seq 1 20); do
     sleep 0.2
-    if tmux capture-pane -t ferrit -p | grep -q '[^[:space:]]'; then
+    if tmux capture-pane -t "$session" -p | grep -q '[^[:space:]]'; then
       break
     fi
   done
@@ -49,7 +59,7 @@ fi
 winid=""
 [ -f "$winfile" ] && winid="$(cat "$winfile")"
 if [ -z "$winid" ] || ! osascript -e "tell application \"Terminal\" to exists window id $winid" 2>/dev/null | grep -q true; then
-  winid="$(osascript -e 'tell application "Terminal" to do script "tmux attach -t ferrit"' \
+  winid="$(osascript -e "tell application \"Terminal\" to do script \"tmux attach -t $session\"" \
                       -e 'delay 0.5' \
                       -e 'tell application "Terminal" to id of front window')"
   osascript -e "tell application \"Terminal\"
@@ -62,14 +72,32 @@ fi
 
 for key in "$@"; do
   case "$key" in
-    Enter | Escape | Up | Down | Left | Right | Tab | BTab | PageUp | PageDown | Space)
-      tmux send-keys -t ferrit "$key"
+    Enter | Escape | Up | Down | Left | Right | Tab | BTab | PageUp | PageDown | Space | BSpace | C-?)
+      tmux send-keys -t "$session" "$key"
+      ;;
+    click:* | wheel:* | scrollbar:* | dragbar:*)
+      # A mouse gesture, by panel name: see tui-mouse.py.
+      "$root/.dev-tools/tui-mouse.py" "$session" "$key"
+      ;;
+    text:*)
+      # text:<string> types the string as is, spaces included.
+      tmux send-keys -t "$session" -l "${key#text:}"
       ;;
     *)
-      tmux send-keys -t ferrit -l "$key"
+      tmux send-keys -t "$session" -l "$key"
       ;;
   esac
   sleep 0.4
+done
+
+# Wait for the screen to stop changing (two identical captures in a row), so a
+# program that redraws asynchronously, lazygit, is shot once it has settled.
+prev=""
+for _ in $(seq 1 30); do
+  cur="$(tmux capture-pane -t "$session" -p -e)"
+  [ "$cur" = "$prev" ] && break
+  prev="$cur"
+  sleep 0.15
 done
 
 screencapture -x -l "$winid" "$shots/$name.png"
