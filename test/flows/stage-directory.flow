@@ -1,0 +1,8 @@
+# Space on a directory row: lazygit stages every file under it. Kept as its own
+# flow because it is a behaviour, not just a look: the git state must match.
+fixture canonical
+
+step 01_start
+step 02_focus_files 2
+step 03_on_docs_dir j j
+step 04_stage_dir Space

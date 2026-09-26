@@ -1,0 +1,16 @@
+# Read-only tour of a real repository: every panel, then into a commit and its
+# files. Nothing depends on what the repository contains, so it runs on any
+# copy: .dev-tools/flow-compare.sh --repo . test/flows/repo-tour.flow
+repo .
+focus "reading: every panel and a commit's files, with the keys"
+not "anything that changes the repository (feature-workflow); mouse and scrolling (ui-mouse)"
+
+step 01_start
+step 02_files 2
+step 03_branches 3
+step 04_commits 4
+step 05_commit_down j
+step 06_commit_files Enter
+step 07_back Escape
+step 08_stash 5
+step 09_help ?

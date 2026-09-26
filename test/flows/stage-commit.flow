@@ -1,0 +1,14 @@
+# Stage a file, then commit it. The same keys drive lazygit and ferrit; the
+# report shows both screens per step and diffs the git state each left.
+#
+#   step NAME KEYS...   send KEYS (tmux names, text:<string> for typed text),
+#                       let the screen settle, shoot both programs
+fixture canonical
+
+step 01_start
+step 02_focus_files 2
+step 03_move_to_main_rs j j j j j
+step 04_stage Space
+step 05_open_commit c
+step 06_type_message "text:test: flow commit"
+step 07_confirm Enter

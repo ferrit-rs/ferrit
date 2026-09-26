@@ -1,0 +1,37 @@
+# Mouse and scrolling, no git feature involved: click the panels and rows, roll the
+# wheel over focused and unfocused panels, use the scrollbar. Run on a copy:
+#   .dev-tools/flow-compare.sh --repo . test/flows/ui-mouse.flow
+# Gestures: click:PANEL[:ROW]  wheel:PANEL:up|down:N  scrollbar:PANEL:PERCENT
+#           dragbar:PANEL:FROM:TO   (PANEL: status files branches commits stash main)
+repo .
+focus "interactions with the interface itself, whatever the repository holds: launch, focus by click, selection by click, wheel, scrollbar, drag, key bar and panel sizes as they react to focus"
+not "what git commands do or print, popups, commit or branch workflows (feature-workflow); how a patch or a commit list is styled"
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+
+note "Launch: what is focused, what the panes and the key bar show."
+step 01_launch
+
+note "Click Files, Branches, Commits in turn: does the focus move, and what changes in the key bar and the right pane?"
+step 02_click_files click:files
+step 03_click_branches click:branches
+step 04_click_commits click:commits
+
+note "Click the 4th row of Commits: the selection moves there and the right pane follows."
+step 05_click_commit_row click:commits:4
+
+note "Click the right pane."
+step 06_click_main click:main
+
+note "Wheel over Commits while Branches is focused: does the hovered panel scroll, or the focused one?"
+step 07_wheel_unfocused click:branches wheel:commits:down:3
+
+note "Focus Commits, then roll the wheel: does the selection move, or the view?"
+step 08_wheel_focused click:commits:1 wheel:commits:down:5
+step 09_wheel_up wheel:commits:up:2
+
+note "Scrollbar of Commits: click at 50% of the track, then drag from the top to the bottom."
+step 10_scrollbar_click scrollbar:commits:50
+step 11_scrollbar_drag dragbar:commits:0:100
+
+note "Wheel over the right pane, on a commit with a long patch: scroll the list back to the top so both programs select the same commit (the 4th, a new 165-line script), then wheel over the patch."
+step 12_wheel_main wheel:commits:up:100 click:commits:4 wheel:main:down:5

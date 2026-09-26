@@ -1,0 +1,49 @@
+# A developer's round trip on the real repository: edit, stage, commit, open a
+# feature branch, commit again, review the result. Run on a copy:
+#   .dev-tools/flow-compare.sh --repo . test/flows/feature-workflow.flow
+# Behaviour = the git state after every step (must match lazygit); rendering =
+# the two screenshots side by side.
+repo .
+focus "the git result of the round trip (files staged, commits made, branch created) and what the panels say about it: selection after an action, current branch visible, git's own message, commit list"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); commit popup look and diff styling, which are style and belong to no flow yet"
+
+# Setup: a known starting point, your history and branches, no work in progress.
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+
+note "Both programs open on the same clean repository."
+step 01_start
+
+sh "printf '\n- flow-compare demo line\n' >> README.md; printf 'scratch\n' > FLOW_NOTES.md"
+note "An editor changed README.md and created FLOW_NOTES.md. Each program must notice on its own: one modified, one untracked file."
+step 02_files_changed 2
+
+note "Stage everything (a): both files become staged."
+step 03_stage_all a
+
+note "Commit (c): the message popup opens."
+step 04_commit_popup c
+
+note "Type the summary."
+step 05_commit_message "text:docs: flow-compare demo"
+
+note "Confirm: a commit is made, the Files panel empties, the commit tops the list."
+step 06_commit_done Enter
+
+note "Branches panel, then n: the new-branch prompt."
+step 07_new_branch_prompt 3 n
+
+note "Name the branch and confirm: it is created and checked out."
+step 08_new_branch_named "text:feat/flow-demo" Enter
+
+sh "printf 'second line\n' >> FLOW_NOTES.md"
+note "Another edit on the new branch, staged and committed the same way."
+step 09_second_edit 2 a c
+
+step 10_second_message "text:feat: second commit"
+
+note "Confirm: two commits on feat/flow-demo on top of main."
+step 11_second_done Enter
+
+note "Commits panel: the two new commits at the top, then into the first one to see its files."
+step 12_commits 4
+step 13_commit_files Enter
