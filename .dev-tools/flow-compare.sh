@@ -51,8 +51,22 @@ fixture="$(awk '$1 == "fixture" { print $2 }' "$flow")"
 [ -z "$repo_src" ] || repo_src="$(cd "$root" && cd "$repo_src" && pwd)"
 
 cargo build --quiet --manifest-path "$root/Cargo.toml"
+# The run about to be replaced is kept as before/ (screenshots only): the report
+# shows it next to the new one for every fix. Only a run of the same flow, and only
+# when the previous one had screenshots; before/ of before/ is not kept.
+keep="$(mktemp -d)"
+if [ -d "$out/ferrit" ]; then
+  mkdir -p "$keep/ferrit" "$keep/lazygit"
+  cp "$out"/ferrit/*.png "$keep/ferrit/" 2>/dev/null || true
+  cp "$out"/lazygit/*.png "$keep/lazygit/" 2>/dev/null || true
+fi
 rm -rf "$out"
 mkdir -p "$out"
+if [ -d "$keep/ferrit" ]; then
+  mkdir -p "$out/before"
+  cp -R "$keep/ferrit" "$keep/lazygit" "$out/before/"
+fi
+rm -rf "$keep"
 
 # What a step left behind, comparable across programs: no commit ids or dates,
 # which differ per run.

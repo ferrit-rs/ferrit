@@ -26,6 +26,7 @@ python3 - "$root/.dev-tools/report-template.html" "$out" "$name" "$root/test/flo
 import difflib, html, pathlib, shlex, sys
 
 template, out, name, flow = sys.argv[1], pathlib.Path(sys.argv[2]), sys.argv[3], pathlib.Path(sys.argv[4])
+out_dir = out
 steps = sorted(p.name[: -len(".git.txt")] for p in (out / "lazygit").glob("*.git.txt"))
 
 def bullets(text):
@@ -94,6 +95,26 @@ def step_links(cell):
     return ", ".join(out)
 
 
+def proof_cell(cell):
+    """`8, 12` becomes, per step, ferrit's screen before the fix next to the one after.
+    The earlier run is kept by flow-compare.sh under before/."""
+    out = []
+    for part in [c.strip() for c in cell.split(",") if c.strip()]:
+        step = next((s for s in steps if part.isdigit() and s.startswith(f"{int(part):02d}_")), None)
+        old = out_dir / "before" / "ferrit" / f"{step}.png" if step else None
+        new = out_dir / "ferrit" / f"{step}.png" if step else None
+        if not (step and old.exists() and new.exists()):
+            out.append(f"<div>step {html.escape(part)}: no earlier run kept</div>")
+            continue
+        out.append(
+            f'<div class="ba"><b>step {part}</b><div class="pair2">'
+            f'<figure><figcaption>before</figcaption><a href="before/ferrit/{step}.png?v={stamp(old)}"><img src="before/ferrit/{step}.png?v={stamp(old)}"></a></figure>'
+            f'<figure><figcaption>after</figcaption><a href="ferrit/{step}.png?v={stamp(new)}"><img src="ferrit/{step}.png?v={stamp(new)}"></a></figure>'
+            "</div></div>"
+        )
+    return "".join(out)
+
+
 def implementation(text):
     sections, current = [], None
     for line in text.splitlines():
@@ -113,9 +134,10 @@ def implementation(text):
         cls = BADGE.get(code, "left")
         out.append(f'<h3><span class="badge {cls}">{html.escape(code if code in BADGE else "out")}</span> '
                    f"{html.escape(title[5:] if code in BADGE else title)}</h3>")
-        wide = table and len(table[0]) == 5
-        heads = HEADS if wide else ["What", "Why"]
-        out.append(f'<table class="audit {cls}"><thead><tr>'
+        wide = table and len(table[0]) >= 5
+        proof = wide and any(len(r) >= 6 for r in table)
+        heads = (HEADS + ["Before / after"] if proof else HEADS) if wide else ["What", "Why"]
+        out.append(f'<table class="audit {cls}{" proof" if proof else ""}"><thead><tr>'
                    + "".join(f"<th>{h}</th>" for h in heads) + "</tr></thead><tbody>")
         for row in table:
             cells = row + [""] * (len(heads) - len(row))
@@ -123,6 +145,8 @@ def implementation(text):
             for i, cell in enumerate(cells[: len(heads)]):
                 if wide and i == 4:
                     tds.append(f'<td class="seen">{step_links(cell)}</td>')
+                elif wide and i == 5:
+                    tds.append(f'<td class="proof">{proof_cell(cell)}</td>')
                 else:
                     tds.append(f'<td class="{"what" if i == 0 else ""}">{html.escape(cell)}</td>')
             out.append("<tr>" + "".join(tds) + "</tr>")
