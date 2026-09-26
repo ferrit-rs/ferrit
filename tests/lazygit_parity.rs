@@ -346,3 +346,39 @@ fn the_new_branch_prompt_names_the_branch_it_starts_from() {
     let out = frame(&mut app);
     assert!(out.contains("New branch name (branch is off of 'main')"), "{out}");
 }
+
+/// Done when: the branch list is the checked-out branch first, then the most recently
+/// committed to, not alphabetical (step 8).
+#[test]
+fn branches_are_listed_current_first_then_most_recent_first() {
+    let repo = Repo::new("branch-order");
+    repo.commit("a.txt", "one\n", "first");
+    // Commit times a day apart, so the order cannot be a tie on the second.
+    let commit_at = |branch: &str, epoch: &str| {
+        repo.git(&["checkout", "-q", "-b", branch]);
+        repo.write(&format!("{branch}.txt"), "x\n");
+        repo.git(&["add", "-A"]);
+        let env_date = format!("{epoch} +0000");
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&repo.dir)
+            .args(["commit", "-q", "-m", branch])
+            .env("GIT_COMMITTER_DATE", &env_date)
+            .env("GIT_AUTHOR_DATE", &env_date)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        repo.git(&["checkout", "-q", "main"]);
+    };
+    commit_at("alpha-old", "1700000000");
+    commit_at("zulu-new", "1700086400");
+    commit_at("mid", "1700043200");
+    let mut app = repo.app();
+    key(&mut app, '3');
+    let lines: Vec<String> = app.branch_lines().iter().map(ToString::to_string).collect();
+    let names: Vec<&str> = lines
+        .iter()
+        .map(|l| l.split_whitespace().last().unwrap_or(""))
+        .collect();
+    assert_eq!(names, ["main", "zulu-new", "mid", "alpha-old"], "{lines:?}");
+}

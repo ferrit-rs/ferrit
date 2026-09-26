@@ -55,7 +55,12 @@ pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
     out.sort_by(|a, b| match (a.is_head, b.is_head) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.cmp(&b.name),
+        // The checked-out branch first, then the most recently committed to, as
+        // lazygit orders them; a tie falls back to the name.
+        _ => b
+            .tip_time
+            .cmp(&a.tip_time)
+            .then_with(|| a.name.cmp(&b.name)),
     });
     Ok(out)
 }

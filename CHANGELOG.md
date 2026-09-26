@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Branches are listed with the checked-out one first, then the most recently committed to, as in lazygit; before, alphabetically.
+
 - The new-branch prompt names the branch it starts from: `New branch name (branch is off of 'main')`, as in lazygit.
 
 - `r` rewords the selected commit in Commits, as in lazygit; `w` still works and the key bar now shows `Reword: r`.

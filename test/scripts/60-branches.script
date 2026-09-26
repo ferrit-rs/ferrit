@@ -17,11 +17,11 @@ key enter
 git rev-parse --abbrev-ref HEAD => "wip/replay"
 git branch --format=%(refname:short) -> "wip/replay"
 
-# Delete asks first. The list is HEAD first, then alphabetical: wip/replay,
-# feat/tui-skeleton, fix/parse-args, main. fix/parse-args is an ancestor of
-# main, so -d succeeds.
-key 3 k k k k j j
-expect-text "3 of 4"
+# Delete asks first. The list is HEAD first, then the most recently committed
+# to: wip/replay, main, feat/tui-skeleton, fix/parse-args. fix/parse-args is an
+# ancestor of main, so -d succeeds.
+key 3 k k k k j j j
+expect-text "4 of 4"
 key d
 expect-text "delete branch fix/parse-args?"
 key n
