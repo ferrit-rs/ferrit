@@ -1,8 +1,8 @@
 //! Branches-pane actions: checkout, create, delete, fast-forward, merge.
 
 use super::{
-    App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup, TextInput,
-    git,
+    App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup,
+    SelectionKey, TextInput, git,
 };
 
 impl App {
@@ -106,6 +106,11 @@ impl App {
         match repo.create_branch(&name) {
             Ok(()) => {
                 self.popup = None;
+                // The new branch is the checked-out one: select it, not the
+                // row the cursor was on (lazygit).
+                if self.branch_drill.is_none() && self.branches_tab == BranchesTab::Local {
+                    self.select_when_listed(Pane::Branches, SelectionKey::Branch(name));
+                }
                 self.request_refresh();
             },
             Err(e) => self.report_error(e),

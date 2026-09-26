@@ -332,6 +332,12 @@ opens the editor; `n` / `Esc` cancels. `A` and `w` are enabled even with an empt
 because amending a message is valid; `A` with nothing staged just reuses the
 tree, which is what `git commit --amend` does.
 
+After a commit succeeds, the selection in Commits moves to the new `HEAD` (the top
+row), from whichever row it was on, as lazygit does; the hash `git commit` reports
+is remembered and selected once a refresh lists it (`App::select_when_listed`, the
+same mechanism as a new branch in `docs/PLAN_8_BRANCHES.md`). Not done while the
+list is drilled into a commit's files.
+
 ## Edge cases
 
 | Case | Behaviour |

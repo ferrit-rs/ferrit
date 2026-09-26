@@ -332,6 +332,12 @@ command yourself would.
 `Enter` (drill into a branch's log) and the branch-log-preview-on-select
 behaviour from phase 2 are unchanged.
 
+After `n` creates a branch, the selection moves to it (it is the checked-out
+one, first in the list), not the row the cursor was on. Found by running the
+same flow in lazygit and ferrit (`test/flows/feature-workflow.flow`). The row is
+remembered by name (`App::select_when_listed`) and selected once a refresh lists
+it, so a refresh already in flight when the branch was made does not lose it.
+
 ## Edge cases
 
 | Case | Behaviour |

@@ -428,7 +428,7 @@ enum BranchesTab {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum SelectionKey {
+pub(super) enum SelectionKey {
     File(PathBuf),
     Directory(PathBuf),
     Branch(String),
@@ -598,6 +598,11 @@ pub struct App {
     /// even with the selection off screen (lazygit). Any other selection
     /// re-attaches the view to it, so no key or click has to clear this.
     view_detached_at: EnumMap<Pane, Option<usize>>,
+    /// Rows an action just created (the new branch, the new `HEAD`) that the
+    /// selection moves to once a refresh lists them, as lazygit does. Kept
+    /// until found, so a refresh already in flight when the action ran, which
+    /// cannot list them yet, does not lose it.
+    select_when_listed: Vec<(Pane, SelectionKey)>,
     /// A click landed on the right pane. Purely a border-highlight flag for
     /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
     /// left-pane navigation and selection are untouched. Cleared by `Esc` or
@@ -771,6 +776,7 @@ impl App {
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
             view_detached_at: EnumMap::default(),
+            select_when_listed: Vec::new(),
             right_focused: false,
             mode: Mode::default(),
             cursor: DiffCursor::default(),
@@ -1051,9 +1057,25 @@ impl App {
                 .unwrap_or(old_index);
             self.selection[pane] = new_index.min(last);
         }
+        let mut waiting = std::mem::take(&mut self.select_when_listed);
+        waiting.retain(|(pane, key)| match self.find_selection_key(*pane, key) {
+            Some(index) => {
+                self.selection[*pane] = index;
+                false
+            },
+            None => true,
+        });
+        self.select_when_listed = waiting;
         self.diff_query.refresh_requested = true;
         self.invalidate_image_query();
         self.update_right_pane();
+    }
+
+    /// After an action that created `key`'s row, select it in `pane` as soon as
+    /// a refresh lists it.
+    pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
+        self.select_when_listed.retain(|(p, _)| *p != pane);
+        self.select_when_listed.push((pane, key));
     }
 
     fn on_refresh_done(&mut self, completion: RefreshCompletion) {

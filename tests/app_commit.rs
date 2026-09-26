@@ -139,6 +139,37 @@ fn c_opens_types_and_enter_commits() {
 }
 
 #[test]
+fn the_new_commit_is_the_selected_row_whichever_row_the_cursor_was_on() {
+    let dir = TempDir::new("app-commit-selects");
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    commit_all(&repo, "second");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\nthree\n").unwrap();
+    Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["add", "a.txt"])
+        .output()
+        .unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.select(Pane::Commits, 1); // an older commit, not the top one
+    app.select(Pane::Files, 0);
+    app.feed_key(char_key('c'));
+    type_text(&mut app, "feat: third");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    assert_eq!(
+        app.selected(Pane::Commits),
+        0,
+        "the commit just made is the selected row"
+    );
+}
+
+#[test]
 fn tab_switches_to_body_and_ctrl_enter_commits_message() {
     let dir = TempDir::new("app-commit-body");
     let repo = Repository::init(dir.path()).unwrap();

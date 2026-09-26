@@ -165,6 +165,23 @@ fn n_opens_types_and_enter_creates_and_switches() {
 }
 
 #[test]
+fn the_new_branch_is_the_selected_row_whichever_row_the_cursor_was_on() {
+    let (_dir, mut app) = two_branch_app("app-branch-create-selects");
+    select_branch(&mut app, "feat"); // the cursor is elsewhere when `n` is pressed
+    app.feed_key(char_key('n'));
+    type_text(&mut app, "wip/replay");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    let selected = app.selected(Pane::Branches);
+    assert!(
+        app.branch_lines()[selected]
+            .to_string()
+            .contains("wip/replay"),
+        "the selection follows the branch just created, row {selected}"
+    );
+}
+
+#[test]
 fn n_with_a_name_already_taken_keeps_the_popup_open_with_the_typed_text() {
     let (dir, mut app) = two_branch_app("app-branch-create-taken");
     let head_before = git(dir.path(), &["symbolic-ref", "--short", "HEAD"]);

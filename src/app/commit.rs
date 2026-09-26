@@ -2,8 +2,8 @@
 //! editor: `c` opens it; Tab switches fields; Enter confirms summary.
 
 use super::{
-    App, AppError, ApplyDir, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Popup, TextInput,
-    TextInputMode, git,
+    App, AppError, ApplyDir, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Pane, Popup,
+    SelectionKey, TextInput, TextInputMode, git,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -340,10 +340,15 @@ impl App {
         let result = repo.commit(&kind, &message, opts);
 
         match result {
-            Ok(_) => {
+            Ok(head) => {
                 self.commit_draft = None;
                 self.popup = None;
                 self.commit_overlay.close();
+                // The commit just made tops the list, and is the row selected
+                // once it shows up (lazygit).
+                if self.commit_drill.is_none() {
+                    self.select_when_listed(Pane::Commits, SelectionKey::Commit(head));
+                }
                 self.request_refresh();
             },
             Err(git::error::GitError::NothingStaged) => {
