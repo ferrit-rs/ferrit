@@ -287,9 +287,14 @@ pub(super) fn file_diff(
 pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
     let workdir = workdir(repo)?;
 
+    // `--decorate` puts `(HEAD -> main, tag: v1, origin/main)` on the commit line and
+    // `--stat` the per-file summary between the message and the patch, as lazygit's
+    // Patch shows them.
     let out = DiffCmd::base("show", opts)
         .arg("-m")
         .arg("--first-parent")
+        .arg("--decorate=short")
+        .arg("--stat")
         .arg("-p")
         .arg(hash.to_owned())
         .run(workdir)?;

@@ -7,7 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
-- Commit names show where they point: `(HEAD -> main, tag: v0.6.0, origin/main)` on the branch Log, and a commit's tags in the Commits list before its subject. Before, no tag or ref was shown anywhere.
+- A commit's Patch has the `---` line and the per-file stat (`a.txt | 1 +`, `1 file changed, 1 insertion(+)`) between its message and the diff, as in lazygit; before it went straight from the message to the diff.
+- Commit names show where they point: `(HEAD -> main, tag: v0.6.0, origin/main)` on a commit's Patch and on the branch Log, and a commit's tags in the Commits list before its subject. Before, no tag or ref was shown anywhere.
 - In the Commits list the hash is red for a commit not pushed yet, yellow for one pushed, and green for one merged into `origin/main` (or `origin/master`), as in lazygit; before every hash was green.
 
 - After a command that prints something on stdout (a commit: `[main 3cd9f42] docs: flow-compare demo`), the Infos box shows that first line under the command, as lazygit's command log does with git's output. Before, only `$ git commit -F -` showed, with no sign of what git answered.

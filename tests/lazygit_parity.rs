@@ -286,3 +286,33 @@ fn the_branch_log_shows_ref_decorations() {
     assert!(log.contains("(tag: v1, origin/main)"), "{log}");
 }
 
+/// Done when: a commit's Patch carries the same decoration on its `commit` line (step 12).
+#[test]
+fn a_commit_patch_shows_ref_decorations() {
+    let (repo, _first, _second) = published_repo("patch-decor");
+    let mut app = repo.app();
+    key(&mut app, '4');
+    let tip = frame(&mut app);
+    assert!(tip.contains("(HEAD -> main)"), "{tip}");
+    key(&mut app, 'j');
+    let older = frame(&mut app);
+    assert!(older.contains("(tag: v1, origin/main)"), "{older}");
+}
+
+/// Done when: a commit's Patch has lazygit's `---` line and per-file stat between the
+/// message and the diff (step 12).
+#[test]
+fn a_commit_patch_has_the_stat_block_before_the_diff() {
+    let (repo, _first, _second) = published_repo("stat");
+    let mut app = repo.app();
+    key(&mut app, '4');
+    let out = frame(&mut app);
+    let dashes = out.find("---").expect("the separator before the stat");
+    let stat = out.find("a.txt | 1 +").expect("the per-file stat line");
+    let summary = out.find("1 file changed").expect("the totals line");
+    let diff = out.find("diff --git").expect("the diff");
+    assert!(
+        dashes < stat && stat < summary && summary < diff,
+        "message, ---, stat, totals, then the diff\n{out}"
+    );
+}

@@ -28,6 +28,10 @@ highlight (from earlier work) are unaffected by this change.
 
 ## LazyGit visual contract
 
+A commit's patch is `git show --decorate=short --stat -p`: the decoration `(HEAD -> main,
+tag: v0.6.0, origin/main)` on the `commit` line, and lazygit's `---` line with the per-file
+stat between the message and the diff.
+
 Lazygit does not show raw git show output directly. It presents structured
 patch output:
 
