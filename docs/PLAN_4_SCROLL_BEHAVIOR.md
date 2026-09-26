@@ -166,14 +166,24 @@ AppEvent::Input(Event::Mouse(m)) => self.on_mouse(m),
 MouseEventKind::ScrollDown | ScrollUp:
     if column is inside self.right_area and the right pane is a real diff:
         scroll_right(±WHEEL_LINES)          // 3, matching gitu's default
-    else:
-        move the focused left-pane selection by ±1
+    else if the pointer is over a left pane:
+        scroll that pane's list by ±2 rows  // lazygit's scrollHeight;
+                                            // focus, selection, right pane untouched
+    else: nothing
 other kinds: ignored (no click-to-select yet)
 ```
 
 Column test: `self.right_area.x <= m.column < self.right_area.x + self.right_area.width`.
-Wheel over the left column moving the selection is a small bonus lazygit also
-does; drop it if it complicates the diff test.
+
+Over a left pane the wheel scrolls the *view*, not the selection, and acts on
+the pane under the pointer, not the focused one. That is lazygit's behaviour,
+found by running the same flow in both (`test/flows/ui-mouse.flow`); the first
+version of ferrit moved the focused pane's selection one row a tick. The
+selection may end up off screen. `App::view_detached_at` remembers the row
+that was selected when the wheel scrolled; while the selection is still that
+row the list keeps the wheel's offset, and any other selection makes the
+ratatui offset follow it again (`tests/list_wheel.rs`). `ListState::select(None)`
+resets the offset in ratatui, so an off-screen selection is simply not passed.
 
 Enabling mouse capture also means the terminal no longer does native
 text selection with the mouse. lazygit accepts this; ferrit does too (a

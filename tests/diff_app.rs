@@ -218,6 +218,15 @@ fn mouse_wheel_routes_by_column() {
         width: 80,
         height: 12,
     });
+    app.set_left_area(
+        Pane::Files,
+        Rect {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 12,
+        },
+    );
     app.select(Pane::Files, 0);
 
     let wheel = |column: u16| MouseEvent {
@@ -237,13 +246,18 @@ fn mouse_wheel_routes_by_column() {
     app.feed_mouse(wheel(5));
     assert_eq!(
         app.selected(Pane::Files),
-        1,
-        "wheel over the list moves the selection"
+        0,
+        "wheel over the list scrolls its view, the selection stays"
+    );
+    assert_eq!(
+        app.list_offset(Pane::Files),
+        2,
+        "a wheel tick scrolls a list two rows"
     );
     assert_eq!(
         app.right_scroll(),
-        0,
-        "the new file's diff starts at the top"
+        3,
+        "the diff of the still-selected file is not reset"
     );
 }
 

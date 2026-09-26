@@ -28,6 +28,9 @@ const AUTHOR_CHANGE_CONFIRM_MESSAGE: &str =
     "Use this global Git user for future Ferrit commits? Git config stays unchanged.";
 const AUTHOR_RESET_CONFIRM_MESSAGE: &str = "Return to the identity resolved from Git config?";
 
+/// Rows a wheel tick scrolls a left pane's list: lazygit's `scrollHeight`.
+const LIST_WHEEL_ROWS: isize = 2;
+
 impl App {
     pub(super) fn on_key(&mut self, key: KeyEvent) {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
@@ -468,8 +471,7 @@ impl App {
     }
 
     /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
-    /// over the main view"); over the left column it nudges the focused
-    /// pane's selection.
+    /// over the main view"); over a left pane it scrolls that pane's list.
     pub(super) fn wheel(&mut self, ev: MouseEvent, step: isize) {
         let a = self.right_area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
@@ -477,12 +479,12 @@ impl App {
             self.scroll_right(step * isize::from(self.config.ui.wheel_step));
             return;
         }
-        if step > 0 {
-            self.select_down();
-        } else {
-            self.select_up();
+        // Over a left pane the wheel scrolls that pane's view, wherever the
+        // focus is, and leaves the focus, the selection and the right pane
+        // alone (lazygit). Anywhere else there is nothing to scroll.
+        if let Some(pane) = self.pane_at(ev.column, ev.row) {
+            self.scroll_list(pane, step * LIST_WHEEL_ROWS);
         }
-        self.update_right_pane();
     }
 
     pub(super) fn pane_offset(&self, delta: usize) -> Pane {

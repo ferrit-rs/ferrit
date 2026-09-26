@@ -593,6 +593,11 @@ pub struct App {
     /// keep the selection on screen. Lets a click in a scrolled list map to
     /// the right row. Only valid post-render; 0 before the first draw.
     list_offset: EnumMap<Pane, usize>,
+    /// Per left pane, the selected row a wheel scroll left behind: while the
+    /// selection is still that row, the view stays where the wheel put it,
+    /// even with the selection off screen (lazygit). Any other selection
+    /// re-attaches the view to it, so no key or click has to clear this.
+    view_detached_at: EnumMap<Pane, Option<usize>>,
     /// A click landed on the right pane. Purely a border-highlight flag for
     /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
     /// left-pane navigation and selection are untouched. Cleared by `Esc` or
@@ -765,6 +770,7 @@ impl App {
             toast: None,
             left_areas: EnumMap::default(),
             list_offset: EnumMap::default(),
+            view_detached_at: EnumMap::default(),
             right_focused: false,
             mode: Mode::default(),
             cursor: DiffCursor::default(),
@@ -1373,6 +1379,24 @@ impl App {
     /// the right row.
     pub fn set_list_offset(&mut self, pane: Pane, offset: usize) {
         self.list_offset[pane] = offset;
+    }
+
+    /// Whether a wheel scroll left `pane`'s view away from its selection. Read
+    /// by `ui::draw_left_column`; forgets a detachment the selection has left.
+    pub fn view_detached(&mut self, pane: Pane) -> bool {
+        let selected = self.selection[pane];
+        if self.view_detached_at[pane] != Some(selected) {
+            self.view_detached_at[pane] = None;
+        }
+        self.view_detached_at[pane].is_some()
+    }
+
+    /// Scroll `pane`'s list by `rows` (negative is up) and keep its selection
+    /// where it is, which may leave it off screen. `draw_left_column` clamps
+    /// the offset to the list's length on the next frame.
+    pub(super) fn scroll_list(&mut self, pane: Pane, rows: isize) {
+        self.view_detached_at[pane] = Some(self.selection[pane]);
+        self.list_offset[pane] = self.list_offset[pane].saturating_add_signed(rows);
     }
 
     /// Feed one key to the handler. Integration-test seam; the running app

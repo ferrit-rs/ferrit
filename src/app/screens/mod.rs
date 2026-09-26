@@ -268,7 +268,9 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
         let row_ct = app.row_count(pane);
         let lines = pane_lines(app, pane);
+        let detached = app.view_detached(pane);
         let offset = PaneList::new(lines, block)
+            .detached(detached)
             .selected((row_ct > 0).then(|| app.selected(pane).min(row_ct - 1)))
             .offset(app.list_offset(pane))
             .highlight_style(theme::selection_style(palette, focused))

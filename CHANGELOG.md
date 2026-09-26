@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The mouse wheel over a left pane scrolls that pane's list, whichever pane has the focus; before, it moved the focused pane's selection. The list scrolls two rows a tick and the selection stays where it was, even off screen, with the right pane still showing it, as in lazygit; any key or click that changes the selection brings the view back to it. Over the right pane the wheel scrolls the diff as before, and elsewhere it does nothing.
+
 ## [0.6.0] - 2026-09-25
 
 - With `[ui] mouse = false`, ferrit ignores mouse events even if the terminal still sends them; before, only mouse capture was left off.
