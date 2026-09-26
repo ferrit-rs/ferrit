@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::git::model::RemoteEntry;
 use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
-use crate::domain::git::model::{Change, FileEntry, StatusHeader};
+use crate::domain::git::model::{Change, FileEntry, PushState, StatusHeader};
 
 /// An 8x8 PNG, embedded so `App::mock()` can drive the image-preview path with
 /// no repo and nothing on disk.
@@ -129,6 +129,8 @@ pub fn mock_commits() -> Vec<CommitEntry> {
             author: "Max Wells".to_owned(),
             summary: summary.to_string(),
             time: 1_725_000_000 - (i64::try_from(i).unwrap_or(0) * 3600),
+            refs: Vec::new(),
+            push_state: PushState::Merged,
         })
         .collect()
 }

@@ -122,6 +122,35 @@ pub struct BranchEntry {
     pub tip_time: i64,
 }
 
+/// What a name that points at a commit is, for the `(HEAD -> main, tag: v1, origin/main)`
+/// decoration and for a tag shown in the commit list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommitRefKind {
+    /// `HEAD -> main`, or a bare `HEAD` when detached.
+    Head,
+    Branch,
+    Tag,
+    Remote,
+}
+
+/// One name pointing at a commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommitRef {
+    /// As `git log --decorate` writes it: `HEAD -> main`, `feat/x`, `tag: v0.6.0`, `origin/main`.
+    pub label: String,
+    pub kind: CommitRefKind,
+}
+
+/// Where a commit stands relative to the remote, lazygit's hash colours: red
+/// not pushed yet, yellow pushed, green merged into the remote's main branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PushState {
+    #[default]
+    Unpushed,
+    Pushed,
+    Merged,
+}
+
 /// One commit row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitEntry {
@@ -130,9 +159,30 @@ pub struct CommitEntry {
     pub author: String,
     pub summary: String,
     pub time: i64,
+    /// Names pointing at this commit, in `git log --decorate` order: `HEAD ->` and the
+    /// branches, then tags, then remote branches. Empty when none, and in a branch's log.
+    pub refs: Vec<CommitRef>,
+    pub push_state: PushState,
 }
 
 impl CommitEntry {
+    /// `(HEAD -> main, tag: v0.6.0, origin/main)`, `None` when nothing points here.
+    pub fn decoration(&self) -> Option<String> {
+        if self.refs.is_empty() {
+            return None;
+        }
+        let labels: Vec<&str> = self.refs.iter().map(|r| r.label.as_str()).collect();
+        Some(format!("({})", labels.join(", ")))
+    }
+
+    /// The tag names on this commit, without the `tag: ` prefix.
+    pub fn tags(&self) -> impl Iterator<Item = &str> {
+        self.refs
+            .iter()
+            .filter(|r| r.kind == CommitRefKind::Tag)
+            .map(|r| r.label.trim_start_matches("tag: "))
+    }
+
     /// Up to two uppercase initials from the author name.
     pub fn author_initials(&self) -> String {
         let mut initials: String = self

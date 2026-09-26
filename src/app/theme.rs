@@ -14,10 +14,10 @@ use syntect::parsing::SyntaxSet;
 use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
-use crate::domain::git::model::Change;
 use crate::domain::git::model::FileEntry;
 use crate::domain::git::model::RemoteEntry;
 use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
+use crate::domain::git::model::{Change, CommitRefKind, PushState};
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[
@@ -223,15 +223,55 @@ pub fn remote_line(p: &Palette, entry: &RemoteEntry) -> Line<'static> {
 /// node in green, author initials in magenta, subject plain. `graph` is the
 /// graph-column glyph, a plain `o` for linear history until phase 2 G4.
 pub fn commit_line(p: &Palette, entry: &CommitEntry) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(entry.short_hash.clone(), fg(p.hash)),
+    // lazygit's hash colours: red not pushed yet, yellow pushed, green merged into
+    // the remote's main branch.
+    let hash = match entry.push_state {
+        PushState::Unpushed => p.del,
+        PushState::Pushed => p.warn,
+        PushState::Merged => p.hash,
+    };
+    let mut spans = vec![
+        Span::styled(entry.short_hash.clone(), fg(hash)),
         Span::raw(" "),
         Span::styled(entry.author_initials(), fg(p.author)),
         Span::raw(" "),
         Span::styled("o", fg(p.hash)),
         Span::raw(" "),
-        Span::raw(entry.summary.clone()),
-    ])
+    ];
+    // Tags sit before the subject, in bold magenta.
+    for tag in entry.tags() {
+        spans.push(Span::styled(
+            tag.to_owned(),
+            fg(p.author).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" "));
+    }
+    spans.push(Span::raw(entry.summary.clone()));
+    Line::from(spans)
+}
+
+/// `(HEAD -> main, tag: v0.6.0, origin/main)` as spans, each name in its own colour: the
+/// checked-out branch and `HEAD` green, other branches green, tags yellow, remotes red.
+/// Empty when nothing points at the commit.
+fn decoration_spans(p: &Palette, entry: &CommitEntry) -> Vec<Span<'static>> {
+    if entry.refs.is_empty() {
+        return Vec::new();
+    }
+    let mut spans = vec![Span::raw(" (")];
+    for (i, reference) in entry.refs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw(", "));
+        }
+        let style = match reference.kind {
+            CommitRefKind::Head => fg(p.add).add_modifier(Modifier::BOLD),
+            CommitRefKind::Branch => fg(p.add),
+            CommitRefKind::Tag => fg(p.warn).add_modifier(Modifier::BOLD),
+            CommitRefKind::Remote => fg(p.del),
+        };
+        spans.push(Span::styled(reference.label.clone(), style));
+    }
+    spans.push(Span::raw(")"));
+    spans
 }
 
 /// Line count of one `branch_log_block` entry. Kept in sync with it so the
@@ -247,12 +287,14 @@ pub const BRANCH_LOG_BLOCK_LINES: usize = 6;
 pub fn branch_log_block(p: &Palette, entry: &CommitEntry) -> Vec<Line<'static>> {
     let graph = fg(p.hunk);
     let label = fg(p.idle);
+    let mut header = vec![
+        Span::styled("* ", graph),
+        Span::styled("commit ", label),
+        Span::styled(entry.short_hash.clone(), fg(p.hash)),
+    ];
+    header.extend(decoration_spans(p, entry));
     vec![
-        Line::from(vec![
-            Span::styled("* ", graph),
-            Span::styled("commit ", label),
-            Span::styled(entry.short_hash.clone(), fg(p.hash)),
-        ]),
+        Line::from(header),
         Line::from(vec![
             Span::styled("| ", graph),
             Span::styled("Author: ", label),

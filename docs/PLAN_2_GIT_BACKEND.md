@@ -52,6 +52,14 @@ landed early in `src/domain/git/model.rs` as part of phase 1's lazygit re-skin (
 early: `Repo::name()` for the `ferrit -> main` status line, and the right-pane
 contextual titles (`Pane::right_title`).
 
+`CommitEntry` also carries `refs` (the names pointing at it, in `git log --decorate` order:
+`HEAD -> main` and branches, tags, remotes) and `push_state` (`Unpushed`, `Pushed`,
+`Merged`), filled by `log::commits` for HEAD's list: a commit reachable from `origin/main`
+(or `origin/master`) is merged, one reachable from the current branch's upstream is
+pushed, the rest are not pushed. A branch's own log gets `refs` only. The ancestry walks
+stop once every listed commit is placed, or after 20,000 commits. Found by comparing a
+flow with lazygit (`test/flows/feature-workflow.flow`).
+
 ```rust
 pub struct StatusHeader {
     pub branch: String,           // "main", or a short hash when detached

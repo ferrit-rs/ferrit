@@ -231,3 +231,58 @@ fn a_commit_shows_git_s_own_answer_under_the_command() {
     let second: String = lines[1].spans.iter().map(|s| s.content.as_ref()).collect();
     assert!(second.contains("zz answer marker"), "{second}");
 }
+
+/// A repository whose `main` is published to a bare `origin`, with a tag on the first
+/// commit and one more commit that is not pushed. Returns the short hashes.
+fn published_repo(tag: &str) -> (Repo, String, String) {
+    let repo = Repo::new(tag);
+    repo.commit("a.txt", "one\n", "first");
+    repo.git(&["tag", "v1"]);
+    let origin = format!("{}-origin", repo.dir.display());
+    let _ = fs::remove_dir_all(&origin);
+    Command::new("git")
+        .args(["init", "-q", "--bare", &origin])
+        .output()
+        .unwrap();
+    repo.git(&["remote", "add", "origin", &origin]);
+    repo.git(&["push", "-q", "-u", "origin", "main"]);
+    repo.commit("a.txt", "one\ntwo\n", "second");
+    let first = repo.git(&["rev-parse", "--short=7", "HEAD~1"]);
+    let second = repo.git(&["rev-parse", "--short=7", "HEAD"]);
+    (repo, first, second)
+}
+
+/// Done when: in the Commits list a tag shows before the subject (`v1 first`), and the hash
+/// is red for a commit not pushed yet, green for one merged into origin/main (step 6, 11).
+#[test]
+fn the_commit_list_shows_tags_and_colours_hashes_by_push_state() {
+    let (repo, first, second) = published_repo("list-state");
+    let mut app = repo.app();
+    key(&mut app, '4');
+    key(&mut app, 'j'); // select the older commit so the newer row is drawn plain
+    let out = frame(&mut app);
+    assert!(out.contains("v1 first"), "a tag before the subject\n{out}");
+
+    let unpushed = colour_of(&mut app, &second).unwrap();
+    key(&mut app, 'k'); // now the older one is drawn plain
+    let merged = colour_of(&mut app, &first).unwrap();
+    assert_ne!(unpushed, merged, "unpushed and merged hashes differ");
+    assert_eq!(
+        unpushed,
+        ratatui::style::Color::Red,
+        "not pushed yet is red"
+    );
+}
+
+/// Done when: the branch Log carries the decoration lazygit prints, `(HEAD -> main)` on
+/// the tip and `(tag: v1, origin/main)` on the published commit (step 8).
+#[test]
+fn the_branch_log_shows_ref_decorations() {
+    let (repo, _first, _second) = published_repo("log-decor");
+    let mut app = repo.app();
+    key(&mut app, '3');
+    let log = frame(&mut app);
+    assert!(log.contains("(HEAD -> main)"), "{log}");
+    assert!(log.contains("(tag: v1, origin/main)"), "{log}");
+}
+

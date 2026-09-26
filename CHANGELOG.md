@@ -7,6 +7,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Commit names show where they point: `(HEAD -> main, tag: v0.6.0, origin/main)` on the branch Log, and a commit's tags in the Commits list before its subject. Before, no tag or ref was shown anywhere.
+- In the Commits list the hash is red for a commit not pushed yet, yellow for one pushed, and green for one merged into `origin/main` (or `origin/master`), as in lazygit; before every hash was green.
+
 - After a command that prints something on stdout (a commit: `[main 3cd9f42] docs: flow-compare demo`), the Infos box shows that first line under the command, as lazygit's command log does with git's output. Before, only `$ git commit -F -` showed, with no sign of what git answered.
 
 - `Space` on a directory row in Files stages every change under it, or unstages them all when none is left to stage, as in lazygit; before it did nothing on a directory. On the root row it is every file. Conflicted files that still hold markers block it, with the same message as for a single file.
