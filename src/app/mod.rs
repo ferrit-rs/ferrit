@@ -603,6 +603,8 @@ pub struct App {
     /// until found, so a refresh already in flight when the action ran, which
     /// cannot list them yet, does not lose it.
     select_when_listed: Vec<(Pane, SelectionKey)>,
+    /// The new-branch prompt's title, naming the branch it starts from (lazygit).
+    new_branch_title: String,
     /// A click landed on the right pane. Purely a border-highlight flag for
     /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
     /// left-pane navigation and selection are untouched. Cleared by `Esc` or
@@ -777,6 +779,7 @@ impl App {
             list_offset: EnumMap::default(),
             view_detached_at: EnumMap::default(),
             select_when_listed: Vec::new(),
+            new_branch_title: String::new(),
             right_focused: false,
             mode: Mode::default(),
             cursor: DiffCursor::default(),

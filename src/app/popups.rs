@@ -84,7 +84,7 @@ impl App {
             return None;
         };
         Some(CommitPopupView {
-            title: "New branch",
+            title: &self.new_branch_title,
             input: buf,
             description: None,
             summary_focused: false,

@@ -333,3 +333,16 @@ fn r_rewords_the_selected_commit_and_w_still_does() {
         app.feed_key(KeyEvent::from(KeyCode::Esc));
     }
 }
+
+/// Done when: the new-branch prompt is titled `New branch name (branch is off of 'main')`,
+/// naming the branch it starts from (step 7).
+#[test]
+fn the_new_branch_prompt_names_the_branch_it_starts_from() {
+    let repo = Repo::new("prompt-base");
+    repo.commit("a.txt", "one\n", "first");
+    let mut app = repo.app();
+    key(&mut app, '3');
+    key(&mut app, 'n');
+    let out = frame(&mut app);
+    assert!(out.contains("New branch name (branch is off of 'main')"), "{out}");
+}

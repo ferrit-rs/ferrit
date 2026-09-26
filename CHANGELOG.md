@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The new-branch prompt names the branch it starts from: `New branch name (branch is off of 'main')`, as in lazygit.
+
 - `r` rewords the selected commit in Commits, as in lazygit; `w` still works and the key bar now shows `Reword: r`.
 
 - A commit's Patch has the `---` line and the per-file stat (`a.txt | 1 +`, `1 file changed, 1 insertion(+)`) between its message and the diff, as in lazygit; before it went straight from the message to the diff.

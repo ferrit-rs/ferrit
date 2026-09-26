@@ -89,6 +89,10 @@ impl App {
         {
             return;
         }
+        self.new_branch_title = format!(
+            "New branch name (branch is off of '{}')",
+            self.header.branch
+        );
         self.popup = Some(Popup::NewBranch(TextInput::default()));
     }
 
