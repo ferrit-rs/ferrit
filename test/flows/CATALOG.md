@@ -106,9 +106,9 @@ E7 is free: the copy's remotes already point nowhere.
 
 | ID | Workflow | What it checks | Status |
 |---|---|---|---|
-| F1 | Stash push | the message prompt, the empty tree after | SETUP |
+| F1 | Stash push | the message prompt, the empty tree after | DONE (stash) |
 | F2 | Stash with untracked, keep index | the options | SETUP, KEYS |
-| F3 | Apply, pop, drop | each result, the list after | SETUP |
+| F3 | Apply, pop (drop not covered) | each result, the list after | DONE (stash) |
 | F4 | Stash files view | Enter on a stash, its files and patch | SETUP |
 | F5 | Rename a stash | | KEYS |
 

@@ -1,0 +1,32 @@
+# Stash: push, apply (keeps it), pop (applies and drops). No feature of ours has
+# touched this yet, unlike commit and branches.
+focus "the stash workflow: push a change, apply it, pop it"
+not "stash message editing beyond the plain case, dropping a stash, renaming one"
+repo .
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+
+note "A clean repo, then an edit to stash."
+step 01_start
+sh "printf '\n- stash flow demo\n' >> README.md"
+step 02_files_changed 2
+
+note "s on Files: stash push. Type a message, confirm."
+step 03_stash_prompt s
+step 04_stash_named "text:wip: stash demo" Enter
+
+note "The tree is clean again, the stash panel has one entry."
+step 05_files_clean
+step 06_stash_list 5
+
+note "Apply (keeps the stash): the change is back, the entry is still there."
+step 07_apply Space Enter
+step 08_after_apply 2
+
+sh "git reset -q --hard"
+
+note "Pop (applies and drops): the change is back, the stash is empty."
+step 09_focus_stash_again 5
+step 10_pop g Enter
+step 11_stash_empty
+step 12_files_after_pop 2
