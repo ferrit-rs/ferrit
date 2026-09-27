@@ -7,7 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
-- README now shows the Ferrit demo GIF at the top.
+- README now shows a compressed Ferrit demo GIF at the top (600×432, 6 fps).
 
 - Selecting a directory row in Files shows the diff of the files under it in the right pane (`git diff -- <dir>`, on the staged or unstaged side), and the root row every file, as in lazygit; before the pane stayed empty. Untracked files under a directory are not in that diff yet.
 
