@@ -500,6 +500,7 @@ impl App {
                 }
             },
             ConfirmAction::DropStash { oid } => self.drop_stash(&oid),
+            ConfirmAction::RestoreStash { oid, pop } => self.restore_stash(&oid, pop),
             ConfirmAction::DropCommit { hash } => self.drop_commit(&hash),
             ConfirmAction::AbortOperation => {
                 self.apply_operation_step(git::operation::Step::Abort);

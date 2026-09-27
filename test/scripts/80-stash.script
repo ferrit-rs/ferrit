@@ -16,8 +16,10 @@ expect-text "stash@{0}"
 expect-text "parked"
 expect-text "diff --git a/src/main.rs b/src/main.rs"   # the preview
 
-# Apply keeps the entry and brings the changes back.
+# Apply asks first, keeps the entry and brings the changes back.
 key space
+expect-text "apply stash@{0}: On main: parked?"
+key y
 git status --porcelain -> " M src/main.rs"          # apply restores it unstaged
 git status --porcelain -> "?? docs/notes.md"
 git stash list -> "parked"
@@ -35,6 +37,8 @@ key enter
 key 5 j
 git stash list -> "second"
 key g                                      # pops `parked`, the older one
+expect-text "pop stash@{1}: On main: parked?"
+key y
 git stash list => "stash@{0}: On main: second"
 git status --porcelain -> "?? docs/notes.md"
 key d y

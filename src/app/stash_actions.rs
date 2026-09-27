@@ -50,16 +50,29 @@ impl App {
         }
     }
 
-    /// `<space>` (apply) or `g` (pop) on the Stash pane.
-    pub(super) fn restore_selected_stash(&mut self, pop: bool) {
-        let Some(oid) = self.selected_stash().map(|entry| entry.oid.clone()) else {
+    /// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either,
+    /// same reason as drop (`docs/PLAN_10_STASH.md`) — both mutate the working
+    /// tree at once, with no undo, exactly like the discard prompt they mirror.
+    pub(super) fn restore_stash_prompt(&mut self, pop: bool) {
+        let Some(entry) = self.selected_stash() else {
             return;
         };
+        let verb = if pop { "pop" } else { "apply" };
+        let message = format!("{verb} stash@{{{}}}: {}?", entry.index, entry.message);
+        let oid = entry.oid.clone();
+        self.pending_confirm = Some(ConfirmPrompt {
+            message,
+            action: ConfirmAction::RestoreStash { oid, pop },
+        });
+    }
+
+    /// Confirmed apply or pop.
+    pub(super) fn restore_stash(&mut self, oid: &str, pop: bool) {
         let Some(repo) = &mut self.repo else { return };
         let result = if pop {
-            repo.stash_pop(&oid)
+            repo.stash_pop(oid)
         } else {
-            repo.stash_apply(&oid)
+            repo.stash_apply(oid)
         };
         self.request_refresh();
         match result {

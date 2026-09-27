@@ -128,8 +128,8 @@ impl App {
             Action::EditCommit => self.edit_selected_commit(),
             Action::NewFixup => self.create_fixup_commit(),
             Action::Autosquash => self.autosquash_from_selected(),
-            Action::ApplyStash => self.restore_selected_stash(false),
-            Action::PopStash => self.restore_selected_stash(true),
+            Action::ApplyStash => self.restore_stash_prompt(false),
+            Action::PopStash => self.restore_stash_prompt(true),
             Action::DropStash => self.drop_stash_prompt(),
         }
     }

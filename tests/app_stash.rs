@@ -185,10 +185,17 @@ fn s_is_inert_outside_the_files_pane() {
 }
 
 #[test]
-fn space_applies_and_keeps_the_entry() {
+fn space_asks_then_y_applies_and_keeps_the_entry() {
     let (dir, mut app) = stashed_app("app-stash-apply");
     app.feed_key(char_key(' '));
+    let prompt = app.confirm_message().expect("confirm is up").to_owned();
+    assert!(
+        prompt.contains("apply") && prompt.contains("stash@{0}"),
+        "{prompt}"
+    );
+    assert!(!dir.path().join("new.txt").exists(), "not applied yet");
 
+    app.feed_key(char_key('y'));
     assert!(dir.path().join("new.txt").exists());
     assert_eq!(app.row_count(Pane::Stash), 1, "apply keeps the entry");
     assert_eq!(
@@ -198,13 +205,39 @@ fn space_applies_and_keeps_the_entry() {
 }
 
 #[test]
-fn g_pops_and_removes_the_entry() {
+fn g_asks_then_y_pops_and_removes_the_entry() {
     let (dir, mut app) = stashed_app("app-stash-pop");
     app.feed_key(char_key('g'));
+    let prompt = app.confirm_message().expect("confirm is up").to_owned();
+    assert!(
+        prompt.contains("pop") && prompt.contains("stash@{0}"),
+        "{prompt}"
+    );
+    assert!(
+        git(dir.path(), &["stash", "list"]).contains("parked"),
+        "not popped yet"
+    );
 
+    app.feed_key(char_key('y'));
     assert!(dir.path().join("new.txt").exists());
     assert_eq!(git(dir.path(), &["stash", "list"]), "");
     assert_eq!(app.row_count(Pane::Stash), 0);
+}
+
+#[test]
+fn n_cancels_apply_or_pop_and_changes_nothing() {
+    let (dir, mut app) = stashed_app("app-stash-restore-cancel");
+    app.feed_key(char_key(' '));
+    app.feed_key(char_key('n'));
+    assert!(app.confirm_message().is_none());
+    assert!(!dir.path().join("new.txt").exists());
+    assert!(git(dir.path(), &["stash", "list"]).contains("parked"));
+
+    app.feed_key(char_key('g'));
+    app.feed_key(char_key('n'));
+    assert!(app.confirm_message().is_none());
+    assert!(!dir.path().join("new.txt").exists());
+    assert!(git(dir.path(), &["stash", "list"]).contains("parked"));
 }
 
 #[test]
@@ -276,6 +309,7 @@ fn a_conflicting_pop_keeps_the_stash_and_shows_a_note() {
     app.refresh();
 
     app.feed_key(char_key('g'));
+    app.feed_key(char_key('y'));
     assert!(app.note_popup().is_some_and(|n| n.contains("conflicts")));
     assert!(git(dir.path(), &["stash", "list"]).contains("parked"));
 }

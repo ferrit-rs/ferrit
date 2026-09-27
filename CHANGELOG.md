@@ -15,6 +15,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - README now shows a compressed Ferrit demo GIF at the top (600×432, 6 fps).
 
+- Apply (`<space>`) and pop (`g`) on the Stash pane ask first (`apply stash@{0}: On main: message?`, `y` confirms, `n` or Esc cancels), as in lazygit; before, both mutated the working tree immediately, unlike every other Stash and Branches action that changes something (drop, delete, discard).
+
 - Selecting a directory row in Files shows the diff of the files under it in the right pane (`git diff -- <dir>`, on the staged or unstaged side), and the root row every file, as in lazygit; before the pane stayed empty. Untracked files under a directory are not in that diff yet.
 
 - The Commits pane lists up to 1,000 commits (its counter reads the real total up to there), where it stopped at 200 and read `1 of 200` on a longer history.

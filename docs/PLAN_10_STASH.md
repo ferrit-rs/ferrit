@@ -22,6 +22,10 @@ real right-pane preview, so a user can park work, switch branches (phase 8),
 and come back without leaving ferrit. lazygit's Stash panel does the same:
 `<space>` apply, `g` pop, `d` drop, and `s` from the Files panel to stash.
 
+`<space>` and `g` ask first (`pop stash@{0}: On main: message?`, `y`/`n`), the same
+shape as `d`: found by comparing a flow with lazygit, which also confirms both
+(`test/flows/stash.flow`). Neither mutates a stash entry silently.
+
 This is the last phase `PLAN_0_GENERAL.md` counts toward "v1.0" (phases 1
 through 10).
 
