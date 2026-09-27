@@ -7,7 +7,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
-- README now includes a visible ✅/❌ Ferrit-versus-lazygit capability table, highlighting Ferrit's Git identity drawer, profile activity, and contributor ranking.
+- README comparison table now uses ⚠️ for Ferrit capabilities planned for implementation instead of ❌.
+
+- README now includes a visible ✅/⚠️ Ferrit-versus-lazygit capability table, highlighting Ferrit's Git identity drawer, profile activity, and contributor ranking.
 
 - README now shows a compressed Ferrit demo GIF at the top (600×432, 6 fps).
 

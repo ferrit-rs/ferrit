@@ -26,13 +26,14 @@ the commit flow.
 | Repository profile drawer | ✅ | ❌ | Settings and repository activity in one place |
 | Contributor ranking | ✅ | ❌ | Commit count by author |
 | Recent activity across local and fetched remote branches | ✅ | ❌ | Includes unmerged branch activity |
-| Custom commands | ❌ | ✅ | lazygit supports user-defined commands |
-| Worktree management | ❌ | ✅ | lazygit has built-in worktree actions |
-| Gitflow integration | ❌ | ✅ | Available when Gitflow is installed |
-| Git bisect workflow | ❌ | ✅ | Built into lazygit's documented commit actions |
+| Custom commands | ⚠️ | ✅ | Planned for Ferrit; lazygit supports user-defined commands |
+| Worktree management | ⚠️ | ✅ | Planned for Ferrit; lazygit has built-in worktree actions |
+| Gitflow integration | ⚠️ | ✅ | Planned for Ferrit; available in lazygit when Gitflow is installed |
+| Git bisect workflow | ⚠️ | ✅ | Planned for Ferrit; built into lazygit's documented commit actions |
 
-Comparison covers built-in features. lazygit can be extended with custom
-commands; Ferrit is focused on a smaller, identity-aware Git workflow.
+✅ available · ⚠️ planned. Comparison covers built-in features. lazygit can be
+extended with custom commands; Ferrit is focused on an identity-aware Git
+workflow.
 
 ## Why
 
