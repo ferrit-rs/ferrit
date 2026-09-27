@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Added `CONTRIBUTING.md` with development setup, architecture, CI checks, testing, DCO, and pull request guidance.
+
 - README comparison table now uses ⚠️ for Ferrit capabilities planned for implementation instead of ❌.
 
 - README now includes a visible ✅/⚠️ Ferrit-versus-lazygit capability table, highlighting Ferrit's Git identity drawer, profile activity, and contributor ranking.

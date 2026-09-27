@@ -113,6 +113,9 @@ git commit -s -m "your message"
 
 By signing off you certify the [Developer Certificate of Origin](https://developercertificate.org/).
 
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, checks, testing, and pull
+request guidelines.
+
 See [`MAINTAINERS.md`](MAINTAINERS.md) for the people maintaining this project.
 
 ## License
