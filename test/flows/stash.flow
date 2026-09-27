@@ -19,14 +19,16 @@ note "The tree is clean again, the stash panel has one entry."
 step 05_files_clean
 step 06_stash_list 5
 
-note "Apply (keeps the stash): the change is back, the entry is still there."
-step 07_apply Space Enter
-step 08_after_apply 2
+note "Apply (keeps the stash): a confirm, then y. The change is back, the entry is still there."
+step 07_apply_prompt Space
+step 08_apply y Enter
+step 09_after_apply 2
 
 sh "git reset -q --hard"
 
-note "Pop (applies and drops): the change is back, the stash is empty."
-step 09_focus_stash_again 5
-step 10_pop g Enter
-step 11_stash_empty
-step 12_files_after_pop 2
+note "Pop (applies and drops): a confirm, then y. The change is back, the stash is empty."
+step 10_focus_stash_again 5
+step 11_pop_prompt g
+step 12_pop y Enter
+step 13_stash_empty
+step 14_files_after_pop 2
