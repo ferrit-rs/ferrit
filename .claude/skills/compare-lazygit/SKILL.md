@@ -184,6 +184,17 @@ before looking at any screenshot.
 - A step with nothing inside the focus gets `- nothing in this flow's scope`.
 - A flow with no `focus` line gets one before it is run: ask what it is for.
 
+## Reading a screenshot without misattributing text
+
+The same string can appear twice on one screen: a stash or commit's own diff
+often repeats its label as the first line of the patch, next to the left
+panel's row carrying the same label. Before writing a claim about what a
+specific panel or row says, be sure which region of the screen it came from,
+not just that the text is present somewhere in the image; a tight crop is
+worth it when two candidates are plausible. A finding that turns out to
+compare two different regions of the same screenshot is worse than no
+finding: it invents a difference that was never there.
+
 ## What to compare in each pair
 
 - Behaviour visible on screen: what the selection does after an action, what
