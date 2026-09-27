@@ -102,7 +102,10 @@ inside the focus (see the skill), so the interface's own behaviour is judged in
 
 After a fix, `flow-compare.sh` keeps the run it replaces under `before/`, and an audit
 row with a sixth cell (`8, 12`) shows ferrit's screen before and after for those
-steps. `flow-report.sh` opens each report as a copy under a new name and prints its
+steps. A `<step>.marks.json` next to a screenshot adds numbered red (open) or green
+(fixed) boxes, on the main screenshot and on a before/after pair alike, with the
+same number as a badge on the matching `analysis/<step>.txt` bullet (see the skill
+for how the row/col of a box is worked out and checked). `flow-report.sh` opens each report as a copy under a new name and prints its
 path (`REPORT: ...`); screenshots are addressed by their mtime, so a browser never
 shows a previous run from its cache.
 

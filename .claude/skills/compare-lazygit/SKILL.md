@@ -25,10 +25,14 @@ scripts cannot make.
 4. Look at every pair of screenshots (`.verify-shots/flows/<name>/lazygit/<step>.png`
    and `ferrit/<step>.png`), one step at a time.
 5. Write `.verify-shots/flows/<name>/analysis/<step>.txt`, one `- ` bullet per
-   difference, for every step (say "identical" when it is).
+   difference, for every step (say "identical" when it is). When a bullet is
+   worth pointing at on the screen (usually one per audit row you also give a
+   before/after pair to, see step 7), mark it and box it (below).
 6. Write `.verify-shots/flows/<name>/implementation.txt`: the report the user
    acts on, rendered as tables at the end of the page (see "Implementation
-   report" below for the format).
+   report" below for the format). Give a row you box on screen (below) the
+   same step numbers in "Seen in" and the sixth cell, so the audit's
+   before/after pair reuses the box.
 7. `.dev-tools/flow-report.sh <name>` rebuilds the report and opens it. This is the
    only step that opens it: `flow-compare.sh` builds it without opening, so the
    user first sees it with the analyses and the audit in place. Give the
@@ -88,6 +92,38 @@ Question, version, tips), ferrit's own identity (logo, its Infos box), pure
 cosmetics with no effect on the workflow (title punctuation, glyphs, hash
 length, age format, where a marker sits), and anything where ferrit adds to
 lazygit rather than lacks something.
+
+### Pointing at the screen: numbered boxes
+
+A bullet worth showing, not just describing, gets a box on ferrit's screenshot for
+that step: a red rectangle around a still-open gap, green around a confirmed one,
+a small circled number next to it. The same number opens the matching bullet in
+`analysis/<step>.txt`, and the numbers are also what turns a plain before/after
+image pair (the sixth audit cell) into an annotated one — write the marks file
+once, both places pick it up.
+
+1. Write `.verify-shots/flows/<name>/ferrit/<step>.marks.json`, a list of
+   `{"number": 1, "row": R, "col": C, "rows": 1, "cols": W, "color": "green"}`
+   (0-based terminal cells, "green" once fixed, "red" while still open).
+   Estimate `row`/`col` from the screenshot: its content area starts at pixel
+   (77, 114) and each cell is 14.105 x 28.66px on this machine's capture
+   geometry (`.dev-tools/annotate.py`'s module docstring); `row = round((y -
+   114) / 28.66)`, same idea for `col`. Recalibrate those two constants (see
+   the docstring) if the capture geometry ever changes.
+2. Render a check with:
+   `python3 -c "import sys; sys.path.insert(0,'.dev-tools'); import annotate, json; annotate.draw_marks('PNG', json.loads(open('MARKS.json').read()), 'OUT.png')"`
+   then look at `OUT.png`. A box a row or column off is common on the first
+   try; adjust and rerun until it sits tight around the right text. This
+   costs one render-and-look per box, so reserve it for the findings the
+   report should lead with (the before/after rows), not every bullet.
+3. Prefix the matching bullet with the same number: `- [1] Done: ...`.
+   `flow-report.sh` turns `[N]` into a coloured badge, coloured from the
+   marks file, and drops it from the bullet text.
+4. `flow-report.sh` picks up `ferrit/<step>.marks.json` on its own: the main
+   trio's ferrit screenshot is drawn with the marks as authored, and a
+   before/after cell for a step that has one reuses it forced red on the old
+   screenshot and green on the new one. A `lazygit/<step>.marks.json` (rare)
+   only affects the main trio's lazygit image.
 
 ### Format
 

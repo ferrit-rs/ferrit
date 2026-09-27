@@ -23,15 +23,55 @@ name="$1"
 out="$root/.verify-shots/flows/$name"
 
 python3 - "$root/.dev-tools/report-template.html" "$out" "$name" "$root/test/flows/$name.flow" <<'PY'
-import difflib, html, pathlib, shlex, sys
+import difflib, html, importlib.util, json, pathlib, re, shlex, sys
 
 template, out, name, flow = sys.argv[1], pathlib.Path(sys.argv[2]), sys.argv[3], pathlib.Path(sys.argv[4])
 out_dir = out
-steps = sorted(p.name[: -len(".git.txt")] for p in (out / "lazygit").glob("*.git.txt"))
+root_dir = pathlib.Path(template).parent.parent
 
-def bullets(text):
-    items = [line[2:].strip() for line in text.splitlines() if line.startswith("- ")]
-    return "<ul>%s</ul>" % "".join(f"<li>{html.escape(i)}</li>" for i in items)
+_spec = importlib.util.spec_from_file_location("annotate", root_dir / ".dev-tools" / "annotate.py")
+_annotate = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_annotate)
+
+
+def marked_image(png, marks_path, color_override=None):
+    """`png` unchanged if `marks_path` has no marks file; otherwise a `.annotated*.png`
+    next to it, redrawn on every call (cheap, keeps it in sync with the marks file).
+    `color_override` forces every mark's colour (used for a before/after pair, where
+    the same marks.json is red on the old screen and green on the new one)."""
+    if not marks_path.exists() or not png.exists():
+        return png, None
+    marks = json.loads(marks_path.read_text())
+    if color_override:
+        marks = [dict(m, color=color_override) for m in marks]
+    suffix = f"-{color_override}" if color_override else ""
+    annotated = png.with_name(f"{png.stem}.annotated{suffix}.png")
+    _annotate.draw_marks(png, marks, annotated)
+    numbers = {m["number"]: m.get("color", "red") for m in marks}
+    return annotated, numbers
+
+
+MARK_RE = re.compile(r"^\[(\d+)\]\s*")
+
+
+def bullets(text, mark_colors):
+    out = []
+    for line in text.splitlines():
+        if not line.startswith("- "):
+            continue
+        item = line[2:].strip()
+        m = MARK_RE.match(item)
+        badge = ""
+        if m:
+            number = m.group(1)
+            color = mark_colors.get(int(number), "red") if mark_colors else "red"
+            badge = f'<span class="mark {color}">{number}</span> '
+            item = item[m.end():]
+        out.append(f"<li>{badge}{html.escape(item)}</li>")
+    return "<ul>%s</ul>" % "".join(out)
+
+
+steps = sorted(p.name[: -len(".git.txt")] for p in (out / "lazygit").glob("*.git.txt"))
 
 focus, not_here = [], []
 if flow.exists():
@@ -68,16 +108,22 @@ for step in steps:
     )
     note_file = out / "lazygit" / f"{step}.note.txt"
     note = f"<p>{html.escape(note_file.read_text().strip())}</p>" if note_file.exists() else ""
+
+    lazygit_png, _ = marked_image(out / "lazygit" / f"{step}.png", out / "lazygit" / f"{step}.marks.json")
+    ferrit_png, mark_colors = marked_image(out / "ferrit" / f"{step}.png", out / "ferrit" / f"{step}.marks.json")
+
     analysis_file = out / "analysis" / f"{step}.txt"
     if analysis_file.exists():
         analysed += 1
-        analysis = bullets(analysis_file.read_text())
+        analysis = bullets(analysis_file.read_text(), mark_colors)
     else:
         analysis = '<p class="muted">no analysis written for this step</p>'
+    lazygit_rel = lazygit_png.relative_to(out)
+    ferrit_rel = ferrit_png.relative_to(out)
     rows.append(
         f'<div class="step" id="{step}"><h2>{step}</h2>{note}{verdict}<div class="trio">'
-        f'<figure><figcaption>lazygit</figcaption><img src="lazygit/{step}.png?v={stamp(out / "lazygit" / f"{step}.png")}"></figure>'
-        f'<figure><figcaption>ferrit</figcaption><img src="ferrit/{step}.png?v={stamp(out / "ferrit" / f"{step}.png")}"></figure>'
+        f'<figure><figcaption>lazygit</figcaption><img src="{lazygit_rel}?v={stamp(lazygit_png)}"></figure>'
+        f'<figure><figcaption>ferrit</figcaption><img src="{ferrit_rel}?v={stamp(ferrit_png)}"></figure>'
         f'<div class="diffs"><div class="caption">visual differences</div>{analysis}</div>'
         f"</div></div>"
     )
@@ -106,10 +152,13 @@ def proof_cell(cell):
         if not (step and old.exists() and new.exists()):
             out.append(f"<div>step {html.escape(part)}: no earlier run kept</div>")
             continue
+        marks_path = out_dir / "ferrit" / f"{step}.marks.json"
+        old_shown, _ = marked_image(old, marks_path, color_override="red")
+        new_shown, _ = marked_image(new, marks_path, color_override="green")
         out.append(
             f'<div class="ba"><b>step {part}</b><div class="pair2">'
-            f'<figure><figcaption>before</figcaption><a href="before/ferrit/{step}.png?v={stamp(old)}"><img src="before/ferrit/{step}.png?v={stamp(old)}"></a></figure>'
-            f'<figure><figcaption>after</figcaption><a href="ferrit/{step}.png?v={stamp(new)}"><img src="ferrit/{step}.png?v={stamp(new)}"></a></figure>'
+            f'<figure><figcaption>before</figcaption><a href="{old_shown.relative_to(out_dir)}?v={stamp(old_shown)}"><img src="{old_shown.relative_to(out_dir)}?v={stamp(old_shown)}"></a></figure>'
+            f'<figure><figcaption>after</figcaption><a href="{new_shown.relative_to(out_dir)}?v={stamp(new_shown)}"><img src="{new_shown.relative_to(out_dir)}?v={stamp(new_shown)}"></a></figure>'
             "</div></div>"
         )
     return "".join(out)
