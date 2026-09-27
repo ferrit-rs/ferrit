@@ -34,27 +34,41 @@ _annotate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_annotate)
 
 
-def marked_image(png, marks_path, color_override=None):
-    """`png` unchanged if `marks_path` has no marks file; otherwise a `.annotated*.png`
-    next to it, redrawn on every call (cheap, keeps it in sync with the marks file).
-    `color_override` forces every mark's colour (used for a before/after pair, where
-    the same marks.json is red on the old screen and green on the new one)."""
-    if not marks_path.exists() or not png.exists():
-        return png, None
-    marks = json.loads(marks_path.read_text())
-    if color_override:
-        marks = [dict(m, color=color_override) for m in marks]
-    suffix = f"-{color_override}" if color_override else ""
-    annotated = png.with_name(f"{png.stem}.annotated{suffix}.png")
+def diff_image(png, diffmarks_path):
+    """`png` unchanged if `<step>.diffmarks.json` is absent next to it; otherwise a copy
+    with a red box (a still-open difference, on this screenshot's own screen: the same
+    file lives beside the lazygit and the ferrit screenshot, each with its own row/col)
+    and a circled number, redrawn on every call. Never used once a row is fixed: a
+    matching screen has nothing left to box, and a stale box would be unreadable."""
+    if not diffmarks_path.exists() or not png.exists():
+        return png
+    marks = [dict(m, color="red") for m in json.loads(diffmarks_path.read_text())]
+    annotated = png.with_name(f"{png.stem}.annotated.png")
     _annotate.draw_marks(png, marks, annotated)
-    numbers = {m["number"]: m.get("color", "red") for m in marks}
-    return annotated, numbers
+    return annotated
+
+
+def fixed_pair(before_png, after_png, fixmarks_path):
+    """The before/after pair for a FIXED audit row: `before_png` boxed red, `after_png`
+    the same box in green, from one `<step>.fixmarks.json` (ferrit-only: lazygit did not
+    change). Plain copies back when there is no fixmarks file."""
+    if not fixmarks_path.exists():
+        return before_png, after_png
+    marks = json.loads(fixmarks_path.read_text())
+    before_out = before_png.with_name(f"{before_png.stem}.annotated-red.png")
+    after_out = after_png.with_name(f"{after_png.stem}.annotated-green.png")
+    _annotate.draw_marks(before_png, [dict(m, color="red") for m in marks], before_out)
+    _annotate.draw_marks(after_png, [dict(m, color="green") for m in marks], after_out)
+    return before_out, after_out
 
 
 MARK_RE = re.compile(r"^\[(\d+)\]\s*")
 
 
-def bullets(text, mark_colors):
+def bullets(text):
+    """A `[N] ...` bullet gets a red circled badge (a still-open difference, boxed on
+    both screenshots by a diffmarks.json with a matching number); a plain bullet (a
+    fixed row's prose, or anything with nothing to box) gets none."""
     out = []
     for line in text.splitlines():
         if not line.startswith("- "):
@@ -63,9 +77,7 @@ def bullets(text, mark_colors):
         m = MARK_RE.match(item)
         badge = ""
         if m:
-            number = m.group(1)
-            color = mark_colors.get(int(number), "red") if mark_colors else "red"
-            badge = f'<span class="mark {color}">{number}</span> '
+            badge = f'<span class="mark red">{m.group(1)}</span> '
             item = item[m.end():]
         out.append(f"<li>{badge}{html.escape(item)}</li>")
     return "<ul>%s</ul>" % "".join(out)
@@ -109,13 +121,13 @@ for step in steps:
     note_file = out / "lazygit" / f"{step}.note.txt"
     note = f"<p>{html.escape(note_file.read_text().strip())}</p>" if note_file.exists() else ""
 
-    lazygit_png, _ = marked_image(out / "lazygit" / f"{step}.png", out / "lazygit" / f"{step}.marks.json")
-    ferrit_png, mark_colors = marked_image(out / "ferrit" / f"{step}.png", out / "ferrit" / f"{step}.marks.json")
+    lazygit_png = diff_image(out / "lazygit" / f"{step}.png", out / "lazygit" / f"{step}.diffmarks.json")
+    ferrit_png = diff_image(out / "ferrit" / f"{step}.png", out / "ferrit" / f"{step}.diffmarks.json")
 
     analysis_file = out / "analysis" / f"{step}.txt"
     if analysis_file.exists():
         analysed += 1
-        analysis = bullets(analysis_file.read_text(), mark_colors)
+        analysis = bullets(analysis_file.read_text())
     else:
         analysis = '<p class="muted">no analysis written for this step</p>'
     lazygit_rel = lazygit_png.relative_to(out)
@@ -152,9 +164,7 @@ def proof_cell(cell):
         if not (step and old.exists() and new.exists()):
             out.append(f"<div>step {html.escape(part)}: no earlier run kept</div>")
             continue
-        marks_path = out_dir / "ferrit" / f"{step}.marks.json"
-        old_shown, _ = marked_image(old, marks_path, color_override="red")
-        new_shown, _ = marked_image(new, marks_path, color_override="green")
+        old_shown, new_shown = fixed_pair(old, new, out_dir / "ferrit" / f"{step}.fixmarks.json")
         out.append(
             f'<div class="ba"><b>step {part}</b><div class="pair2">'
             f'<figure><figcaption>before</figcaption><a href="{old_shown.relative_to(out_dir)}?v={stamp(old_shown)}"><img src="{old_shown.relative_to(out_dir)}?v={stamp(old_shown)}"></a></figure>'
@@ -180,9 +190,14 @@ def implementation(text):
     out = [f'<p class="counts">{counts}</p>']
     for title, table in sections:
         code = title[:2]
-        cls = BADGE.get(code, "left")
-        out.append(f'<h3><span class="badge {cls}">{html.escape(code if code in BADGE else "out")}</span> '
-                   f"{html.escape(title[5:] if code in BADGE else title)}</h3>")
+        if code not in BADGE:
+            # "Left out on purpose" and the like: kept in implementation.txt for the
+            # next run's context, never shown to the user (it would read as a list of
+            # complaints about lazygit features ferrit was never going to match).
+            continue
+        cls = BADGE[code]
+        out.append(f'<h3><span class="badge {cls}">{html.escape(code)}</span> '
+                   f"{html.escape(title[5:])}</h3>")
         wide = table and len(table[0]) >= 5
         proof = wide and any(len(r) >= 6 for r in table)
         heads = (HEADS + ["Before / after"] if proof else HEADS) if wide else ["What", "Why"]

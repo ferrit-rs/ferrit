@@ -95,36 +95,48 @@ lazygit rather than lacks something.
 
 ### Pointing at the screen: numbered boxes
 
-A bullet worth showing, not just describing, gets a box on ferrit's screenshot for
-that step: a red rectangle around a still-open gap, green around a confirmed one,
-a small circled number next to it. The same number opens the matching bullet in
-`analysis/<step>.txt`, and the numbers are also what turns a plain before/after
-image pair (the sixth audit cell) into an annotated one — write the marks file
-once, both places pick it up.
+Two distinct uses, never mixed:
 
-1. Write `.verify-shots/flows/<name>/ferrit/<step>.marks.json`, a list of
-   `{"number": 1, "row": R, "col": C, "rows": 1, "cols": W, "color": "green"}`
-   (0-based terminal cells, "green" once fixed, "red" while still open).
-   Estimate `row`/`col` from the screenshot: its content area starts at pixel
-   (77, 114) and each cell is 14.105 x 28.66px on this machine's capture
-   geometry (`.dev-tools/annotate.py`'s module docstring); `row = round((y -
-   114) / 28.66)`, same idea for `col`. Recalibrate those two constants (see
-   the docstring) if the capture geometry ever changes.
-2. Render a check with:
-   `python3 -c "import sys; sys.path.insert(0,'.dev-tools'); import annotate, json; annotate.draw_marks('PNG', json.loads(open('MARKS.json').read()), 'OUT.png')"`
-   then look at `OUT.png`. A box a row or column off is common on the first
-   try; adjust and rerun until it sits tight around the right text. This
-   costs one render-and-look per box, so reserve it for the findings the
-   report should lead with (the before/after rows), not every bullet.
-3. Prefix the matching bullet with the same number: `- [1] Done: ...`.
-   `flow-report.sh` turns `[N]` into a coloured badge, coloured from the
-   marks file, and drops it from the bullet text.
-4. `flow-report.sh` picks up `ferrit/<step>.marks.json` on its own: the main
-   trio's ferrit screenshot is drawn with the marks as authored, and a
-   before/after cell for a step that has one reuses it forced red on the old
-   screenshot and green on the new one. A `lazygit/<step>.marks.json` (rare)
-   only affects the main trio's lazygit image.
+- **A still-open difference** (a STILL DIFFERS row, or a P3 "kept on purpose"
+  decision: the screens genuinely differ either way): a red box on the
+  differing element in *both* `lazygit/<step>.diffmarks.json` and
+  `ferrit/<step>.diffmarks.json`, same number in each, so the two boxes read
+  as one comparison. The matching `analysis/<step>.txt` bullet is prefixed
+  `[N]`, which the report turns into a red circled badge and drops from the
+  bullet text.
+- **A confirmed fix** (a FIXED row that already has a before/after step in
+  the audit's "Seen in"/"Before after" cells): `ferrit/<step>.fixmarks.json`,
+  drawn red on the kept `before/` screenshot and green on the current one, in
+  the audit's before/after cell only. Never on the main trio: the current
+  screenshot now matches lazygit, so there is nothing left to box there, and
+  boxing a screen that no longer differs is unreadable. The bullet for a
+  fixed row stays plain prose, no `[N]`.
 
+A row that is genuinely fixed never gets a `.diffmarks.json` entry, and a row
+that still differs never gets a `.fixmarks.json` one; a step can have both
+kinds of file at once for different rows.
+
+Format, either kind: a list of
+`{"number": 1, "row": R, "col": C, "rows": 1, "cols": W}` (0-based terminal
+cells; `color` is set by the tool, never authored). Estimate `row`/`col` from
+the screenshot: its content area starts at pixel (77, 114) and each cell is
+14.105 x 28.66px on this machine's capture geometry (`.dev-tools/annotate.py`'s
+module docstring) — `row = round((y - 114) / 28.66)`, same idea for `col`.
+**The bottom key-bar row is 48, not 49: row 49 is tmux's own status line**,
+one row below the app. Recalibrate the two pixel constants (see the
+docstring) if the capture geometry ever changes.
+
+Render a check before trusting a box:
+`python3 -c "import sys; sys.path.insert(0,'.dev-tools'); import annotate, json; annotate.draw_marks('PNG', [dict(m, color='red') for m in json.loads(open('MARKS.json').read())], 'OUT.png')"`,
+then look at `OUT.png`. Off by a row or a few columns on the first try is
+normal; adjust and rerun until the box sits tight around the right text. This
+costs one render-and-look per box, so reserve it for the findings worth
+leading with, not every bullet — most bullets stay plain prose.
+
+`flow-report.sh` picks the files up on its own: no wiring beyond naming them
+right.
+
+### Format
 ### Format
 
 One `## P1 - title` heading per section, then one row per gap, five cells:

@@ -102,10 +102,15 @@ inside the focus (see the skill), so the interface's own behaviour is judged in
 
 After a fix, `flow-compare.sh` keeps the run it replaces under `before/`, and an audit
 row with a sixth cell (`8, 12`) shows ferrit's screen before and after for those
-steps. A `<step>.marks.json` next to a screenshot adds numbered red (open) or green
-(fixed) boxes, on the main screenshot and on a before/after pair alike, with the
-same number as a badge on the matching `analysis/<step>.txt` bullet (see the skill
-for how the row/col of a box is worked out and checked). `flow-report.sh` opens each report as a copy under a new name and prints its
+steps. Two kinds of numbered box, never mixed: `<step>.diffmarks.json` (in each
+program's own folder) draws a red box on a still-open difference, on both the
+lazygit and the ferrit screenshot, matched to a `[N]`-prefixed `analysis/<step>.txt`
+bullet; `ferrit/<step>.fixmarks.json` draws the same box red on the kept `before/`
+screenshot and green on the current one, in the audit's before/after cell only, for
+a row already fixed (see the skill for how a box's row/col is worked out and
+checked, and why row 48, not 49, is the app's own bottom key bar). The audit's
+"Left out on purpose" section is written for the next run's own context but never
+shown in the report. `flow-report.sh` opens each report as a copy under a new name and prints its
 path (`REPORT: ...`); screenshots are addressed by their mtime, so a browser never
 shows a previous run from its cache.
 
