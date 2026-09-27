@@ -1,3 +1,5 @@
+![Ferrit demo](demo-ferrit.gif)
+
 # ferrit
 
 A lazygit-style terminal UI for git, written in Rust.
