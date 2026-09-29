@@ -91,8 +91,8 @@ fn flatten_file_tree(
 }
 
 /// The Files pane's tree, as lazygit draws it: a collapsible root ("/") plus
-/// one `Dir` row per directory, the root present even for a flat list. Empty
-/// when nothing changed.
+/// one `Dir` row per directory, the root present even for a flat list of two
+/// or more files. Empty when nothing changed.
 pub(super) fn tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
@@ -102,6 +102,15 @@ pub(super) fn tree_rows(
     }
 
     let tree = build_file_tree(files);
+    // lazygit draws no root for a lone top-level file ("1 of 1"); from two
+    // entries up, or with any directory, the root row comes first.
+    if let [_] = files
+        && tree.values().all(|node| matches!(node, TreeNode::File(_)))
+    {
+        let mut rows = Vec::new();
+        flatten_file_tree(&tree, Path::new(""), 0, collapsed, &mut rows);
+        return rows;
+    }
     let root_expanded = !collapsed.contains(Path::new(""));
     let mut rows = vec![FileRow::Dir {
         path: PathBuf::new(),

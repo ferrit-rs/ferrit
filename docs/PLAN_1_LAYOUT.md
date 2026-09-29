@@ -428,7 +428,8 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   `▼ /` root row (cursor on it, right pane showing the diff of everything),
   even when every changed file sits directly at the repo root: two changed
   files read "1 of 3", `j` reaches the first file, and Space on the root
-  stages everything. Only an empty list has no rows. `tree_rows(files,
+  stages everything. A lone changed file at the root has no root row
+  ("1 of 1"), as in lazygit; an empty list has no rows. `tree_rows(files,
   collapsed)` (`src/app/tree.rs`) builds it.
 - **Drilled commit.** Enter on a commit lists its files as lazygit does:
   no root row, every directory open, single-child directory chains folded

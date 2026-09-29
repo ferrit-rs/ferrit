@@ -365,3 +365,18 @@ fn a_flat_file_list_starts_on_the_root_row() {
         "Space on the root stages every changed file"
     );
 }
+
+#[test]
+fn a_lone_top_level_file_has_no_root_row_like_lazygit() {
+    let dir = TempDir::new("app-stage-lone-file");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("README.md"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("README.md"), "one\ntwo\n").unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2'));
+    assert_eq!(app.selected(Pane::Files), 0);
+    assert_eq!(app.counter(Pane::Files), Some((1, 1)));
+    assert!(!app.files_selection_is_dir());
+}
