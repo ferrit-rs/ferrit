@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Enter confirms every key-bar question (drop, apply / pop / drop stash, delete branch, discard, force-push, abort), like lazygit's popups; `y` still does, `n` / `Esc` cancel. The prompt reads `Enter/y yes`. On Branches the Enter no longer risks opening the commits.
 - The Infos box shows every line git printed after a write (at most 8), not only the first: after a commit the `[branch hash] subject` line, the stat and `create mode`, like lazygit's command log; the box grows to fit and the `@` viewer lists the same lines.
 - With no stash entries the Stash right pane says `No stash entries`, like lazygit. Before it was empty.
 - The Stash right pane starts with the stash's subject (`stash@{0}: On main: wip`, yellow) and the `git stash show --stat` summary above the patch, like lazygit.

@@ -281,6 +281,21 @@ fn a_drop_that_conflicts_stops_and_the_menu_abort_restores_the_branch() {
 }
 
 #[test]
+fn enter_confirms_a_drop_like_y() {
+    let dir = history("rw-app-drop-enter");
+    fs::write(dir.path().join("g"), "x\n").unwrap();
+    git(dir.path(), &["add", "g"]);
+    git(dir.path(), &["commit", "-qm", "extra"]);
+    let mut app = commits_app(&dir);
+    app.feed_key(char_key('d'));
+    assert!(app.confirm_message().is_some());
+    enter(&mut app);
+    assert!(app.confirm_message().is_none());
+    assert_eq!(subjects(&dir), ["three", "two", "one", "base"]);
+    assert!(!app.commits_drilled(), "Enter did not drill");
+}
+
+#[test]
 fn s_squashes_into_the_commit_below() {
     let dir = history("rw-app-squash");
     let mut app = commits_app(&dir);

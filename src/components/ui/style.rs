@@ -13,7 +13,7 @@ pub fn confirm_line(message: &str, p: &Palette) -> Line<'static> {
     Line::from(vec![
         Span::styled(message.to_owned(), fg(p.warn).add_modifier(Modifier::BOLD)),
         Span::raw("   "),
-        Span::styled("y", fg(p.key)),
+        Span::styled("Enter/y", fg(p.key)),
         Span::raw(" yes    "),
         Span::styled("n", fg(p.key)),
         Span::raw(" / "),

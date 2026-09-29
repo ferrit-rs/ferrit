@@ -252,6 +252,20 @@ fn d_on_an_unmerged_branch_asks_twice_then_force_deletes() {
 }
 
 #[test]
+fn enter_confirms_a_branch_delete_without_opening_the_commits() {
+    let (dir, mut app) = two_branch_app("app-branch-delete-enter");
+    git(dir.path(), &["branch", "already-merged"]);
+    app.refresh();
+    select_branch(&mut app, "already-merged");
+
+    app.feed_key(char_key('d'));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+    assert!(app.confirm_message().is_none());
+    assert!(!git(dir.path(), &["branch", "--list"]).contains("already-merged"));
+    assert!(!app.branches_drilled(), "Enter did not drill");
+}
+
+#[test]
 fn n_cancels_the_confirm_on_a_merged_branch() {
     let (dir, mut app) = two_branch_app("app-branch-delete-merged");
     git(dir.path(), &["branch", "already-merged"]);

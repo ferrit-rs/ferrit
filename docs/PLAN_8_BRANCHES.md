@@ -329,7 +329,7 @@ command yourself would.
 | `u` | Nav, Branches focused | fast-forward the selected branch to its upstream (checked out or not) |
 | `M` | Nav, Branches focused | merge the selected branch into the current one |
 | `Enter` | popup (`NewBranch`) | create the branch, close the popup |
-| `y` / `n` / `Esc` | confirm prompt | as phase 6 (now shared by discard and branch delete) |
+| `Enter` / `y` / `n` / `Esc` | confirm prompt | as phase 6 (now shared by discard and branch delete) |
 
 `Enter` (drill into a branch's log) and the branch-log-preview-on-select
 behaviour from phase 2 are unchanged.

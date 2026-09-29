@@ -46,11 +46,12 @@ impl App {
             return;
         }
 
-        // A discard / branch-delete confirmation swallows every key but its
-        // own answer, same as the help overlay below.
+        // A key-bar confirmation swallows every key but its own answer (Enter
+        // or `y` confirms, so Enter never reaches the pane), same as the
+        // help overlay below.
         if self.pending_confirm.is_some() {
             match key.code {
-                KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.run_confirm(),
+                KeyCode::Enter | KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.run_confirm(),
                 KeyCode::Char(KEY_CONFIRM_NO | 'N') | KeyCode::Esc => {
                     self.pending_confirm = None;
                 },
