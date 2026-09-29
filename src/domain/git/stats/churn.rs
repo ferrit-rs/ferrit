@@ -131,15 +131,20 @@ fn parse(text: &str, cap: usize) -> Churn {
 }
 
 impl Churn {
-    /// The 10 files most commits touched, the ignored ones counted apart.
-    pub(super) fn hot_files(&self) -> HotFiles {
+    /// The 10 files most commits touched that `exists` in HEAD, the ignored
+    /// ones counted apart and the missing ones counted in `gone` (before the
+    /// top 10 is taken; an ignored path is `hidden` whether it exists or not).
+    pub(super) fn hot_files(&self, exists: &dyn Fn(&str) -> bool) -> HotFiles {
         let mut kept = Vec::new();
         let mut hidden = Vec::new();
+        let mut gone = 0;
         for (path, file) in &self.files {
             if is_ignored(path) {
                 hidden.push((path.clone(), file.commits));
-            } else {
+            } else if exists(path) {
                 kept.push((path, file));
+            } else {
+                gone += 1;
             }
         }
         kept.sort_by(|a, b| b.1.commits.cmp(&a.1.commits).then_with(|| a.0.cmp(b.0)));
@@ -157,6 +162,7 @@ impl Churn {
                 })
                 .collect(),
             hidden: hidden.into_iter().map(|(path, _)| path).collect(),
+            gone,
             commits: self.commits,
         }
     }
@@ -209,7 +215,7 @@ mod tests {
         assert_eq!((churn.lines.added, churn.lines.removed), (8, 1));
         assert_eq!(churn.authors["max@example.com"].added, 3);
         assert_eq!(churn.authors["ri@x.com"].added, 5);
-        let hot = churn.hot_files();
+        let hot = churn.hot_files(&|_| true);
         assert_eq!(hot.files[0].path, "src/a.rs");
         assert_eq!(hot.files[0].share.count, 2);
         assert_eq!(hot.files[0].share.percent, Some(100));

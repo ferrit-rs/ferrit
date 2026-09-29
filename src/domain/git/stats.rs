@@ -157,10 +157,17 @@ pub struct FileStat {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HotFiles {
-    /// Top 10, most commits first (ties by path), lockfiles and changelogs left out.
+    /// Top 10, most commits first (ties by path), lockfiles and changelogs left
+    /// out, only files that exist in the tree of HEAD. The log is read with
+    /// `--no-renames`: a renamed file's new path counts only its post-rename
+    /// commits, and the old path is `gone`.
     pub files: Vec<FileStat>,
     /// The left-out files that were touched in the window, most touched first.
     pub hidden: Vec<String>,
+    /// Distinct touched paths left out because HEAD's tree has no such file
+    /// (deleted, moved). Ignored paths count in `hidden` only. 0 when HEAD has
+    /// no tree (unborn).
+    pub gone: usize,
     /// Non-merge commits read, the whole the shares are taken of.
     pub commits: usize,
 }
@@ -323,6 +330,13 @@ pub(super) fn repo_stats(
         return Err(GitError::Cancelled);
     }
 
+    // Unborn or tree-less HEAD: nothing to check against, keep every path.
+    let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
+    let head_tree_has = |path: &str| {
+        head_tree
+            .as_ref()
+            .is_none_or(|tree| tree.get_path(std::path::Path::new(path)).is_ok())
+    };
     let work = work_state(repo);
     Ok(RepoStats {
         window,
@@ -343,7 +357,7 @@ pub(super) fn repo_stats(
         daily,
         authors: author_stats,
         kinds: kind_stats,
-        hot_files: churn.as_ref().map(churn::Churn::hot_files),
+        hot_files: churn.as_ref().map(|c| c.hot_files(&head_tree_has)),
         branches: branch_health,
         main_branch,
         work,

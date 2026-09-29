@@ -77,7 +77,7 @@ pub struct RepoStats {
     pub granularity: Granularity,       // Day | Week | Month, chosen from the span ("Charts")
     pub authors: Vec<AuthorStat>,       // grouped by mailmap-resolved email, then merged by name: commits, emails, added, removed, last commit
     pub kinds: Vec<KindStat>,           // feat, fix, docs, test, refactor, perf, style, build, ci, chore, other
-    pub hot_files: Vec<FileStat>,       // top 10 by commits touching it (share of the window's commits), added, removed
+    pub hot_files: Vec<FileStat>,       // top 10 by commits touching it, only files that exist in HEAD's tree (share of the window's commits), added, removed; `gone` counts the paths dropped
     pub branches: Vec<BranchHealth>,    // ahead/behind the main branch, age of the tip, merged, current
     pub work: WorkState,                // changed / staged / untracked / conflicted, stashes, ahead/behind upstream
     pub since_tag: Option<TagSince>,    // newest tag reachable from HEAD and the commits since it
@@ -111,6 +111,12 @@ pub(super) fn repo_stats(repo: &Repository, window: Window, cancel: &AtomicBool)
   the default of a `[dashboard] hot_files_ignore` key in `config.toml`
   (`PLAN_12_POLISH.md` P1), and the panel footer says "N files hidden" when the
   filter removed any, so the omission is never silent.
+  Only files that exist in the tree of HEAD are listed (deleted or moved files
+  would otherwise rank first, e.g. a `src/app.rs` split into `src/app/`): the
+  ranking is computed, the missing paths dropped before the top 10 is taken and
+  counted in `gone` (an ignored path counts in `hidden` only; unborn or
+  tree-less HEAD skips the check). The log uses `--no-renames`, so a renamed
+  file's new path counts only its post-rename commits.
 - **Branch order and staleness.** The current branch first, then the branches
   with work not in the main branch, most recently committed to first, then the
   merged ones. A branch is **stale** when it is not the current one and its tip is

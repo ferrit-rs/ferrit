@@ -162,6 +162,7 @@ fn stats() -> RepoStats {
                 hot("README.md", 30),
             ],
             hidden: vec!["CHANGELOG.md".to_owned(), "Cargo.lock".to_owned()],
+            gone: 0,
             commits: 423,
         }),
         branches,
@@ -649,6 +650,7 @@ fn a_window_without_commits_keeps_the_totals_and_empties_the_charts() {
     s.hot_files = Some(HotFiles {
         files: vec![],
         hidden: vec![],
+        gone: 0,
         commits: 0,
     });
     s.totals.lines = Some(Lines::default());
@@ -732,6 +734,7 @@ fn no_remote_hides_the_remote_count_and_a_small_whole_shows_counts() {
             removed: 0,
         }],
         hidden: vec![],
+        gone: 0,
         commits: 12,
     });
     let out = render(&view(Some(&s)), 120, 42);
