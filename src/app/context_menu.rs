@@ -114,7 +114,6 @@ impl App {
             _ => (String::new(), Vec::new()),
         };
         if items.is_empty() {
-            self.report_notice("no extra actions for this row");
             return;
         }
         self.popup = Some(Popup::Menu(MenuState {

@@ -14,4 +14,4 @@ git status --porcelain => "M  f"
 git show :f => "side"                      # theirs
 
 key x
-expect-text "no extra actions for this row"
+expect-no-text "no extra actions"   # nothing to offer: no menu and no error

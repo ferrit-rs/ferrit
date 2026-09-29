@@ -413,7 +413,10 @@ fn a_file_that_is_not_conflicted_has_no_menu() {
     app.feed_key(char_key('x'));
 
     assert!(app.menu_popup().is_none());
-    assert!(status_lines(&app).join("\n").contains("no extra actions"));
+    assert!(
+        !status_lines(&app).join("\n").contains("error"),
+        "lazygit does nothing, ferrit shows no red error"
+    );
 }
 
 // -------------------------------------------------------------- right-click

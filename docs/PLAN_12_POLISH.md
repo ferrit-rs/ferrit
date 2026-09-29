@@ -368,6 +368,8 @@ bindings or with a user's remaps.
 
 ## P4: `x` menu, right-click, clickable hints
 
+(`x` on a row with no extra actions does nothing: no menu, no error, as lazygit.)
+
 Phase 11 builds `Popup::Menu` (title, items with a label, shortcut and
 action, `j` / `k`, `Enter`, `Esc`) and uses it for `m`. This slice adds the
 per-pane `x` menu that holds the long tail, seeded with the loose ends earlier

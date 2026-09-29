@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- `x` on a row with no extra actions does nothing, like lazygit. Before it set a red `error: no extra actions for this row` in Status that stayed until the next refresh.
 - With nothing changed the Files key bar shows `Commit`, `Stash`, `Reword`, `Fetch/Pull/Push`, `Help` and `Quit`, like lazygit; Stage, All, Discard and Amend have nothing to act on and are gone. Before it offered them.
 - A branch level with its upstream shows a tick (`✓`) in the Status line and on its Branches row, like lazygit (`ferrit → main ✓`). A branch with no upstream, or ahead or behind, shows none.
 - On a branch with no upstream the commit hashes are no longer red: yellow, or green when merged into `origin/main`, like lazygit. Before, every commit there counted as not pushed yet. With an upstream nothing changes.
