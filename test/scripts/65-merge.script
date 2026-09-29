@@ -15,5 +15,8 @@ key 3
 expect-text "topic"
 key j                                      # main is first (HEAD), topic second
 key M
+expect-text "Merge (fast-forward when possible)"
+git log -1 --format=%s => "three"
+key enter
 git log -1 --format=%s => "topic"
 git branch --contains topic --format=%(refname:short) -> "main"

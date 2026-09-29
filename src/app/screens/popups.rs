@@ -404,8 +404,9 @@ pub(super) fn draw_menu(
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let rows = u16::try_from(view.rows.len()).unwrap_or(u16::MAX).max(1);
+    let hint_width = u16::try_from(view.hint.chars().count() + 4).unwrap_or(u16::MAX);
     let dialog = Dialog::new(Line::styled(format!(" {} ", view.title), focused))
-        .fit_content(44.min(area.width), rows, 1)
+        .fit_content(44.max(hint_width).min(area.width), rows, 1)
         .border_style(focused)
         .render(frame, area);
     let lines: Vec<Line<'static>> = view
@@ -423,7 +424,11 @@ pub(super) fn draw_menu(
         .render(frame, dialog.body);
     frame.render_widget(
         Paragraph::new(Line::styled(
-            "Enter / letter run \u{b7} Esc close",
+            if view.hint.is_empty() {
+                "Enter / letter run \u{b7} Esc close"
+            } else {
+                view.hint
+            },
             Style::new().fg(palette.idle),
         )),
         dialog.footer,

@@ -201,6 +201,32 @@ pub(super) fn merge_branch_no_ff(repo: &Repository, name: &str) -> GitResult<Mer
     merge(repo, name, true)
 }
 
+/// `git merge --squash`: the branch's changes land in the index and the
+/// worktree, `HEAD` does not move. With `commit`, one ordinary commit follows.
+/// A conflict is an error here: `--squash` writes no `MERGE_HEAD`, so there is
+/// no merge in progress to continue; the conflicted files show in Files.
+pub(super) fn merge_squash(repo: &Repository, name: &str, commit: bool) -> GitResult<()> {
+    let workdir = workdir(repo)?;
+    run_git(
+        workdir,
+        |cmd| {
+            cmd.args(["merge", "--squash", name]);
+        },
+        GitError::MergeFailed,
+    )?;
+    if commit {
+        let message = format!("Squash merge '{name}'");
+        run_git(
+            workdir,
+            |cmd| {
+                cmd.args(["commit", "-m", &message]);
+            },
+            GitError::MergeFailed,
+        )?;
+    }
+    Ok(())
+}
+
 fn merge(repo: &Repository, name: &str, no_ff: bool) -> GitResult<MergeOutcome> {
     let workdir = workdir(repo)?;
     let message = format!("Merge branch '{name}'");

@@ -4,11 +4,12 @@
 //!
 //! | Pane | Entries |
 //! | --- | --- |
-//! | Branches | rename the branch, merge it with `--no-ff` |
+//! | Branches | rename the branch, merge it with `--no-ff` (`M` opens the full Merge menu) |
 //! | Commits | new branch from this commit |
 //! | Stash | stash keeping the index, rename the entry |
 //! | Files (a conflicted file) | take ours, take theirs |
 
+use super::branch_actions::MergeKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, BranchesTab, Mode, Pane, Popup, TextInput, git};
 
@@ -46,6 +47,7 @@ fn item(label: &'static str, shortcut: char, action: MenuAction) -> MenuItem {
         label,
         shortcut,
         action,
+        hint: "",
     }
 }
 
@@ -139,7 +141,10 @@ impl App {
                     input,
                 );
             },
-            MenuAction::MergeNoFf => self.merge_selected_branch_with(true),
+            MenuAction::MergeNoFf => self.merge_selected_branch_with(MergeKind::NoFf),
+            MenuAction::MergeFf => self.merge_selected_branch_with(MergeKind::Regular),
+            MenuAction::SquashStaged => self.merge_selected_branch_with(MergeKind::Squash),
+            MenuAction::SquashCommit => self.merge_selected_branch_with(MergeKind::SquashCommit),
             MenuAction::BranchFromCommit => {
                 let Some(commit) = self.commits.get(index) else {
                     return;

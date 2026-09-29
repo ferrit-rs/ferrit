@@ -12,7 +12,7 @@
 //! `App`-level wiring for the Branches pane's five actions
 //! (`docs/PLAN_8_BRANCHES.md`): `<space>` checks out, `n` creates from a
 //! popup, `d` deletes (two-step when unmerged), `u` fast-forwards, `M`
-//! merges.
+//! opens the Merge menu.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -315,18 +315,108 @@ fn u_fast_forwards_a_branch_that_is_not_checked_out() {
     );
 }
 
+fn head_and_status(dir: &Path) -> (String, String) {
+    (
+        git(dir, &["rev-parse", "HEAD"]),
+        git(dir, &["status", "--porcelain"]),
+    )
+}
+
+fn parent_count(dir: &Path) -> usize {
+    git(dir, &["log", "-1", "--format=%P"])
+        .split_whitespace()
+        .count()
+}
+
 #[test]
-fn m_merges_the_selected_branch_into_the_current_one() {
-    let (dir, mut app) = two_branch_app("app-branch-merge");
+fn m_opens_the_merge_menu_and_merges_nothing() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-menu");
+    let before = head_and_status(dir.path());
     select_branch(&mut app, "feat");
     app.feed_key(char_key('M'));
+
+    let menu = app.menu_popup().expect("M opens a menu");
+    assert_eq!(menu.title, "Merge");
+    assert_eq!(menu.rows.len(), 4);
+    assert!(menu.hint.contains("Fast-forward"), "{}", menu.hint);
+    assert_eq!(head_and_status(dir.path()), before, "nothing merged yet");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+        "one\n"
+    );
+}
+
+#[test]
+fn esc_on_the_merge_menu_leaves_the_repo_untouched() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-esc");
+    let before = head_and_status(dir.path());
+    select_branch(&mut app, "feat");
+    app.feed_key(char_key('M'));
+    app.feed_key(KeyEvent::from(KeyCode::Esc));
+
+    assert!(app.menu_popup().is_none());
+    assert_eq!(head_and_status(dir.path()), before);
+}
+
+#[test]
+fn the_fast_forward_choice_merges_without_a_merge_commit() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-ff");
+    select_branch(&mut app, "feat");
+    app.feed_key(char_key('M'));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
 
     assert_eq!(
         fs::read_to_string(dir.path().join("a.txt")).unwrap(),
         "one\nfeat-change\n",
         "feat's change landed on base"
     );
+    assert_eq!(parent_count(dir.path()), 1, "fast-forward, no merge commit");
+    assert_eq!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        git(dir.path(), &["rev-parse", "feat"])
+    );
     assert!(app.note_popup().is_none(), "a clean merge needs no note");
+}
+
+#[test]
+fn the_no_ff_choice_makes_a_merge_commit() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-noff");
+    select_branch(&mut app, "feat");
+    app.feed_key(char_key('M'));
+    app.feed_key(char_key('n'));
+
+    assert_eq!(parent_count(dir.path()), 2);
+}
+
+#[test]
+fn the_squash_choice_stages_the_changes_without_committing() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-squash");
+    let head = git(dir.path(), &["rev-parse", "HEAD"]);
+    select_branch(&mut app, "feat");
+    app.feed_key(char_key('M'));
+    app.feed_key(char_key('s'));
+
+    assert_eq!(git(dir.path(), &["rev-parse", "HEAD"]), head, "HEAD stays");
+    assert_eq!(git(dir.path(), &["status", "--porcelain"]), "M  a.txt");
+}
+
+#[test]
+fn the_squash_and_commit_choice_makes_one_ordinary_commit() {
+    let (dir, mut app) = two_branch_app("app-branch-merge-squash-commit");
+    select_branch(&mut app, "feat");
+    app.feed_key(char_key('M'));
+    app.feed_key(char_key('c'));
+
+    assert_eq!(parent_count(dir.path()), 1, "not a merge commit");
+    assert_eq!(git(dir.path(), &["status", "--porcelain"]), "");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+        "one\nfeat-change\n"
+    );
+    assert_ne!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        git(dir.path(), &["rev-parse", "feat"])
+    );
 }
 
 #[test]
@@ -347,6 +437,7 @@ fn m_on_a_conflicting_merge_shows_a_dismissible_note() {
     app.feed_key(char_key('3'));
     select_branch(&mut app, "feat");
     app.feed_key(char_key('M'));
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
 
     let note = app.note_popup().expect("a conflict shows a note");
     assert!(note.contains("a.txt"), "names the conflicted file: {note}");

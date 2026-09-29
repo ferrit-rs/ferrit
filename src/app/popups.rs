@@ -159,6 +159,7 @@ impl App {
                 .map(|item| format!("{}  ({})", item.label, item.shortcut))
                 .collect(),
             selected: menu.selected,
+            hint: menu.items.get(menu.selected).map_or("", |item| item.hint),
         })
     }
 

@@ -138,6 +138,8 @@ pub struct MenuView {
     pub title: String,
     pub rows: Vec<String>,
     pub selected: usize,
+    /// What the highlighted row does; empty when the menu has no hints.
+    pub hint: &'static str,
 }
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.

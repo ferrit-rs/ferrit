@@ -88,7 +88,9 @@ every git version ferrit might meet, not just the ones with `switch`.
    d      -> delete the SELECTED branch, confirmed  (git branch -d / -D)
    u      -> fast-forward the SELECTED branch       (see "u: fast-forward
              to its upstream, checked out or not        any branch" below)
-   M      -> merge the SELECTED branch into current (git merge <name>)
+   M      -> Merge menu for the SELECTED branch: fast-forward when possible,
+             --no-ff, squash (staged), squash and commit; nothing runs until
+             a row is chosen (the current branch merges at once, a no-op)
 ```
 
 `u` rather than a global-looking `f`: `f` is reserved for phase 9's

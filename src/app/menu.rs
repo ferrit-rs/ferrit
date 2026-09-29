@@ -18,6 +18,10 @@ pub(super) enum MenuAction {
     // The `x` menu (`docs/PLAN_12_POLISH.md` P4).
     RenameBranch,
     MergeNoFf,
+    // The `M` menu (`docs/PLAN_8_BRANCHES.md`).
+    MergeFf,
+    SquashStaged,
+    SquashCommit,
     BranchFromCommit,
     StashKeepIndex,
     RenameStash,
@@ -32,6 +36,8 @@ pub(super) struct MenuItem {
     pub(super) label: &'static str,
     pub(super) shortcut: char,
     pub(super) action: MenuAction,
+    /// One line under the menu while the row is highlighted; empty for none.
+    pub(super) hint: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,18 +54,21 @@ fn operation_items(operation: git::model::Operation) -> Vec<MenuItem> {
         label: "Continue",
         shortcut: 'c',
         action: MenuAction::Continue,
+        hint: "",
     }];
     if operation != git::model::Operation::Merge {
         items.push(MenuItem {
             label: "Skip this step",
             shortcut: 's',
             action: MenuAction::Skip,
+            hint: "",
         });
     }
     items.push(MenuItem {
         label: "Abort",
         shortcut: 'a',
         action: MenuAction::Abort,
+        hint: "",
     });
     items
 }
@@ -121,6 +130,9 @@ impl App {
             MenuAction::Skip => self.apply_operation_step(Step::Skip),
             MenuAction::RenameBranch
             | MenuAction::MergeNoFf
+            | MenuAction::MergeFf
+            | MenuAction::SquashStaged
+            | MenuAction::SquashCommit
             | MenuAction::BranchFromCommit
             | MenuAction::StashKeepIndex
             | MenuAction::RenameStash

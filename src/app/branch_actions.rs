@@ -1,9 +1,19 @@
 //! Branches-pane actions: checkout, create, delete, fast-forward, merge.
 
+use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{
     App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup,
     SelectionKey, TextInput, git,
 };
+
+/// How a merge is done: the choices of the `M` menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MergeKind {
+    Regular,
+    NoFf,
+    Squash,
+    SquashCommit,
+}
 
 impl App {
     /// `Ctrl-Right` / `Ctrl-Left`, Branches focused: switch its own Local
@@ -184,16 +194,69 @@ impl App {
             .collect()
     }
 
-    /// `M` (Nav, Branches focused): merge the selected branch into the
-    /// current one. `refresh()` always runs, even on a conflict — the
-    /// Files pane already renders `Change::Conflicted`, so the conflicted
-    /// paths are visible without a dedicated flow.
+    /// `M` (Nav, Branches focused): open the Merge menu for the selected
+    /// branch, and merge nothing until a row is chosen. On the current branch
+    /// there is nothing to choose between, so it merges straight away (git
+    /// answers "Already up to date").
     pub(super) fn merge_selected_branch(&mut self) {
-        self.merge_selected_branch_with(false);
+        if self.focus != Pane::Branches
+            || self.branch_drill.is_some()
+            || self.branches_tab == BranchesTab::Remotes
+            || self.popup.is_some()
+            || self.pending_confirm.is_some()
+        {
+            return;
+        }
+        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+            return;
+        };
+        if entry.is_head {
+            self.merge_selected_branch_with(MergeKind::Regular);
+            return;
+        }
+        let item = |label, shortcut, action, hint| MenuItem {
+            label,
+            shortcut,
+            action,
+            hint,
+        };
+        self.popup = Some(Popup::Menu(MenuState {
+            title: "Merge".to_owned(),
+            items: vec![
+                item(
+                    "Merge (fast-forward when possible)",
+                    'm',
+                    MenuAction::MergeFf,
+                    "Fast-forward when history allows, else a merge commit.",
+                ),
+                item(
+                    "Merge with --no-ff",
+                    'n',
+                    MenuAction::MergeNoFf,
+                    "Always create a merge commit.",
+                ),
+                item(
+                    "Squash, leave changes staged",
+                    's',
+                    MenuAction::SquashStaged,
+                    "Stage the branch's changes without committing.",
+                ),
+                item(
+                    "Squash and commit",
+                    'c',
+                    MenuAction::SquashCommit,
+                    "Squash the branch's changes into one new commit.",
+                ),
+            ],
+            selected: 0,
+        }));
     }
 
-    /// `merge_selected_branch`, optionally with `--no-ff` (the `x` menu).
-    pub(super) fn merge_selected_branch_with(&mut self, no_ff: bool) {
+    /// Merge the selected branch into the current one the way `kind` says.
+    /// `refresh()` always runs, even on a conflict: the Files pane already
+    /// renders `Change::Conflicted`, so the conflicted paths are visible
+    /// without a dedicated flow.
+    pub(super) fn merge_selected_branch_with(&mut self, kind: MergeKind) {
         if self.focus != Pane::Branches
             || self.branch_drill.is_some()
             || self.branches_tab == BranchesTab::Remotes
@@ -205,10 +268,15 @@ impl App {
         };
         let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
-        let result = if no_ff {
-            repo.merge_branch_no_ff(&name)
-        } else {
-            repo.merge_branch(&name)
+        let result = match kind {
+            MergeKind::Regular => repo.merge_branch(&name),
+            MergeKind::NoFf => repo.merge_branch_no_ff(&name),
+            MergeKind::Squash => repo
+                .merge_squash(&name, false)
+                .map(|()| git::branch::MergeOutcome::Merged),
+            MergeKind::SquashCommit => repo
+                .merge_squash(&name, true)
+                .map(|()| git::branch::MergeOutcome::Merged),
         };
         self.request_refresh();
         match result {

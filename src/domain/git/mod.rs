@@ -403,6 +403,11 @@ impl Repo {
         branch::merge_branch_no_ff(&self.inner, name)
     }
 
+    /// `git merge --squash <name>`, then a commit when `commit` is set.
+    pub fn merge_squash(&self, name: &str, commit: bool) -> GitResult<()> {
+        branch::merge_squash(&self.inner, name, commit)
+    }
+
     /// Take one side of a conflicted file whole (`checkout --ours|--theirs`).
     pub fn take_side(&self, path: &Path, ours: bool) -> GitResult<()> {
         apply::take_side(&self.inner, path, ours)
