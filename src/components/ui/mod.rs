@@ -1,5 +1,6 @@
 //! Small reusable UI building blocks (`components/ui/*`).
 
+pub mod chart_palette;
 pub mod color_picker;
 pub mod dialog;
 pub mod donut;
