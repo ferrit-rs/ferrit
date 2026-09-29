@@ -33,5 +33,6 @@ note "Scrollbar of Commits: click at 50% of the track, then drag from the top to
 step 10_scrollbar_click scrollbar:commits:50
 step 11_scrollbar_drag dragbar:commits:0:100
 
-note "Wheel over the right pane, on a commit with a long patch: scroll the list back to the top so both programs select the same commit (the 4th, a new 165-line script), then wheel over the patch."
-step 12_wheel_main wheel:commits:up:100 click:commits:4 wheel:main:down:5
+sh "seq 1 165 > FLOW_LONG.txt && git add FLOW_LONG.txt && git commit -qm 'flow: a 165-line file'"
+note "A commit with a long patch is added on the copy, so the test does not depend on what the history holds. Wheel over the right pane: scroll the list back to the top, which selects that commit, then wheel over the patch."
+step 12_wheel_main wheel:commits:up:100 click:commits:1 wheel:main:down:5

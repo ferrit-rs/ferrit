@@ -1,8 +1,14 @@
 # Space on a directory row: lazygit stages every file under it. Kept as its own
 # flow because it is a behaviour, not just a look: the git state must match.
-fixture canonical
+repo .
+focus "Space on a directory row of the Files tree: which files end up staged, and what the panel shows afterwards"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); commit workflows (stage-commit, feature-workflow)"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "mkdir -p flow_dir/sub; printf 'a\n' > flow_dir/a.txt; printf 'b\n' > flow_dir/sub/b.txt; printf 'top\n' > TOP.txt"
+note "Untracked: TOP.txt and a directory flow_dir/ holding two files, one nested."
 
 step 01_start
 step 02_focus_files 2
-step 03_on_docs_dir j j
+step 03_on_dir j j
 step 04_stage_dir Space

@@ -1,13 +1,17 @@
 # Stage a file, then commit it. The same keys drive lazygit and ferrit; the
 # report shows both screens per step and diffs the git state each left.
-#
-#   step NAME KEYS...   send KEYS (tmux names, text:<string> for typed text),
-#                       let the screen settle, shoot both programs
-fixture canonical
+# Run on a copy: .dev-tools/flow-compare.sh --repo . test/flows/stage-commit.flow
+repo .
+focus "staging one file with Space, then committing it: selection after Space, what the panels and the key bar say, the commit popup's outcome, git's own message"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); commit popup look and diff styling, which are style and belong to no flow yet"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "printf '\n- stage demo line\n' >> README.md; printf 'scratch\n' > FLOW_NOTES.md"
+note "Two changes on disk: README.md modified, FLOW_NOTES.md untracked."
 
 step 01_start
 step 02_focus_files 2
-step 03_move_to_main_rs j j j j j
+step 03_move_to_second j
 step 04_stage Space
 step 05_open_commit c
 step 06_type_message "text:test: flow commit"

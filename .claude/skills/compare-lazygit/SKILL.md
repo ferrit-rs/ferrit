@@ -137,13 +137,16 @@ leading with, not every bullet — most bullets stay plain prose.
 right.
 
 ### Format
-### Format
 
 One `## P1 - title` heading per section, then one row per gap, five cells:
 
 ```
-| What | lazygit | ferrit | To do | Seen in
+| What | lazygit | ferrit | To do. Done when: ... | Seen in
 ```
+
+`flow-report.sh` reads five columns headed What, lazygit, ferrit, Done when, Seen
+in: write the fix and its "Done when" in the one fourth cell (`To do. Done when:
+...`), never as two cells, or every column after it shifts.
 
 Rows start with `| ` and separate cells with ` | `; no closing pipe, and no `|`
 character inside a cell (write key bars and git stat lines with commas: a `|` in a
