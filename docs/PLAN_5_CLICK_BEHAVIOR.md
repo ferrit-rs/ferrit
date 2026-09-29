@@ -222,7 +222,8 @@ origin into the view Y for lazygit; ratatui does not, so ferrit adds
 
         pane_at == None  ->  click was on the right pane, the command log,
                              the keybar, or an inter-pane gap: no-op.
-                             (right pane: hook for the right-pane-focus plan.)
+                             (right pane: sets `right_focused`; the left panes then draw unfocused and
+                             the keybar is `Bar::RightPane`: Switch view: tab, Back: esc.)
 ```
 
 Clicking the title bar or the box border of a pane focuses it without moving

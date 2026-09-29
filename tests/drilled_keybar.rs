@@ -108,3 +108,53 @@ fn keybar_offers_only_back_and_open_inside_a_branch() {
     assert!(!out.contains("Checkout:"), "{out}");
     assert!(!out.contains("Merge:"), "{out}");
 }
+
+fn click(app: &mut App, column: u16, row: u16) {
+    use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    app.feed_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    });
+}
+
+/// Colour of the top-left border cell of the pane whose title is on `line`.
+fn border_fg(terminal: &Terminal<TestBackend>, title: &str) -> ratatui::style::Color {
+    let buf = terminal.backend().buffer();
+    let width = buf.area.width;
+    for y in 0..buf.area.height {
+        let row: String = (0..width).map(|x| buf[(x, y)].symbol()).collect();
+        if let Some(at) = row.find(title) {
+            let x = u16::try_from(row[..at].chars().count()).unwrap();
+            return buf[(x.saturating_sub(2), y)].fg;
+        }
+    }
+    panic!("no pane titled {title}");
+}
+
+#[test]
+fn clicking_the_right_pane_leaves_only_it_focused_with_its_own_key_bar() {
+    let (_dir, mut app) = app_with_two_commits("right-click-focus");
+    key(&mut app, KeyCode::Char('4')); // focus Commits
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal.draw(|f| screens::draw(f, &mut app)).unwrap();
+    let focused_fg = border_fg(&terminal, "Commits");
+    assert_ne!(focused_fg, border_fg(&terminal, "Files"));
+
+    click(&mut app, 100, 10); // inside the right pane
+    assert!(app.right_focused());
+    terminal.draw(|f| screens::draw(f, &mut app)).unwrap();
+    let out = terminal.backend().to_string();
+    assert!(out.contains("Switch view: tab"), "{out}");
+    assert!(out.contains("Back: esc"), "{out}");
+    assert!(!out.contains("Reword:"), "the Commits actions are gone\n{out}");
+    assert_eq!(
+        border_fg(&terminal, "Commits"),
+        border_fg(&terminal, "Files"),
+        "Commits is drawn unfocused"
+    );
+
+    key(&mut app, KeyCode::Esc);
+    assert!(frame(&mut app).contains("Reword:"), "Esc gives Commits back");
+}

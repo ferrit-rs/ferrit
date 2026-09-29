@@ -37,6 +37,7 @@ impl Action {
             Self::OperationMenu => "Continue / skip / abort",
             Self::Back => "Back",
             Self::Enter => "Open",
+            Self::NextPane => "Switch view",
             _ => "",
         }
     }
@@ -119,6 +120,9 @@ pub enum Bar {
     /// Drilled into a branch's log or a commit's files: the list of commits or
     /// files is read only there, so only the ways in and out are offered.
     Drilled,
+    /// The right (Patch / Diff) pane was clicked: the left pane's own actions
+    /// do not apply, so only the way to another pane and the way back are shown.
+    RightPane,
     /// A merge, rebase, cherry-pick or revert is stopped: `m` is the way out.
     Operation,
 }
@@ -177,6 +181,10 @@ fn body(bar: Bar) -> &'static [Segment] {
         Bar::Drilled => &[
             &[(Context::Global, Action::Back)],
             &[(Context::Global, Action::Enter)],
+        ],
+        Bar::RightPane => &[
+            &[(Context::Global, Action::NextPane)],
+            &[(Context::Global, Action::Back)],
         ],
         Bar::Operation => &[
             &[(Context::Global, Action::OperationMenu)],

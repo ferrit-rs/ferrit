@@ -88,9 +88,18 @@ impl App {
             Action::Commit => self.open_commit(git::commit::CommitKind::Normal),
             Action::Amend => self.open_commit(git::commit::CommitKind::Amend),
             Action::RewordHead => self.open_commit(git::commit::CommitKind::Reword),
-            Action::Focus(pane) => self.focus = pane,
-            Action::NextPane => self.focus = self.pane_offset(1),
-            Action::PrevPane => self.focus = self.pane_offset(PANES.len() - 1),
+            Action::Focus(pane) => {
+                self.right_focused = false;
+                self.focus = pane;
+            }
+            Action::NextPane => {
+                self.right_focused = false;
+                self.focus = self.pane_offset(1);
+            }
+            Action::PrevPane => {
+                self.right_focused = false;
+                self.focus = self.pane_offset(PANES.len() - 1);
+            }
             Action::ToggleBranchesTab => self.toggle_branches_tab(),
             Action::SelectDown => self.select_down(),
             Action::SelectUp => self.select_up(),

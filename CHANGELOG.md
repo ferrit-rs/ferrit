@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- Clicking the right (Patch / Diff) pane focuses only that pane, like lazygit: the left pane you came from is drawn unfocused (no green border, no blue selection bar), and the key bar shows `Switch view: tab | Back: esc | Help | Quit` instead of that pane's actions. `Tab`, `Shift-Tab` and `1`-`5` also hand focus back to a left pane.
 - The Files pane always starts on the `▼ /` root row, like lazygit, even when every changed file sits at the repo root: the counter reads "1 of 3" with two changed files, the right pane shows the diff of all changes, `j` reaches the first file, and Space on the root stages everything. Before, a flat list started on the first file, so the same keys landed on different files in the two programs.
 
 ## [0.7.0] - 2026-09-29

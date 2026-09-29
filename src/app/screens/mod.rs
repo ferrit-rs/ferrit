@@ -237,7 +237,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         // read, so this `&mut` borrow never overlaps the `&self` one below.
         app.set_left_area(pane, row);
 
-        let focused = app.focus == pane;
+        let focused = app.focus == pane && !app.right_focused();
         let border = if focused {
             Style::new()
                 .fg(app.theme_config.color())
@@ -687,6 +687,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
     let bar = if app.operation.is_some() {
         Bar::Operation
+    } else if app.right_focused() {
+        Bar::RightPane
     } else if (app.focus == Pane::Branches && app.branches_drilled())
         || (app.focus == Pane::Commits && app.commits_drilled())
     {
