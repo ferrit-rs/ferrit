@@ -26,6 +26,6 @@ note "main moves on, then n with flow-a still selected: the new branch starts fr
 step 10_new_prompt n
 step 11_new_named "text:flow-b" Enter
 note "Back on flow-a (merged, so it deletes without a warning): d asks, then confirms."
-step 12_select_flow_a j
+step 12_select_flow_a j j
 step 13_delete_prompt d
-step 14_delete_confirm y Enter
+step 14_delete_confirm y Enter Escape

@@ -16,8 +16,9 @@ step 03_reword_prompt r
 step 04_reword_typed "text: (reworded)" Enter
 note "Second commit, then s: it is squashed into the one below."
 step 05_select_second j
-step 06_squash s Enter Escape
+step 06_squash_prompt s
+step 07_squash_confirm Enter Escape
 note "Top commit, then d: a confirm, then y."
-step 07_select_top k
-step 08_drop_prompt d
-step 09_drop_confirm y Enter Escape
+step 08_select_top k
+step 09_drop_prompt d
+step 10_drop_confirm y Enter Escape
