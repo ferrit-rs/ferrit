@@ -56,7 +56,8 @@ contextual titles (`Pane::right_title`).
 `HEAD -> main` and branches, tags, remotes) and `push_state` (`Unpushed`, `Pushed`,
 `Merged`), filled by `log::commits` for HEAD's list: a commit reachable from `origin/main`
 (or `origin/master`) is merged, one reachable from the current branch's upstream is
-pushed, the rest are not pushed. A branch's own log gets `refs` only. The ancestry walks
+pushed, the rest are not pushed. On a branch with no upstream nothing is unpushed (lazygit
+computes that against `@{upstream}..HEAD`), so its commits are pushed unless merged. A branch's own log gets `refs` only. The ancestry walks
 stop once every listed commit is placed, or after 20,000 commits. Found by comparing a
 flow with lazygit (`test/flows/feature-workflow.flow`).
 

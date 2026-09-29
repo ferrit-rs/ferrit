@@ -124,10 +124,13 @@ fn mark_push_state(repo: &Repository, entries: &mut [CommitEntry]) {
         .iter()
         .filter_map(|e| Oid::from_str(&e.full_hash).ok())
         .collect();
-    let upstream = repo
-        .head()
-        .ok()
-        .filter(git2::Reference::is_branch)
+    let head = repo.head().ok().filter(git2::Reference::is_branch);
+    // A branch with no upstream has nothing "unpushed" (lazygit computes that against
+    // `@{upstream}..HEAD`), so its commits are pushed unless merged.
+    let no_upstream = head
+        .as_ref()
+        .is_some_and(|h| git2::Branch::wrap(h.clone()).upstream().is_err());
+    let upstream = head
         .and_then(|head| git2::Branch::wrap(head).upstream().ok())
         .and_then(|branch| branch.get().target());
     let main = ["origin/main", "origin/master"].iter().find_map(|name| {
@@ -143,7 +146,7 @@ fn mark_push_state(repo: &Repository, entries: &mut [CommitEntry]) {
         };
         entry.push_state = if merged.contains(&oid) {
             PushState::Merged
-        } else if pushed.contains(&oid) {
+        } else if no_upstream || pushed.contains(&oid) {
             PushState::Pushed
         } else {
             PushState::Unpushed
@@ -189,8 +192,8 @@ fn walk(repo: &Repository, mut revwalk: Revwalk<'_>, max: usize) -> GitResult<Ve
                 short_hash: full_hash.chars().take(7).collect(),
                 full_hash,
                 author: commit.author().name().unwrap_or("unknown").to_owned(),
-                summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
-                time: commit.time().seconds(),
+                    summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
+                    time: commit.time().seconds(),
                 refs: Vec::new(),
                 push_state: PushState::default(),
             })

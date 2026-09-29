@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- On a branch with no upstream the commit hashes are no longer red: yellow, or green when merged into `origin/main`, like lazygit. Before, every commit there counted as not pushed yet. With an upstream nothing changes.
 - With no stash entries the Stash pane's key bar shows only `Help: ?` and `Quit: q`, like lazygit. Before it offered Apply, Pop and Drop, which do nothing there.
 - Enter on a commit lists its changed files expanded, like lazygit: no root row, single-child directories folded (`▼ test/flows`, then `A stash.flow`, "1 of 2"). Before it showed one collapsed `▶ /` row, because the same Enter also toggled the first row, and the Files pane's collapsed directories leaked into the list.
 - After a confirmed Apply (`Space`) or Pop (`g`) on the Stash pane, the focus moves to Files with the first restored file selected and its diff on the right, like lazygit. Before, the focus stayed on Stash (after Pop, on an empty pane). Drop, a conflict and a failed Apply or Pop leave the focus where it was.

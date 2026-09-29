@@ -488,3 +488,21 @@ fn a_directory_row_keeps_the_side_column_at_full_width() {
     let out = frame(&mut app);
     assert!(out.contains("[2] Files - Worktrees - Submodules"), "{out}");
 }
+
+/// Done when: on a branch with no upstream nothing is unpushed, so its newest commit is
+/// yellow, not red (feature-workflow step 11); with an upstream the unpushed one stays red.
+#[test]
+fn a_branch_without_an_upstream_has_no_red_hashes() {
+    let repo = Repo::new("no-upstream");
+    repo.commit("a.txt", "one\n", "first");
+    repo.commit("a.txt", "one\ntwo\n", "second");
+    let second = repo.git(&["rev-parse", "--short=7", "HEAD"]);
+    let mut app = repo.app();
+    key(&mut app, '4');
+    key(&mut app, 'j'); // select the older commit so the newer row is drawn plain
+    assert_eq!(
+        colour_of(&mut app, &second).unwrap(),
+        ratatui::style::Color::Yellow,
+        "no upstream: pushed, yellow"
+    );
+}
