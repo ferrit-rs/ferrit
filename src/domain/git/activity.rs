@@ -42,6 +42,7 @@ pub(super) fn commits(repo: &Repository) -> GitResult<Vec<CommitEntry>> {
             full_hash,
             author: commit.author().name().unwrap_or("unknown").to_owned(),
             summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
+            body: commit.body().ok().flatten().unwrap_or("").trim().to_owned(),
             time,
             refs: Vec::new(),
             push_state: crate::domain::git::model::PushState::default(),

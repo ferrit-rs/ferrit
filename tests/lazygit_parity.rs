@@ -506,3 +506,33 @@ fn a_branch_without_an_upstream_has_no_red_hashes() {
         "no upstream: pushed, yellow"
     );
 }
+
+/// Done when: the branch Log prints a commit's message body under its subject, and the
+/// Author line ends with the email as `Name <email>`; a subject-only commit has no body
+/// rows (repo-tour step 3).
+#[test]
+fn the_branch_log_shows_the_body_and_the_author_email() {
+    let repo = Repo::new("log-body");
+    repo.commit("a.txt", "one\n", "plain subject");
+    repo.commit(
+        "a.txt",
+        "one\ntwo\n",
+        "with body\n\nfirst body line\nsecond body line",
+    );
+    let mut app = repo.app();
+    key(&mut app, '3');
+    let out = frame(&mut app);
+    let subject = out.find("with body").expect("the subject");
+    let first = out.find("first body line").expect("the body");
+    let second = out.find("second body line").expect("the whole body");
+    let older = out.find("plain subject").expect("the older subject");
+    assert!(
+        subject < first && first < second && second < older,
+        "the body sits under its subject\n{out}"
+    );
+    let plain_tail = &out[older..];
+    assert!(
+        !plain_tail.contains("body line"),
+        "no body under a bare subject\n{out}"
+    );
+}

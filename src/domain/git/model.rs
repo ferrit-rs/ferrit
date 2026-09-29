@@ -158,6 +158,8 @@ pub struct CommitEntry {
     pub short_hash: String,
     pub author: String,
     pub summary: String,
+    /// The message under the subject, trimmed; empty for a subject-only commit.
+    pub body: String,
     pub time: i64,
     /// Names pointing at this commit, in `git log --decorate` order: `HEAD ->` and the
     /// branches, then tags, then remote branches. Empty when none, and in a branch's log.

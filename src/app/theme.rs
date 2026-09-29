@@ -276,7 +276,10 @@ fn decoration_spans(p: &Palette, entry: &CommitEntry) -> Vec<Span<'static>> {
 
 /// Line count of one `branch_log_block` entry. Kept in sync with it so the
 /// scroll clamp knows the real height without re-building the styled lines.
-pub const BRANCH_LOG_BLOCK_LINES: usize = 6;
+pub fn branch_log_block_lines(entry: &CommitEntry) -> usize {
+    let body = entry.body.lines().count();
+    6 + if body > 0 { body + 1 } else { 0 }
+}
 
 /// One commit as a multi-line, git-log-style block: hash, author, relative
 /// date, and the summary indented under a `|` continuation — closer to
@@ -293,7 +296,7 @@ pub fn branch_log_block(p: &Palette, entry: &CommitEntry) -> Vec<Line<'static>> 
         Span::styled(entry.short_hash.clone(), fg(p.hash)),
     ];
     header.extend(decoration_spans(p, entry));
-    vec![
+    let mut lines = vec![
         Line::from(header),
         Line::from(vec![
             Span::styled("| ", graph),
@@ -311,7 +314,18 @@ pub fn branch_log_block(p: &Palette, entry: &CommitEntry) -> Vec<Line<'static>> 
             Span::raw(format!("    {}", entry.summary)),
         ]),
         Line::from(Span::styled("|", graph)),
-    ]
+    ];
+    // The message body, as lazygit prints it, under the subject and a blank row.
+    if !entry.body.is_empty() {
+        for text in entry.body.lines() {
+            lines.push(Line::from(vec![
+                Span::styled("| ", graph),
+                Span::raw(format!("    {text}")),
+            ]));
+        }
+        lines.push(Line::from(Span::styled("|", graph)));
+    }
+    lines
 }
 
 /// lazygit stash row: `stash@{0}: message`.

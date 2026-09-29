@@ -1225,7 +1225,7 @@ impl App {
                 .count()
                 .max(f.staged.text.lines().count()),
             DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.text.lines().count(),
-            DiffView::BranchLog(log) => log.commits.len() * theme::BRANCH_LOG_BLOCK_LINES,
+            DiffView::BranchLog(log) => log.commits.iter().map(theme::branch_log_block_lines).sum(),
             DiffView::None | DiffView::Note(_) => 0,
         }
     }
