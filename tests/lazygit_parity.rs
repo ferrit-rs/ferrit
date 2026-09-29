@@ -233,10 +233,14 @@ fn files_colour_names_and_directories_by_staging_state() {
     // The root row is selected, and part of the tree is staged: yellow on the bar.
     assert_eq!(colour(&mut app, "\u{25bc} /"), Color::Yellow);
 
-    // A file staged and modified again is not fully staged: its name stays default.
+    // A file staged and modified again is only partly staged: its name is yellow.
     repo.write("m.txt", "one\ntwo\nthree\n");
     app.refresh();
-    assert_eq!(colour(&mut app, " m.txt"), Color::Reset, "MM name");
+    assert_eq!(
+        colour(&mut app, " m.txt"),
+        Color::Yellow,
+        "MM name is yellow"
+    );
 }
 
 /// Done when: `Space` on a directory row stages every file under it, and the same key

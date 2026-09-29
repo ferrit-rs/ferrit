@@ -116,9 +116,12 @@ pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> 
             |n| n.to_string_lossy().into_owned(),
         )
     };
-    // lazygit greens the name of a fully staged file, letters included.
+    // lazygit greens the name of a fully staged file, letters included, and
+    // yellows one that is staged and changed again (`MM`).
     let name_style = if entry.is_fully_staged() {
         fg(p.add)
+    } else if entry.has_staged() {
+        fg(p.warn)
     } else {
         Style::new()
     };

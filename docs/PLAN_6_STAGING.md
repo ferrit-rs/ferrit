@@ -324,7 +324,7 @@ pub fn render_diff(
   `theme::file_line`; a file with both sides non-`None` renders e.g. `MM`.
   The row also colours by staging state, measured on lazygit: the NAME of a
   fully staged file (index side set, worktree clean: `M `, `A `) is green
-  like its letter; unstaged, untracked and `MM` names stay default. A
+  like its letter; unstaged and untracked names stay default, an `MM` name is yellow. A
   directory row's arrow and name (the `/` root included) are green when every
   file under it is fully staged, yellow when only part is staged, default
   when none is (`tree::dir_stage_state`, `theme::dir_line`). The selected row
