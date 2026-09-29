@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-29
+
 - `P`, `p` and `f` no longer hang when the SSH key has a passphrase (or a remote asks for an HTTPS password or a host-key `yes/no`): a popup asks for it, typed as dots for a password, and `Esc` cancels so git reports the failed login. Before, the question went to the terminal ferrit owns and the push waited five minutes for an answer nobody could see. A question that comes while another popup is open is cancelled rather than replacing it.
 
 - Added `CONTRIBUTING.md` with development setup, architecture, CI checks, testing, DCO, and pull request guidance.
@@ -369,7 +371,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ferrit-rs/ferrit/releases/tag/v0.4.0
