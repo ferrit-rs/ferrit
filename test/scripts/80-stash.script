@@ -24,7 +24,8 @@ git status --porcelain -> " M src/main.rs"          # apply restores it unstaged
 git status --porcelain -> "?? docs/notes.md"
 git stash list -> "parked"
 
-# Drop asks first.
+# Drop asks first. Apply moved the focus to Files, so go back to Stash.
+key 5
 key d
 expect-text "drop stash@{0}"
 key n
@@ -41,6 +42,7 @@ expect-text "pop stash@{1}: On main: parked?"
 key y
 git stash list => "stash@{0}: On main: second"
 git status --porcelain -> "?? docs/notes.md"
+key 5                                      # pop moved the focus to Files
 key d y
 git stash list => ""
 expect-text "(no stash entries)"
