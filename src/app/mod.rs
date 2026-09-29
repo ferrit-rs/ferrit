@@ -421,8 +421,9 @@ enum Popup {
 /// The five left panes, in top-to-bottom screen order.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
 pub enum Pane {
-    #[default]
     Status,
+    /// Where ferrit opens, like lazygit.
+    #[default]
     Files,
     Branches,
     Commits,

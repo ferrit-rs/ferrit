@@ -121,7 +121,7 @@ fn each_mistake_is_reported_with_its_line() {
 
 #[test]
 fn a_passing_script_returns_its_snapshots_in_order() {
-    let outcome = run("fixture canonical\nsnapshot first\nkey 2\nsnapshot second\n").unwrap();
+    let outcome = run("fixture canonical\nsnapshot first\nkey 1\nsnapshot second\n").unwrap();
     let labels: Vec<(usize, &str)> = outcome
         .frames
         .iter()

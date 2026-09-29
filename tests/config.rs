@@ -690,7 +690,7 @@ fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
             modifiers: KeyModifiers::NONE,
         });
     };
-    for (mouse, expected_focus) in [(true, Pane::Branches), (false, Pane::Status)] {
+    for (mouse, expected_focus) in [(true, Pane::Branches), (false, Pane::Files)] {
         let mut config = Config::default();
         config.ui.mouse = mouse;
         let mut app = with(config, dir.path());

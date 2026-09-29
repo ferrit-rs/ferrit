@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- ferrit opens on the Files pane with the first row selected and its diff on the right, like lazygit; the Status pane (`1`) keeps the welcome screen with the logo.
 - `s` (squash) on Commits asks first, like drop and like lazygit: `squash <hash> <subject> into <hash> <subject>?`, `Enter`/`y` confirms, `n`/`Esc` rewrites nothing. On the oldest commit it still just says there is no commit below. `S` (fixup) still acts at once.
 - Enter confirms every key-bar question (drop, apply / pop / drop stash, delete branch, discard, force-push, abort), like lazygit's popups; `y` still does, `n` / `Esc` cancel. The prompt reads `Enter/y yes`. On Branches the Enter no longer risks opening the commits.
 - The Infos box shows every line git printed after a write (at most 8), not only the first: after a commit the `[branch hash] subject` line, the stat and `create mode`, like lazygit's command log; the box grows to fit and the `@` viewer lists the same lines.

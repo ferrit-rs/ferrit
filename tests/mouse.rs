@@ -4,7 +4,9 @@
 //! in for a real frame. See `docs/PLAN_5_CLICK_BEHAVIOR.md` milestone C1.
 
 use ferrit::app::{App, Pane};
-use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::layout::Rect;
 
 fn left_click(column: u16, row: u16) -> MouseEvent {
@@ -137,7 +139,7 @@ fn click_outside_every_pane_is_a_no_op() {
     // nothing on screen contains a click, whatever the coordinates.
     app.feed_mouse(left_click(50, 50));
 
-    assert_eq!(app.focus, Pane::Status, "the default focus is unchanged");
+    assert_eq!(app.focus, Pane::Files, "the default focus is unchanged");
 }
 
 #[test]
@@ -162,6 +164,7 @@ fn middle_click_drag_and_move_do_not_route_to_a_pane() {
         height: 5,
     };
     app.set_left_area(Pane::Files, files);
+    app.feed_key(KeyEvent::from(KeyCode::Char('1'))); // start off Files
 
     let ev = |kind: MouseEventKind| MouseEvent {
         kind,

@@ -259,6 +259,7 @@ fn focused_border_rows(app: &mut App) -> BTreeSet<u16> {
 #[test]
 fn click_moves_focus_and_selection_on_screen() {
     let mut app = App::mock();
+    app.feed_key(KeyEvent::from(KeyCode::Char('1'))); // start from Status
     // A first frame lays out the panes, populating `left_areas` /
     // `list_offset` the way a real draw does before any click lands.
     let out = frame(&mut app, 120, 40);
@@ -333,7 +334,7 @@ fn click_on_the_command_log_or_keybar_is_a_no_op() {
 
     assert_eq!(
         app.focus,
-        Pane::Status,
+        Pane::Files,
         "a click on the log or the keybar moves nothing"
     );
 }
@@ -361,10 +362,29 @@ fn image_selection_takes_over_the_right_pane() {
     assert!(!out.contains("diff --git"), "the mock diff is gone\n{out}");
 }
 
+/// lazygit opens on Files, so ferrit does: the first row is selected and the
+/// right pane is Files' diff, not the welcome screen. Status keeps the logo.
+#[test]
+fn ferrit_opens_on_files_and_status_keeps_the_welcome_screen() {
+    let mut app = App::mock();
+    assert_eq!(app.focus, Pane::Files);
+    assert_eq!(app.selected(Pane::Files), 0);
+    let start = frame(&mut app, 160, 50);
+    assert!(!start.contains("Press ? for keybindings"), "{start}");
+    assert!(
+        start.contains("diff --git") || start.contains("@@"),
+        "{start}"
+    );
+
+    app.feed_key(KeyEvent::from(KeyCode::Char('1')));
+    let status = frame(&mut app, 160, 50);
+    assert!(status.contains("Press ? for keybindings"), "{status}");
+}
+
 #[test]
 fn help_overlay_toggles() {
     let mut app = App::mock();
-    // Not "keybindings": the welcome screen (Status is the default focus)
+    // Not "keybindings": the welcome screen (Status, when focused)
     // legitimately mentions it in its own one-liner ("Press ? for
     // keybindings"), so check for text unique to the help overlay's body.
     assert!(!frame(&mut app, 120, 40).contains("toggle this help"));

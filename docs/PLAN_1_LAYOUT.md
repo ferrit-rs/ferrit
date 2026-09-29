@@ -416,6 +416,11 @@ tier.
   (both routes return earlier now, before that match is ever reached for
   either pane).
 
+**Start focus**: ferrit opens on Files, like lazygit (`Pane::default()`; there
+is no config option for the start pane). The welcome screen shows when Status
+is focused with `1`, no longer at start
+(`ferrit_opens_on_files_and_status_keeps_the_welcome_screen`).
+
 ## Files pane: directory tree — done
 
 lazygit's Files pane groups changed paths under their directories (an

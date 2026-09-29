@@ -208,6 +208,7 @@ fn key(c: char) -> KeyEvent {
 fn the_screen_shows_the_remapped_key_in_the_bar_and_in_the_help() {
     let (_dir, mut app) = app_with("hints-remap", "[keys.global]\nhelp = \"H\"\n");
     assert!(frame(&mut app, 120, 40).contains("Help: H"));
+    app.feed_key(key('1')); // Status has no section of its own: Global is on top
     app.feed_key(key('H'));
     let help = frame(&mut app, 120, 40);
     assert!(help.contains("keybindings"), "{help}");
