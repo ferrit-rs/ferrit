@@ -780,14 +780,17 @@ pub fn log_line(p: &Palette, raw: &'static str) -> Line<'static> {
     }
 }
 
-/// The lines a record takes in the Infos box: the command, then git's own answer to it
-/// when it printed one (`[branch hash] summary` after a commit), as lazygit's command log
+/// The lines a record takes in the Infos box: the command, then every line of git's own
+/// answer to it (`[branch hash] summary`, the stat, `create mode` after a commit), as lazygit's command log
 /// does under "Git output".
 pub fn command_lines(p: &Palette, record: &CommandRecord) -> Vec<Line<'static>> {
     let mut lines = vec![command_line(p, record)];
-    if let Some(output) = &record.output {
-        lines.push(Line::styled(output.clone(), fg(p.idle)));
-    }
+    lines.extend(
+        record
+            .output
+            .iter()
+            .map(|line| Line::styled(line.clone(), fg(p.idle))),
+    );
     lines
 }
 

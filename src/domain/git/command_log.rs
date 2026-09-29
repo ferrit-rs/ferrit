@@ -12,6 +12,9 @@ use std::time::Duration;
 /// Entries kept; older ones are dropped.
 const CAPACITY: usize = 200;
 
+/// Lines of git's answer kept per write; the rest is cut.
+pub const MAX_OUTPUT_LINES: usize = 8;
+
 /// Subcommands that only read. `git diff` runs on every selection change, so
 /// showing them by default would bury the commands the user asked for.
 const READ_ONLY: [&str; 9] = [
@@ -42,9 +45,10 @@ pub struct CommandRecord {
     /// `None` when git could not be spawned, was killed, or was cancelled.
     pub exit: Option<i32>,
     pub took: Duration,
-    /// The first line git printed on stdout, for a write that printed one
-    /// (`[main 3cd9f42] docs: flow-compare demo` after a commit).
-    pub output: Option<String>,
+    /// The non-empty lines git printed on stdout for a write, at most
+    /// `MAX_OUTPUT_LINES` (`[main 3cd9f42] docs: demo`, `1 file changed, ...`
+    /// after a commit). Empty for a read or a silent write.
+    pub output: Vec<String>,
 }
 
 impl CommandRecord {

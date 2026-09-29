@@ -60,7 +60,7 @@ pub(super) fn track(cmd: &Command) -> Tracked {
         kind,
         started: Instant::now(),
         exit: None,
-        output: None,
+        output: Vec::new(),
     }
 }
 
@@ -70,7 +70,7 @@ pub(super) struct Tracked {
     kind: command_log::CommandKind,
     started: Instant,
     exit: Option<i32>,
-    output: Option<String>,
+    output: Vec<String>,
 }
 
 impl Tracked {
@@ -79,16 +79,19 @@ impl Tracked {
         self.exit = exit;
     }
 
-    /// `finish`, and keep the first line git wrote on stdout when this is a write:
-    /// it is the answer the command log shows under the command.
+    /// `finish`, and keep the lines git wrote on stdout (up to
+    /// `MAX_OUTPUT_LINES`) when this is a write: the answer the command log
+    /// shows under the command.
     pub(super) fn finish_with_stdout(mut self, exit: Option<i32>, stdout: &[u8]) {
         self.exit = exit;
         if self.kind == command_log::CommandKind::Write {
             self.output = String::from_utf8_lossy(stdout)
                 .lines()
                 .map(str::trim_end)
-                .find(|line| !line.is_empty())
-                .map(str::to_owned);
+                .filter(|line| !line.is_empty())
+                .take(command_log::MAX_OUTPUT_LINES)
+                .map(str::to_owned)
+                .collect();
         }
     }
 }
@@ -100,7 +103,7 @@ impl Drop for Tracked {
             kind: self.kind,
             exit: self.exit,
             took: self.started.elapsed(),
-            output: self.output.take(),
+            output: std::mem::take(&mut self.output),
         });
     }
 }
@@ -111,6 +114,23 @@ mod tests {
 
     use super::output;
     use crate::domain::git::command_log::recent;
+
+    #[test]
+    fn a_write_keeps_its_non_empty_stdout_lines_up_to_the_cap() {
+        let mut cmd = super::git(std::path::Path::new("."));
+        // `var -l` is a write to the log and prints one line per config entry.
+        cmd.args(["-c", "zz.marker=1", "var", "-l"]);
+        assert!(output(&mut cmd).is_ok());
+        let records: Vec<_> = recent(usize::MAX, true)
+            .into_iter()
+            .filter(|entry| entry.argv.contains("zz.marker=1"))
+            .collect();
+        assert_eq!(records.len(), 1, "{records:?}");
+        let lines: Vec<_> = records.iter().flat_map(|r| r.output.clone()).collect();
+        assert!(lines.len() > 1, "more than the first line");
+        assert!(lines.len() <= crate::domain::git::command_log::MAX_OUTPUT_LINES);
+        assert!(lines.iter().all(|line| !line.is_empty()));
+    }
 
     #[test]
     fn a_command_that_cannot_be_spawned_is_recorded_with_no_exit_code() {

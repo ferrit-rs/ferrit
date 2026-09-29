@@ -254,17 +254,26 @@ fn a_commit_shows_git_s_own_answer_under_the_command() {
         .into_iter()
         .rev()
         .find(|r| {
-            r.argv == "git commit -F -"
-                && r.output
-                    .as_deref()
-                    .is_some_and(|o| o.contains("zz answer marker"))
+            r.argv == "git commit -F -" && r.output.iter().any(|o| o.contains("zz answer marker"))
         })
         .expect("the commit's record has git's answer");
-    let answer = record.output.clone().unwrap();
-    assert!(answer.starts_with("[main "), "{answer}");
+    assert!(
+        record.output[0].starts_with("[main "),
+        "{:?}",
+        record.output
+    );
+    assert!(
+        record.output.iter().any(|l| l.contains("1 file changed")),
+        "the stat line too: {:?}",
+        record.output
+    );
 
     let lines = theme::command_lines(&Palette::DARK, &record);
-    assert_eq!(lines.len(), 2, "the command, then its answer");
+    assert_eq!(
+        lines.len(),
+        1 + record.output.len(),
+        "the command, then every answer line"
+    );
     let second: String = lines[1].spans.iter().map(|s| s.content.as_ref()).collect();
     assert!(second.contains("zz answer marker"), "{second}");
 }

@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The Infos box shows every line git printed after a write (at most 8), not only the first: after a commit the `[branch hash] subject` line, the stat and `create mode`, like lazygit's command log; the box grows to fit and the `@` viewer lists the same lines.
 - With no stash entries the Stash right pane says `No stash entries`, like lazygit. Before it was empty.
 - The Stash right pane starts with the stash's subject (`stash@{0}: On main: wip`, yellow) and the `git stash show --stat` summary above the patch, like lazygit.
 - `x` on a row with no extra actions does nothing, like lazygit. Before it set a red `error: no extra actions for this row` in Status that stayed until the next refresh.

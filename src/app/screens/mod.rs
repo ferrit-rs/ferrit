@@ -32,9 +32,10 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
     let palette = app.palette();
 
+    let log_rows = command_log_rows(app, area.height);
     let [content, log, keybar] = Layout::vertical([
         Constraint::Min(0),
-        Constraint::Length(5),
+        Constraint::Length(log_rows + 3),
         Constraint::Length(1),
     ])
     .areas(area);
@@ -638,24 +639,20 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let inner = block.inner(panel_area);
     frame.render_widget(block, panel_area);
 
-    let [first, second] =
-        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(inner);
+    let [first, rest] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
     app.set_author_click_area(Rect::ZERO);
 
     // The two newest commands ferrit ran (writes only; `@` lists everything),
     // oldest on top. A repo-free `App::mock()` keeps its fixed sample.
+    let rows = usize::from(inner.height);
     let lines: Vec<Line<'static>> = if app.is_mock() {
         mock::COMMAND_LOG
             .iter()
             .map(|command| theme::log_line(palette, command))
             .collect()
     } else {
-        // Each command may bring git's answer with it: the two newest lines fit.
-        let mut lines: Vec<Line<'static>> = command_log::recent(2, app.config.log.show_reads)
-            .iter()
-            .flat_map(|record| theme::command_lines(palette, record))
-            .collect();
-        let extra = lines.len().saturating_sub(2);
+        let mut lines = command_log_lines(app);
+        let extra = lines.len().saturating_sub(rows);
         lines.drain(..extra);
         lines
     };
@@ -679,9 +676,36 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     } else {
         frame.render_widget(Paragraph::new(first_line), first);
     }
-    if let Some(line) = lines.get(1) {
-        frame.render_widget(Paragraph::new(line.clone()), second);
+    if lines.len() > 1 {
+        frame.render_widget(
+            Paragraph::new(lines.get(1..).unwrap_or_default().to_vec()),
+            rest,
+        );
     }
+}
+
+/// Inner rows of the Infos box: the two it always has, grown to hold the newest
+/// command and every line git answered with (`MAX_OUTPUT_LINES` at most), but never
+/// more than a third of the screen so the panes above keep their room.
+fn command_log_rows(app: &App, screen_height: u16) -> u16 {
+    if app.is_mock() {
+        return 2;
+    }
+    let newest = command_log::recent(1, app.config.log.show_reads)
+        .last()
+        .map_or(0, |record| {
+            theme::command_lines(&app.palette(), record).len()
+        });
+    let wanted = u16::try_from(newest).unwrap_or(u16::MAX).max(2);
+    wanted.min((screen_height / 3).saturating_sub(3).max(2))
+}
+
+/// The two newest commands' lines, each command followed by git's answer.
+fn command_log_lines(app: &App) -> Vec<Line<'static>> {
+    command_log::recent(2, app.config.log.show_reads)
+        .iter()
+        .flat_map(|record| theme::command_lines(&app.palette(), record))
+        .collect()
 }
 
 /// The bottom key-hint bar, or, while a discard or branch-delete has a

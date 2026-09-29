@@ -365,16 +365,16 @@ pub(super) fn draw_command_log_view(
         .border_style(focused)
         .render(frame, area);
     let rows = usize::from(dialog.body.height);
-    let total = view.records.len();
+    // Every record's command and its answer lines, one row each.
+    let all: Vec<Line<'static>> = view
+        .records
+        .iter()
+        .flat_map(|record| theme::command_lines(palette, record))
+        .collect();
+    let total = all.len();
     let end = total.saturating_sub(view.from_bottom.min(total.saturating_sub(rows)));
     let start = end.saturating_sub(rows);
-    let lines: Vec<Line<'static>> = view
-        .records
-        .get(start..end)
-        .unwrap_or_default()
-        .iter()
-        .map(|record| theme::command_line(palette, record))
-        .collect();
+    let lines: Vec<Line<'static>> = all.get(start..end).unwrap_or_default().to_vec();
     let body = if lines.is_empty() {
         vec![Line::styled(
             "no git command run yet",

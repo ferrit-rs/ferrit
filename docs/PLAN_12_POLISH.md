@@ -191,9 +191,11 @@ What exists today, each read from the code:
 
 ## P0: real command log
 
-A record also keeps the first line git printed on stdout for a write (`[main 3cd9f42] summary`
-after a commit), and the Infos box shows it under the command, as lazygit does with "Git output";
-the `@` viewer does not draw it yet.
+A record also keeps the non-empty lines git printed on stdout for a write, at most 8
+(`[main 3cd9f42] summary`, the stat and `create mode` after a commit), and the Infos box shows
+them all under the command, as lazygit does with "Git output". The box is two rows tall and
+grows to fit the newest command and its answer, up to a third of the screen; the `@` viewer
+draws the same lines.
 
 **One choke point.** Every subprocess goes through one function in a new
 `src/domain/git/exec.rs`:
