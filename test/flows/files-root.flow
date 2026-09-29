@@ -1,0 +1,23 @@
+# When does the Files tree show its root row `▼ /`? One dir with one file, one dir
+# with two files, a chain of single-child dirs, then a dir plus a file at the root.
+# Run on a copy: .dev-tools/flow-compare.sh --repo . test/flows/files-root.flow
+repo .
+focus "the Files tree shape for changes under a single directory: whether the root row shows, whether single-child directories are folded (a/b/c), the row count and the row the cursor starts on"
+not "what Space does on a row (stage-directory); panel sizes, mouse and scrolling (ui-mouse)"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "mkdir -p flow_dir && printf 'a\n' > flow_dir/a.txt"
+note "One directory holding one changed file."
+step 01_one_dir_one_file 2
+
+sh "printf 'b\n' > flow_dir/b.txt"
+note "The same directory holding two changed files."
+step 02_one_dir_two_files
+
+sh "git clean -fdq && mkdir -p x/y/z && printf 'c\n' > x/y/z/c.txt"
+note "Only a chain of single-child directories: x/y/z/c.txt."
+step 03_single_child_chain
+
+sh "printf 'top\n' > TOP.txt"
+note "The chain plus a file at the root."
+step 04_chain_and_root_file
