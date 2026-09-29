@@ -93,15 +93,15 @@ impl App {
             Action::Focus(pane) => {
                 self.right_focused = false;
                 self.focus = pane;
-            }
+            },
             Action::NextPane => {
                 self.right_focused = false;
                 self.focus = self.pane_offset(1);
-            }
+            },
             Action::PrevPane => {
                 self.right_focused = false;
                 self.focus = self.pane_offset(PANES.len() - 1);
-            }
+            },
             Action::ToggleBranchesTab => self.toggle_branches_tab(),
             Action::SelectDown => self.select_down(),
             Action::SelectUp => self.select_up(),
