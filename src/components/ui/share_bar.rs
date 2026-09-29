@@ -136,6 +136,10 @@ pub fn pad_label(label: &str, width: usize) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test scaffolding: an out-of-range index is the failed assertion"
+)]
 mod tests {
     use super::*;
 

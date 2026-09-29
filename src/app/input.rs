@@ -2,8 +2,8 @@
 
 use super::theme_config::ThemeMode;
 use super::{
-    App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
-    Pane, Position,
+    App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
+    MouseEventKind, PANES, Pane, Position,
 };
 
 const KEY_THEME_PALETTE: char = 'p';
