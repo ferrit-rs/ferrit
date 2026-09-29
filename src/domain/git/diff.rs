@@ -179,8 +179,12 @@ impl Diff {
     /// Render raw diff through delta's pager-compatible formatter. This keeps
     /// ferrit's parser read-only while matching lazygit's configured diff
     /// appearance: file markers, line gutters, word highlights, and blocks.
-    /// Missing delta is normal; callers fall back to ferrit's native renderer.
+    /// Missing delta is normal; callers fall back to ferrit's native renderer,
+    /// which is also what `FERRIT_NO_DELTA` (set by the test runner) asks for.
     pub fn delta_output(&self, width: usize) -> Option<String> {
+        if std::env::var_os("FERRIT_NO_DELTA").is_some() {
+            return None;
+        }
         let mut child = Command::new("delta")
             .args([
                 "--paging=never".to_owned(),

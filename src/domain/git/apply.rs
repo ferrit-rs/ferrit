@@ -6,7 +6,7 @@
 //! (fuzz, whitespace policy, `core.autocrlf` are its problem, not ours), one
 //! subprocess per action, no long-lived patch-builder state.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -74,18 +74,34 @@ pub(super) fn stage_all(repo: &Repository, dir: ApplyDir) -> GitResult<()> {
     })
 }
 
-/// `git add -A` for everything except `excluded`, each matched literally
+/// `git add -A` for everything except `excluded`, each path named literally
 /// (no glob or magic in a path such as `we ird [1].txt`). An excluded path
 /// that is unmerged stays unmerged. See `has_conflict_markers`.
+///
+/// The paths are listed rather than excluded with `:(exclude,literal)<path>`:
+/// git 2.50 stages an unmerged path that a pathspec excludes, which is the
+/// marker-guard bypass this function exists to prevent.
 pub(super) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitResult<()> {
     let workdir = workdir(repo)?;
+    let mut list = exec::git(workdir);
+    list.args(["ls-files", "-z", "-m", "-d", "-o", "--exclude-standard"]);
+    let out = exec::output(&mut list)
+        .map_err(|e| GitError::ApplyFailed(format!("cannot run git: {e}")))?;
+    if !out.status.success() {
+        return Err(GitError::ApplyFailed(stderr(&out)));
+    }
+    let listed = String::from_utf8_lossy(&out.stdout);
+    let paths: BTreeSet<&str> = listed
+        .split('\0')
+        .filter(|p| !p.is_empty() && !excluded.iter().any(|e| e.to_str() == Some(p)))
+        .collect();
+    if paths.is_empty() {
+        return Ok(());
+    }
     run_git(workdir, |cmd| {
-        cmd.arg("add").arg("-A").arg("--").arg(".");
-        for path in excluded {
-            let mut spec = std::ffi::OsString::from(":(exclude,literal)");
-            spec.push(path.as_os_str());
-            cmd.arg(spec);
-        }
+        cmd.arg("--literal-pathspecs")
+            .args(["add", "-A", "--"])
+            .args(&paths);
     })
 }
 

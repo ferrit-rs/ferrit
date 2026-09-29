@@ -1,0 +1,9 @@
+experimental = ["setup-scripts"]
+
+# Tests must not depend on the machine: no delta on PATH, no user git config.
+[scripts.setup.hermetic-env]
+command = 'sh -c "printf \"FERRIT_NO_DELTA=1\nGIT_CONFIG_GLOBAL=/dev/null\nGIT_CONFIG_NOSYSTEM=1\n\" >> $NEXTEST_ENV"'
+
+[[profile.default.scripts]]
+filter = 'all()'
+setup = 'hermetic-env'
