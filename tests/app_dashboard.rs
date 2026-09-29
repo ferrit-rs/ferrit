@@ -16,10 +16,13 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::events::AppEvent;
 use ferrit::app::{App, FullScreen, Pane};
 use ferrit::domain::git::stats::Window;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 fn key(c: char) -> KeyEvent {
     KeyEvent::from(KeyCode::Char(c))
@@ -305,4 +308,78 @@ fn the_mock_app_has_no_repository_and_no_statistics() {
     assert!(app.dashboard().error().is_none());
     app.close_dashboard();
     assert_eq!(app.full_screen(), FullScreen::None);
+}
+
+#[test]
+fn d_opens_the_dashboard_and_closes_it_again() {
+    let tmp = history("dash-d");
+    let mut app = App::open(tmp.path()).unwrap();
+    app.feed_key(key('D'));
+    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert_eq!(app.dashboard().stats().unwrap().totals.commits, 3);
+    app.feed_key(key('D'));
+    assert_eq!(app.full_screen(), FullScreen::None);
+}
+
+#[test]
+fn the_key_that_opens_the_dashboard_can_be_rebound_and_still_closes_it() {
+    let tmp = history("dash-rebind");
+    let (config, issues) = Config::parse("[keys.global]\ndashboard = \"B\"\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    let load = ConfigLoad {
+        config,
+        file: None,
+        issues,
+    };
+    let mut app = App::open_with(tmp.path(), load).unwrap();
+
+    app.feed_key(key('D'));
+    assert_eq!(app.full_screen(), FullScreen::None, "D is no longer bound");
+    app.feed_key(key('B'));
+    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    app.feed_key(key('B'));
+    assert_eq!(
+        app.full_screen(),
+        FullScreen::None,
+        "the rebound key closes it"
+    );
+}
+
+fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    }
+}
+
+#[test]
+fn a_click_reaches_no_pane_behind_the_dashboard_and_the_wheel_scrolls_it() {
+    let tmp = history("dash-mouse");
+    let mut app = App::open(tmp.path()).unwrap();
+    // A frame of the panes first, so their click areas exist.
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 40)).unwrap();
+    terminal
+        .draw(|f| ferrit::app::screens::draw(f, &mut app))
+        .unwrap();
+    app.open_dashboard();
+    let selected = app.selected(Pane::Commits);
+
+    for row in [3, 12, 20, 30] {
+        app.feed_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 4, row));
+    }
+    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert_eq!(
+        app.selected(Pane::Commits),
+        selected,
+        "no pane heard a click"
+    );
+
+    app.feed_mouse(mouse(MouseEventKind::ScrollDown, 10, 10));
+    assert_eq!(app.dashboard().scroll(), 3);
+    app.feed_mouse(mouse(MouseEventKind::ScrollUp, 10, 10));
+    assert_eq!(app.dashboard().scroll(), 0);
+    app.feed_mouse(mouse(MouseEventKind::ScrollUp, 10, 10));
+    assert_eq!(app.dashboard().scroll(), 0, "no scrolling above the top");
 }

@@ -24,6 +24,7 @@ const EXPECTED: &[(Context, &str, Action)] = &[
     (C::Global, "q", A::Quit),
     (C::Global, "?", A::Help),
     (C::Global, "@", A::CommandLog),
+    (C::Global, "D", A::Dashboard),
     (C::Global, "m", A::OperationMenu),
     (C::Global, "x", A::ContextMenu),
     (C::Global, "esc", A::Back),

@@ -13,7 +13,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
-use super::{App, AppEvent, FullScreen, KeyCode, KeyEvent, WorkerKind, git, run_worker};
+use super::keymap::{Action, Context, KeyBinding};
+use super::{
+    App, AppEvent, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, git,
+    run_worker,
+};
 use crate::domain::git::stats::{RepoStats, StatsOptions, Window};
 
 /// The windows `t` cycles through, shortest first.
@@ -28,6 +32,8 @@ const WINDOWS: [Window; 5] = [
 const DEFAULT_WINDOW: usize = 2;
 /// Rows `PageUp` / `PageDown` scroll.
 const PAGE: usize = 10;
+/// Rows one wheel notch scrolls.
+const WHEEL_ROWS: usize = 3;
 
 /// One answer of the worker.
 #[derive(Debug)]
@@ -285,8 +291,17 @@ impl App {
     /// Every key while the dashboard is up (after the popups, a pending
     /// confirmation and the help overlay, which own input before it).
     pub(super) fn dashboard_key(&mut self, key: KeyEvent) {
+        // The key that opens the dashboard closes it, whatever it is bound to.
+        let toggles = self
+            .keymap
+            .resolve(&[Context::Global], KeyBinding::from_event(key))
+            == Some(Action::Dashboard);
+        if toggles {
+            self.close_dashboard();
+            return;
+        }
         match key.code {
-            KeyCode::Esc | KeyCode::Char('q' | 'D') => self.close_dashboard(),
+            KeyCode::Esc | KeyCode::Char('q') => self.close_dashboard(),
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('t') => self.cycle_window(true),
             KeyCode::Char('T') => self.cycle_window(false),
@@ -306,6 +321,19 @@ impl App {
             },
             KeyCode::Home => self.dashboard.scroll = 0,
             KeyCode::End => self.dashboard.scroll = usize::MAX,
+            _ => {},
+        }
+    }
+
+    /// Only the wheel does anything on the dashboard: three rows a notch.
+    pub(super) fn dashboard_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::ScrollUp => {
+                self.dashboard.scroll = self.dashboard.scroll.saturating_sub(WHEEL_ROWS);
+            },
+            MouseEventKind::ScrollDown => {
+                self.dashboard.scroll = self.dashboard.scroll.saturating_add(WHEEL_ROWS);
+            },
             _ => {},
         }
     }

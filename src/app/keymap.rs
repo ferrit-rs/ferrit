@@ -93,6 +93,8 @@ pub enum Action {
     Quit,
     Help,
     CommandLog,
+    /// The full-screen repository dashboard (`docs/PLAN_13_DASHBOARD.md`).
+    Dashboard,
     OperationMenu,
     /// The menu of extra actions for the selected row.
     ContextMenu,
@@ -167,6 +169,7 @@ impl Action {
             Self::Quit => "quit",
             Self::Help => "help",
             Self::CommandLog => "command_log",
+            Self::Dashboard => "dashboard",
             Self::OperationMenu => "operation_menu",
             Self::ContextMenu => "context_menu",
             Self::Back => "back",
@@ -368,6 +371,7 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Global, "q", Action::Quit),
     (Context::Global, "?", Action::Help),
     (Context::Global, "@", Action::CommandLog),
+    (Context::Global, "D", Action::Dashboard),
     (Context::Global, "m", Action::OperationMenu),
     (Context::Global, "x", Action::ContextMenu),
     (Context::Global, "esc", Action::Back),

@@ -334,6 +334,13 @@ impl App {
             return;
         }
 
+        // The panes are not on screen: their areas from the last frame must not
+        // answer clicks. The wheel scrolls the dashboard.
+        if self.full_screen == FullScreen::Dashboard {
+            self.dashboard_mouse(ev);
+            return;
+        }
+
         if !self.author_overlay.is_closed() {
             self.mouse_pointer.request(false);
             if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left)) {

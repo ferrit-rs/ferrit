@@ -62,6 +62,7 @@ impl App {
             Action::Quit => self.should_quit = true,
             Action::Help => self.show_help = true,
             Action::CommandLog => self.open_command_log(),
+            Action::Dashboard => self.open_dashboard(),
             Action::OperationMenu => self.open_operation_menu(),
             Action::ContextMenu => self.open_context_menu(),
             Action::Back => {
