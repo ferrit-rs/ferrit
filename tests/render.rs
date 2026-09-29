@@ -497,15 +497,17 @@ fn busy_and_status_note_render_on_the_status_pane_and_are_exclusive() {
 }
 
 /// `docs/PLAN_10_STASH.md` S4: the keybar swaps for the Stash pane, same as
-/// Branches.
+/// Branches. The mock has no stash entries, so the bar is the empty-stash one:
+/// no Apply, Pop or Drop, and none of the Files pane's keys either.
 #[test]
 fn keybar_swaps_for_the_stash_pane() {
     let mut app = App::mock();
     app.focus = Pane::Stash;
     let out = frame(&mut app, 120, 40);
-    assert!(out.contains("Apply:"), "{out}");
-    assert!(out.contains("Drop:"), "{out}");
-    assert!(!out.contains("Stage:"), "{out}");
+    for hint in ["Apply:", "Pop:", "Drop:", "Stage:"] {
+        assert!(!out.contains(hint), "{hint}\n{out}");
+    }
+    assert!(out.contains("Help: ?"), "{out}");
 }
 
 /// `docs/PLAN_10_STASH.md` S4: the stash popup reuses the single-input

@@ -116,6 +116,9 @@ pub enum Bar {
     Default,
     Branches,
     Stash,
+    /// The Stash pane with no entries: apply, pop and drop have nothing to act
+    /// on, so only the pinned help and quit remain (lazygit: `Keybindings: ?`).
+    StashEmpty,
     Commits,
     /// Drilled into a branch's log or a commit's files: the list of commits or
     /// files is read only there, so only the ways in and out are offered.
@@ -168,6 +171,7 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Stash, Action::DropStash)],
             FETCH_PULL_PUSH,
         ],
+        Bar::StashEmpty => &[],
         Bar::Commits => &[
             &[(Context::Commits, Action::RewordCommit)],
             &[(Context::Commits, Action::DropCommit)],

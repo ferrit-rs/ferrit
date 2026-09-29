@@ -272,6 +272,23 @@ fn stash_keys_are_no_ops_on_an_empty_stash_pane() {
 }
 
 #[test]
+fn an_empty_stash_pane_offers_no_apply_pop_or_drop_in_the_key_bar() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    let (_dir, mut app) = dirty_app("app-stash-empty-bar");
+    app.feed_key(char_key('5'));
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal
+        .draw(|f| ferrit::app::screens::draw(f, &mut app))
+        .unwrap();
+    let out = terminal.backend().to_string();
+    for hint in ["Apply:", "Pop:", "Drop:"] {
+        assert!(!out.contains(hint), "{hint} has nothing to act on\n{out}");
+    }
+    assert!(out.contains("Help: ?"), "{out}");
+}
+
+#[test]
 fn space_on_files_still_stages_and_d_still_asks_to_discard() {
     let (dir, mut app) = dirty_app("app-stash-prior");
     app.feed_key(char_key('j')); // off the root row

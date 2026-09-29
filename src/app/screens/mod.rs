@@ -695,6 +695,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Drilled
     } else if app.focus == Pane::Branches {
         Bar::Branches
+    } else if app.focus == Pane::Stash && app.row_count(Pane::Stash) == 0 {
+        Bar::StashEmpty
     } else if app.focus == Pane::Stash {
         Bar::Stash
     } else if app.focus == Pane::Commits {

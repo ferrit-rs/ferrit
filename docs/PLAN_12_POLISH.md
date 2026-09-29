@@ -359,6 +359,9 @@ bindings or with a user's remaps.
   bar is its own `Bar::Drilled`: `Back: esc | Open: enter`, then `Help` and
   `Quit`. The rows there are read only, so `Stage`, `Commit` or `Reword` would
   do nothing. lazygit shows the sub-view's own keys (`tests/drilled_keybar.rs`).
+- The Stash pane with no entries has `Bar::StashEmpty`, an empty body: only
+  `Help: ?` and `Quit: q`, since Apply, Pop and Drop have nothing to act on
+  (lazygit: `Keybindings: ?`). Those keys are already no-ops there.
 
 ## P4: `x` menu, right-click, clickable hints
 
