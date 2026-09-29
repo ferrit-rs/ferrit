@@ -44,9 +44,11 @@ const DAY: i64 = 86_400;
 // ---------------------------------------------------------------- synthetic
 
 fn author(name: &str, commits: usize) -> AuthorStat {
+    let email = format!("{}@example.com", name.to_lowercase().replace(' ', "."));
     AuthorStat {
         name: name.to_owned(),
-        email: format!("{}@example.com", name.to_lowercase().replace(' ', ".")),
+        emails: vec![email.clone()],
+        email,
         commits,
         added: Some(0),
         removed: Some(0),

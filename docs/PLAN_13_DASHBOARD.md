@@ -75,7 +75,7 @@ pub struct RepoStats {
     pub totals: Totals,                 // commits, authors, local/remote branches, tags, stashes, first/last commit
     pub series: Vec<Bucket>,            // commits per day, ISO week or month (by span of history), oldest first
     pub granularity: Granularity,       // Day | Week | Month, chosen from the span ("Charts")
-    pub authors: Vec<AuthorStat>,       // grouped by mailmap-resolved email: commits, added, removed, last commit
+    pub authors: Vec<AuthorStat>,       // grouped by mailmap-resolved email, then merged by name: commits, emails, added, removed, last commit
     pub kinds: Vec<KindStat>,           // feat, fix, docs, test, refactor, perf, style, build, ci, chore, other
     pub hot_files: Vec<FileStat>,       // top 10 by commits touching it (share of the window's commits), added, removed
     pub branches: Vec<BranchHealth>,    // ahead/behind the main branch, age of the tip, merged, current
@@ -316,7 +316,7 @@ same mechanism as `Bar::Help`).
 | no remote | remote counts hidden, not shown as 0 |
 | window with no commits | charts empty with "no commits in this window", totals unchanged |
 | huge history | caps above; `sampled` notice; the screen is usable before the churn arrives |
-| author with several emails | grouped through `.mailmap` when present; otherwise listed apart (documented, not guessed) |
+| author with several emails | grouped through `.mailmap` first; then the entries that share a name (case-insensitive, trimmed, non-empty) merge into one row: commits and lines summed, the most frequent email names it, `emails` lists all ("3 emails"). Two people who share a name are merged too: a deliberate choice |
 | bots, empty names | shown as is; nothing is filtered |
 | `git log` missing or failing | churn columns show `n/a`, the rest still renders; the error goes to the command log |
 | terminal resized while open | redraw; sections reflow |

@@ -7,7 +7,15 @@
 //! Counting rules: `totals.commits`, the series and the authors count every
 //! commit in the window, merges included; `kinds` leaves merges out. Times are
 //! committer times (what `git log --since` uses), days and ISO weeks are UTC.
+//!
+//! Authors: commits are grouped by `.mailmap`-resolved email, then the groups
+//! that share a name (case-insensitive, trimmed) are merged into one author.
+//! Two different people with the same name are merged too: a deliberate choice
+//! (the user asked for it), since one person with several emails and no
+//! `.mailmap` is far more common. `.mailmap` still wins when present, as it
+//! renames before the grouping.
 
+mod authors;
 pub mod branches;
 mod churn;
 pub mod kind;
@@ -19,6 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use git2::{Repository, Sort};
 
+use self::authors::AuthorAcc;
 use self::branches::{BranchHealth, TagSince};
 use self::kind::Kind;
 use self::series::{Bucket, Granularity};
@@ -95,7 +104,8 @@ pub struct Lines {
 pub struct Totals {
     /// Commits in the window.
     pub commits: usize,
-    /// Distinct authors in the window, after `.mailmap`.
+    /// Distinct authors in the window, after `.mailmap` and after the merge of
+    /// the emails that share a name.
     pub authors: usize,
     pub local_branches: usize,
     /// Remote-tracking branches, `HEAD` aliases left out.
@@ -113,12 +123,18 @@ pub struct Totals {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorStat {
+    /// Name and `email` are those of the most frequent email.
     pub name: String,
     pub email: String,
+    /// Every distinct email of this author (same name), most commits first
+    /// (ties alphabetical); at least one, `email` is the first.
+    pub emails: Vec<String>,
+    /// Summed over every email.
     pub commits: usize,
-    /// `None` when `git log` failed.
+    /// Summed over every email; `None` when `git log` failed.
     pub added: Option<u64>,
     pub removed: Option<u64>,
+    /// The newest commit of any email.
     pub last_commit: i64,
 }
 
@@ -190,14 +206,6 @@ pub struct RepoStats {
     pub shallow: bool,
     /// A cap cut the walk or the numstat short.
     pub sampled: bool,
-}
-
-#[derive(Default)]
-struct AuthorAcc {
-    name: String,
-    email: String,
-    commits: usize,
-    last: i64,
 }
 
 pub(super) fn repo_stats(
@@ -281,17 +289,7 @@ pub(super) fn repo_stats(
         Granularity::Day,
     );
 
-    let mut author_stats: Vec<AuthorStat> = authors
-        .into_values()
-        .map(|a| AuthorStat {
-            name: a.name,
-            email: a.email,
-            commits: a.commits,
-            added: None,
-            removed: None,
-            last_commit: a.last,
-        })
-        .collect();
+    let mut author_stats = authors::merge(authors);
     author_stats.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.name.cmp(&b.name)));
     let mut kind_stats: Vec<KindStat> = kinds
         .into_iter()
@@ -310,9 +308,15 @@ pub(super) fn repo_stats(
     if let Some(churn) = &churn {
         sampled |= churn.sampled;
         for author in &mut author_stats {
-            let lines = churn.authors.get(&author.email.to_lowercase());
-            author.added = Some(lines.map_or(0, |l| l.added));
-            author.removed = Some(lines.map_or(0, |l| l.removed));
+            let (mut added, mut removed) = (0, 0);
+            for email in &author.emails {
+                if let Some(l) = churn.authors.get(&email.to_lowercase()) {
+                    added += l.added;
+                    removed += l.removed;
+                }
+            }
+            author.added = Some(added);
+            author.removed = Some(removed);
         }
     }
     if cancel.load(Ordering::Relaxed) {
