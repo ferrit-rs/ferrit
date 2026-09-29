@@ -1,6 +1,6 @@
 //! Commit activity across local and fetched remote branches.
 
-use git2::{Repository, Sort};
+use git2::{Repository, Revwalk, Sort};
 
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::model::CommitEntry;
@@ -8,22 +8,7 @@ use crate::domain::git::model::CommitEntry;
 /// Read recent commits across local and fetched remote branches, newest first.
 /// This captures activity from every contributor, including unmerged branches.
 pub(super) fn commits(repo: &Repository) -> GitResult<Vec<CommitEntry>> {
-    let mut walk = repo.revwalk().map_err(GitError::Read)?;
-    let references = repo.references().map_err(GitError::Read)?;
-    for reference in references {
-        let reference = reference.map_err(GitError::Read)?;
-        let Ok(name) = reference.name() else {
-            continue;
-        };
-        if !(name.starts_with("refs/heads/") || name.starts_with("refs/remotes/"))
-            || name.ends_with("/HEAD")
-        {
-            continue;
-        }
-        if let Ok(commit) = reference.peel_to_commit() {
-            walk.push(commit.id()).map_err(GitError::Read)?;
-        }
-    }
+    let mut walk = branch_walk(repo)?;
     walk.set_sorting(Sort::TIME | Sort::TOPOLOGICAL)
         .map_err(GitError::Read)?;
     let cutoff = now_days().saturating_sub(730).saturating_mul(86_400);
@@ -50,6 +35,29 @@ pub(super) fn commits(repo: &Repository) -> GitResult<Vec<CommitEntry>> {
         });
     }
     Ok(result)
+}
+
+/// A revwalk primed with the tip of every local and fetched remote branch
+/// (`refs/heads`, `refs/remotes`, remote `HEAD` aliases left out). Shared by
+/// `commits` and `stats`; the caller sets the sorting.
+pub(super) fn branch_walk(repo: &Repository) -> GitResult<Revwalk<'_>> {
+    let mut walk = repo.revwalk().map_err(GitError::Read)?;
+    let references = repo.references().map_err(GitError::Read)?;
+    for reference in references {
+        let reference = reference.map_err(GitError::Read)?;
+        let Ok(name) = reference.name() else {
+            continue;
+        };
+        if !(name.starts_with("refs/heads/") || name.starts_with("refs/remotes/"))
+            || name.ends_with("/HEAD")
+        {
+            continue;
+        }
+        if let Ok(commit) = reference.peel_to_commit() {
+            walk.push(commit.id()).map_err(GitError::Read)?;
+        }
+    }
+    Ok(walk)
 }
 
 fn now_days() -> i64 {

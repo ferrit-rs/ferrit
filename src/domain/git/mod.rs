@@ -26,6 +26,7 @@ pub mod rebase;
 pub mod refs;
 pub mod remote;
 pub mod stash;
+pub mod stats;
 pub mod status;
 
 use std::path::Path;
@@ -242,6 +243,22 @@ impl Repo {
     /// Recent commit activity across local and fetched remote branches.
     pub fn activity(&self) -> GitResult<Vec<CommitEntry>> {
         activity::commits(&self.inner)
+    }
+
+    /// Dashboard statistics over `window`, polling `cancel` while it walks
+    /// (`GitError::Cancelled` when set). `docs/PLAN_13_DASHBOARD.md`.
+    pub fn stats(&self, window: stats::Window, cancel: &AtomicBool) -> GitResult<stats::RepoStats> {
+        self.stats_with(window, &stats::StatsOptions::default(), cancel)
+    }
+
+    /// `stats` with the clock and the caps given (tests, tuning).
+    pub fn stats_with(
+        &self,
+        window: stats::Window,
+        opts: &stats::StatsOptions,
+        cancel: &AtomicBool,
+    ) -> GitResult<stats::RepoStats> {
+        stats::repo_stats(&self.inner, window, opts, cancel)
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.

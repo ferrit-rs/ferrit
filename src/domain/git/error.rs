@@ -103,6 +103,10 @@ pub enum GitError {
     /// `StashFailed` because git exits 0 here and the message is stable.
     #[error("no local changes to save")]
     NothingToStash,
+    /// A long read (`Repo::stats`) was stopped by its cancel flag. Not a
+    /// failure: the caller asked for it and drops the result.
+    #[error("cancelled")]
+    Cancelled,
 }
 
 pub type GitResult<T> = Result<T, GitError>;
