@@ -161,13 +161,17 @@ mod tests {
 
     #[test]
     fn passphrases_and_passwords_are_hidden() {
-        assert!(is_secret("Enter passphrase for key '/home/a/.ssh/id_ed25519': "));
+        assert!(is_secret(
+            "Enter passphrase for key '/home/a/.ssh/id_ed25519': "
+        ));
         assert!(is_secret("Password for 'https://github.com': "));
     }
 
     #[test]
     fn usernames_and_host_key_questions_are_shown() {
         assert!(!is_secret("Username for 'https://github.com': "));
-        assert!(!is_secret("Are you sure you want to continue connecting (yes/no)? "));
+        assert!(!is_secret(
+            "Are you sure you want to continue connecting (yes/no)? "
+        ));
     }
 }

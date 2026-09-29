@@ -3,9 +3,7 @@
 //! on the terminal the TUI owns (`domain::git::askpass`,
 //! `docs/PLAN_9_REMOTE.md`, "Credentials").
 
-use super::{
-    App, CommitPopupView, KeyCode, KeyEvent, Popup, TextInput, TextInputMode, mpsc,
-};
+use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, TextInput, TextInputMode, mpsc};
 use crate::domain::git::askpass;
 
 /// One pending question and where its answer goes. `typed` holds the real
