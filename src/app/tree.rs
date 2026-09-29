@@ -11,8 +11,9 @@ use crate::domain::git;
 /// `self.collapsed_dirs` on every call — cheap at working-tree sizes, same
 /// "no cache" choice `branch_lines`/`commit_lines` already make.
 pub(super) enum FileRow {
-    /// A directory header, including the always-present root ("/", the
-    /// repo's own worktree). `path` is empty for the root.
+    /// A directory header, or the root ("/", the repo's own worktree, only
+    /// when it has two or more children). `path` is empty for the root and
+    /// the full path of the last folded directory otherwise.
     Dir {
         path: PathBuf,
         name: String,
@@ -58,68 +59,29 @@ fn build_file_tree(files: &[git::model::FileEntry]) -> BTreeMap<String, TreeNode
     root
 }
 
-/// Depth-first flatten of `nodes` (a `build_file_tree` level) into visible
-/// rows, skipping the children of any directory in `collapsed`.
-fn flatten_file_tree(
-    nodes: &BTreeMap<String, TreeNode>,
-    dir_path: &Path,
-    depth: usize,
-    collapsed: &HashSet<PathBuf>,
-    rows: &mut Vec<FileRow>,
-) {
-    for (name, node) in nodes {
-        match node {
-            TreeNode::Dir(children) => {
-                let path = dir_path.join(name);
-                let expanded = !collapsed.contains(&path);
-                rows.push(FileRow::Dir {
-                    path: path.clone(),
-                    name: name.clone(),
-                    depth,
-                    expanded,
-                });
-                if expanded {
-                    flatten_file_tree(children, &path, depth + 1, collapsed, rows);
-                }
-            },
-            TreeNode::File(index) => rows.push(FileRow::File {
-                index: *index,
-                depth,
-            }),
-        }
-    }
-}
-
-/// The Files pane's tree, as lazygit draws it: a collapsible root ("/") plus
-/// one `Dir` row per directory, the root present even for a flat list of two
-/// or more files. Empty when nothing changed.
+/// The Files pane's tree, as lazygit draws it: single-child directory chains
+/// folded into one row (`x/y/z`), and a collapsible root ("/") only when the
+/// root has two or more children; a lone child (file or folded directory)
+/// sits at depth 0 with no root row. Empty when nothing changed.
 pub(super) fn tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
 ) -> Vec<FileRow> {
-    if files.is_empty() {
-        return Vec::new();
-    }
-
     let tree = build_file_tree(files);
-    // lazygit draws no root for a lone top-level file ("1 of 1"); from two
-    // entries up, or with any directory, the root row comes first.
-    if let [_] = files
-        && tree.values().all(|node| matches!(node, TreeNode::File(_)))
-    {
-        let mut rows = Vec::new();
-        flatten_file_tree(&tree, Path::new(""), 0, collapsed, &mut rows);
+    let mut rows = Vec::new();
+    if tree.len() < 2 {
+        flatten_folded(&tree, Path::new(""), 0, collapsed, &mut rows);
         return rows;
     }
-    let root_expanded = !collapsed.contains(Path::new(""));
-    let mut rows = vec![FileRow::Dir {
+    let expanded = !collapsed.contains(Path::new(""));
+    rows.push(FileRow::Dir {
         path: PathBuf::new(),
         name: "/".to_owned(),
         depth: 0,
-        expanded: root_expanded,
-    }];
-    if root_expanded {
-        flatten_file_tree(&tree, Path::new(""), 1, collapsed, &mut rows);
+        expanded,
+    });
+    if expanded {
+        flatten_folded(&tree, Path::new(""), 1, collapsed, &mut rows);
     }
     rows
 }

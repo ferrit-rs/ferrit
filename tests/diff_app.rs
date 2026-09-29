@@ -535,11 +535,9 @@ fn enter_on_a_files_directory_row_toggles_it() {
 
     let mut app = App::open(dir.path()).unwrap();
     let before = app.row_count(Pane::Files);
-    assert_eq!(before, 3, "root, \"src\", src/main.rs");
-    // Row 0 is the root ("/"), row 1 is "src" (the only directory), row 2
-    // is main.rs — `file_display` is empty for both directory rows, so
-    // index them directly rather than searching for one by name.
-    app.select(Pane::Files, 1);
+    assert_eq!(before, 2, "\"src\" (no root: one child), src/main.rs");
+    // Row 0 is "src", row 1 is main.rs; index the directory row directly.
+    app.select(Pane::Files, 0);
     app.feed_key(KeyEvent::from(KeyCode::Enter));
     assert!(
         app.row_count(Pane::Files) < before,

@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The Files tree has lazygit's shape: a chain of single-child directories folds into one row (`▼ x/y/z`), and the `/` root row only shows when the root has two or more children (a lone directory or file is first, no root).
 - `n` on Branches creates the new branch from the selected branch, not from the checked-out one, and the prompt names it (`branch is off of '<selected>'`); no upstream is set from it. Same as lazygit; with the current branch selected nothing changes.
 - While the help is open the key bar shows the help's own keys, `Close: esc/? | Scroll: j/k`, instead of the focused pane's keys, and the help no longer covers the bar; like lazygit swapping in the popup's keys.
 - ferrit opens on the Files pane with the first row selected and its diff on the right, like lazygit; the Status pane (`1`) keeps the welcome screen with the logo.

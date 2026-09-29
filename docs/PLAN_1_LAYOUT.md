@@ -429,13 +429,19 @@ shown by their own name rather than the full path), not a flat list of
 full paths. ferrit's had a flat list since phase 1 (`theme::file_line`,
 one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
 
-- **Root row always.** Like lazygit, the Files pane always starts on the
-  `▼ /` root row (cursor on it, right pane showing the diff of everything),
-  even when every changed file sits directly at the repo root: two changed
-  files read "1 of 3", `j` reaches the first file, and Space on the root
-  stages everything. A lone changed file at the root has no root row
-  ("1 of 1"), as in lazygit; an empty list has no rows. `tree_rows(files,
-  collapsed)` (`src/app/tree.rs`) builds it.
+- **Root row only with two or more children.** Like lazygit's compressed
+  tree, the `▼ /` root row exists only when the root has two or more
+  children (two changed files at the root read "1 of 3", `j` reaches the
+  first file, Space on the root stages everything). With exactly one child
+  the root folds away: a lone changed file is at depth 0 ("1 of 1"), and a
+  lone directory is the first row (`▼ flow_dir`, no leading `/`), cursor on
+  it. A directory whose only child is a directory folds into one row
+  labelled `x/y/z`; that row's path is the full folded path, used for its
+  collapse state, Space (stages everything under it), Enter and the diff
+  (`git diff -- x/y/z`). A directory with two children (a file and a
+  directory) is not folded. An empty list has no rows. `tree_rows(files,
+  collapsed)` (`src/app/tree.rs`) builds it with the same `flatten_folded`
+  as the drilled commit list.
 - **Drilled commit.** Enter on a commit lists its files as lazygit does:
   no root row, every directory open, single-child directory chains folded
   into one row (`▼ test/flows`, then `A a.flow`, "1 of 2"), the first row
@@ -448,7 +454,7 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   `git::status::files`) into nested `BTreeMap<String, TreeNode>` levels —
   `BTreeMap` for free alphabetical iteration per level, directories and
   files interleaved by name rather than directories-first, matching
-  lazygit. `flatten_file_tree` walks it depth-first into `Vec<FileRow>`
+  lazygit. `flatten_folded` walks it depth-first into `Vec<FileRow>`
   (`Dir { path, name, depth, expanded }` or `File { index, depth }`),
   skipping the children of any directory in `self.collapsed_dirs`.
 - **New `App` state**: `collapsed_dirs: HashSet<PathBuf>` — empty means

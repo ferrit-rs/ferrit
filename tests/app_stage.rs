@@ -380,3 +380,79 @@ fn a_lone_top_level_file_has_no_root_row_like_lazygit() {
     assert_eq!(app.counter(Pane::Files), Some((1, 1)));
     assert!(!app.files_selection_is_dir());
 }
+
+fn file_labels(app: &App) -> Vec<String> {
+    app.file_lines()
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        })
+        .map(|text| text.trim().to_owned())
+        .collect()
+}
+
+fn changed_repo(tag: &str, files: &[&str]) -> (TempDir, Repository) {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("seed.txt"), "seed\n").unwrap();
+    commit_all(&repo, "init");
+    for file in files {
+        let path = dir.path().join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "x\n").unwrap();
+    }
+    (dir, repo)
+}
+
+/// Lazygit shape: one directory with one or two files has no root row, the
+/// directory row comes first at depth 0.
+#[test]
+fn a_single_directory_has_no_root_row() {
+    let (dir, _repo) = changed_repo("app-tree-one-dir", &["flow_dir/a.txt"]);
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2'));
+    assert_eq!(app.counter(Pane::Files), Some((1, 2)));
+    assert!(app.files_selection_is_dir());
+    assert!(file_labels(&app)[0].contains("flow_dir"));
+    assert!(!file_labels(&app)[0].contains('/'));
+
+    fs::write(dir.path().join("flow_dir/b.txt"), "y\n").unwrap();
+    let app = App::open(dir.path()).unwrap();
+    assert_eq!(app.row_count(Pane::Files), 3, "flow_dir, a.txt, b.txt");
+}
+
+/// A chain of single-child directories folds into one `x/y/z` row, and Space
+/// on it stages the file underneath.
+#[test]
+fn a_single_child_chain_folds_into_one_row_and_space_stages_it() {
+    let (dir, repo) = changed_repo("app-tree-chain", &["x/y/z/c.txt"]);
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2'));
+    assert_eq!(app.row_count(Pane::Files), 2, "x/y/z, c.txt");
+    assert!(file_labels(&app)[0].contains("x/y/z"));
+    assert!(app.files_selection_is_dir());
+
+    app.feed_key(char_key(' '));
+    let staged = repo.statuses(None).unwrap();
+    assert!(
+        staged
+            .iter()
+            .any(|e| e.path().ok() == Some("x/y/z/c.txt") && e.status().is_index_new()),
+        "Space on the folded row stages the file under it"
+    );
+}
+
+/// A root with a file and a folded chain keeps the root row.
+#[test]
+fn a_root_with_two_children_keeps_its_row_and_folds_the_chain() {
+    let (dir, _repo) = changed_repo("app-tree-root-chain", &["TOP.txt", "x/y/z/c.txt"]);
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2'));
+    assert_eq!(app.row_count(Pane::Files), 4, "/, TOP.txt, x/y/z, c.txt");
+    let labels = file_labels(&app);
+    assert!(labels[0].contains('/') && !labels[0].contains("x/"));
+    assert!(labels[2].contains("x/y/z"));
+}

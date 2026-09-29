@@ -1199,9 +1199,9 @@ impl App {
         }
     }
 
-    /// Files pane rows, lazygit-style directory tree: an always-present root
-    /// ("/") first, with changed files grouped under directory header rows
-    /// below it. Empty when nothing changed. Built fresh from
+    /// Files pane rows, lazygit-style directory tree: single-child directory
+    /// chains folded, a root ("/") first only when it has two or more
+    /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
     /// `self.files` and `self.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
