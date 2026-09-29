@@ -9,6 +9,7 @@
 //! committer times (what `git log --since` uses), days and ISO weeks are UTC.
 
 pub mod branches;
+mod churn;
 pub mod kind;
 pub mod series;
 pub mod share;
@@ -78,7 +79,7 @@ impl Default for StatsOptions {
 }
 
 /// Lines added and removed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Lines {
     pub added: u64,
     pub removed: u64,
@@ -278,6 +279,22 @@ pub(super) fn repo_stats(
         .collect();
     kind_stats.sort_by_key(|k| std::cmp::Reverse(k.commits));
 
+    if cancel.load(Ordering::Relaxed) {
+        return Err(GitError::Cancelled);
+    }
+    let churn = churn::read(repo, cutoff, opts.numstat_cap);
+    if let Some(churn) = &churn {
+        sampled |= churn.sampled;
+        for author in &mut author_stats {
+            let lines = churn.authors.get(&author.email.to_lowercase());
+            author.added = Some(lines.map_or(0, |l| l.added));
+            author.removed = Some(lines.map_or(0, |l| l.removed));
+        }
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(GitError::Cancelled);
+    }
+
     let work = work_state(repo);
     Ok(RepoStats {
         window,
@@ -291,13 +308,13 @@ pub(super) fn repo_stats(
             stashes: work.stashes,
             first_commit: first,
             last_commit: last,
-            lines: None,
+            lines: churn.as_ref().map(|c| c.lines),
         },
         series,
         granularity,
         authors: author_stats,
         kinds: kind_stats,
-        hot_files: None,
+        hot_files: churn.as_ref().map(churn::Churn::hot_files),
         branches: branch_health,
         main_branch,
         work,

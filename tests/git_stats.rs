@@ -19,6 +19,7 @@ use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
 use ferrit::domain::git::Repo;
+use ferrit::domain::git::command_log;
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::stats::kind::Kind;
 use ferrit::domain::git::stats::series::Granularity;
@@ -133,7 +134,7 @@ fn stats_at(dir: &Path, window: Window) -> RepoStats {
 /// c2  45d Max     feat: add b      <- tag v1
 /// c3  10d Max W.  fix(core): bug
 /// M    8d Richard Merge branch 'done'   (d1 9d Richard feat: done work)
-/// c4   3d Richard docs: readme
+/// c4   3d Richard docs: readme     (empties a.txt: one line removed)
 /// c5   2d Richard feat!: breaking       <- main, `same`
 /// old:     o1 80d Ola     wip: stuff        (off c2)
 /// feature: f1 5d Max W.   feat: f1          (off c3)
@@ -640,4 +641,160 @@ fn a_set_cancel_flag_stops_the_walk() {
     let repo = Repo::open(tmp.path()).unwrap();
     let result = repo.stats(Window::All, &AtomicBool::new(true));
     assert!(matches!(result, Err(GitError::Cancelled)), "{result:?}");
+}
+
+#[test]
+fn hot_files_rank_by_commits_touching_them_and_hide_lockfiles_and_changelogs() {
+    let tmp = project();
+    let stats = stats_at(tmp.path(), Window::Days90);
+    let hot = stats.hot_files.unwrap();
+    assert_eq!(hot.commits, 8, "the merge commit is not read");
+    let rows: Vec<_> = hot
+        .files
+        .iter()
+        .map(|f| {
+            (
+                f.path.as_str(),
+                f.share.count,
+                f.share.percent,
+                f.added,
+                f.removed,
+            )
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("src/app.rs", 3, Some(38), 3, 0),
+            ("f.txt", 2, Some(25), 2, 0),
+            ("README.md", 1, Some(13), 1, 0),
+            ("b.txt", 1, Some(13), 1, 0),
+            ("c.txt", 1, Some(13), 1, 0),
+            ("d.txt", 1, Some(13), 1, 0),
+            ("e.txt", 1, Some(13), 1, 0),
+            ("o.txt", 1, Some(13), 1, 0),
+        ]
+    );
+    assert_eq!(hot.hidden, ["CHANGELOG.md", "Cargo.lock"]);
+}
+
+#[test]
+fn only_the_ten_hottest_files_are_listed() {
+    let tmp = TempDir::new("stats-many");
+    init(tmp.path(), "main");
+    let names: Vec<String> = (0..12).map(|i| format!("f{i:02}.txt")).collect();
+    let files: Vec<(&str, &str)> = names.iter().map(|n| (n.as_str(), "x\n")).collect();
+    commit(tmp.path(), RICHARD, ago(2), "feat: many", &files);
+    let hot = stats_at(tmp.path(), Window::All).hot_files.unwrap();
+    assert_eq!(hot.files.len(), 10);
+    assert_eq!(hot.files[0].share.percent, Some(100));
+    assert!(hot.hidden.is_empty());
+}
+
+#[test]
+fn lines_are_summed_in_total_and_per_author() {
+    let tmp = project();
+    let stats = stats_at(tmp.path(), Window::Days90);
+    let lines = stats.totals.lines.unwrap();
+    assert_eq!(
+        (lines.added, lines.removed),
+        (13, 0),
+        "lockfile lines count as git counts them; the stash commit is not branch history"
+    );
+    let per_author: Vec<_> = stats
+        .authors
+        .iter()
+        .map(|a| (a.name.as_str(), a.added.unwrap(), a.removed.unwrap()))
+        .collect();
+    assert_eq!(
+        per_author,
+        [("Richard", 5, 0), ("Max Wells", 7, 0), ("Ola", 1, 0)]
+    );
+}
+
+#[test]
+fn the_churn_reads_the_window_only() {
+    let tmp = project();
+    let stats = stats_at(tmp.path(), Window::Days7);
+    let hot = stats.hot_files.unwrap();
+    assert_eq!(hot.commits, 4);
+    let paths: Vec<_> = hot.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["f.txt", "README.md", "e.txt"]);
+    let all = stats_at(tmp.path(), Window::All).totals.lines.unwrap();
+    assert!(
+        all.added > stats.totals.lines.unwrap().added,
+        "the whole history has more lines"
+    );
+}
+
+#[test]
+fn the_numstat_cap_keeps_the_newest_commits_and_says_sampled() {
+    let tmp = project();
+    let repo = Repo::open(tmp.path()).unwrap();
+    let opts = StatsOptions {
+        now: NOW,
+        numstat_cap: 3,
+        ..StatsOptions::default()
+    };
+    let stats = repo
+        .stats_with(Window::All, &opts, &AtomicBool::new(false))
+        .unwrap();
+    assert!(stats.sampled);
+    assert_eq!(stats.totals.commits, 10, "the walk has its own cap");
+    let hot = stats.hot_files.unwrap();
+    assert_eq!(hot.commits, 3, "c5, c4 and f2");
+    let lines = stats.totals.lines.unwrap();
+    assert_eq!((lines.added, lines.removed), (3, 0));
+
+    let exact = StatsOptions {
+        now: NOW,
+        numstat_cap: 9,
+        ..StatsOptions::default()
+    };
+    let stats = repo
+        .stats_with(Window::All, &exact, &AtomicBool::new(false))
+        .unwrap();
+    assert!(!stats.sampled, "9 non-merge commits fit a cap of 9");
+}
+
+#[test]
+fn a_failing_git_log_leaves_the_churn_absent_and_the_rest_filled() {
+    let tmp = project();
+    git(tmp.path(), &["config", "log.date", "bogus"]);
+    let stats = stats_at(tmp.path(), Window::Days90);
+    assert!(stats.hot_files.is_none());
+    assert!(stats.totals.lines.is_none());
+    assert!(
+        stats
+            .authors
+            .iter()
+            .all(|a| a.added.is_none() && a.removed.is_none())
+    );
+    assert_eq!(stats.totals.commits, 9);
+    assert_eq!(stats.authors.len(), 3);
+}
+
+#[test]
+fn the_numstat_command_lands_in_the_command_log() {
+    let tmp = project();
+    let _ = stats_at(tmp.path(), Window::Days90);
+    let logged = command_log::recent(usize::MAX, true)
+        .into_iter()
+        .any(|entry| {
+            entry.argv.contains("--numstat")
+                && entry.argv.contains("--no-merges")
+                && entry.exit == Some(0)
+        });
+    assert!(logged);
+}
+
+#[test]
+fn an_empty_repository_has_empty_churn() {
+    let tmp = TempDir::new("stats-empty-churn");
+    init(tmp.path(), "main");
+    let stats = stats_at(tmp.path(), Window::All);
+    let hot = stats.hot_files.unwrap();
+    assert!(hot.files.is_empty() && hot.hidden.is_empty());
+    assert_eq!(hot.commits, 0);
+    assert_eq!(stats.totals.lines.map(|l| l.added), Some(0));
 }
