@@ -365,12 +365,32 @@ carriage-return redraws, not structured data.
 
 `f`/`p`/`P` are inert (no-op, not an error) while `remote_busy` is `Some`.
 
+## Credentials
+
+The remote git child has no usable TTY (ferrit owns it in raw mode), so ssh's
+passphrase question used to wait out `REMOTE_TIMEOUT` unseen. ferrit is now
+its own askpass helper (`src/domain/git/askpass.rs`):
+
+```
+ push (git child)                     ferrit (running TUI)
+   env SSH_ASKPASS=ferrit             listener on $TMP/ferrit-<pid>/s
+       SSH_ASKPASS_REQUIRE=force              ▲
+       GIT_ASKPASS=ferrit                     │ prompt line
+   ssh ──► runs `ferrit "<prompt>"` ──────────┘ (run_helper, first in main)
+                                      AppEvent::Askpass ► popup ► Enter/Esc
+   ssh ◄── stdout: the answer ◄────── `OK <secret>` / `NO` (exit 1)
+```
+
+`Popup::Askpass` (`src/app/askpass.rs`) hides the typed text as dots when the
+prompt mentions a password, passphrase or PIN, and shows it otherwise (a
+username, `yes/no`). Only a key not already in `ssh-agent` reaches it.
+
 ## Edge cases
 
 | Case | Behaviour |
 | --- | --- |
 | fetch/pull/push with no network reachable | git's own timeout/DNS-failure message, `FetchFailed`/`PullFailed`/`PushFailed` verbatim |
-| an SSH passphrase or 2FA prompt git would normally show interactively | ferrit's subprocess has no TTY to prompt on; git fails (or the underlying `ssh` does) rather than hanging forever, same known limitation `docs/PLAN_7_COMMIT.md` already notes for GPG — configuring `ssh-agent` / a credential helper avoids ever hitting this prompt, which is most real setups already |
+| an SSH passphrase, HTTPS password or host-key `yes/no` git would normally ask interactively | answered in a popup (`## Credentials`), never on the terminal; `Esc` cancels and git reports the failed login; a question arriving while another popup is up is cancelled, not stacked. 2FA that needs a browser or a hardware touch still cannot be answered here |
 | push rejected as non-fast-forward (someone else pushed first) | `PushFailed`, git's "Updates were rejected because the remote contains work that you do not have locally" verbatim; ferrit suggests nothing beyond showing it — `p` (pull) is one keypress away |
 | pull with local uncommitted changes that would be overwritten | git refuses (same message class as phase 8's checkout case) -> `PullFailed`, worktree untouched |
 | pull that starts a rebase and conflicts | same treatment as phase 8's conflicted merge: not resolved, not pretended-resolved; `Files` pane shows `Change::Conflicted`; message notes conflict resolution is phase 11. `git status` during a rebase is enough to retry `git rebase --continue`/`--abort` from the shell meanwhile. |

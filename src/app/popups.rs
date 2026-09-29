@@ -32,6 +32,7 @@ enum PopupKind {
     CommandLog,
     Menu,
     Upstream,
+    Askpass,
     Note,
 }
 
@@ -47,6 +48,7 @@ impl App {
             Popup::CommandLog { .. } => PopupKind::CommandLog,
             Popup::Menu(_) => PopupKind::Menu,
             Popup::Upstream(_) => PopupKind::Upstream,
+            Popup::Askpass(_) => PopupKind::Askpass,
             Popup::Note(_) => PopupKind::Note,
         };
         match kind {
@@ -60,6 +62,7 @@ impl App {
             PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
             PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
+            PopupKind::Askpass => self.askpass_popup().map(PopupView::Askpass),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
     }
@@ -210,6 +213,10 @@ impl App {
             self.commit_all_confirm_key(key);
             return;
         }
+        if matches!(self.popup, Some(Popup::Askpass(_))) {
+            self.askpass_key(key);
+            return;
+        }
         if matches!(self.popup, Some(Popup::Menu(_))) {
             self.menu_key(key);
             return;
@@ -228,7 +235,9 @@ impl App {
                 }
             },
             // Both are routed to their own handlers above.
-            Some(Popup::Commit(_) | Popup::CommitAllConfirm | Popup::Menu(_)) => {},
+            Some(
+                Popup::Commit(_) | Popup::CommitAllConfirm | Popup::Menu(_) | Popup::Askpass(_),
+            ) => {},
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,
                 KeyCode::Enter => create_branch_now = true,

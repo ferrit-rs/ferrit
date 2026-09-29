@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use clap::Parser;
 use color_eyre::Result;
@@ -35,7 +36,12 @@ struct Cli {
     tape: Option<PathBuf>,
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<ExitCode> {
+    // ssh or git running ferrit as its askpass helper: answer and leave,
+    // before clap sees the prompt as an argument.
+    if let Some(code) = ferrit::domain::git::askpass::run_helper(std::env::args().skip(1)) {
+        return Ok(code);
+    }
     color_eyre::install()?;
     let cli = Cli::parse();
 
@@ -51,7 +57,7 @@ fn main() -> Result<()> {
         let printed = ferrit::replay::cli::run(&harness)
             .map_err(|message| color_eyre::eyre::eyre!(message))?;
         writeln!(std::io::stdout(), "{}", printed.trim_end())?;
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
 
     if cli.config_path {
@@ -60,7 +66,7 @@ fn main() -> Result<()> {
             |p| p.display().to_string(),
         );
         writeln!(std::io::stdout(), "{location}")?;
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Open the repo before touching the terminal, so a non-repo path is a
@@ -89,5 +95,5 @@ fn main() -> Result<()> {
     let mut terminal = tui::init(app.mouse_enabled())?;
     let result = app.run(&mut terminal);
     tui::restore()?;
-    result
+    result.map(|()| ExitCode::SUCCESS)
 }

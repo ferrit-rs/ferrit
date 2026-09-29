@@ -119,6 +119,7 @@ pub enum PopupView<'a> {
     CommandLog(CommandLogView),
     Menu(MenuView),
     Upstream(CommitPopupView<'a>),
+    Askpass(CommitPopupView<'a>),
     Note(&'a str),
 }
 
@@ -391,6 +392,9 @@ enum Popup {
     Stash(TextInput),
     /// `P` with no upstream: edit `<remote> <branch>` before first push.
     Upstream(TextInput),
+    /// A passphrase, password or host-key question from ssh/git during a
+    /// remote op (`app::askpass`).
+    Askpass(askpass::AskpassPrompt),
     /// A list of actions to pick from (`app::menu`): the `m` menu for an
     /// operation stopped mid-way, and later the `x` menu.
     Menu(menu::MenuState),
@@ -662,6 +666,7 @@ pub struct App {
 
 mod tree;
 
+mod askpass;
 mod branch_actions;
 mod commit;
 mod context_menu;
@@ -1467,6 +1472,7 @@ impl App {
             AppEvent::DiffDone(completion) => self.on_diff_done(completion),
             AppEvent::ImageDone(completion) => self.on_image_done(completion),
             AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+            AppEvent::Askpass { prompt, reply } => self.on_askpass(prompt, reply),
             AppEvent::Input(_) => {},
         }
     }
@@ -1886,6 +1892,16 @@ impl App {
         // taking `&Events` directly (it is also called from `feed_key`,
         // which has none).
         self.event_sender = Some(events.sender());
+        // Answers ssh/git credential prompts in a popup (`app::askpass`);
+        // without it a passphrase question would hang on the raw terminal.
+        let askpass_sender = events.sender();
+        let _askpass = git::askpass::serve(move |prompt| {
+            let (reply, answer) = mpsc::channel();
+            askpass_sender
+                .send(AppEvent::Askpass { prompt, reply })
+                .ok()?;
+            answer.recv().ok().flatten()
+        });
         let mut prev_was_image = false;
         let mut overlay_tick = Instant::now();
         while !self.should_quit {

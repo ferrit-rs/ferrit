@@ -11,6 +11,7 @@
 
 pub mod activity;
 pub mod apply;
+pub mod askpass;
 pub mod blob;
 pub mod branch;
 pub mod command_log;

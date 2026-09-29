@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- `P`, `p` and `f` no longer hang when the SSH key has a passphrase (or a remote asks for an HTTPS password or a host-key `yes/no`): a popup asks for it, typed as dots for a password, and `Esc` cancels so git reports the failed login. Before, the question went to the terminal ferrit owns and the push waited five minutes for an answer nobody could see. A question that comes while another popup is open is cancelled rather than replacing it.
+
 - Added `CONTRIBUTING.md` with development setup, architecture, CI checks, testing, DCO, and pull request guidance.
 
 - README comparison table now uses ⚠️ for Ferrit capabilities planned for implementation instead of ❌.

@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 
 use git2::Repository;
 
+use crate::domain::git::askpass;
 use crate::domain::git::diff::workdir;
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
@@ -103,8 +104,10 @@ fn run_command(
     let mut command = exec::git(workdir);
     command
         .args(args)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    askpass::configure(&mut command);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

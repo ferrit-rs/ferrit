@@ -35,6 +35,12 @@ pub enum AppEvent {
     /// `GitError` with `.to_string()` before sending, the same boundary
     /// `App` already draws between itself and `git::`. See
     /// `docs/PLAN_9_REMOTE.md`.
+    /// A git child asked for a passphrase, password or host-key answer;
+    /// the answer (`None` cancels) goes back through `reply`.
+    Askpass {
+        prompt: String,
+        reply: Sender<Option<String>>,
+    },
     RemoteDone {
         op: RemoteOp,
         message: Result<String, String>,
