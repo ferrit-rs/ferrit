@@ -82,6 +82,8 @@ pub struct ChartPalette {
     pub warn: Color,
     /// Quiet day, then four levels from dim to bright.
     pub heat: [Style; 5],
+    /// `NO_COLOR`: the heat map's level is a glyph (`· ░ ▒ ▓ █`), not only a colour.
+    pub density: bool,
     pub branch_current: Style,
     pub branch_active: Style,
     pub branch_merged: Style,
@@ -121,6 +123,7 @@ impl ChartPalette {
                     .fg(bright(p.focus))
                     .add_modifier(Modifier::BOLD),
             ],
+            density: false,
             branch_current: accent.add_modifier(Modifier::BOLD),
             branch_active: Style::new(),
             branch_merged: Style::new().fg(gray),

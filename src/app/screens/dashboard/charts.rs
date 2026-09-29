@@ -294,7 +294,10 @@ pub(super) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
         height: map_rows,
         ..area
     };
-    HeatMap::new(&counts, ctx.view.now.div_euclid(DAY), ctx.colors().heat).render(map, buf);
+    let density = ctx.colors().density;
+    HeatMap::new(&counts, ctx.view.now.div_euclid(DAY), ctx.colors().heat)
+        .density(density)
+        .render(map, buf);
     if area.height > map_rows {
         let legend = Rect::new(
             area.x + 4,
@@ -302,6 +305,6 @@ pub(super) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
             area.width.saturating_sub(4),
             1,
         );
-        Paragraph::new(heatmap::legend(ctx.colors().heat)).render(legend, buf);
+        Paragraph::new(heatmap::legend(ctx.colors().heat, density, ctx.dim())).render(legend, buf);
     }
 }

@@ -172,7 +172,10 @@ fn draw_dashboard(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
         stats: app.dashboard().stats(),
         repo: &app.repo_name,
         branch: &app.header.branch,
-        colors: ChartPalette::for_palette(&app.palette()),
+        colors: ChartPalette {
+            density: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
+            ..ChartPalette::for_palette(&app.palette())
+        },
         mode: charts_mode_from_env(),
         show_counts: app.dashboard().show_counts(),
         computing: app.dashboard().computing(),

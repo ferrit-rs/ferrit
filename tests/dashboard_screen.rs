@@ -391,7 +391,7 @@ fn contributors_are_share_bars_and_more_than_six_fold_into_others() {
     }
     assert!(!out.contains("Zed Seventh") && !out.contains("Nine Ninth"));
     assert!(out.contains("others"));
-    assert!(out.contains('█') && out.contains('░'));
+    assert!(out.contains('━') && out.contains('─'));
     // Shares are of the whole: 200 of 428 is 47 %, others is 28 of 428.
     assert!(out.contains("47 %  (200)"), "{out}");
     assert!(out.contains("6 %  (28)"), "{out}");
@@ -551,8 +551,36 @@ fn without_braille_the_donut_is_one_full_width_stacked_bar_above_its_legend() {
         .position(|l| l.contains("What was done"))
         .unwrap();
     let bar: String = lines[title + 1].chars().skip(1).take(98).collect();
-    assert!(bar.chars().all(|c| c == '█'), "{bar}");
+    assert!(bar.chars().all(|c| c == '━'), "{bar}");
     assert!(lines[title + 2].contains("● feat"));
+}
+
+#[test]
+fn the_heat_map_is_one_glyph_in_five_colours_and_glyph_density_without_colour() {
+    let s = stats();
+    let buf = buffer(&view(Some(&s)), 120, 42);
+    let out = text(&buf);
+    let row = out.lines().find(|l| l.contains("Mon ")).unwrap();
+    assert!(row.contains('■'), "{row}");
+    assert!(!out.contains('░') && !out.contains('▒') && !out.contains('▓'));
+    let fills: std::collections::HashSet<_> = (0..buf.area.height)
+        .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .map(|p| &buf[p])
+        .filter(|c| c.symbol() == "■")
+        .map(|c| (c.fg, c.modifier))
+        .collect();
+    assert!(fills.len() >= 4, "levels differ by colour: {fills:?}");
+    assert!(out.contains("less ■ ■ ■ ■ ■ more"), "{out}");
+
+    let mut plain = view(Some(&s));
+    plain.colors.density = true;
+    let out = render(&plain, 120, 42);
+    let row = out.lines().find(|l| l.contains("Mon ")).unwrap();
+    assert!(
+        row.contains('░') || row.contains('▒') || row.contains('▓') || row.contains('█'),
+        "{row}"
+    );
+    assert!(out.contains("less · ░ ▒ ▓ █ more"), "{out}");
 }
 
 // ----------------------------------------------------------------- edge cases

@@ -2,13 +2,14 @@
 //!
 //! `LineGauge` draws a thin line glyph with its own label and one ratio, so it
 //! cannot be a stacked bar or a span run inside a table row; these helpers draw
-//! `█░` spans instead. Colours always come from the caller (the theme).
+//! thin `━` (filled, in the caller's colour) over a dim `─` track instead, on the
+//! same row. Colours always come from the caller (the theme).
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-const FULL: &str = "█";
-const EMPTY: &str = "░";
+const FULL: &str = "━";
+const EMPTY: &str = "─";
 
 fn dim() -> Style {
     Style::new().add_modifier(Modifier::DIM)
@@ -40,7 +41,7 @@ fn run(glyph: &str, cells: u16, style: Style) -> Option<Span<'static>> {
     (cells > 0).then(|| Span::styled(glyph.repeat(usize::from(cells)), style))
 }
 
-/// One share as `█` (in `fg`) followed by dim `░`, exactly `width` cells.
+/// One share as `━` (in `fg`) followed by the dim `─` track, exactly `width` cells.
 pub fn single_bar(fraction: f64, width: u16, fg: Color) -> Vec<Span<'static>> {
     let filled = filled_cells(fraction, width);
     [
@@ -100,7 +101,7 @@ fn split_cells(parts: &[(u64, Color)], width: u16) -> Vec<u16> {
 }
 
 /// One 100 % line split between `parts` (weight, colour), exactly `width`
-/// cells. A zero total gives a dim `░` line.
+/// cells. A zero total gives a dim `─` line.
 pub fn stacked_bar(parts: &[(u64, Color)], width: u16) -> Line<'static> {
     let cells = split_cells(parts, width);
     if cells.iter().all(|&c| c == 0) {
@@ -148,7 +149,7 @@ mod tests {
     }
 
     fn filled(spans: &[Span<'_>]) -> usize {
-        text(spans).chars().filter(|&c| c == '█').count()
+        text(spans).chars().filter(|&c| c == '━').count()
     }
 
     fn line_cells(line: &Line<'_>) -> usize {
@@ -190,10 +191,10 @@ mod tests {
         let bar = single_bar(0.5, 4, Color::Blue);
         assert_eq!(bar.len(), 2);
         assert_eq!(bar[0].style.fg, Some(Color::Blue));
-        assert_eq!(bar[0].content, "██");
+        assert_eq!(bar[0].content, "━━");
         assert_eq!(bar[1].style.fg, None);
         assert!(bar[1].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(bar[1].content, "░░");
+        assert_eq!(bar[1].content, "──");
     }
 
     #[test]
@@ -254,7 +255,7 @@ mod tests {
         for parts in [&[][..], &[(0, Color::Red), (0, Color::Blue)][..]] {
             let line = stacked_bar(parts, 6);
             assert_eq!(line.spans.len(), 1);
-            assert_eq!(line.spans[0].content, "░░░░░░");
+            assert_eq!(line.spans[0].content, "──────");
             assert!(line.spans[0].style.add_modifier.contains(Modifier::DIM));
         }
         assert_eq!(line_cells(&stacked_bar(&[(1, Color::Red)], 0)), 0);

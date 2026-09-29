@@ -3,17 +3,23 @@
 //! Weeks run in columns, days in rows (Monday first), two cells per day. Days are
 //! unix day numbers (days since 1970-01-01), so no calendar library is needed. The
 //! widget owns no colour: the caller passes one [`Style`] per level.
+//!
+//! A day is one `■` whose colour is its level (the caller's ramp). With
+//! [`HeatMap::density`] (`NO_COLOR`) the level is the glyph instead, `· ░ ▒ ▓ █`,
+//! so it never rests on colour alone.
 
 use std::collections::HashMap;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 
-/// The glyph of each level: none, then four buckets of non-zero days.
-const GLYPHS: [&str; 5] = ["·", "░", "▒", "▓", "█"];
+/// The glyph of each level without colour: none, then four buckets of non-zero days.
+const DENSITY: [&str; 5] = ["·", "░", "▒", "▓", "█"];
+/// The one glyph of every level when colour carries it.
+const SQUARE: &str = "■";
 /// Cells reserved on the left for the weekday labels.
 const GUTTER: u16 = 4;
 /// Cells per week column (one glyph and one space).
@@ -52,17 +58,25 @@ pub fn level(count: u32, thresholds: [u32; 3]) -> usize {
     1 + thresholds.iter().filter(|&&t| count > t).count()
 }
 
-/// The `░ few  █ many  · none` legend line, in the same level styles as the map.
-pub fn legend(styles: [Style; 5]) -> Line<'static> {
-    let [none, few, _, _, many] = styles;
-    Line::from(vec![
-        Span::styled(GLYPHS[1], few),
-        Span::raw(" few  "),
-        Span::styled(GLYPHS[4], many),
-        Span::raw(" many  "),
-        Span::styled(GLYPHS[0], none),
-        Span::raw(" none"),
-    ])
+/// The glyph of `level` in the colour ramp (`density` false) or density mode.
+fn glyph(level: usize, density: bool) -> &'static str {
+    if density {
+        DENSITY.get(level).copied().unwrap_or("·")
+    } else {
+        SQUARE
+    }
+}
+
+/// The `less ■ ■ ■ ■ ■ more` legend line, every level in its own style; `less`
+/// and `more` are `label`.
+pub fn legend(styles: [Style; 5], density: bool, label: Style) -> Line<'static> {
+    let mut spans = vec![Span::styled("less", label)];
+    for (level, style) in styles.into_iter().enumerate() {
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled(glyph(level, density), style));
+    }
+    spans.push(Span::styled(" more", label));
+    Line::from(spans)
 }
 
 /// Week columns drawn in a panel `width` cells wide (the title says how many).
@@ -80,17 +94,26 @@ pub struct HeatMap<'a> {
     counts: &'a [(i64, u32)],
     today: i64,
     styles: [Style; 5],
+    density: bool,
 }
 
 impl<'a> HeatMap<'a> {
     /// `counts` are `(unix day, commits)`, in any order; a repeated day is summed.
-    /// `styles[0]` styles the `·` of a quiet day, `styles[1..]` the four buckets.
+    /// `styles[0]` styles a quiet day, `styles[1..]` the four buckets.
     pub fn new(counts: &'a [(i64, u32)], today: i64, styles: [Style; 5]) -> Self {
         Self {
             counts,
             today,
             styles,
+            density: false,
         }
+    }
+
+    /// Draw the level as a glyph (`· ░ ▒ ▓ █`) instead of a coloured `■`.
+    #[must_use]
+    pub const fn density(mut self, density: bool) -> Self {
+        self.density = density;
+        self
     }
 }
 
@@ -126,6 +149,7 @@ impl Widget for HeatMap<'_> {
             &[(0, "Mon"), (2, "Wed"), (4, "Fri")]
         };
         let grid_x = area.x.saturating_add(GUTTER);
+        let quiet = Style::new().add_modifier(Modifier::DIM);
         let mut put = |x: u16, y: u16, text: &str, style: Style| {
             if let Some(cell) = buf
                 .cell_mut((x, y))
@@ -142,24 +166,14 @@ impl Widget for HeatMap<'_> {
                 let fits = usize::from(x) + label.len() <= usize::from(area.right());
                 if fits {
                     for (dx, ch) in (0..).zip(label.chars()) {
-                        put(
-                            x.saturating_add(dx),
-                            area.y,
-                            &ch.to_string(),
-                            Style::default(),
-                        );
+                        put(x.saturating_add(dx), area.y, &ch.to_string(), quiet);
                     }
                 }
             }
         }
         for (&(wd, name), y) in rows.iter().zip(area.y.saturating_add(1)..area.bottom()) {
             for (dx, ch) in (0..).zip(name.chars()) {
-                put(
-                    area.x.saturating_add(dx),
-                    y,
-                    &ch.to_string(),
-                    Style::default(),
-                );
+                put(area.x.saturating_add(dx), y, &ch.to_string(), quiet);
             }
             for col in 0..weeks {
                 let day = first_monday + 7 * i64::from(col) + wd;
@@ -169,7 +183,7 @@ impl Widget for HeatMap<'_> {
                 let lvl = level(per_day.get(&day).copied().unwrap_or(0), cuts);
                 let style = self.styles.get(lvl).copied().unwrap_or_default();
                 let x = grid_x.saturating_add(col * CELL);
-                put(x, y, GLYPHS.get(lvl).copied().unwrap_or("·"), style);
+                put(x, y, glyph(lvl, self.density), style);
             }
         }
     }
@@ -238,7 +252,7 @@ mod tests {
         let today = MONDAY + 2;
         let buf = render(&[], today, 12, 12);
         let last = GUTTER + 2 * 3;
-        for (y, want) in [(1, "·"), (2, "·"), (3, "·"), (4, " "), (7, " ")] {
+        for (y, want) in [(1, "■"), (2, "■"), (3, "■"), (4, " "), (7, " ")] {
             assert_eq!(sym(&buf, last, y), want, "row {y}");
         }
     }
@@ -264,12 +278,12 @@ mod tests {
     #[test]
     fn weeks_cap_at_26_and_fit_narrow_widths() {
         let wide = render(&[], MONDAY + 6, 200, 9);
-        let dots = row_text(&wide, 1).matches('·').count();
+        let dots = row_text(&wide, 1).matches('■').count();
         assert_eq!(dots, 26);
         let narrow = render(&[], MONDAY + 6, 4 + 2 * 5 + 1, 9);
-        assert_eq!(row_text(&narrow, 1).matches('·').count(), 5);
+        assert_eq!(row_text(&narrow, 1).matches('■').count(), 5);
         assert_eq!(
-            row_text(&render(&[], MONDAY, 5, 9), 1).matches('·').count(),
+            row_text(&render(&[], MONDAY, 5, 9), 1).matches('■').count(),
             0
         );
     }
@@ -280,9 +294,15 @@ mod tests {
         let today = MONDAY + 4;
         let buf = render(&[(today, 3)], today, 4 + 2 * 3, 9);
         let last = GUTTER + 2 * 2;
-        assert_eq!(sym(&buf, last, 5), "░", "Friday holds today's commits");
+        assert_eq!(sym(&buf, last, 5), "■", "Friday holds today's commits");
         assert_eq!(sym(&buf, last, 6), " ", "Saturday is in the future");
-        assert_eq!(sym(&buf, last, 1), "·");
+        assert_eq!(sym(&buf, last, 1), "■");
+        let mut plain = Buffer::empty(Rect::new(0, 0, 10, 9));
+        HeatMap::new(&[(today, 3)], today, styles())
+            .density(true)
+            .render(Rect::new(0, 0, 10, 9), &mut plain);
+        assert_eq!(sym(&plain, last, 5), "░", "density: the level is the glyph");
+        assert_eq!(sym(&plain, last, 1), "·");
     }
 
     #[test]
@@ -298,13 +318,14 @@ mod tests {
         assert_eq!(fg(3), Some(Color::Blue));
         assert_eq!(fg(4), Some(Color::Magenta));
         assert_eq!(fg(5), Some(Color::Red), "a quiet day");
-        assert_eq!(sym(&buf, GUTTER, 4), "█");
+        assert_eq!(sym(&buf, GUTTER, 4), "■");
+        assert_ne!(fg(1), fg(2), "one glyph, a colour per level");
     }
 
     #[test]
     fn empty_data_draws_the_quiet_grid_and_zero_area_nothing() {
         let buf = render(&[], MONDAY + 6, 20, 9);
-        assert!(row_text(&buf, 3).contains('·'));
+        assert!(row_text(&buf, 3).contains('■'));
         let none = Buffer::empty(Rect::new(0, 0, 10, 5));
         let mut buf = none.clone();
         HeatMap::new(&[], MONDAY, styles()).render(Rect::new(0, 0, 0, 5), &mut buf);
@@ -337,12 +358,15 @@ mod tests {
     }
 
     #[test]
-    fn legend_reads_few_many_none() {
-        let text: String = legend(styles())
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
-        assert_eq!(text, "░ few  █ many  · none");
+    fn legend_reads_less_to_more() {
+        let text = |density| -> String {
+            legend(styles(), density, Style::default())
+                .spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect()
+        };
+        assert_eq!(text(false), "less ■ ■ ■ ■ ■ more");
+        assert_eq!(text(true), "less · ░ ▒ ▓ █ more");
     }
 }
