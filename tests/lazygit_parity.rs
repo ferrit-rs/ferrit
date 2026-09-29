@@ -537,3 +537,38 @@ fn the_branch_log_shows_the_body_and_the_author_email() {
         "no body under a bare subject\n{out}"
     );
 }
+
+/// Done when: a branch level with its upstream has a tick (✓) in the Status line and on
+/// its Branches row, and none once it is ahead, or when it has no upstream (repo-tour
+/// steps 1, 3).
+#[test]
+fn a_branch_level_with_its_upstream_has_a_tick() {
+    let repo = Repo::new("tick");
+    repo.commit("a.txt", "one\n", "init");
+    let mut app = repo.app();
+    assert!(
+        !frame(&mut app).contains('\u{2713}'),
+        "no upstream, no tick"
+    );
+
+    let remote = repo.dir.join("remote.git");
+    repo.git(&["init", "-q", "--bare", remote.to_str().unwrap()]);
+    repo.git(&["remote", "add", "origin", remote.to_str().unwrap()]);
+    repo.git(&["push", "-q", "-u", "origin", "main"]);
+    app.refresh();
+    let status = app.status_lines()[0].to_string();
+    assert!(status.ends_with("main \u{2713}"), "{status}");
+    assert!(
+        app.branch_lines()[0].to_string().contains('\u{2713}'),
+        "the branch row"
+    );
+
+    repo.commit("a.txt", "one\ntwo\n", "second");
+    app.refresh();
+    let status = app.status_lines()[0].to_string();
+    assert!(
+        status.contains('\u{2191}') && !status.contains('\u{2713}'),
+        "{status}"
+    );
+    assert!(!app.branch_lines()[0].to_string().contains('\u{2713}'));
+}

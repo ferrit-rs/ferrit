@@ -184,6 +184,9 @@ pub fn branch_line_with_status(
     if let Some(operation) = operation {
         spans.push(Span::styled(format!(" {operation}"), fg(p.hunk)));
     } else if entry.upstream.is_some() {
+        if entry.ahead == 0 && entry.behind == 0 {
+            spans.push(Span::styled(" \u{2713}", fg(p.add)));
+        }
         if entry.ahead > 0 {
             spans.push(Span::styled(
                 format!(" \u{2191}{}", entry.ahead),

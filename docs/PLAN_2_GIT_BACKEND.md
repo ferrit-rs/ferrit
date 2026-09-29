@@ -164,7 +164,8 @@ and the `mod mock;`.
 
 ## Rendering deltas (ui/)
 
-- Status pane: `header` -> `ferrit <branch> ↑<ahead> ↓<behind>`, a second
+- Status pane: `header` -> `ferrit <branch> ↑<ahead> ↓<behind>` (or ` ✓` when
+  the branch has an upstream and is level with it, as the Branches row does), a second
   line for conflicts or `✓ no merge conflicts`, and `last_error` in red
   when set.
 - Files pane: one row per `FileEntry`, two-column XY status code like

@@ -1656,6 +1656,9 @@ impl App {
             if h.behind > 0 {
                 let _ = write!(line, " \u{2193}{}", h.behind);
             }
+            if h.upstream.is_some() && h.ahead == 0 && h.behind == 0 {
+                line.push_str(" \u{2713}");
+            }
             let mut lines = vec![theme::status_line(&self.palette, &line)];
             if h.conflicts > 0 {
                 lines.push(theme::error_line(
