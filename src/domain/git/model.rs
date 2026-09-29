@@ -157,6 +157,8 @@ pub struct CommitEntry {
     pub full_hash: String,
     pub short_hash: String,
     pub author: String,
+    /// The author's email, `Name <email>` in the branch Log header; empty when unknown.
+    pub author_email: String,
     pub summary: String,
     /// The message under the subject, trimmed; empty for a subject-only commit.
     pub body: String,

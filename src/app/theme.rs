@@ -301,7 +301,7 @@ pub fn branch_log_block(p: &Palette, entry: &CommitEntry) -> Vec<Line<'static>> 
         Line::from(vec![
             Span::styled("| ", graph),
             Span::styled("Author: ", label),
-            Span::raw(entry.author.clone()),
+            Span::raw(format!("{} <{}>", entry.author, entry.author_email)),
         ]),
         Line::from(vec![
             Span::styled("| ", graph),

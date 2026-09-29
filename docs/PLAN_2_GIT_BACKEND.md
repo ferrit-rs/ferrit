@@ -96,6 +96,7 @@ pub struct CommitEntry {
     pub summary: String,          // first line of the message
     pub body: String,             // the rest of the message, trimmed; empty when none
     pub author: String,
+    pub author_email: String,
     pub time: i64,                // commit time, seconds since epoch
 }
 
@@ -296,7 +297,7 @@ Lands in the same commits as the features:
      returns `RightKey::BranchLog { branch }`, and `build_diff` turns that
      into `DiffView::BranchLog { branch, commits, .. }`, rendered as
      multi-line `git log`-style blocks (`theme::branch_log_block`, `commit
-     <hash>` / `Author:` / `Date:` / summary and then the message body under a
+     <hash>` / `Author: Name <email>` / `Date:` / summary and then the message body under a
      `|` continuation, `theme::branch_log_block_lines` lines each) rather than the compact one-line
      `theme::commit_line` row `Commits` uses — there is a whole pane's width
      to spend here, first shipped compact and then widened once the compact

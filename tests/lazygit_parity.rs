@@ -522,6 +522,7 @@ fn the_branch_log_shows_the_body_and_the_author_email() {
     let mut app = repo.app();
     key(&mut app, '3');
     let out = frame(&mut app);
+    assert!(out.contains("Author: Test <test@example.com>"), "{out}");
     let subject = out.find("with body").expect("the subject");
     let first = out.find("first body line").expect("the body");
     let second = out.find("second body line").expect("the whole body");
