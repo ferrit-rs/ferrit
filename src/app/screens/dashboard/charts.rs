@@ -292,8 +292,9 @@ pub(super) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     }
 }
 
-pub(super) fn heat_title(width: u16) -> String {
-    format!("Commits per day ({} weeks)", heatmap::weeks_shown(width))
+/// `26 weeks`, the dim words after the section title.
+pub(super) fn heat_unit(width: u16) -> String {
+    format!("{} weeks", heatmap::weeks_shown(width))
 }
 
 pub(super) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {

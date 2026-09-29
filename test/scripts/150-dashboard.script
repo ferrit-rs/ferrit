@@ -10,9 +10,12 @@ expect-text "window: 90 days (t)"
 expect-text "What was done"
 expect-text "Contributors"
 expect-text "Branches"
-expect-text "In progress"
+expect-text "stash"                        # the work in progress line under the sections
 expect-text "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?"
 expect-no-text "[2] Files"                # the panes are not drawn behind it
+expect-text "commits"                      # a stat tile: the value over its label
+expect-no-text "├"                         # one outer border, no boxes between sections
+expect-no-text "┬"
 # The fixture's commits are months old: nothing in 90 days, and it says so.
 expect-text "no commits in this window"
 

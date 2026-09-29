@@ -71,7 +71,8 @@ fn bright(color: Color) -> Color {
 /// Everything the dashboard colours with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChartPalette {
-    /// feat, fix, docs, test, refactor, others; authors use the same order.
+    /// feat, fix, docs, test, refactor, others: the kinds of change only, authors
+    /// and files are one series and wear the accent.
     pub categorical: [Color; SLOTS],
     /// Line chart, single-series bars.
     pub accent: Color,
@@ -90,6 +91,8 @@ pub struct ChartPalette {
     pub branch_stale: Style,
     /// Secondary figures (counts in brackets), empty bar cells, captions.
     pub dim: Style,
+    /// The page border and the thin rule under each section title: `Palette.idle`, dim.
+    pub rule: Style,
 }
 
 impl ChartPalette {
@@ -129,6 +132,7 @@ impl ChartPalette {
             branch_merged: Style::new().fg(gray),
             branch_stale: Style::new().fg(p.warn),
             dim,
+            rule: Style::new().fg(p.idle).add_modifier(Modifier::DIM),
         }
     }
 
@@ -138,11 +142,6 @@ impl ChartPalette {
             .get(slot.min(OTHERS))
             .copied()
             .unwrap_or(Color::Gray)
-    }
-
-    /// The `n`th author by commits (0 first); the sixth and beyond are "others".
-    pub fn author_color(&self, rank: usize) -> Color {
-        self.slot_color(rank)
     }
 
     pub fn kind_color(&self, kind: Kind) -> Color {
@@ -273,12 +272,10 @@ mod tests {
     }
 
     #[test]
-    fn authors_use_the_same_six_in_order_then_others() {
+    fn the_rule_is_the_idle_colour_dimmed() {
         let c = ChartPalette::for_palette(&Palette::DARK);
-        for rank in 0..6 {
-            assert_eq!(c.author_color(rank), c.categorical[rank]);
-        }
-        assert_eq!(c.author_color(9), c.slot_color(OTHERS));
+        assert_eq!(c.rule.fg, Some(Palette::DARK.idle));
+        assert!(c.rule.add_modifier.contains(Modifier::DIM));
         assert_eq!(slot_marker(40), "○");
     }
 

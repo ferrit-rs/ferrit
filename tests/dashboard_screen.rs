@@ -236,37 +236,188 @@ fn is_braille(c: char) -> bool {
 // ------------------------------------------------------------------- layouts
 
 #[test]
-fn wide_layout_has_every_section_and_the_plans_first_line() {
+fn wide_layout_has_every_section_and_the_header_and_progress_lines() {
     let s = stats();
     let out = render(&view(Some(&s)), 120, 42);
     println!("{out}");
     for want in [
-        "Dashboard ─ ferrit ─ main",
+        "ferrit · main",
+        "Dashboard",
         "window: 90 days (t)",
-        "Commits 423 · Authors 7 · Branches 13 (+3 remote) · Tags 5 · 35 commits since v0.7.0",
-        "Activity (commits per week)",
+        "Activity  commits per week",
         "13 weeks of history · peak ",
         "What was done",
-        "Commits per day (26 weeks)",
+        "Commits per day  23 weeks",
         "Contributors",
-        "Hot files (share of commits touching)",
+        "Hot files  share of commits touching",
         "Branches",
-        "In progress",
         "2 changed · 1 stash · main 1 commit ahead of origin/main",
     ] {
         assert!(out.contains(want), "{want:?} missing in\n{out}");
     }
-    // Two columns: the first rule joins Activity and What was done.
-    let rule = out.lines().find(|l| l.contains("Activity")).unwrap();
+    // Two columns: the first title row holds Activity and What was done.
+    let row = out.lines().find(|l| l.contains("Activity")).unwrap();
+    assert!(row.contains("What was done"), "{row}");
     assert!(
-        rule.contains("┬") && rule.contains("What was done"),
-        "{rule}"
+        out.lines()
+            .any(|l| l.contains("Commits per day") && l.contains("Contributors"))
     );
-    assert!(
-        out.lines().any(|l| l.contains("Commits per day")
-            && l.contains("┼")
-            && l.contains("Contributors"))
-    );
+}
+
+/// No box-drawing junction and no vertical rule inside the page: the border is
+/// the only frame, sections are a bold title over a thin rule.
+fn assert_no_inner_box(out: &str, width: usize) {
+    let rows: Vec<Vec<char>> = out.lines().map(|l| l.chars().collect()).collect();
+    let left = rows[0].iter().position(|&c| c == '╭').unwrap();
+    let right = rows[0].iter().position(|&c| c == '╮').unwrap();
+    assert!(right < width);
+    for (y, row) in rows.iter().enumerate() {
+        if !row.contains(&'│') && !row.contains(&'╭') {
+            continue;
+        }
+        for (x, &c) in row.iter().enumerate() {
+            assert!(
+                !matches!(c, '├' | '┬' | '┼' | '┴' | '┤' | '┌' | '┐' | '└' | '┘'),
+                "junction {c} at ({x},{y})\n{out}"
+            );
+            if c == '│' {
+                assert!(x == left || x == right, "inner vertical rule at ({x},{y})");
+            }
+        }
+    }
+}
+
+#[test]
+fn there_are_no_inner_boxes_only_the_outer_border() {
+    let s = stats();
+    for (w, h) in [(120, 60), (110, 60), (80, 120), (200, 60)] {
+        let out = render(&view(Some(&s)), w, h);
+        assert_no_inner_box(&out, usize::from(w));
+    }
+}
+
+#[test]
+fn the_border_is_one_rounded_line_in_the_dim_idle_colour() {
+    let s = stats();
+    let buf = buffer(&view(Some(&s)), 120, 60);
+    let corner = &buf[(5, 0)];
+    assert_eq!(corner.symbol(), "╭");
+    assert_eq!(corner.fg, Palette::DARK.idle);
+    assert!(corner.modifier.contains(ratatui::style::Modifier::DIM));
+    // The rule under a section title has the same recessive style.
+    let out = text(&buf);
+    let row = out.lines().position(|l| l.contains("Activity")).unwrap() + 1;
+    let rule = &buf[(10, u16::try_from(row).unwrap())];
+    assert_eq!(rule.symbol(), "─");
+    assert_eq!(rule.fg, Palette::DARK.idle);
+    assert!(rule.modifier.contains(ratatui::style::Modifier::DIM));
+}
+
+#[test]
+fn the_page_is_capped_at_110_columns_and_centred() {
+    let s = stats();
+    for width in [200_u16, 111, 150] {
+        let out = render(&view(Some(&s)), width, 60);
+        let first = out.lines().next().unwrap();
+        let margin = (usize::from(width) - 110) / 2;
+        assert_eq!(
+            first.chars().position(|c| c == '╭'),
+            Some(margin),
+            "{width}"
+        );
+        assert_eq!(
+            first.chars().position(|c| c == '╮'),
+            Some(margin + 109),
+            "{width}"
+        );
+        assert!(first.chars().take(margin).all(|c| c == ' '));
+        let last = out.lines().find(|l| l.contains('╰')).unwrap();
+        assert_eq!(last.chars().position(|c| c == '╰'), Some(margin));
+    }
+    // At exactly 110 there is no margin, and under it the page is the terminal.
+    let out = render(&view(Some(&s)), 110, 60);
+    assert_eq!(out.lines().next().unwrap().chars().next(), Some('╭'));
+    let out = render(&view(Some(&s)), 90, 120);
+    assert_eq!(out.lines().next().unwrap().chars().last(), Some('╮'));
+}
+
+#[test]
+fn the_two_columns_are_four_columns_apart_with_no_rule_between() {
+    let s = stats();
+    let out = render(&view(Some(&s)), 120, 60);
+    let rule = out
+        .lines()
+        .skip_while(|l| !l.contains("Activity"))
+        .nth(1)
+        .unwrap();
+    let cells: Vec<char> = rule.chars().collect();
+    let dashes: Vec<usize> = cells
+        .iter()
+        .enumerate()
+        .filter(|&(_, &c)| c == '─')
+        .map(|(x, _)| x)
+        .collect();
+    let left_end = dashes
+        .iter()
+        .copied()
+        .find(|&x| cells[x + 1] == ' ')
+        .unwrap();
+    let right_start = dashes.iter().copied().find(|&x| x > left_end).unwrap();
+    assert_eq!(right_start - left_end - 1, 4, "{rule}");
+    assert_no_inner_box(&out, 120);
+}
+
+#[test]
+fn the_tiles_show_the_value_above_its_label() {
+    let s = stats();
+    let out = render(&view(Some(&s)), 120, 60);
+    let lines: Vec<&str> = out.lines().collect();
+    let labels = lines
+        .iter()
+        .position(|l| l.contains("commits    authors"))
+        .unwrap();
+    let values = lines[labels - 1];
+    for (value, label) in [
+        ("423", "commits"),
+        ("7", "authors"),
+        ("13 (+3 remote)", "branches"),
+        ("5", "tags"),
+        ("35", "since v0.7.0"),
+    ] {
+        let x = col_of(lines[labels], label);
+        assert_eq!(col_of(values, value), x, "{value} above {label}");
+    }
+    // No boxes and no sentence line.
+    assert!(!out.contains("Commits 423 ·"), "{out}");
+}
+
+#[test]
+fn the_commit_count_is_the_hero_tile_and_the_labels_are_dim() {
+    let s = stats();
+    let buf = buffer(&view(Some(&s)), 120, 60);
+    let out = text(&buf);
+    let vy = out.lines().position(|l| l.contains("423")).unwrap();
+    let vy = u16::try_from(vy).unwrap();
+    let x = col_of(out.lines().nth(usize::from(vy)).unwrap(), "423");
+    let hero = &buf[(x, vy)];
+    assert_eq!(hero.fg, Palette::DARK.focus);
+    assert!(hero.modifier.contains(ratatui::style::Modifier::BOLD));
+    let other = &buf[(
+        col_of(out.lines().nth(usize::from(vy)).unwrap(), "13 (+3"),
+        vy,
+    )];
+    assert_eq!(other.fg, Color::Reset, "the other values are primary ink");
+    assert!(other.modifier.contains(ratatui::style::Modifier::BOLD));
+    let label = &buf[(x, vy + 1)];
+    assert!(label.modifier.contains(ratatui::style::Modifier::DIM));
+}
+
+#[test]
+fn the_bars_are_thin_and_the_donut_and_the_heat_map_have_no_block_glyphs() {
+    let s = stats();
+    let out = render(&view(Some(&s)), 120, 60);
+    assert!(out.contains('━') && out.contains('─'));
+    assert!(!out.contains('█') && !out.contains('░'), "{out}");
 }
 
 #[test]
@@ -315,23 +466,20 @@ fn narrow_layout_stacks_the_sections_and_scrolls() {
         "Contributors",
         "Hot files",
         "Branches",
-        "In progress",
+        "main 1 commit ahead",
     ] {
         assert!(tall.contains(want), "{want:?} missing");
     }
-    assert!(!tall.contains("┬"), "one column has no joints");
+    assert_no_inner_box(&tall, 80);
     let mut v = view(Some(&s));
     let top = render(&v, 80, 20);
-    assert!(top.contains("Activity") && !top.contains("In progress"));
+    assert!(top.contains("Activity") && !top.contains("main 1 commit ahead"));
     v.scroll = 5;
     let scrolled = render(&v, 80, 20);
     assert_ne!(top, scrolled, "scrolling moves the page");
     v.scroll = usize::MAX;
     let end = render(&v, 80, 20);
-    assert!(
-        end.contains("In progress") && end.contains("main 1 commit ahead"),
-        "{end}"
-    );
+    assert!(end.contains("main 1 commit ahead"), "{end}");
     v.scroll = 100_000;
     assert_eq!(end, render(&v, 80, 20), "the renderer clamps the scroll");
 }
@@ -346,30 +494,6 @@ fn a_very_narrow_terminal_shows_the_totals_and_the_work_in_progress() {
     assert!(!out.contains("Activity") && !out.contains("Contributors"));
     for line in out.lines() {
         assert!(line.chars().count() <= 50);
-    }
-}
-
-#[test]
-fn no_section_spills_over_the_column_bar() {
-    let s = stats();
-    for width in [110, 111, 119, 120, 133, 140] {
-        let out = render(&view(Some(&s)), width, 60);
-        let rows: Vec<Vec<char>> = out.lines().map(|l| l.chars().collect()).collect();
-        let start = rows.iter().position(|r| r.contains(&'┬')).unwrap();
-        let end = rows.iter().position(|r| r.contains(&'┴')).unwrap();
-        let bar = rows[start].iter().position(|&c| c == '┬').unwrap();
-        for (y, row) in rows.iter().enumerate().take(end).skip(start + 1) {
-            assert!(
-                matches!(row[bar], '│' | '┼'),
-                "{width} row {y}: {}",
-                row[bar]
-            );
-        }
-        assert!(
-            rows.iter()
-                .take(end + 3)
-                .all(|r| r.len() == usize::from(width))
-        );
     }
 }
 
@@ -396,6 +520,88 @@ fn contributors_are_share_bars_and_more_than_six_fold_into_others() {
     // Shares are of the whole: 200 of 428 is 47 %, others is 28 of 428.
     assert!(out.contains("47 %  (200)"), "{out}");
     assert!(out.contains("6 %  (28)"), "{out}");
+}
+
+#[test]
+fn every_contributor_bar_wears_the_one_accent_and_the_text_stays_ink() {
+    let s = stats();
+    let buf = buffer(&view(Some(&s)), 120, 60);
+    let out = text(&buf);
+    let mut bar_colours = std::collections::HashSet::new();
+    for name in [
+        "Richard Lavoura",
+        "Max Wells",
+        "Ola Nordmann",
+        "Ana Silva",
+        "Li Wei",
+        "others",
+    ] {
+        let y = out
+            .lines()
+            .position(|l| l.contains(name) && l.contains('━'))
+            .unwrap();
+        let y = u16::try_from(y).unwrap();
+        let row = out.lines().nth(usize::from(y)).unwrap();
+        let name_cell = &buf[(col_of(row, name), y)];
+        assert_ne!(name_cell.fg, Palette::DARK.focus, "{name} is ink");
+        let bar = &buf[(col_of(row, "━"), y)];
+        assert_eq!(bar.symbol(), "━");
+        bar_colours.insert(bar.fg);
+        let pct = &buf[(col_of(row, " %") - 1, y)];
+        assert_ne!(pct.fg, Palette::DARK.focus, "the percentage is ink");
+    }
+    assert_eq!(
+        bar_colours,
+        std::collections::HashSet::from([Palette::DARK.focus]),
+        "one series, one colour"
+    );
+}
+
+#[test]
+fn an_author_with_several_emails_says_so_after_the_name() {
+    let mut s = stats();
+    s.authors[0].emails = vec!["a@x.org".into(), "b@x.org".into(), "c@x.org".into()];
+    let out = render(&view(Some(&s)), 120, 60);
+    let row = out.lines().find(|l| l.contains("Richard Lavoura")).unwrap();
+    assert!(row.contains("Richard Lavoura (3 emails)"), "{row}");
+    let other = out.lines().find(|l| l.contains("Max Wells")).unwrap();
+    assert!(!other.contains("emails"), "{other}");
+}
+
+#[test]
+fn the_hot_files_footer_counts_the_files_gone_from_the_tree() {
+    let mut s = stats();
+    s.hot_files.as_mut().unwrap().gone = 3;
+    // Both notes do not fit a 51-column column: two dim lines.
+    let out = render(&view(Some(&s)), 120, 60);
+    assert!(
+        out.contains("2 files hidden (CHANGELOG.md, Cargo.lock)"),
+        "{out}"
+    );
+    assert!(out.contains("3 files no longer in the tree"), "{out}");
+    let hidden = out
+        .lines()
+        .position(|l| l.contains("files hidden"))
+        .unwrap();
+    assert_eq!(
+        out.lines()
+            .position(|l| l.contains("no longer in the tree"))
+            .unwrap(),
+        hidden + 1
+    );
+    // In one 76-column column they share a line.
+    let out = render(&view(Some(&s)), 80, 120);
+    assert!(
+        out.contains("2 files hidden (CHANGELOG.md, Cargo.lock) · 3 files no longer in the tree"),
+        "{out}"
+    );
+    // Nothing hidden: only the gone note; none of either: no footer.
+    s.hot_files.as_mut().unwrap().hidden.clear();
+    let out = render(&view(Some(&s)), 80, 120);
+    assert!(out.contains("3 files no longer in the tree") && !out.contains("hidden"));
+    s.hot_files.as_mut().unwrap().gone = 1;
+    let out = render(&view(Some(&s)), 80, 120);
+    assert!(out.contains("1 file no longer in the tree"), "{out}");
 }
 
 #[test]
@@ -449,7 +655,7 @@ fn branches_summarise_then_list_eight_rows_and_the_rest_as_more() {
     assert!(out.contains("9 active · 2 merged · 2 stale"), "{out}");
     assert!(out.contains("+5 more"), "{out}");
     assert!(out.contains("↑4 ↓9"), "{out}");
-    let main_row = out.lines().find(|l| l.contains("* main")).unwrap();
+    let main_row = out.lines().find(|l| l.contains("main ●")).unwrap();
     assert!(main_row.contains("↑0 ↓0"), "{main_row}");
     assert!(out.contains("3 d ago") && out.contains("just now"), "{out}");
 }
@@ -484,7 +690,7 @@ fn stale_branches_carry_the_word_and_the_warn_colour() {
         buf[(merged_x, u16::try_from(merged).unwrap())].fg,
         Color::Gray
     );
-    let main_row = out.lines().position(|l| l.contains("* main")).unwrap();
+    let main_row = out.lines().position(|l| l.contains("main ●")).unwrap();
     let mx = col_of(out.lines().nth(main_row).unwrap(), "main");
     let cell = &buf[(mx, u16::try_from(main_row).unwrap())];
     assert_eq!(cell.fg, Palette::DARK.focus);
@@ -551,9 +757,9 @@ fn without_braille_the_donut_is_one_full_width_stacked_bar_above_its_legend() {
         .iter()
         .position(|l| l.contains("What was done"))
         .unwrap();
-    let bar: String = lines[title + 1].chars().skip(1).take(98).collect();
+    let bar: String = lines[title + 2].chars().skip(2).take(96).collect();
     assert!(bar.chars().all(|c| c == '━'), "{bar}");
-    assert!(lines[title + 2].contains("● feat"));
+    assert!(lines[title + 3].contains("● feat"));
 }
 
 #[test]
@@ -708,10 +914,10 @@ fn an_empty_repository_says_no_commits_yet() {
     s.since_tag = None;
     let out = render(&view(Some(&s)), 120, 30);
     assert!(
-        out.contains("no commits yet") && out.contains("Commits 0"),
+        out.contains("no commits yet") && out.contains("commits"),
         "{out}"
     );
-    assert!(!out.contains("Activity") && out.contains("In progress"));
+    assert!(!out.contains("Activity") && out.contains("2 changed"));
 }
 
 #[test]
@@ -736,7 +942,7 @@ fn a_window_without_commits_keeps_the_totals_and_empties_the_charts() {
         out.matches("no commits in this window").count() >= 4,
         "{out}"
     );
-    assert!(out.contains("Branches 13"), "totals unchanged");
+    assert!(out.contains("13 (+3 remote)"), "totals unchanged");
 }
 
 #[test]
@@ -773,7 +979,7 @@ fn the_activity_caption_follows_the_granularity() {
     s.granularity = Granularity::Day;
     let out = render(&view(Some(&s)), 120, 42);
     assert!(
-        out.contains("Activity (commits per day)") && out.contains("13 days of history · peak "),
+        out.contains("Activity  commits per day") && out.contains("13 days of history · peak "),
         "{out}"
     );
     s.granularity = Granularity::Month;
@@ -814,11 +1020,8 @@ fn no_remote_hides_the_remote_count_and_a_small_whole_shows_counts() {
         commits: 12,
     });
     let out = render(&view(Some(&s)), 120, 42);
-    assert!(
-        out.contains("Branches 13 ·") && !out.contains("remote"),
-        "{out}"
-    );
-    assert!(out.contains("Hot files (commits touching)"));
+    assert!(out.contains("branches") && !out.contains("remote"), "{out}");
+    assert!(out.contains("Hot files  commits touching"));
     assert!(!out.contains("since"));
     // 12 commits: counts, no percentages, in the kinds legend, the bars and the branches.
     let legend = out.lines().find(|l| l.contains("● feat")).unwrap();
@@ -986,13 +1189,13 @@ fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
     let out = app_frame(&mut app, 120, 40);
     println!("{out}");
     for want in [
-        "Dashboard ─ ",
-        "─ main",
+        "Dashboard",
+        "· main",
         "Activity",
         "What was done",
         "Contributors",
         "Hot files",
-        "In progress",
+        "changed",
     ] {
         assert!(out.contains(want), "{want:?} missing in\n{out}");
     }
@@ -1002,8 +1205,9 @@ fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
         last.contains("Back: esc | Window: t | Counts: n | Refresh: r | Help: ?"),
         "{last:?}"
     );
+    let authors = out.lines().position(|l| l.contains("authors")).unwrap();
     assert!(
-        out.contains("Authors 3") && out.contains("1 untracked"),
+        out.lines().nth(authors - 1).unwrap().contains(" 3 ") && out.contains("1 untracked"),
         "{out}"
     );
     assert!(out.contains("1 file hidden (Cargo.lock)"), "{out}");
@@ -1011,11 +1215,11 @@ fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
         out.contains("stale"),
         "the branch whose tip is 100 days old"
     );
-    assert!(out.contains("* main") && out.contains("feature") && out.contains("done"));
+    assert!(out.contains("main ●") && out.contains("feature") && out.contains("done"));
     // Back to the panes.
     key(&mut app, 'q');
     let out = app_frame(&mut app, 120, 40);
-    assert!(out.contains("Stash") && !out.contains("Dashboard ─ "));
+    assert!(out.contains("Stash") && !out.contains("Dashboard"));
 }
 
 #[test]
@@ -1059,8 +1263,8 @@ fn the_help_overlay_still_draws_over_the_dashboard() {
     let out = app_frame(&mut app, 120, 40);
     assert!(out.contains("Close: esc/? | Scroll: j/k"), "{out}");
     assert!(
-        out.contains("Dashboard ─ "),
-        "the screen stays under the overlay"
+        out.contains("Activity") && out.contains("Hot files"),
+        "the screen stays under the overlay\n{out}"
     );
 }
 
@@ -1076,7 +1280,7 @@ fn scrolling_through_the_app_is_clamped_to_the_page() {
     assert_ne!(app_frame(&mut app, 80, 20), top);
     app.feed_key(KeyEvent::from(KeyCode::End));
     let end = app_frame(&mut app, 80, 20);
-    assert!(end.contains("In progress"));
+    assert!(end.contains("changed"));
     // Past the end and back: one `k` moves up by one row, not by the overshoot.
     for _ in 0..50 {
         key(&mut app, 'j');
@@ -1188,11 +1392,24 @@ fn show_frames() {
     let s = stats();
     let mut v = view(Some(&s));
     for (w, h, mode) in [
+        (100, 42, ChartMode::Braille),
         (120, 42, ChartMode::Braille),
+        (200, 42, ChartMode::Braille),
         (80, 30, ChartMode::Blocks),
         (50, 10, ChartMode::Braille),
     ] {
         v.mode = mode;
         println!("--- {w}x{h} {mode:?}\n{}", render(&v, w, h));
+    }
+}
+
+#[test]
+#[ignore = "prints real fixture frames for a human to read: cargo test --test dashboard_screen show_app_frames -- --ignored --nocapture"]
+fn show_app_frames() {
+    let tmp = busy();
+    let mut app = App::open(tmp.path()).unwrap();
+    app.open_dashboard();
+    for (w, h) in [(100, 50), (200, 50)] {
+        println!("--- through App {w}x{h}\n{}", app_frame(&mut app, w, h));
     }
 }
