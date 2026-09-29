@@ -296,6 +296,8 @@ enum ConfirmAction {
     AbortOperation,
     /// `d` on the Commits pane: drop that commit with `git rebase -i`.
     DropCommit { hash: String },
+    /// `s` on the Commits pane: squash that commit into the one below.
+    SquashCommit { hash: String },
     /// `d` on the Stash pane: `git stash drop`, resolved by oid.
     DropStash { oid: String },
     /// `<space>` (apply) or `g` (pop) on the Stash pane: confirmed first, like

@@ -29,7 +29,9 @@ and cancelling does not save the text as the next `c`'s draft (it would have
 come back as a new commit's message). The refusal rule follows the new-branch
 popup: a refused reword (dirty worktree) keeps the popup and the typed text
 for a retry, a stop or success closes it. `s` / `S` / `e` / `d` act at once
-except `d`, which asks; squashing the oldest commit is an error message (git
+except `d` and `s`, which ask (`squash <commit> into <commit below>?`, like
+lazygit; `s` on the oldest commit skips the question and reports the error;
+`S` stays immediate); squashing the oldest commit is an error message (git
 has nothing below it), not an inert key, so the user learns why. While an
 operation is stopped the keys answer `finish or abort the operation in
 progress first (m)` in the Status line instead of doing nothing silently.
@@ -410,7 +412,7 @@ pattern to reuse if that shows up in practice. Deferred, named below.
 
 - Commits `w` on an older commit opens the popup pre-filled, `Enter` rewords;
   `w` on the first row keeps the phase 7 amend path
-- `d` asks, `y` drops, `n` keeps; `s` / `S` / `e` / `F` / `a` happy paths
+- `d` asks, `y` drops, `n` keeps; `s` asks then squashes; `S` / `e` / `F` / `a` happy paths
 - a conflicting action shows REBASING in Status and `m` opens the menu;
   Continue, Skip, Abort each behave, Abort behind a confirm
 - `<space>` on `UU` with markers stages nothing and says why; without

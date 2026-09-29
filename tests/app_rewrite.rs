@@ -296,11 +296,30 @@ fn enter_confirms_a_drop_like_y() {
 }
 
 #[test]
+fn s_asks_first_and_n_rewrites_nothing() {
+    let dir = history("rw-app-squash-ask");
+    let mut app = commits_app(&dir);
+    select_row(&mut app, 1);
+    app.feed_key(char_key('s'));
+
+    let message = app.confirm_message().expect("squash asks").to_owned();
+    assert!(
+        message.contains("squash") && message.contains("two") && message.contains("into"),
+        "{message}"
+    );
+    assert_eq!(subjects(&dir).len(), 4, "nothing rewritten yet");
+    app.feed_key(char_key('n'));
+    assert!(app.confirm_message().is_none());
+    assert_eq!(subjects(&dir), ["three", "two", "one", "base"]);
+}
+
+#[test]
 fn s_squashes_into_the_commit_below() {
     let dir = history("rw-app-squash");
     let mut app = commits_app(&dir);
     select_row(&mut app, 1);
     app.feed_key(char_key('s'));
+    app.feed_key(char_key('y'));
 
     assert_eq!(subjects(&dir), ["three", "one", "base"]);
     let message = git(dir.path(), &["log", "-1", "--format=%B", "HEAD~1"]);

@@ -19,6 +19,8 @@ git status --porcelain => ""
 # Squash it into the commit below, keeping both messages.
 key k k k k j                              # top, then row 1 (two!)
 key s
+expect-text "squash "
+key y
 git log --format=%s => "three\none\nbase"
 git log -1 --format=%B HEAD~1 -> "two!"
 git show HEAD~1:f => "two"

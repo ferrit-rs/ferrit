@@ -62,18 +62,30 @@ impl App {
         });
     }
 
-    /// `s` (squash, keeps both messages) or `S` (fixup, drops this one) on
-    /// Commits: fold the selected commit into the one below it.
+    /// `s` (squash, keeps both messages, asks first like drop) or `S` (fixup,
+    /// drops this one, acts at once) on Commits: fold the selected commit
+    /// into the one below it. The oldest commit has nothing below, so `s`
+    /// there skips the question and reports why.
     pub(super) fn fold_selected_commit(&mut self, fixup: bool) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
-        let edit = if fixup {
-            RebaseEdit::Fixup
+        let below = self.commits.get(self.selected(Pane::Commits) + 1);
+        if fixup {
+            self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Fixup);
+        } else if let Some(below) = below {
+            self.pending_confirm = Some(ConfirmPrompt {
+                message: format!(
+                    "squash {} {} into {} {}?",
+                    entry.short_hash, entry.summary, below.short_hash, below.summary
+                ),
+                action: ConfirmAction::SquashCommit {
+                    hash: entry.full_hash,
+                },
+            });
         } else {
-            RebaseEdit::Squash
-        };
-        self.run_rebase_edit(&entry.full_hash, &edit);
+            self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Squash);
+        }
     }
 
     /// `e` on Commits: stop the rebase at the selected commit so it can be
