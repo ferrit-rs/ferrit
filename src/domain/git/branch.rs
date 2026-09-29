@@ -79,14 +79,19 @@ pub(super) fn create_branch(repo: &Repository, name: &str) -> GitResult<()> {
     )
 }
 
-/// `git checkout -b <name> <hash>`: a new branch at an arbitrary commit, checked
-/// out, instead of always at `HEAD` (`docs/PLAN_12_POLISH.md` P4).
+/// `git checkout -b <name> <start> --no-track`: a new branch at a commit or ref
+/// (`refs/heads/<branch>` for `n` on Branches), checked out, instead of always at
+/// `HEAD` (`docs/PLAN_12_POLISH.md` P4); never tracks the branch it starts from.
 pub(super) fn create_branch_at(repo: &Repository, name: &str, hash: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
         |cmd| {
-            cmd.arg("checkout").arg("-b").arg(name).arg(hash);
+            cmd.arg("checkout")
+                .arg("-b")
+                .arg(name)
+                .arg(hash)
+                .arg("--no-track");
         },
         GitError::BranchFailed,
     )

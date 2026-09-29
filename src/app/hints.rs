@@ -93,7 +93,7 @@ impl Action {
             Self::ToggleSelection => "start / clear a line selection",
             Self::StageCursor => "stage / unstage the hunk or lines",
             Self::Checkout => "check out the selected branch",
-            Self::NewBranch => "new branch from HEAD, named in a popup",
+            Self::NewBranch => "new branch off the selected one, named in a popup",
             Self::FastForward => "fast-forward the selected branch to its upstream",
             Self::Merge => "merge the selected branch into the current one",
             Self::DeleteBranch => "delete the selected branch (asks first)",

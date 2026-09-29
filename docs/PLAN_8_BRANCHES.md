@@ -84,7 +84,8 @@ every git version ferrit might meet, not just the ones with `switch`.
    └────────────────2 of 3 ─┘
 
    space  -> checkout the SELECTED branch          (git checkout feat/commit)
-   n      -> new branch from the CURRENT HEAD       (git checkout -b <name>)
+   n      -> new branch from the SELECTED branch    (git checkout -b <name>
+                                                    refs/heads/<sel> --no-track)
    d      -> delete the SELECTED branch, confirmed  (git branch -d / -D)
    u      -> fast-forward the SELECTED branch       (see "u: fast-forward
              to its upstream, checked out or not        any branch" below)
@@ -125,8 +126,9 @@ impl Repo {
     /// user's behalf.
     pub fn checkout(&self, name: &str) -> GitResult<()>;
 
-    /// `git checkout -b <name>`, always from the current `HEAD` (branching
-    /// from an arbitrary commit is a deferred nicety, see "After phase 8").
+    /// `git checkout -b <name>` from the current `HEAD`. The `n` key does not
+    /// use it: it starts from the selected branch through `create_branch_at`
+    /// (`refs/heads/<sel>`, `--no-track`).
     pub fn create_branch(&self, name: &str) -> GitResult<()>;
 
     /// `git branch -d <name>` (or `-D` when `force`). Refuses the currently
@@ -334,8 +336,9 @@ command yourself would.
 `Enter` (drill into a branch's log) and the branch-log-preview-on-select
 behaviour from phase 2 are unchanged.
 
-The new-branch prompt is titled `New branch name (branch is off of '<current>')`, naming the
-branch it starts from, as lazygit's does. The list is the checked-out branch first, then the
+The new-branch prompt is titled `New branch name (branch is off of '<selected>')`, naming the
+branch it starts from, as lazygit's does: `n` runs `git checkout -b <name> refs/heads/<selected> --no-track`,
+so the new branch starts at the selected branch, not at `HEAD` (the same when the selected one is the current). The list is the checked-out branch first, then the
 most recently committed to (tip time, newest first), as lazygit orders it; before, alphabetical.
 
 After `n` creates a branch, the selection moves to it (it is the checked-out
@@ -438,7 +441,7 @@ against them; the replay harness (`ferrit::replay`, `--replay`) runs
 
 - `<space>` checks out the selected branch; a dirty worktree that would be
   overwritten blocks it with git's own message, unchanged.
-- `n` creates and checks out a new branch from `HEAD`, named from a popup.
+- `n` creates and checks out a new branch from the selected branch, named from a popup.
 - `d` deletes the selected branch after a confirm; an unmerged branch gets
   a second, explicit force-delete confirm instead of silently losing work.
 - `u` fast-forwards the selected branch to its upstream when possible,

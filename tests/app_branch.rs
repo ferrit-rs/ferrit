@@ -165,6 +165,56 @@ fn n_opens_types_and_enter_creates_and_switches() {
 }
 
 #[test]
+fn n_starts_the_new_branch_from_the_selected_branch() {
+    let (dir, mut app) = two_branch_app("app-branch-create-from-selected");
+    select_branch(&mut app, "feat"); // base is checked out, feat is one commit ahead
+    app.feed_key(char_key('n'));
+    assert!(
+        app.new_branch_popup()
+            .unwrap()
+            .title
+            .contains("off of 'feat'"),
+        "the prompt names the selected branch"
+    );
+    type_text(&mut app, "wip/from-feat");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    assert_eq!(
+        git(dir.path(), &["symbolic-ref", "--short", "HEAD"]),
+        "wip/from-feat"
+    );
+    assert_eq!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        git(dir.path(), &["rev-parse", "feat"]),
+        "the new branch starts at feat's commit"
+    );
+    assert_ne!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        git(dir.path(), &["rev-parse", "base"])
+    );
+}
+
+#[test]
+fn n_with_the_current_branch_selected_starts_from_head() {
+    let (dir, mut app) = two_branch_app("app-branch-create-from-current");
+    select_branch(&mut app, "base");
+    app.feed_key(char_key('n'));
+    assert!(
+        app.new_branch_popup()
+            .unwrap()
+            .title
+            .contains("off of 'base'")
+    );
+    type_text(&mut app, "wip/from-base");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    assert_eq!(
+        git(dir.path(), &["rev-parse", "HEAD"]),
+        git(dir.path(), &["rev-parse", "base"])
+    );
+}
+
+#[test]
 fn the_new_branch_is_the_selected_row_whichever_row_the_cursor_was_on() {
     let (_dir, mut app) = two_branch_app("app-branch-create-selects");
     select_branch(&mut app, "feat"); // the cursor is elsewhere when `n` is pressed

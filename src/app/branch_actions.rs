@@ -89,8 +89,15 @@ impl App {
         self.finish_branch_action(result);
     }
 
+    /// The branch `n` starts from: the selected one (lazygit), or `None` when
+    /// the list has no row (a detached `HEAD`), which falls back to `HEAD`.
+    fn new_branch_base(&self) -> Option<String> {
+        let entry = self.branches.get(self.selected(Pane::Branches))?;
+        Some(entry.name.clone())
+    }
+
     /// `n` (Nav, Branches focused): open the new-branch popup, named from
-    /// the current `HEAD` once submitted.
+    /// the selected branch once submitted.
     pub(super) fn open_new_branch_popup(&mut self) {
         if self.focus != Pane::Branches
             || self.popup.is_some()
@@ -101,13 +108,15 @@ impl App {
         }
         self.new_branch_title = format!(
             "New branch name (branch is off of '{}')",
-            self.header.branch
+            self.new_branch_base()
+                .as_deref()
+                .unwrap_or(&self.header.branch)
         );
         self.popup = Some(Popup::NewBranch(TextInput::default()));
     }
 
     /// `Enter` in the new-branch popup: `git checkout -b <name>` from
-    /// `HEAD`. Success closes the popup and refreshes; failure (a bad
+    /// the selected branch, without tracking it. Success closes the popup and refreshes; failure (a bad
     /// name, or one already taken) keeps the popup open with the typed
     /// text so the user can fix it and retry — the message surfaces in
     /// the Status pane rather than a second popup layered on this one.
@@ -116,8 +125,13 @@ impl App {
             return;
         };
         let name = buf.text();
+        let base = self.new_branch_base();
         let Some(repo) = &self.repo else { return };
-        match repo.create_branch(&name) {
+        let result = match base {
+            Some(base) => repo.create_branch_at(&name, &format!("refs/heads/{base}")),
+            None => repo.create_branch(&name),
+        };
+        match result {
             Ok(()) => {
                 self.popup = None;
                 // The new branch is the checked-out one: select it, not the

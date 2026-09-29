@@ -388,7 +388,7 @@ impl Repo {
         branch::fast_forward(&self.inner, name)
     }
 
-    /// `git checkout -b <name> <hash>`.
+    /// `git checkout -b <name> <hash> --no-track`; `hash` may be a ref.
     pub fn create_branch_at(&self, name: &str, hash: &str) -> GitResult<()> {
         branch::create_branch_at(&self.inner, name, hash)
     }
