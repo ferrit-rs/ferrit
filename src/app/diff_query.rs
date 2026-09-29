@@ -25,7 +25,7 @@ pub(crate) enum RightKey {
     File { path: PathBuf },
     Commit { full_hash: String },
     BranchLog { branch: String },
-    Stash { oid: String },
+    Stash { oid: String, header: String },
 }
 
 #[derive(Debug)]
@@ -78,8 +78,8 @@ pub(crate) fn load(
             .branch_log(branch)
             .map(DiffQueryResult::BranchLog)
             .map_err(|error| error.to_string()),
-        RightKey::Stash { oid } => repo
-            .stash_diff(oid, opts)
+        RightKey::Stash { oid, header } => repo
+            .stash_diff(oid, header, opts)
             .map(DiffQueryResult::Stash)
             .map_err(|error| error.to_string()),
     }
@@ -253,6 +253,7 @@ impl App {
                 let entry = self.stashes.get(self.selected(Pane::Stash))?;
                 Some(RightKey::Stash {
                     oid: entry.oid.clone(),
+                    header: format!("stash@{{{}}}: {}", entry.index, entry.message),
                 })
             },
             Pane::Status => None,
@@ -299,7 +300,7 @@ impl App {
                     commits,
                 })
             },
-            (RightKey::Stash { oid }, DiffQueryResult::Stash(diff)) => {
+            (RightKey::Stash { oid, .. }, DiffQueryResult::Stash(diff)) => {
                 match self.stashes.iter().find(|entry| &entry.oid == oid) {
                     Some(entry) => DiffView::Stash(entry.clone(), diff),
                     None => DiffView::Note("stash entry no longer exists".into()),

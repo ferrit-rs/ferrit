@@ -118,6 +118,31 @@ fn an_empty_working_tree_gives_a_diff_pane_that_says_so() {
     assert!(!out.contains("No changed files"), "{out}");
 }
 
+/// Done when: with a stash selected, the right pane starts with the stash's own
+/// subject, then its stat, then the patch (stash step 6).
+#[test]
+fn a_stash_shows_its_subject_and_stat_above_the_patch() {
+    let repo = Repo::new("stash-header");
+    repo.commit("a.txt", "one\n", "init");
+    repo.write("a.txt", "one\ntwo\n");
+    repo.git(&["stash", "push", "-m", "wip: demo"]);
+    let mut app = repo.app();
+    key(&mut app, '5');
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    app.refresh();
+    let out = frame(&mut app);
+    let at = |needle: &str| {
+        out.find(needle)
+            .unwrap_or_else(|| panic!("{needle}: {out}"))
+    };
+    let (head, stat, patch) = (
+        at("stash@{0}: On main: wip: demo"),
+        at("1 file changed, 1 insertion(+)"),
+        at("diff --git"),
+    );
+    assert!(head < stat && stat < patch, "{out}");
+}
+
 /// The foreground colour of the first cell of `text` where it appears on the frame.
 fn colour_of(app: &mut App, text: &str) -> Option<ratatui::style::Color> {
     let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();

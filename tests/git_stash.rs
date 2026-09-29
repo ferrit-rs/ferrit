@@ -245,7 +245,13 @@ fn stash_diff_shows_the_tracked_hunk_and_the_untracked_file() {
     repo.stash_push("").unwrap();
     let oid = oids(&mut repo).remove(0);
 
-    let diff = repo.stash_diff(&oid, DiffOpts::default()).unwrap();
+    let diff = repo
+        .stash_diff(&oid, "stash@{0}: WIP", DiffOpts::default())
+        .unwrap();
+    let mut lines = diff.text.lines();
+    assert_eq!(lines.next(), Some("stash@{0}: WIP"), "{}", diff.text);
+    assert_eq!(lines.next(), Some(""), "{}", diff.text);
+    assert!(diff.text.contains("file changed") || diff.text.contains("files changed"));
     assert!(diff.text.contains("+local"), "{}", diff.text);
     assert!(diff.text.contains("new.txt"), "{}", diff.text);
 }

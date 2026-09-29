@@ -316,13 +316,20 @@ pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitR
     Ok(Diff::new(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
-/// A stash entry's patch (`git stash show -p`), untracked files included.
-/// `oid` is a `StashEntry::oid`; git accepts a stash-like commit directly,
-/// so a shifted `stash@{n}` cannot make this stale.
-pub(super) fn stash_diff(repo: &Repository, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
+/// A stash entry's patch (`git stash show -p --stat`), untracked files included,
+/// under lazygit's header: `header` (`stash@{0}: On main: msg`), a blank line,
+/// the stat, a blank line, the patch. `oid` is a `StashEntry::oid`; git accepts a
+/// stash-like commit directly, so a shifted `stash@{n}` cannot make this stale.
+pub(super) fn stash_diff(
+    repo: &Repository,
+    oid: &str,
+    header: &str,
+    opts: DiffOpts,
+) -> GitResult<Diff> {
     // `git stash show` wants its own verb before the diff flags.
     let out = DiffCmd::base("stash", opts)
         .after_subcommand("show")
+        .arg("--stat")
         .arg("-p")
         .arg("--include-untracked")
         .arg(oid.to_owned())
@@ -330,7 +337,10 @@ pub(super) fn stash_diff(repo: &Repository, oid: &str, opts: DiffOpts) -> GitRes
     if !out.status.success() {
         return Err(GitError::DiffFailed(stderr(&out)));
     }
-    Ok(Diff::new(String::from_utf8_lossy(&out.stdout).into_owned()))
+    Ok(Diff::new(format!(
+        "{header}\n\n{}",
+        String::from_utf8_lossy(&out.stdout)
+    )))
 }
 
 /// Is `path` untracked (worktree-new) in `repo`? Decides whether an empty

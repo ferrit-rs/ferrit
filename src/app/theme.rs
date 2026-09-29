@@ -385,6 +385,9 @@ fn is_code_line(line: &str) -> bool {
 fn diff_line_style(p: &Palette, line: &str) -> Style {
     if line.starts_with("@@") {
         fg(p.hunk)
+    } else if line.starts_with("stash@{") {
+        // The stash's own subject above its stat, yellow like lazygit's.
+        fg(p.warn)
     } else if line.starts_with("Binary files") || line.starts_with('\\') {
         Style::new().fg(p.idle).add_modifier(Modifier::DIM)
     } else if META.iter().any(|p| line.starts_with(p)) {

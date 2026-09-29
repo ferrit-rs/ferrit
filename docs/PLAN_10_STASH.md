@@ -72,7 +72,7 @@ lazygit source. Re-check when the references are back.
 | apply | `git stash apply stash@{n}` | entry stays |
 | pop | `git stash pop stash@{n}` | entry removed only on a clean apply |
 | drop | `git stash drop stash@{n}` | asks first |
-| diff | `git stash show -p --include-untracked <oid>` | see "Right pane" |
+| diff | `git stash show --stat -p --include-untracked <oid>` | see "Right pane" |
 
 `--include-untracked` on push (staged, unstaged and untracked all go) matches
 what ferrit's commit flow already treats as "everything changed"
@@ -240,8 +240,9 @@ up top for why `mock::KEYBAR` is unchanged).
 
 ### Right pane
 
-The empty-stash text stays as the empty state. With an entry selected, the
-right pane shows `git stash show -p` for its oid through the existing async
+The empty-stash text stays as the empty state. With an
+entry selected, the right pane shows `stash@{n}: <message>` (yellow), a blank
+line, `git stash show --stat -p` (the stat, a blank line, the patch) for its oid through the existing async
 diff worker (`diff_query::load`), so it inherits scroll, the scrollbar,
 delta rendering, hunk / file jumps and the refresh rule from `PLAN_0`
 ("rebuilt on a background `AppEvent::Refresh` without discarding scroll for
@@ -288,7 +289,8 @@ an unchanged selection", which the oid key gives for free).
 - drop removes exactly the entry with that oid even after another entry was
   pushed on top (index shifted)
 - unknown oid: `stash entry no longer exists`
-- `stash_diff` contains the stashed hunk and the untracked file
+- `stash_diff` starts with the given header and a blank line, then the stat, and
+  contains the stashed hunk and the untracked file
 
 `tests/app_stash.rs` (`App` seams, like `tests/app_branch.rs`):
 

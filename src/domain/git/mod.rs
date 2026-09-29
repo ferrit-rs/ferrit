@@ -448,9 +448,9 @@ impl Repo {
         stash::drop_entry(&mut self.inner, oid)
     }
 
-    /// The entry's patch, for the right pane.
-    pub fn stash_diff(&self, oid: &str, opts: DiffOpts) -> GitResult<Diff> {
-        diff::stash_diff(&self.inner, oid, opts)
+    /// The entry's stat and patch under `header`, for the right pane.
+    pub fn stash_diff(&self, oid: &str, header: &str, opts: DiffOpts) -> GitResult<Diff> {
+        diff::stash_diff(&self.inner, oid, header, opts)
     }
 
     /// Reword, drop, edit, squash or fixup the commit `hash` with one
