@@ -1,0 +1,19 @@
+# The help screen and the `x` menu (docs/PLAN_12_POLISH.md, P3 and P4).
+# Run on a copy: .dev-tools/flow-compare.sh --repo . test/flows/help-menu.flow
+repo .
+focus "the help screen and the x menu: what they list for the focused panel, how they open, scroll and close"
+not "panel sizes, launch screen, mouse and scrolling (ui-mouse); what each listed action does (the workflow flows)"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "printf '\n- help flow\n' >> README.md"
+
+step 01_start
+step 02_focus_files 2
+step 03_help ?
+step 04_help_scroll j j j
+step 05_help_close Escape
+step 06_menu x
+step 07_menu_close Escape
+step 08_focus_commits 4
+step 09_help_commits ?
+step 10_help_close Escape

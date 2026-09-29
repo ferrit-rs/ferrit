@@ -1,0 +1,30 @@
+# Branch actions from the Branches panel (docs/PLAN_8_BRANCHES.md): check out,
+# merge, create, delete. The same keys drive lazygit and ferrit; a step whose git
+# state differs is a behaviour difference.
+# Run on a copy: .dev-tools/flow-compare.sh --repo . test/flows/branches.flow
+repo .
+focus "branch actions from the Branches panel: checkout, merge, create, delete: the git result, the confirmations asked, and what the panel and the commit list show afterwards"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); staging and commit workflows (stage-commit, feature-workflow); pushing, which needs a remote"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "for b in \$(git branch --format='%(refname:short)' | grep -v '^main\$'); do git branch -qD \$b; done"
+sh "git checkout -q -b flow-a && printf 'a\n' > FLOW_A.txt && git add FLOW_A.txt && git commit -qm 'flow: work on flow-a' && git checkout -q main"
+note "Two branches: main (checked out) and flow-a, which is one commit ahead."
+
+step 01_start
+step 02_focus_branches 3
+step 03_select_flow_a j
+step 04_checkout_flow_a Space
+step 05_select_main j
+step 06_checkout_main Space
+note "On main with flow-a selected: merge it. Both programs ask first."
+step 07_select_flow_a j
+step 08_merge_prompt M
+step 09_merge_confirm y Enter
+note "n: a new branch from the current one, named in a popup."
+step 10_new_prompt n
+step 11_new_named "text:flow-b" Enter
+note "Back on flow-a (merged, so it deletes without a warning): d asks, then confirms."
+step 12_select_flow_a j
+step 13_delete_prompt d
+step 14_delete_confirm y Enter
