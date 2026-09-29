@@ -64,6 +64,9 @@ pub struct StatsOptions {
     pub now: i64,
     pub walk_cap: usize,
     pub numstat_cap: usize,
+    /// Read `git log --numstat` (lines and hot files). The app first asks for
+    /// `false`, which is quick, paints it, then asks again with `true`.
+    pub churn: bool,
 }
 
 impl Default for StatsOptions {
@@ -74,6 +77,7 @@ impl Default for StatsOptions {
                 .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX)),
             walk_cap: WALK_CAP,
             numstat_cap: NUMSTAT_CAP,
+            churn: true,
         }
     }
 }
@@ -169,7 +173,7 @@ pub struct RepoStats {
     pub authors: Vec<AuthorStat>,
     /// Non-merge commits by kind, most first, empty kinds left out.
     pub kinds: Vec<KindStat>,
-    /// `None` when `git log` failed.
+    /// `None` when `git log` failed or was not asked for (`StatsOptions::churn`).
     pub hot_files: Option<HotFiles>,
     /// See `branches::health` for the order.
     pub branches: Vec<BranchHealth>,
@@ -282,7 +286,11 @@ pub(super) fn repo_stats(
     if cancel.load(Ordering::Relaxed) {
         return Err(GitError::Cancelled);
     }
-    let churn = churn::read(repo, cutoff, opts.numstat_cap);
+    let churn = if opts.churn {
+        churn::read(repo, cutoff, opts.numstat_cap)
+    } else {
+        None
+    };
     if let Some(churn) = &churn {
         sampled |= churn.sampled;
         for author in &mut author_stats {

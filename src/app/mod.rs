@@ -382,6 +382,16 @@ fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
     hasher.finish()
 }
 
+/// A view that takes the whole terminal in place of the five panes. Nothing but
+/// the dashboard yet; the git config editor of `docs/PLAN_14_GIT_CONFIG.md`
+/// adds its own.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FullScreen {
+    #[default]
+    None,
+    Dashboard,
+}
+
 /// Modal state that owns all input while it is up, the same idea as
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
 enum Popup {
@@ -649,6 +659,9 @@ pub struct App {
     remote_busy_started: Option<Instant>,
     remote_cancel: Arc<AtomicBool>,
     remote_worker: Option<JoinHandle<()>>,
+    /// The view that replaces the five panes, if any (`docs/PLAN_13_DASHBOARD.md`).
+    full_screen: FullScreen,
+    dashboard: dashboard::Dashboard,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -678,6 +691,7 @@ mod askpass;
 mod branch_actions;
 mod commit;
 mod context_menu;
+pub mod dashboard;
 pub mod diff_query;
 mod dispatch;
 mod drill_nav;
@@ -807,6 +821,8 @@ impl App {
             remote_busy_started: None,
             remote_cancel: Arc::new(AtomicBool::new(false)),
             remote_worker: None,
+            full_screen: FullScreen::None,
+            dashboard: dashboard::Dashboard::default(),
             status_note: None,
             event_sender: None,
             refresh_query: RefreshQueryState::default(),
@@ -1303,6 +1319,16 @@ impl App {
     }
 
     /// Configured Git author name, shown in the Info panel header when set.
+    /// The view that replaces the panes, `FullScreen::None` for the normal screen.
+    pub fn full_screen(&self) -> FullScreen {
+        self.full_screen
+    }
+
+    /// The dashboard's state, for the screen that draws it and for tests.
+    pub fn dashboard(&self) -> &dashboard::Dashboard {
+        &self.dashboard
+    }
+
     pub fn git_user_name(&self) -> Option<&str> {
         self.git_user_name.as_deref()
     }
@@ -1480,6 +1506,7 @@ impl App {
             AppEvent::ImageDone(completion) => self.on_image_done(completion),
             AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             AppEvent::Askpass { prompt, reply } => self.on_askpass(prompt, reply),
+            AppEvent::StatsDone(completion) => self.on_stats_done(completion),
             AppEvent::Input(_) => {},
         }
     }
@@ -1506,6 +1533,7 @@ impl App {
             && !self.diff_query.in_flight
             && !self.image_query.in_flight
             && self.remote_busy.is_none()
+            && !self.dashboard.is_busy()
     }
 
     /// Back to synchronous work (undo `set_event_sender`).
@@ -1993,6 +2021,7 @@ impl App {
             }
             self.remote_busy = None;
         }
+        self.dashboard.stop_and_join();
         Ok(())
     }
 
@@ -2039,6 +2068,7 @@ pub(super) enum WorkerKind {
     Diff,
     ImagePreview,
     RemoteOperation,
+    Stats,
 }
 
 impl Display for WorkerKind {
@@ -2048,6 +2078,7 @@ impl Display for WorkerKind {
             Self::Diff => "diff",
             Self::ImagePreview => "image preview",
             Self::RemoteOperation => "remote operation",
+            Self::Stats => "statistics",
         };
         f.write_str(label)
     }

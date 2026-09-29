@@ -41,6 +41,8 @@ pub enum AppEvent {
         prompt: String,
         reply: Sender<Option<String>>,
     },
+    /// The dashboard statistics worker answered (`app::dashboard`).
+    StatsDone(crate::app::dashboard::StatsCompletion),
     RemoteDone {
         op: RemoteOp,
         message: Result<String, String>,

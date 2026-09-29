@@ -2,7 +2,7 @@
 
 use super::theme_config::ThemeMode;
 use super::{
-    App, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
+    App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent, MouseEventKind, PANES,
     Pane, Position,
 };
 
@@ -63,6 +63,12 @@ impl App {
 
         if self.show_help {
             self.help_key(key);
+            return;
+        }
+
+        // A full-screen view owns the keys after the overlays above.
+        if self.full_screen == FullScreen::Dashboard {
+            self.dashboard_key(key);
             return;
         }
 
