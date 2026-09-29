@@ -1393,7 +1393,7 @@ fn show_frames() {
     let mut v = view(Some(&s));
     for (w, h, mode) in [
         (100, 42, ChartMode::Braille),
-        (120, 42, ChartMode::Braille),
+        (110, 60, ChartMode::Braille),
         (200, 42, ChartMode::Braille),
         (80, 30, ChartMode::Blocks),
         (50, 10, ChartMode::Braille),

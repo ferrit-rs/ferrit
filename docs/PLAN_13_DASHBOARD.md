@@ -21,33 +21,70 @@ ahead/behind per branch, Status shows the checked-out branch. Nothing gives the
 whole picture.
 
 ```
-┌ Dashboard ─ ferrit ─ main ─────────────────────────────────────────────────── window: 90 days (t) ┐
-│ Commits 423 · Authors 2 · Branches 6 (+3 remote) · Tags 5 · 35 commits since v0.7.0                │
-├ Activity (commits per day) ───────────────────┬ What was done ─────────────────────────────────────┤
-│  58 ┤⡇⠀⠀⠀⠀⣼⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀        │ ⠀⢀⣴⣿⣿⣿⣿⡇⢸⣿⣿⣿⣿⣦⡀⠀  ● feat   29 %  (124)             │
-│     │⢱⠀⠀⠀⠀⡇⢇⠀⠀⣰⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀        │ ⢀⠛⠻⢿⡿⠋⠁⠀⠀⠈⠙⢿⣿⣿⣿⡀  ■ docs   24 %  (103)             │
-│     │⢸⠀⠀⠀⢠⠃⠸⡀⠀⡟⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⢀⣀⣀⠀⡸        │ ⢸⣿⣷⣦⠀⠀⠀⠀⠀⠀⠀⠈⣿⣿⣿⡇  ▲ other  15 %  (64)              │
-│   0 ┼⠀⢳⣀⡤⠇⠀⠀⠈⡎⠀⠘⠉⠘⢆⣀⣀⣀⣠⠃⠀⠀⠀⣇⣰⠁⠀⠹⡼        │ ⠈⣉⣤⣶⣶⣄⡀⠀⠀⢀⣠⣾⣿⣿⣿⠀  ◆ fix    13 %  (54)              │
-│      09-04                       09-29        │ ⠀⠈⠻⣿⣿⣿⡇⢸⣿⣿⣿⣿⣿⠟⠁⠀  ○ others 19 %  (78)              │
-├ Commits per day (6 weeks) ────────────────────┼ Contributors ──────────────────────────────────────┤
-│      W1 W2 W3 W4 W5 W6                        │ Richard L.  ██████████████████░░░░░░░ 71 %         │
-│ Mon  ·· ·· ░░ ·· ▓▓ ··                        │ Max Wells   ███████░░░░░░░░░░░░░░░░░░ 29 %         │
-│ Wed  ·· ·· ▓▓ ·· ··                           │ lines  +87.5k (84 %)  −16.1k (16 %)                │
-│ Fri  ·· ██ ██ ▒▒ ▓▓                           │ ████████████████████░░░░                           │
-├ Hot files (share of commits touching) ────────┼ Branches ──────────────────────────────────────────┤
-│ src/app.rs        ██░░░░░░░░ 20 %             │ 4 active · 1 merged · 0 stale                      │
-│ src/ui.rs         ██░░░░░░░░ 20 %             │ feat/read_repo_features  ↑90 ↓299   16 d ago       │
-│ src/app/mod.rs    █░░░░░░░░░ 14 %             │ feat/plan_2_backend      ↑23 ↓299   21 d ago       │
-│ 2 files hidden (CHANGELOG.md, Cargo.lock)     │ +3 more                                            │
-├ In progress ──────────────────────────────────┴────────────────────────────────────────────────────┤
-│ 0 changed · 0 stash · main 1 commit ahead of origin                                                │
-└────────────────────────────────────────────────────────────────────────────────────────────────────┘
-  Esc: back   t: window   n: counts   r: refresh   ?: help          (the key bar, one row under the box)
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ferrit · main   Dashboard                                                              window: 90 days (t) │
+│                                                                                                            │
+│ 423        7          13 (+3 remote)    5       35                                                         │
+│ commits    authors    branches          tags    since v0.7.0                                               │
+│                                                                                                            │
+│ Activity  commits per week                             What was done                                       │
+│ ───────────────────────────────────────────────────    ─────────────────────────────────────────────────── │
+│ 45            ⢀⢧                                          ⣠⣴⣶⣿⡇⢸⣿⣶⣦⣄                                       │
+│               ⡸ ⢇          ⣆                            ⣠⣾⣿⠟⠉⠁  ⠈⠉⠻⣿⣷⣄   ● feat    29 %  (124)             │
+│               ⡇ ⠘⡄        ⢸⠘⡄         ⢠                ⢰⣿⡟⠁        ⠈⢻⣿⡆  ▲ docs    24 %  (103)             │
+│              ⢸   ⠸⡀       ⡇ ⢱         ⡎⢣          ●    ⣿⣿⠁          ⠈⣿⣿  ■ fix     13 %  (54)              │
+│       ⢀⢧     ⡎    ⢣      ⢰⠁  ⢇       ⢰⠁⠈⡆         ⡸    ⠿⠟⡀           ⠿⢿  ◆ test     5 %  (20)              │
+│       ⡸ ⢇   ⢰⠁     ⢇     ⡜   ⠘⡄      ⡜  ⠘⡄       ⢀⠇    ⠸⠿⢃⡀        ⢀⣼⣿⠆  ○ others  29 %  (122)             │
+│       ⡇ ⠘⡄  ⡜      ⠈⡆   ⢠⠃    ⢱     ⢀⠇   ⢱       ⢸      ⠘⢿⣿⣦⣀⡀  ⢀⣀⣴⣿⡿⠋                                     │
+│      ⢸   ⠸⡀⢀⠇       ⠸⡀  ⡸      ⢣    ⡸     ⢣      ⡇        ⠙⠻⠿⢰⣿⣿⣿⠿⠟⠋                                       │
+│      ⡇    ⢣⡸         ⢱  ⡇      ⠈⡆   ⡇     ⠈⢆    ⢸                                                          │
+│     ⢰⠁     ⠃          ⢇⢸        ⠘⡄ ⢸       ⠘⡄   ⡎                                                          │
+│     ⡎                 ⠈⠇         ⢱ ⡎        ⠱⡀ ⢰⠁                                                          │
+│    ⢠⠃                             ⢳⠁         ⢣ ⡜                                                           │
+│    ⡜                                         ⠈⢦⠃                                                           │
+│    ⠁                                          ⠈                                                            │
+│ 0                                                                                                          │
+│ 13 weeks of history · peak 45 (07-21)                                                                      │
+│                                                                                                            │
+│ Commits per day  23 weeks                              Contributors                                        │
+│ ───────────────────────────────────────────────────    ─────────────────────────────────────────────────── │
+│     W1      W5      W9      W13     W17     W21        Richard Lavoura  ━━━━━━━━━━───────────  47 %  (200) │
+│ Mon ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■      Max Wells        ━━━━━────────────────  24 %  (100) │
+│ Tue ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■      Ola Nordmann     ━━───────────────────  12 %  (50)  │
+│ Wed ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■        Ana Silva        ━────────────────────   7 %  (30)  │
+│ Thu ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■        Li Wei           ━────────────────────   5 %  (20)  │
+│ Fri ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■        others           ━────────────────────   5 %  (23)  │
+│ Sat ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■        lines  +84 %  (87.5k)  ━━━━━━━━━━━━  −16 %  (16.1k) │
+│ Sun ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                                                            │
+│                                                                                                            │
+│     less ■ ■ ■ ■ ■ more                                                                                    │
+│                                                                                                            │
+│ Hot files  share of commits touching                   Branches                                            │
+│ ───────────────────────────────────────────────────    ─────────────────────────────────────────────────── │
+│ src/app.rs                    ━━───────  20 %  (85)    9 active · 2 merged · 2 stale                       │
+│ src/ui.rs                     ━━───────  20 %  (84)    main ●         ↑0 ↓0   just now                     │
+│ src/app/s…module_name/mod.rs  ━────────  14 %  (60)    feat/work_0    ↑4 ↓9    3 d ago                     │
+│ README.md                     ━────────   7 %  (30)    feat/work_1    ↑6 ↓9    4 d ago                     │
+│ 2 files hidden (CHANGELOG.md, Cargo.lock)              feat/work_2    ↑8 ↓9    5 d ago                     │
+│                                                        feat/work_3    ↑10 ↓9   6 d ago                     │
+│                                                        feat/work_4    ↑12 ↓9   7 d ago                     │
+│                                                        feat/work_5    ↑14 ↓9   8 d ago                     │
+│                                                        feat/work_6    ↑16 ↓9   9 d ago                     │
+│                                                        +5 more                                             │
+│                                                                                                            │
+│ 2 changed · 1 stash · main 1 commit ahead of origin/main                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  Back: esc   Window: t   Counts: n   Refresh: r   Help: ?          (the key bar, one row under the page)
 ```
 
-The numbers above are ferrit's own history at the time of writing (computed with
-`git`, see "Numbers as shares"); the drawing is a monochrome mock, the real screen
-is coloured ("Colours").
+The drawing is the 110-column frame the tests render from hand-built numbers shaped
+like ferrit's own history, with the colours dropped: the real screen is coloured
+("Colours"). It is one rounded border in the dim `idle` colour, at most 110
+columns wide and centred (a 200-column terminal gets margins, not stretched
+charts). Inside it: the header, a row of stat tiles (the commit count is the hero
+figure), then sections that are each a bold title over a thin dim rule, no boxes,
+two columns four columns apart. Under 110 columns the sections stack in one
+column, under 60 only the totals and the work in progress show.
 
 Out, on purpose (see "Out of scope"): a per-file or per-commit drill-down,
 exporting, charts in a terminal graphics protocol, anything that needs a
@@ -164,20 +201,21 @@ the share of the window's commits per week. Rules, so the numbers stay honest:
 ## Charts
 
 Every visual is a ratatui widget already in the dependency tree (`ratatui` 0.30
-with its default widgets; `Cargo.toml` needs no new dependency), except the donut,
-which is a custom `Shape` drawn on ratatui's `Canvas`.
+with its default widgets; `Cargo.toml` needs no new dependency); the line chart
+and the donut are drawn on ratatui's `Canvas` (the donut with a custom `Shape`).
 
 | Visual | Where | Built with | Detail |
 | --- | --- | --- | --- |
-| **Line chart**, commits over time | Activity | `Chart` with a `Dataset` in `GraphType::Line`, `Marker::Braille` | y axis labelled 0 and the peak, x axis first and last date |
+| **Line chart**, commits over time | Activity | `Canvas` with `Line` shapes between the points, `Marker::Braille`, x and y bounds, in the accent | no axis box; two dim tick labels (the peak top-left, `0` bottom-left), one dot at the last point (`Points`) and one dim caption under it (`26 days of history · peak 58 (09-04)`) |
 | **Donut**, kinds of change | What was done | `Canvas` + a `Donut` `Shape` (`src/components/ui/donut.rs`), `Marker::Braille` | up to 6 slices, legend on the right with `%` first |
-| **Share bars**, 100 % | Contributors, lines added / removed, Hot files | `LineGauge`, or a drawn `█░` bar where the widget does not fit | one bar per row, the percentage right-aligned |
-| **Heat map**, commits per day | Commits per day | own widget (`src/components/ui/heatmap.rs`), 2 characters per day | weeks in columns; five levels `· ░ ▒ ▓ █` |
+| **Share bars**, 100 % | Contributors, lines added / removed, Hot files | drawn spans (`share_bar.rs`), a thin `━` filled part over a dim `─` track on the same row | one bar per row, the percentage right-aligned; contributors and files in the one accent; lines added / removed is a stacked bar (add colour, delete colour) with its two shares at its ends |
+| **Heat map**, commits per day | Commits per day | own widget (`src/components/ui/heatmap.rs`), 2 characters per day | weeks in columns; one glyph `■` in five colours of the ramp; with `NO_COLOR` set the glyph density `· ░ ▒ ▓ █` instead; legend `less ■ ■ ■ ■ ■ more` |
+| **Stat tiles**, the totals | under the header | text only (`tables::tiles`) | commits (hero, bold accent), authors, branches (`6 (+2 remote)`), tags, `N since <tag>`: the value in bold ink over its dim label, spacing between, no boxes; under 60 columns the compact text line |
 
 **Line chart granularity** follows the span of history so the chart never has 4
 points across the whole width: daily up to 60 days of history, weekly up to two
-years, monthly beyond. The axis label says which ("commits per day"). Fewer than 2
-points: text instead of a chart.
+years, monthly beyond. The dim words after the title say which (`Activity  commits
+per day`). Fewer than 2 points: text instead of a chart.
 
 **Donut.**
 - Angles come from the shares of the whole window, largest first, starting at 12
@@ -197,13 +235,17 @@ points: text instead of a chart.
   Fri). Weeks shown: as many as fit, capped at 26.
 - Levels come from the quantiles of the non-zero days, not from the maximum, so one
   burst day does not flatten the rest to the palest shade.
-- Days after today are blank, days with no commit show `·`.
+- Days after today are blank, days with no commit are the dimmest gray `■`.
+- Levels are colours of the `ChartPalette` ramp (the dimmest gray, then the accent
+  dim to bright: one hue, light to dark), one glyph. Colour is never the only
+  signal: with `NO_COLOR` set (a non-empty value) the glyph is the level again,
+  `· ░ ▒ ▓ █`, in the same styles, and the legend follows.
 
 **Fallback.** `[dashboard] charts = "auto" | "braille" | "blocks"` in `config.toml`.
 `auto` chooses `braille` unless the locale is not UTF-8 or `TERM=linux` (the Linux
 console has no Braille glyphs), then `blocks`: the line chart becomes a
 `Sparkline` of block glyphs, the donut a stacked 100 % bar, the heat map is
-unchanged (it already uses block characters).
+unchanged (`■` is not Braille).
 
 ## Colours
 
@@ -213,22 +255,25 @@ Colours come from the theme, never hard-coded in the widgets. `Palette`
 `PLAN_12_POLISH.md` P5; the dashboard adds a small `ChartPalette` derived from it,
 so a theme change recolours the charts too.
 
-**One meaning, one colour, on every visual.** A kind of change or an author keeps
-the same colour in the donut, the legend and the bars.
+**One meaning, one colour, on every visual.** A kind of change keeps the same
+colour in the donut, the legend and the stacked bar of the blocks fallback.
+Categorical colours exist for the kinds only, where identity matters: authors,
+files, the line and the heat map are the accent and grays.
 
 | Use | Colour | Why |
 | --- | --- | --- |
-| line chart series, single-series bars (Hot files) | the theme accent (`Palette.focus`) | one series, one colour, no rainbow |
+| line chart series and its end dot, single-series bars (contributors, Hot files) | the theme accent (`Palette.focus`) | one series, one colour, no rainbow: the contributors are one series, not one colour each |
+| page border and the rule under each section title | `Palette.idle`, dim (`ChartPalette.rule`) | recessive: structure never competes with the data |
+| text (names, percentages, counts, legend labels) | normal ink, or dim for secondary figures | text never wears the data colour; only the marker glyph next to a label does (`● feat`) |
 | lines added / removed | `Palette.add` / `Palette.del` | the same green and red as the diff |
 | kinds of change | `feat` green, `fix` yellow, `docs` blue, `test` cyan, `refactor` magenta, all the rest "others" gray | six named ANSI colours, so the terminal's own theme decides the exact shade |
-| authors | the same six colours in order of commits, the sixth and beyond "others" gray | stable for the session |
-| heat map | the accent, from the dimmest to its bright variant, over the glyph density `░▒▓█` | the glyphs carry the level, the colour reinforces it |
-| branch state | current: accent, bold · active: default · merged: gray · stale: `Palette.warn` | stale is the only alert |
+| heat map | the dimmest gray for a quiet day, then the accent dim, normal, bold and bright, all on `■` | one hue light to dark; `NO_COLOR` swaps to the glyph density `· ░ ▒ ▓ █` |
+| branch state | current: `main ●` in the accent, bold · active: default · merged: gray · stale: `Palette.warn` | stale is the only alert |
 | ahead / behind arrows | as Branches: `↑` `Palette.warn` | one convention across the app |
 
 **Colour is never the only signal.** Donut slices carry a shape marker in the
 legend (`● ■ ▲ ◆ ○`), every bar and slice carries its percentage, the heat map
-uses glyph density, and `stale` is written out.
+falls back to glyph density under `NO_COLOR`, and `stale` is written out.
 
 **Light terminals.** `Palette.light` selects darker variants for the colours that
 wash out on white (yellow, cyan): `ChartPalette::for(&Palette)` returns explicit
@@ -237,7 +282,8 @@ background colour, so the ANSI names are the safe default and the RGB variants a
 opt-in through `[theme] base = "light"`.
 
 **Overrides.** `[theme.colors]` accepts `chart1` to `chart6` (`"#rrggbb"` or an
-ANSI name) for the six categorical colours; unset ones keep the defaults above.
+ANSI name) for the six categorical colours (the kinds); unset ones keep the
+defaults above.
 
 **Off the UI thread.** Same shape as the remote operations
 (`docs/PLAN_9_REMOTE.md`, "Approach part 2"): a worker computes `RepoStats` and
@@ -275,19 +321,31 @@ methods (`src/domain/git/mod.rs`). Nothing here imports `ratatui`.
 ## Rendering: `src/app/screens/dashboard.rs`
 
 Pure function of `(&RepoStats, area, palette)`; the widgets are generic and live
-in `src/components/ui/` (`donut.rs`, `heatmap.rs`, `share_bar.rs`; the line chart and
-gauge are ratatui's own) so a later screen can reuse
+in `src/components/ui/` (`donut.rs`, `heatmap.rs`, `share_bar.rs`; the line chart is
+ratatui's own `Canvas`) so a later screen can reuse
 them and they can be tested alone.
 
-- **Wide (≥ 110 columns):** two columns as in the diagram. **Narrow (60 to 109):**
+- **Page.** One rounded border in the dim `idle` colour, at most 110 columns wide
+  and centred (the border included), one blank column of padding inside it. The
+  header row reads `ferrit · main   Dashboard` on the left and
+  `window: 90 days (t)` on the right, then the stat tiles, then the sections; the
+  work in progress is one plain line at the bottom.
+- **Sections.** No inner boxes and no `├ ┬ ┼ ┴ │` grid: each section is a bold
+  title (with dim words after it: `commits per week`, `26 weeks`, `share of
+  commits touching`), a thin dim `─` rule under it, its content, and one blank
+  row before the next block.
+- **Wide (≥ 110 columns):** two columns as in the diagram, four columns apart,
+  no vertical rule between them. **Narrow (60 to 109):**
   one column, sections stacked, scrolling with `j`/`k`. **Under 60 columns:**
   totals and the in-progress line only, with "widen the terminal for charts".
-- Bars: `█` and `░`, width from the available columns, the percentage
-  right-aligned and the count dimmed after it; `n` swaps them. The block
+- Bars: thin `━` over a dim `─` track, width from the available columns, the
+  percentage right-aligned and the count dimmed after it; `n` swaps them. The block
   `Sparkline` (`▁▂▃▄▅▆▇█`) is only the fallback of the line chart ("Charts").
 - Colours: see "Colours". No colour carries meaning alone (the word "stale" and the
   legend markers carry it too).
 - Long paths are cut in the middle (`src/app/…/mod.rs`), never wrapped.
+- Hot files footer, dim: `2 files hidden (CHANGELOG.md, Cargo.lock)` and `3 files
+  no longer in the tree` (`HotFiles.gone`), on one line when they fit.
 - Built as (D3b): the page is drawn on an off-screen buffer as tall as its
   content, then the rows `scroll` selects are copied (every layout scrolls the
   same way, and the renderer hands the largest useful offset back to the app,
@@ -295,6 +353,31 @@ them and they can be tested alone.
   before it scrolls. Kinds other than the five named ones are one gray "others"
   slice. A branch is counted and coloured `stale` whenever the domain says so,
   merged or not; `merged` counts the merged branches that are not stale.
+
+## Design rules applied
+
+The redesign follows a data-visualisation guide; each rule and where it shows:
+
+1. **Thin marks.** Bars are `━` over a dim `─`, the heat map a small `■`, the line a
+   one-dot-wide braille stroke: no filled blocks (`█ ░`) except the blocks fallback's
+   sparkline.
+2. **Recessive hairlines.** The only frame is the outer border and the rule under
+   each title, both `Palette.idle` dimmed; there are no inner boxes or joints.
+3. **Generous padding.** A blank column inside the border, a blank row between
+   blocks, four columns between the two columns.
+4. **One series, one colour.** Contributors, hot files and the line are the accent;
+   lines added / removed are the diff's own green and red.
+5. **Sequential means one hue, light to dark.** The heat map is the dimmest gray then
+   the accent from dim to bright.
+6. **Categorical only where identity matters.** Only the kinds of change (donut,
+   legend) use six colours, each with a shape marker.
+7. **Text never wears the data colour.** Names, percentages, counts and legend
+   labels are ink or dim; the marker glyph next to a label carries the colour.
+8. **Selective labels.** The line chart has two ticks (peak, 0) and one caption; the
+   commit count is the only hero figure.
+9. **Stat tiles for the headline numbers.** Value in bold over a dim label, spacing
+   instead of boxes; the compact text line under 60 columns.
+10. **Bounded width.** Past 110 columns the margins grow, not the charts.
 
 ## Keybindings (new)
 
@@ -322,7 +405,7 @@ same mechanism as `Bar::Help`).
 | no remote | remote counts hidden, not shown as 0 |
 | window with no commits | charts empty with "no commits in this window", totals unchanged |
 | huge history | caps above; `sampled` notice; the screen is usable before the churn arrives |
-| author with several emails | grouped through `.mailmap` first; then the entries that share a name (case-insensitive, trimmed, non-empty) merge into one row: commits and lines summed, the most frequent email names it, `emails` lists all ("3 emails"). Two people who share a name are merged too: a deliberate choice |
+| author with several emails | grouped through `.mailmap` first; then the entries that share a name (case-insensitive, trimmed, non-empty) merge into one row: commits and lines summed, the most frequent email names it, `emails` lists all: the row says `(3 emails)` in dim text after the name. Two people who share a name are merged too: a deliberate choice |
 | bots, empty names | shown as is; nothing is filtered |
 | `git log` missing or failing | churn columns show `n/a`, the rest still renders; the error goes to the command log |
 | terminal resized while open | redraw; sections reflow |
@@ -341,7 +424,7 @@ same mechanism as `Bar::Help`).
 - Unit tests for the widgets (`sparkline` scaling, `bars` widths) and for the
   Conventional Commits parser (`feat!:`, scopes, `Revert "…"`, `Merge …`).
 - `test/scripts/150-dashboard.script`: open with `D`, `expect-text` on the
-  totals and a known author, `t` changes the window label, `Esc` returns to the
+  header, a stat tile and a known author, `t` changes the window label, `Esc` returns to the
   panes, and a `snapshot` of the wide and narrow layouts.
 - Widget tests on a `TestBackend` buffer: the donut's slice angles and that the
   displayed shares add to 100 (largest remainder), one slice = full ring, an empty
@@ -361,12 +444,15 @@ same mechanism as `Bar::Help`).
 - **D2** `FullScreen`, `dashboard.rs` state, worker, `AppEvent::StatsDone`,
   cache and cancel.
 - **D3a** widgets: `donut.rs`, `heatmap.rs`, `share_bar.rs`, each with tests; the
-  line chart wired on `Chart`.
+  line chart wired on `Canvas`.
 - **D3b** `screens/dashboard.rs`: layout at three widths, percentages first,
   `n` to swap to counts.
 - **D3c** `ChartPalette`, `chart1..6`, light variants, `[dashboard] charts`.
 - **D4** keymap entry, key bar, help text, `t`/`r`/scroll.
 - **D5** replay script, snapshots, README row, CHANGELOG line.
+- **D6** the redesign ("Design rules applied"): thin bars, `■` heat map with the
+  `NO_COLOR` fallback, the line chart on `Canvas`, stat tiles, one dim border and
+  a page capped at 110 columns.
 
 ## Definition of done (phase 13)
 
