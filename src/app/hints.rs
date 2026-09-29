@@ -15,6 +15,7 @@ impl Action {
             Self::Discard => "Discard",
             Self::Commit => "Commit",
             Self::Amend => "Amend",
+            Self::StashPush => "Stash",
             Self::RewordHead | Self::RewordCommit => "Reword",
             Self::Fetch => "Fetch",
             Self::Pull => "Pull",
@@ -120,6 +121,9 @@ pub enum Bar {
     /// on, so only the pinned help and quit remain (lazygit: `Keybindings: ?`).
     StashEmpty,
     Commits,
+    /// The Files pane with nothing changed: stage, stage all, discard and amend
+    /// have nothing to act on (lazygit: `Commit, Stash, Reset, Keybindings`).
+    FilesEmpty,
     /// Drilled into a branch's log or a commit's files: the list of commits or
     /// files is read only there, so only the ways in and out are offered.
     Drilled,
@@ -154,6 +158,12 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Files, Action::Discard)],
             &[(Context::Global, Action::Commit)],
             &[(Context::Global, Action::Amend)],
+            &[(Context::Global, Action::RewordHead)],
+            FETCH_PULL_PUSH,
+        ],
+        Bar::FilesEmpty => &[
+            &[(Context::Global, Action::Commit)],
+            &[(Context::Files, Action::StashPush)],
             &[(Context::Global, Action::RewordHead)],
             FETCH_PULL_PUSH,
         ],

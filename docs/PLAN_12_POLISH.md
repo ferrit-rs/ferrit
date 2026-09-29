@@ -362,6 +362,9 @@ bindings or with a user's remaps.
 - The Stash pane with no entries has `Bar::StashEmpty`, an empty body: only
   `Help: ?` and `Quit: q`, since Apply, Pop and Drop have nothing to act on
   (lazygit: `Keybindings: ?`). Those keys are already no-ops there.
+- The Files pane with nothing changed has `Bar::FilesEmpty`: `Commit`, `Stash`,
+  `Reword`, `Fetch/Pull/Push`, then `Help` and `Quit`. Stage, All, Discard and
+  Amend have nothing to act on (lazygit: `Commit, Stash, Reset, Keybindings`).
 
 ## P4: `x` menu, right-click, clickable hints
 

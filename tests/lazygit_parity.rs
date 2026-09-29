@@ -572,3 +572,27 @@ fn a_branch_level_with_its_upstream_has_a_tick() {
     );
     assert!(!app.branch_lines()[0].to_string().contains('\u{2713}'));
 }
+
+/// Done when: with nothing changed, the Files key bar drops Stage, All, Discard and
+/// Amend and keeps what works; with a change they are back (ui-mouse steps 1, 2).
+#[test]
+fn the_files_key_bar_on_a_clean_tree_offers_only_what_works() {
+    let repo = Repo::new("clean-bar");
+    repo.commit("a.txt", "one\n", "init");
+    let mut app = repo.app();
+    key(&mut app, '2');
+    let out = frame(&mut app);
+    assert!(out.contains("Commit: c"), "{out}");
+    assert!(out.contains("Stash: s"), "{out}");
+    for gone in ["Stage:", "All:", "Discard:", "Amend:"] {
+        assert!(!out.contains(gone), "{gone} on a clean tree\n{out}");
+    }
+
+    repo.write("a.txt", "one\ntwo\n");
+    app.refresh();
+    let out = frame(&mut app);
+    assert!(
+        out.contains("Stage: <space>") && out.contains("Amend: A"),
+        "{out}"
+    );
+}

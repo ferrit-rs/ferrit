@@ -115,6 +115,11 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
         "nothing to apply, pop or drop"
     );
     assert_eq!(
+        bar(&map, Bar::FilesEmpty, 120),
+        "Commit: c | Stash: s | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q",
+        "nothing to stage, discard or amend"
+    );
+    assert_eq!(
         bar(&map, Bar::Commits, 120),
         "Reword: r | Drop: d | Squash: s | Fixup: S | Edit: e | New fixup!: F | \
          Autosquash: a | Help: ? | Quit: q",

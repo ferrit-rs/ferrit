@@ -701,6 +701,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Stash
     } else if app.focus == Pane::Commits {
         Bar::Commits
+    } else if app.row_count(Pane::Files) == 0 {
+        Bar::FilesEmpty
     } else {
         Bar::Default
     };
