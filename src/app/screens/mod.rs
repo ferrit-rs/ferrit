@@ -13,8 +13,9 @@ use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::hints::{self, Bar};
-use crate::app::{App, DiffView, PANES, Pane, PopupView};
+use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
 use crate::app::{mock, theme};
+use crate::components::ui::chart_palette::{ChartPalette, charts_mode_from_env};
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::palette::Palette;
 use crate::components::ui::pane_list::PaneList;
@@ -23,6 +24,7 @@ use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git::command_log;
 use crate::domain::image::preview::Preview;
 
+pub mod dashboard;
 mod diff;
 mod popups;
 pub(super) mod profile;
@@ -32,69 +34,12 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
     let palette = app.palette();
 
-    let log_rows = command_log_rows(app, area.height);
-    let [content, log, keybar] = Layout::vertical([
-        Constraint::Min(0),
-        Constraint::Length(log_rows + 3),
-        Constraint::Length(1),
-    ])
-    .areas(area);
-
-    // LazyGit splits the diff only for partially staged files. One-sided
-    // changes use the full-width diff pane.
-    // A directory row never splits (nor narrows the side column): it shows one side.
-    let files_split = app.focus == Pane::Files
-        && !app.files_selection_is_dir()
-        && matches!(app.diff_view(), DiffView::Files(files)
-            if !files.unstaged.text.trim().is_empty() && !files.staged.text.trim().is_empty());
-
-    // lazygit's default `sidePanelWidth: 0.3333`: the left column takes a third
-    // of the width, floored so it stays usable on a narrow terminal.
-    let side = if files_split {
-        (area.width / 8).max(14)
-    } else {
-        (area.width / 3).max(24)
-    };
-    let [left, right] =
-        Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
-
     let show_help = app.show_help;
-    draw_left_column(frame, app, left);
-    if files_split {
-        diff::draw_files_columns(frame, app, right);
-    } else if app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
-        diff::draw_single_file_diff(frame, app, right);
+    let keybar = if app.full_screen() == FullScreen::Dashboard {
+        draw_dashboard(frame, app, area)
     } else {
-        draw_right_pane(frame, app, right);
-    }
-    draw_command_log(frame, app, log);
-    draw_keybar(frame, keybar, app);
-
-    if app.author_overlay.is_closed() {
-        app.profile_hit_areas = profile::ProfileHitAreas::default();
-    }
-
-    if !app.author_overlay.is_closed() {
-        let profile_data = app.profile().clone();
-        let theme_view = profile::ThemeView {
-            config: &app.theme_config,
-            mode: app.theme_mode,
-            rgb_channel: app.theme_rgb_channel,
-            palette_selected: app.theme_palette_selected,
-            picker_display: app.theme_picker_display,
-            dirty: app.theme_config != app.theme_saved_config,
-            colors: palette,
-        };
-        app.profile_hit_areas = profile::draw_author(
-            frame,
-            area,
-            &mut app.author_overlay,
-            &profile_data,
-            &mut app.profile_scroll,
-            &theme_view,
-            app.selected_author.as_ref(),
-        );
-    }
+        draw_panes(frame, app, area)
+    };
 
     if show_help {
         let lines = app.help_lines();
@@ -149,6 +94,103 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if let Some(toast) = &mut app.toast {
         toast.render(frame, area, &palette);
     }
+}
+
+/// The five panes, the command log and the key bar; returns the key bar's area.
+fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+    let palette = app.palette();
+    let log_rows = command_log_rows(app, area.height);
+    let [content, log, keybar] = Layout::vertical([
+        Constraint::Min(0),
+        Constraint::Length(log_rows + 3),
+        Constraint::Length(1),
+    ])
+    .areas(area);
+
+    // LazyGit splits the diff only for partially staged files. One-sided
+    // changes use the full-width diff pane.
+    // A directory row never splits (nor narrows the side column): it shows one side.
+    let files_split = app.focus == Pane::Files
+        && !app.files_selection_is_dir()
+        && matches!(app.diff_view(), DiffView::Files(files)
+            if !files.unstaged.text.trim().is_empty() && !files.staged.text.trim().is_empty());
+
+    // lazygit's default `sidePanelWidth: 0.3333`: the left column takes a third
+    // of the width, floored so it stays usable on a narrow terminal.
+    let side = if files_split {
+        (area.width / 8).max(14)
+    } else {
+        (area.width / 3).max(24)
+    };
+    let [left, right] =
+        Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
+
+    draw_left_column(frame, app, left);
+    if files_split {
+        diff::draw_files_columns(frame, app, right);
+    } else if app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
+        diff::draw_single_file_diff(frame, app, right);
+    } else {
+        draw_right_pane(frame, app, right);
+    }
+    draw_command_log(frame, app, log);
+    draw_keybar(frame, keybar, app);
+
+    if app.author_overlay.is_closed() {
+        app.profile_hit_areas = profile::ProfileHitAreas::default();
+    }
+
+    if !app.author_overlay.is_closed() {
+        let profile_data = app.profile().clone();
+        let theme_view = profile::ThemeView {
+            config: &app.theme_config,
+            mode: app.theme_mode,
+            rgb_channel: app.theme_rgb_channel,
+            palette_selected: app.theme_palette_selected,
+            picker_display: app.theme_picker_display,
+            dirty: app.theme_config != app.theme_saved_config,
+            colors: palette,
+        };
+        app.profile_hit_areas = profile::draw_author(
+            frame,
+            area,
+            &mut app.author_overlay,
+            &profile_data,
+            &mut app.profile_scroll,
+            &theme_view,
+            app.selected_author.as_ref(),
+        );
+    }
+    keybar
+}
+
+/// The full-screen dashboard above its key bar; returns the key bar's area.
+/// The app's scroll is clamped to what the page can scroll.
+fn draw_dashboard(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+    let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+    let view = dashboard::View {
+        stats: app.dashboard().stats(),
+        repo: &app.repo_name,
+        branch: &app.header.branch,
+        colors: ChartPalette::for_palette(&app.palette()),
+        mode: charts_mode_from_env(),
+        show_counts: app.dashboard().show_counts(),
+        computing: app.dashboard().computing(),
+        churn_pending: app.dashboard().churn_pending(),
+        error: app.dashboard().error(),
+        scroll: app.dashboard().scroll(),
+        now: unix_now(),
+    };
+    let max_scroll = dashboard::draw(frame, page, &view);
+    app.clamp_dashboard_scroll(max_scroll);
+    draw_keybar(frame, keybar, app);
+    keybar
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
 /// Colour each pane's rows by what they mean. Status and Files come from the
@@ -732,6 +774,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
     let bar = if app.show_help {
         Bar::Help
+    } else if app.full_screen() == FullScreen::Dashboard {
+        Bar::Dashboard
     } else if app.operation.is_some() {
         Bar::Operation
     } else if app.right_focused() {

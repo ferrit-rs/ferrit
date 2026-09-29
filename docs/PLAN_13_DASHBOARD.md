@@ -36,7 +36,8 @@ whole picture.
 │ 2 files hidden (CHANGELOG.md, Cargo.lock)     │ +3 more                                            │
 ├ In progress ──────────────────────────────────┴────────────────────────────────────────────────────┤
 │ 0 changed · 0 stash · main 1 commit ahead of origin                                                │
-└ Esc: back   t: window   n: counts   r: refresh   j/k: scroll ──────────────────────────────────────┘
+└────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  Esc: back   t: window   n: counts   r: refresh   ?: help          (the key bar, one row under the box)
 ```
 
 The numbers above are ferrit's own history at the time of writing (computed with
@@ -276,6 +277,13 @@ them and they can be tested alone.
 - Colours: see "Colours". No colour carries meaning alone (the word "stale" and the
   legend markers carry it too).
 - Long paths are cut in the middle (`src/app/…/mod.rs`), never wrapped.
+- Built as (D3b): the page is drawn on an off-screen buffer as tall as its
+  content, then the rows `scroll` selects are copied (every layout scrolls the
+  same way, and the renderer hands the largest useful offset back to the app,
+  which clamps to it). The wide layout shrinks the bands towards their minimum
+  before it scrolls. Kinds other than the five named ones are one gray "others"
+  slice. A branch is counted and coloured `stale` whenever the domain says so,
+  merged or not; `merged` counts the merged branches that are not stale.
 
 ## Keybindings (new)
 
@@ -290,7 +298,7 @@ them and they can be tested alone.
 
 `D` is lazygit's Reset key. ferrit has no Reset, so there is no clash today; if a
 Reset action is added later, this key moves (it is in the keymap, not hard-coded).
-The key bar shows `Back: esc | Window: t | Refresh: r | Help: ?` (`Bar::Dashboard`,
+The key bar shows `Back: esc | Window: t | Counts: n | Refresh: r | Help: ?` (`Bar::Dashboard`,
 same mechanism as `Bar::Help`).
 
 ## Edge cases

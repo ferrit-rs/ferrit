@@ -170,6 +170,11 @@ impl App {
         self.ensure_stats(false);
     }
 
+    /// The renderer's word on how far the page scrolls: keep the offset in it.
+    pub(crate) fn clamp_dashboard_scroll(&mut self, max: usize) {
+        self.dashboard.scroll = self.dashboard.scroll.min(max);
+    }
+
     /// Back to the panes. A running computation is told to stop; its result, if
     /// it still arrives, is kept only when it is good.
     pub fn close_dashboard(&mut self) {

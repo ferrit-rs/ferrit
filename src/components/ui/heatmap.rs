@@ -65,6 +65,11 @@ pub fn legend(styles: [Style; 5]) -> Line<'static> {
     ])
 }
 
+/// Week columns drawn in a panel `width` cells wide (the title says how many).
+pub fn weeks_shown(width: u16) -> u16 {
+    (width.saturating_sub(GUTTER) / CELL).min(MAX_WEEKS)
+}
+
 /// A commits-per-day heat map.
 ///
 /// Levels come from the quartiles of the non-zero days shown, so one burst day does
@@ -91,7 +96,7 @@ impl<'a> HeatMap<'a> {
 
 impl Widget for HeatMap<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let weeks = (area.width.saturating_sub(GUTTER) / CELL).min(MAX_WEEKS);
+        let weeks = weeks_shown(area.width);
         if area.is_empty() || weeks == 0 {
             return;
         }

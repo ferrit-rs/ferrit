@@ -135,7 +135,13 @@ pub enum Bar {
     /// The help screen is up: only its own fixed keys work (`help_key`), so
     /// only those are shown (lazygit swaps the bar for the popup's keys too).
     Help,
+    /// The full-screen dashboard is up (`docs/PLAN_13_DASHBOARD.md`): its own
+    /// keys, fixed like the help screen's.
+    Dashboard,
 }
+
+/// The dashboard's bar. Not remappable and not clickable, like its keys.
+const DASHBOARD_BAR: &str = "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?";
 
 /// The help screen's bar. Not remappable and not clickable, like the keys.
 const HELP_BAR: &str = "Close: esc/? | Scroll: j/k";
@@ -212,7 +218,7 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Files, Action::StageAll)],
             &[(Context::Global, Action::Commit)],
         ],
-        Bar::Help => &[],
+        Bar::Help | Bar::Dashboard => &[],
     }
 }
 
@@ -287,9 +293,14 @@ pub struct Keybar {
 /// the pinned `Help` and `Quit` (last one first).
 pub fn keybar_layout(keymap: &Keymap, bar: Bar, width: usize) -> Keybar {
     const SEPARATOR: &str = " | ";
-    if bar == Bar::Help {
+    let fixed = match bar {
+        Bar::Help => Some(HELP_BAR),
+        Bar::Dashboard => Some(DASHBOARD_BAR),
+        _ => None,
+    };
+    if let Some(text) = fixed {
         return Keybar {
-            text: HELP_BAR.to_owned(),
+            text: text.to_owned(),
             hits: Vec::new(),
         };
     }

@@ -115,6 +115,11 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
         "nothing to apply, pop or drop"
     );
     assert_eq!(
+        bar(&map, Bar::Dashboard, 120),
+        "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?",
+        "the dashboard's own keys, fixed like the help screen's"
+    );
+    assert_eq!(
         bar(&map, Bar::FilesEmpty, 120),
         "Commit: c | Stash: s | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q",
         "nothing to stage, discard or amend"
