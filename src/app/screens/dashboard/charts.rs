@@ -7,7 +7,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Sparkline, Widget};
+use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Points};
+use ratatui::widgets::{Paragraph, Sparkline, Widget};
 
 use super::text::{axis_date, figure, figure_columns, plural};
 use super::{Ctx, note};
@@ -15,7 +16,7 @@ use crate::components::ui::chart_palette::{ChartMode, OTHERS, kind_slot, slot_ma
 use crate::components::ui::donut::{self, Donut, Slice};
 use crate::components::ui::heatmap::{self, HeatMap};
 use crate::components::ui::share_bar::stacked_bar;
-use crate::domain::git::stats::series::Granularity;
+use crate::domain::git::stats::series::{Bucket, Granularity};
 use crate::domain::git::stats::share::{fold, shares};
 
 const DAY: i64 = 86_400;
@@ -37,19 +38,29 @@ fn count_f64(n: usize) -> f64 {
     u32::try_from(n).map_or_else(|_| f64::from(u32::MAX), f64::from)
 }
 
-/// `commits per day` and `13 weeks of history`, for the title.
-pub(super) fn activity_title(ctx: &Ctx<'_>) -> String {
-    let (per, unit) = match ctx.stats.granularity {
-        Granularity::Day => ("day", "days"),
-        Granularity::Week => ("week", "weeks"),
-        Granularity::Month => ("month", "months"),
+/// `commits per day`, the dim words after the section title.
+pub(super) fn activity_unit(ctx: &Ctx<'_>) -> String {
+    let per = match ctx.stats.granularity {
+        Granularity::Day => "day",
+        Granularity::Week => "week",
+        Granularity::Month => "month",
     };
-    let n = ctx.stats.series.len();
-    if n < 2 {
-        format!("Activity (commits per {per})")
-    } else {
-        format!("Activity (commits per {per}, {n} {unit} of history)")
-    }
+    format!("commits per {per}")
+}
+
+/// `26 days of history · peak 58 (09-04)`: the one caption under the plot.
+fn activity_caption(ctx: &Ctx<'_>, peak: Bucket, long: bool) -> String {
+    let unit = match ctx.stats.granularity {
+        Granularity::Day => "days",
+        Granularity::Week => "weeks",
+        Granularity::Month => "months",
+    };
+    format!(
+        "{} {unit} of history · peak {} ({})",
+        ctx.stats.series.len(),
+        peak.commits,
+        axis_date(peak.start, ctx.stats.granularity, long)
+    )
 }
 
 pub(super) fn activity(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
@@ -74,56 +85,78 @@ pub(super) fn activity(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
         note(buf, area, &text, Style::new());
         return;
     }
-    let peak = stats
-        .series
-        .iter()
-        .map(|b| b.commits)
-        .max()
-        .unwrap_or(1)
-        .max(1);
-    let long = last.start - first.start > 300 * DAY;
-    let from = axis_date(first.start, stats.granularity, long);
-    let to = axis_date(last.start, stats.granularity, long);
-    let accent = Style::new().fg(ctx.colors().accent);
-    match ctx.view.mode {
-        ChartMode::Braille => {
-            let data: Vec<(f64, f64)> = stats
-                .series
-                .iter()
-                .enumerate()
-                .map(|(i, b)| (count_f64(i), count_f64(b.commits)))
-                .collect();
-            let dataset = Dataset::default()
-                .marker(Marker::Braille)
-                .graph_type(GraphType::Line)
-                .style(accent)
-                .data(&data);
-            let axis = ctx.dim();
-            Chart::new(vec![dataset])
-                .x_axis(
-                    Axis::default()
-                        .style(axis)
-                        .bounds([0.0, count_f64(data.len() - 1)])
-                        .labels(vec![Span::raw(from), Span::raw(to)]),
-                )
-                .y_axis(
-                    Axis::default()
-                        .style(axis)
-                        .bounds([0.0, count_f64(peak)])
-                        .labels(vec![Span::raw("0"), Span::raw(peak.to_string())]),
-                )
-                .render(area, buf);
-        },
-        ChartMode::Blocks => blocks_line(ctx, area, buf, (&from, &to), peak),
-    }
-}
-
-/// The block-glyph fallback of the line chart: a `Sparkline` with the dates and
-/// the peak on the last row.
-fn blocks_line(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer, dates: (&str, &str), peak: usize) {
+    let Some(peak) = stats.series.iter().max_by_key(|b| b.commits) else {
+        return;
+    };
     if area.height < 2 {
         return;
     }
+    let long = last.start - first.start > 300 * DAY;
+    let caption = Rect::new(area.x, area.bottom() - 1, area.width, 1);
+    let plot = Rect {
+        height: area.height - 1,
+        ..area
+    };
+    note(buf, caption, &activity_caption(ctx, *peak, long), ctx.dim());
+    match ctx.view.mode {
+        ChartMode::Braille => braille_line(ctx, plot, buf, peak.commits.max(1)),
+        ChartMode::Blocks => blocks_line(ctx, plot, buf, peak.commits.max(1)),
+    }
+}
+
+/// The line chart on a `Canvas`: no axis box, two dim tick labels (the peak on
+/// the top row, 0 on the bottom one) and one dot at the last point.
+fn braille_line(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer, peak: usize) {
+    let series = &ctx.stats.series;
+    let top = peak.to_string();
+    let gutter = u16::try_from(top.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(1);
+    if area.width <= gutter + 1 {
+        return;
+    }
+    let mut ticks = |y: u16, text: &str| {
+        note(buf, Rect::new(area.x, y, gutter, 1), text, ctx.dim());
+    };
+    ticks(area.y, &top);
+    ticks(area.bottom() - 1, "0");
+    let points: Vec<(f64, f64)> = series
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (count_f64(i), count_f64(b.commits)))
+        .collect();
+    let color = ctx.colors().accent;
+    let end = points.last().copied().unwrap_or_default();
+    Canvas::default()
+        .marker(Marker::Braille)
+        .x_bounds([0.0, count_f64(series.len() - 1)])
+        .y_bounds([0.0, count_f64(peak)])
+        .paint(|c| {
+            for pair in points.windows(2) {
+                if let [(x1, y1), (x2, y2)] = *pair {
+                    c.draw(&CanvasLine {
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        color,
+                    });
+                }
+            }
+            c.draw(&Points {
+                coords: &[end],
+                color,
+            });
+            c.print(end.0, end.1, Span::styled("●", Style::new().fg(color)));
+        })
+        .render(
+            Rect::new(area.x + gutter, area.y, area.width - gutter, area.height),
+            buf,
+        );
+}
+
+/// The block-glyph fallback of the line chart: a `Sparkline` filling `area`.
+fn blocks_line(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer, peak: usize) {
     let width = usize::from(area.width).max(1);
     let counts: Vec<u64> = ctx
         .stats
@@ -137,18 +170,11 @@ fn blocks_line(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer, dates: (&str, &str),
         .chunks(step)
         .map(|c| c.iter().copied().max().unwrap_or(0))
         .collect();
-    let spark = Rect {
-        height: area.height - 1,
-        ..area
-    };
-    let labels = Rect::new(area.x, area.bottom() - 1, area.width, 1);
     Sparkline::default()
         .data(&data)
         .max(u64::try_from(peak).unwrap_or(1))
         .style(Style::new().fg(ctx.colors().accent))
-        .render(spark, buf);
-    let text = format!("{}  →  {}   peak {peak}", dates.0, dates.1);
-    Paragraph::new(Line::styled(text, ctx.dim())).render(labels, buf);
+        .render(area, buf);
 }
 
 /// One legend row: marker, name, right-aligned figure.

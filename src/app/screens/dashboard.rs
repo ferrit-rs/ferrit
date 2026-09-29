@@ -86,7 +86,7 @@ enum Section {
 impl Section {
     fn title(self, ctx: &Ctx<'_>, width: u16) -> String {
         match self {
-            Self::Activity => charts::activity_title(ctx),
+            Self::Activity => format!("Activity ({})", charts::activity_unit(ctx)),
             Self::Kinds => "What was done".to_owned(),
             Self::Heat => charts::heat_title(width),
             Self::Contributors => "Contributors".to_owned(),

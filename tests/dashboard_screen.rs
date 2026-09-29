@@ -244,7 +244,8 @@ fn wide_layout_has_every_section_and_the_plans_first_line() {
         "Dashboard ─ ferrit ─ main",
         "window: 90 days (t)",
         "Commits 423 · Authors 7 · Branches 13 (+3 remote) · Tags 5 · 35 commits since v0.7.0",
-        "Activity (commits per week, 13 weeks of history)",
+        "Activity (commits per week)",
+        "13 weeks of history · peak ",
         "What was done",
         "Commits per day (26 weeks)",
         "Contributors",
@@ -556,6 +557,53 @@ fn without_braille_the_donut_is_one_full_width_stacked_bar_above_its_legend() {
 }
 
 #[test]
+fn the_line_chart_has_no_axis_box_one_end_dot_and_two_ticks() {
+    let s = stats();
+    let out = render(&view(Some(&s)), 80, 120);
+    let lines: Vec<Vec<char>> = out.lines().map(|l| l.chars().collect()).collect();
+    let title = lines
+        .iter()
+        .position(|l| l.iter().collect::<String>().contains("Activity"))
+        .unwrap();
+    let caption = lines
+        .iter()
+        .position(|l| l.iter().collect::<String>().contains("weeks of history"))
+        .unwrap();
+    let inside = |row: &Vec<char>| row.iter().skip(1).take(78).collect::<String>();
+    let plot: Vec<String> = lines[title + 1..caption].iter().map(inside).collect();
+    for row in &plot {
+        assert!(
+            !row.contains(['│', '└', '┘', '┌', '┐', '┤', '├', '┬', '┴', '┼']),
+            "an axis box in {row:?}"
+        );
+    }
+    let all = plot.join("\n");
+    assert!(all.chars().any(is_braille), "{all}");
+    assert_eq!(all.matches('●').count(), 1, "one end marker\n{all}");
+    // Two ticks only: the peak on the first plot row, 0 on the last.
+    let peak = s
+        .series
+        .iter()
+        .map(|b| b.commits)
+        .max()
+        .unwrap()
+        .to_string();
+    assert!(
+        plot.iter()
+            .filter(|r| r.trim_start().starts_with(&peak))
+            .count()
+            >= 1
+    );
+    assert!(plot.last().unwrap().trim_start().starts_with('0'), "{all}");
+    assert!(
+        lines[caption]
+            .iter()
+            .collect::<String>()
+            .contains(&format!("13 weeks of history · peak {peak} ("))
+    );
+}
+
+#[test]
 fn the_heat_map_is_one_glyph_in_five_colours_and_glyph_density_without_colour() {
     let s = stats();
     let buf = buffer(&view(Some(&s)), 120, 42);
@@ -725,13 +773,13 @@ fn the_activity_caption_follows_the_granularity() {
     s.granularity = Granularity::Day;
     let out = render(&view(Some(&s)), 120, 42);
     assert!(
-        out.contains("Activity (commits per day, 13 days of history)"),
+        out.contains("Activity (commits per day)") && out.contains("13 days of history · peak "),
         "{out}"
     );
     s.granularity = Granularity::Month;
     let out = render(&view(Some(&s)), 120, 42);
     assert!(
-        out.contains("commits per month, 13 months of history"),
+        out.contains("commits per month") && out.contains("13 months of history · peak "),
         "{out}"
     );
 }
