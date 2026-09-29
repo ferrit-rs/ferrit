@@ -1,0 +1,18 @@
+# A branch level with its upstream, then one commit ahead of it (docs/PLAN_2_GIT_BACKEND.md):
+# the tick, the arrows, the hash colours and the branch Log with a commit body.
+# The copy's remote is replaced by a local bare repository next to it.
+# Run on a copy: .dev-tools/flow-compare.sh --repo . test/flows/upstream.flow
+repo .
+focus "what Status, Branches and Commits say about a branch and its upstream: the up-to-date tick, the ahead arrow, the colour of pushed and unpushed hashes, and the branch Log with a commit body and its author email"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); push and pull themselves, which need a real remote"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "git init -q --bare ../up.git && git remote set-url origin ../up.git && git remote set-url --push origin ../up.git && git push -q -u origin main"
+note "main is level with its upstream: a tick is expected in Status and on the branch."
+step 01_start
+
+sh "git commit -q --allow-empty -m 'flow: a commit with a body' -m 'The body line, under the subject.'"
+note "One commit ahead: an up arrow instead of the tick, an unpushed (red) hash, and the body in the branch Log."
+step 02_focus_branches 3
+step 03_commits 4
+step 04_back_to_files 2
