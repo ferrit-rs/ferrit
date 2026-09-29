@@ -90,24 +90,15 @@ fn flatten_file_tree(
     }
 }
 
-/// Lazygit-style directory tree over any file list: nested paths get a
-/// collapsible root plus one `Dir` row per directory. With `always_root`
-/// (the Files pane, as lazygit) a non-empty list gets the root row even when
-/// flat; otherwise flat paths skip the tree. Shared by the Files pane (`self.files`) and
-/// a drilled commit's own changed-file list (`CommitDrill::files`).
+/// The Files pane's tree, as lazygit draws it: a collapsible root ("/") plus
+/// one `Dir` row per directory, the root present even for a flat list. Empty
+/// when nothing changed.
 pub(super) fn tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
-    always_root: bool,
 ) -> Vec<FileRow> {
-    let nested = files
-        .iter()
-        .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
-    let with_root = nested || (always_root && !files.is_empty());
-    if !with_root {
-        return (0..files.len())
-            .map(|index| FileRow::File { index, depth: 0 })
-            .collect();
+    if files.is_empty() {
+        return Vec::new();
     }
 
     let tree = build_file_tree(files);
@@ -122,6 +113,60 @@ pub(super) fn tree_rows(
         flatten_file_tree(&tree, Path::new(""), 1, collapsed, &mut rows);
     }
     rows
+}
+
+/// A drilled commit's tree, as lazygit shows it: no root row, and a chain of
+/// single-child directories folded into one row (`test/flows`). `collapsed`
+/// is the drill's own set, keyed by the folded row's full path.
+pub(super) fn drill_tree_rows(
+    files: &[git::model::FileEntry],
+    collapsed: &HashSet<PathBuf>,
+) -> Vec<FileRow> {
+    let mut rows = Vec::new();
+    flatten_folded(
+        &build_file_tree(files),
+        Path::new(""),
+        0,
+        collapsed,
+        &mut rows,
+    );
+    rows
+}
+
+fn flatten_folded(
+    nodes: &BTreeMap<String, TreeNode>,
+    dir_path: &Path,
+    depth: usize,
+    collapsed: &HashSet<PathBuf>,
+    rows: &mut Vec<FileRow>,
+) {
+    for (name, node) in nodes {
+        match node {
+            TreeNode::Dir(children) => {
+                let (mut name, mut children) = (name.clone(), children);
+                while let [(child, TreeNode::Dir(grand))] = children.iter().collect::<Vec<_>>()[..]
+                {
+                    name = format!("{name}/{child}");
+                    children = grand;
+                }
+                let path = dir_path.join(&name);
+                let expanded = !collapsed.contains(&path);
+                rows.push(FileRow::Dir {
+                    path: path.clone(),
+                    name,
+                    depth,
+                    expanded,
+                });
+                if expanded {
+                    flatten_folded(children, &path, depth + 1, collapsed, rows);
+                }
+            },
+            TreeNode::File(index) => rows.push(FileRow::File {
+                index: *index,
+                depth,
+            }),
+        }
+    }
 }
 
 /// One synthetic `FileEntry` per file in a commit's diff, `staged: None` /

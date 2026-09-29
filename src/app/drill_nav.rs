@@ -1,5 +1,7 @@
 //! Files/Commits pane directory-tree drill navigation (expand/collapse, drill into a commit's files).
 
+use std::collections::HashSet;
+
 use super::{App, CommitDrill, FileRow, Pane, commit_drill_files};
 
 impl App {
@@ -24,15 +26,17 @@ impl App {
     /// Enter on the Commits pane: swap the commit list for that commit's own
     /// changed-file tree, in place, `enter_branch_log`'s counterpart one pane
     /// over. Read only. `Esc` backs out (`on_key`).
-    pub(super) fn enter_commit_files(&mut self) {
+    pub(super) fn enter_commit_files(&mut self) -> bool {
         if self.focus != Pane::Commits || self.commit_drill.is_some() {
-            return;
+            return false;
         }
         let opts = self.diff_opts();
-        let Some(repo) = &self.repo else { return };
+        let Some(repo) = &self.repo else {
+            return false;
+        };
         let return_index = self.selected(Pane::Commits);
         let Some(entry) = self.commits.get(return_index) else {
-            return;
+            return false;
         };
         let hash = entry.full_hash.clone();
         let title = format!("{} {}", entry.short_hash, entry.summary);
@@ -43,10 +47,15 @@ impl App {
                     title,
                     files: commit_drill_files(&diff),
                     return_index,
+                    collapsed: HashSet::default(),
                 });
                 self.selection[Pane::Commits] = 0;
+                true
             },
-            Err(e) => self.report_error(e),
+            Err(e) => {
+                self.report_error(e);
+                false
+            },
         }
     }
 
@@ -60,8 +69,12 @@ impl App {
         let Some(FileRow::Dir { path, .. }) = rows.get(self.selected(Pane::Commits)) else {
             return;
         };
-        if !self.collapsed_dirs.remove(path) {
-            self.collapsed_dirs.insert(path.clone());
+        let path = path.clone();
+        let Some(drill) = &mut self.commit_drill else {
+            return;
+        };
+        if !drill.collapsed.remove(&path) {
+            drill.collapsed.insert(path);
         }
         let last = self.row_count(Pane::Commits).saturating_sub(1);
         self.selection[Pane::Commits] = self.selection[Pane::Commits].min(last);

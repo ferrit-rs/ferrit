@@ -75,10 +75,12 @@ impl App {
             },
             Action::Enter => {
                 self.enter_branch_log();
-                self.enter_commit_files();
-                self.toggle_files_dir();
-                self.toggle_commit_dir();
-                self.enter_diff_mode();
+                // Opening a commit must not also toggle its first row.
+                if !self.enter_commit_files() {
+                    self.toggle_files_dir();
+                    self.toggle_commit_dir();
+                    self.enter_diff_mode();
+                }
             },
             Action::EnterDiff => self.enter_diff_mode(),
             Action::Refresh => self.request_refresh(),

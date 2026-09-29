@@ -211,6 +211,9 @@ struct CommitDrill {
     files: Vec<git::model::FileEntry>,
     /// The commit-list cursor to restore when `Esc` backs out.
     return_index: usize,
+    /// Directory rows the user collapsed in this drill; starts empty, so a
+    /// commit opens fully expanded whatever the Files pane has collapsed.
+    collapsed: HashSet<PathBuf>,
 }
 
 /// Where keystrokes go while a Files diff is up. `Nav` is phase 1..5
@@ -691,7 +694,7 @@ pub(crate) use error::AppError;
 mod tests;
 
 use diff_query::{DiffQueryState, RightKey};
-use tree::{FileRow, commit_drill_files, tree_rows};
+use tree::{FileRow, commit_drill_files, drill_tree_rows, tree_rows};
 
 impl App {
     fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
@@ -1124,7 +1127,7 @@ impl App {
         let Some(drill) = &self.commit_drill else {
             return;
         };
-        let rows = tree_rows(&drill.files, &self.collapsed_dirs, false);
+        let rows = drill_tree_rows(&drill.files, &drill.collapsed);
         let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Commits)) else {
             return;
         };
@@ -1199,14 +1202,14 @@ impl App {
     /// `self.files` and `self.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.files, &self.collapsed_dirs, true)
+        tree_rows(&self.files, &self.collapsed_dirs)
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
     /// changed files instead of the worktree's. Empty while not drilled.
     fn commit_tree_rows(&self) -> Vec<FileRow> {
         match &self.commit_drill {
-            Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs, false),
+            Some(drill) => drill_tree_rows(&drill.files, &drill.collapsed),
             None => Vec::new(),
         }
     }

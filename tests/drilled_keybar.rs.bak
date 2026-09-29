@@ -148,10 +148,7 @@ fn clicking_the_right_pane_leaves_only_it_focused_with_its_own_key_bar() {
     let out = terminal.backend().to_string();
     assert!(out.contains("Switch view: tab"), "{out}");
     assert!(out.contains("Back: esc"), "{out}");
-    assert!(
-        !out.contains("Reword:"),
-        "the Commits actions are gone\n{out}"
-    );
+    assert!(!out.contains("Reword:"), "the Commits actions are gone\n{out}");
     assert_eq!(
         border_fg(&terminal, "Commits"),
         border_fg(&terminal, "Files"),
@@ -159,10 +156,7 @@ fn clicking_the_right_pane_leaves_only_it_focused_with_its_own_key_bar() {
     );
 
     key(&mut app, KeyCode::Esc);
-    assert!(
-        frame(&mut app).contains("Reword:"),
-        "Esc gives Commits back"
-    );
+    assert!(frame(&mut app).contains("Reword:"), "Esc gives Commits back");
 }
 
 #[test]
@@ -191,15 +185,12 @@ fn a_drilled_commit_opens_expanded_with_folded_directories_and_no_root_row() {
     assert!(app.commits_drilled());
     let out = frame(&mut app);
     assert!(out.contains("▼ test/flows"), "open folded directory\n{out}");
-    assert!(
-        out.contains("A a.flow"),
-        "the file shows without Enter\n{out}"
-    );
+    assert!(out.contains("M a.flow"), "the file shows without Enter\n{out}");
     assert!(out.contains("1 of 2"), "directory plus file\n{out}");
     assert!(!out.contains("▶"), "nothing starts collapsed\n{out}");
 
     key(&mut app, KeyCode::Enter); // toggles the selected directory row
     let out = frame(&mut app);
     assert!(out.contains("▶ test/flows"), "Enter collapses it\n{out}");
-    assert!(!out.contains("A a.flow"), "{out}");
+    assert!(!out.contains("M a.flow"), "{out}");
 }
