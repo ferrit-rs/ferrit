@@ -1,7 +1,11 @@
 //! Stash actions: `s` on Files opens a message popup, Stash-pane keys apply,
 //! pop and drop the selected entry. See `docs/PLAN_10_STASH.md`.
 
-use super::{App, ConfirmAction, ConfirmPrompt, Mode, Pane, Popup, TextInput, git};
+use std::path::PathBuf;
+
+use super::{
+    App, ConfirmAction, ConfirmPrompt, DiffView, Mode, Pane, Popup, SelectionKey, TextInput, git,
+};
 use crate::domain::git::stash::StashOutcome;
 
 impl App {
@@ -66,14 +70,30 @@ impl App {
         });
     }
 
-    /// Confirmed apply or pop.
+    /// Confirmed apply or pop. A clean restore moves the focus to Files with
+    /// the first restored file selected, like lazygit; a conflict or an error
+    /// leaves the focus on Stash.
     pub(super) fn restore_stash(&mut self, oid: &str, pop: bool) {
+        let first_file = match &self.diff {
+            DiffView::Stash(entry, diff) if entry.oid == oid => diff
+                .files
+                .first()
+                .and_then(|f| diff.text.get(f.new_path.clone()))
+                .map(PathBuf::from),
+            _ => None,
+        };
         let Some(repo) = &mut self.repo else { return };
         let result = if pop {
             repo.stash_pop(oid)
         } else {
             repo.stash_apply(oid)
         };
+        if matches!(result, Ok(StashOutcome::Done)) {
+            self.focus = Pane::Files;
+            if let Some(path) = first_file {
+                self.select_when_listed(Pane::Files, SelectionKey::File(path));
+            }
+        }
         self.request_refresh();
         match result {
             Ok(StashOutcome::Done) => {},

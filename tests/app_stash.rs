@@ -377,3 +377,40 @@ fn drop_of_an_entry_already_gone_reports_and_spares_the_others() {
         status_text(&app)
     );
 }
+
+#[test]
+fn a_clean_apply_or_pop_moves_focus_to_files_on_the_restored_file() {
+    for key in [' ', 'g'] {
+        let (_dir, mut app) = stashed_app("app-stash-focus");
+        app.feed_key(char_key(key));
+        app.feed_key(char_key('y'));
+
+        assert_eq!(app.focus, Pane::Files, "{key:?}");
+        assert!(app.row_count(Pane::Files) > 1, "restored files are listed");
+        assert!(
+            app.selected(Pane::Files) > 0,
+            "a restored file, not the root row"
+        );
+        assert!(
+            matches!(app.diff_view(), DiffView::Files(_)),
+            "the right pane shows the file diff, got {:?}",
+            app.diff_view()
+        );
+    }
+}
+
+#[test]
+fn drop_and_a_conflicting_pop_keep_the_focus_on_stash() {
+    let (_dir, mut app) = stashed_app("app-stash-focus-drop");
+    app.feed_key(char_key('d'));
+    app.feed_key(char_key('y'));
+    assert_eq!(app.focus, Pane::Stash);
+
+    let (dir, mut app) = stashed_app("app-stash-focus-conflict");
+    fs::write(dir.path().join("a.txt"), "one\ncommitted\n").unwrap();
+    commit_all(&Repository::open(dir.path()).unwrap(), "diverge");
+    app.refresh();
+    app.feed_key(char_key('g'));
+    app.feed_key(char_key('y'));
+    assert_eq!(app.focus, Pane::Stash);
+}

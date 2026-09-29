@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- After a confirmed Apply (`Space`) or Pop (`g`) on the Stash pane, the focus moves to Files with the first restored file selected and its diff on the right, like lazygit. Before, the focus stayed on Stash (after Pop, on an empty pane). Drop, a conflict and a failed Apply or Pop leave the focus where it was.
 - `M` on a branch other than the current one opens a Merge menu, like lazygit, and merges nothing until a row is chosen (`Esc` leaves the repo untouched): merge (fast-forward when possible), merge with `--no-ff`, squash and leave the changes staged, squash and commit. A line under the menu explains the highlighted row. On the current branch `M` still runs the plain merge at once. Before, `M` merged immediately.
 
 - Clicking the right (Patch / Diff) pane focuses only that pane, like lazygit: the left pane you came from is drawn unfocused (no green border, no blue selection bar), and the key bar shows `Switch view: tab | Back: esc | Help | Quit` instead of that pane's actions. `Tab`, `Shift-Tab` and `1`-`5` also hand focus back to a left pane.

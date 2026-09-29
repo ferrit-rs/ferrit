@@ -156,8 +156,9 @@ s (Files focused, Nav)
 
 <space> / g (Stash focused, Nav, entry selected)
   '-- repo.stash_apply|pop(oid)
-        |-- Ok(Done)       -> request_refresh
-        |-- Ok(Conflicted) -> request_refresh + Popup::Note("stash applied with conflicts. The stash was kept. ...")
+        |-- Ok(Done)       -> focus Files, select the stash's first file once listed
+        |                     (lazygit does the same), request_refresh
+        |-- Ok(Conflicted) -> request_refresh (focus stays on Stash) + Popup::Note("stash applied with conflicts. The stash was kept. ...")
         '-- Err            -> report_error
 
 d (Stash focused, Nav, entry selected)
