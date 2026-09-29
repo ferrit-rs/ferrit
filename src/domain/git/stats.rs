@@ -28,6 +28,8 @@ use crate::domain::git::model::Change;
 use crate::domain::git::{activity, status};
 
 const DAY: i64 = 86_400;
+/// The heat map always shows the last 26 weeks, whatever the window.
+pub const HEAT_DAYS: i64 = 26 * 7;
 
 /// Commits walked at most; past it `sampled` is set and the newest are kept.
 pub const WALK_CAP: usize = 20_000;
@@ -169,6 +171,9 @@ pub struct RepoStats {
     /// age up to now; empty when the window has no commits.
     pub series: Vec<Bucket>,
     pub granularity: Granularity,
+    /// Commits per day over the last 26 weeks ending now, empty days included,
+    /// whatever the window (the heat map draws this).
+    pub daily: Vec<Bucket>,
     /// Most commits first (ties by name).
     pub authors: Vec<AuthorStat>,
     /// Non-merge commits by kind, most first, empty kinds left out.
@@ -212,6 +217,7 @@ pub(super) fn repo_stats(
     let mut sampled = false;
     let (mut first, mut last) = (None::<i64>, None::<i64>);
     let mut times = Vec::new();
+    let mut recent = Vec::new();
     let mut authors: BTreeMap<String, AuthorAcc> = BTreeMap::new();
     let mut kinds: BTreeMap<Kind, usize> = BTreeMap::new();
     for (walked, oid) in walk.enumerate() {
@@ -228,6 +234,9 @@ pub(super) fn repo_stats(
         let time = commit.time().seconds();
         first = Some(first.map_or(time, |f| f.min(time)));
         last = Some(last.map_or(time, |l| l.max(time)));
+        if time > opts.now - HEAT_DAYS * DAY {
+            recent.push(time);
+        }
         if cutoff.is_some_and(|c| time < c) {
             continue;
         }
@@ -264,6 +273,13 @@ pub(super) fn repo_stats(
     } else {
         series::series(times.iter().copied(), start, opts.now, granularity)
     };
+
+    let daily = series::series(
+        recent.iter().copied(),
+        opts.now - (HEAT_DAYS - 1) * DAY,
+        opts.now,
+        Granularity::Day,
+    );
 
     let mut author_stats: Vec<AuthorStat> = authors
         .into_values()
@@ -320,6 +336,7 @@ pub(super) fn repo_stats(
         },
         series,
         granularity,
+        daily,
         authors: author_stats,
         kinds: kind_stats,
         hot_files: churn.as_ref().map(churn::Churn::hot_files),

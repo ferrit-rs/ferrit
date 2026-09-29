@@ -798,3 +798,27 @@ fn an_empty_repository_has_empty_churn() {
     assert_eq!(hot.commits, 0);
     assert_eq!(stats.totals.lines.map(|l| l.added), Some(0));
 }
+
+#[test]
+fn the_daily_counts_cover_26_weeks_whatever_the_window() {
+    let tmp = project();
+    let week = stats_at(tmp.path(), Window::Days7);
+    let all = stats_at(tmp.path(), Window::All);
+    assert_eq!(
+        week.daily.len(),
+        182,
+        "one bucket per day, empty ones included"
+    );
+    assert_eq!(week.daily, all.daily, "the heat map ignores the window");
+    let recent: usize = week.daily.iter().map(|b| b.commits).sum();
+    assert_eq!(
+        recent, 10,
+        "every walked commit of the last 26 weeks, the 100-day-old one included"
+    );
+    assert!(
+        week.daily
+            .windows(2)
+            .all(|w| w[1].start - w[0].start == 86_400),
+        "consecutive days"
+    );
+}
