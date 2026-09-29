@@ -195,6 +195,50 @@ fn file_markers_are_red_when_unstaged_and_green_when_staged() {
     assert_ne!(staged, untracked, "a staged M is not red");
 }
 
+/// Done when: the Files pane colours by staging state as lazygit does: the name of a
+/// fully staged file is green with its letter, an untracked or unstaged name stays
+/// default, a directory's arrow and name are green when all under it is staged, yellow
+/// when part of it is, default when none is, and the selected row keeps them.
+#[test]
+fn files_colour_names_and_directories_by_staging_state() {
+    use ratatui::style::Color;
+    let repo = Repo::new("stage-colours");
+    repo.commit("m.txt", "one\n", "init");
+    repo.commit("w.txt", "one\n", "init w");
+    repo.write("m.txt", "one\ntwo\n");
+    repo.write("w.txt", "one\ntwo\n");
+    repo.write("u.txt", "fresh\n");
+    repo.write("zdone/a.txt", "a\n");
+    repo.write("zdone/sub/b.txt", "b\n");
+    repo.write("zpart/p1.txt", "p1\n");
+    repo.write("zpart/p2.txt", "p2\n");
+    repo.write("znone/n.txt", "n\n");
+    repo.git(&["add", "m.txt", "zdone", "zpart/p1.txt"]);
+    let mut app = repo.app();
+    key(&mut app, '2');
+
+    let colour = |app: &mut App, text: &str| colour_of(app, text).unwrap();
+    assert_eq!(colour(&mut app, "M  m.txt"), Color::Green);
+    assert_eq!(colour(&mut app, " m.txt"), Color::Green, "staged name");
+    assert_eq!(colour(&mut app, " u.txt"), Color::Reset, "untracked name");
+    assert_eq!(colour(&mut app, " w.txt"), Color::Reset, "unstaged name");
+    assert_eq!(colour(&mut app, "\u{25bc} zdone"), Color::Green);
+    assert_eq!(colour(&mut app, "zdone"), Color::Green);
+    assert_eq!(colour(&mut app, "\u{25bc} sub"), Color::Green, "nested dir");
+    assert_eq!(colour(&mut app, "\u{25bc} zpart"), Color::Yellow);
+    assert_eq!(colour(&mut app, "zpart"), Color::Yellow);
+    assert_ne!(colour(&mut app, "\u{25bc} znone"), Color::Green);
+    assert_ne!(colour(&mut app, "\u{25bc} znone"), Color::Yellow);
+    assert_eq!(colour(&mut app, "znone"), Color::Reset);
+    // The root row is selected, and part of the tree is staged: yellow on the bar.
+    assert_eq!(colour(&mut app, "\u{25bc} /"), Color::Yellow);
+
+    // A file staged and modified again is not fully staged: its name stays default.
+    repo.write("m.txt", "one\ntwo\nthree\n");
+    app.refresh();
+    assert_eq!(colour(&mut app, " m.txt"), Color::Reset, "MM name");
+}
+
 /// Done when: `Space` on a directory row stages every file under it, and the same key
 /// unstages them again, as lazygit does (the stage-directory flow).
 #[test]

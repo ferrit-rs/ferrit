@@ -92,6 +92,20 @@ pub struct FileEntry {
 }
 
 impl FileEntry {
+    /// Some of the path's changes sit in the index.
+    pub fn has_staged(&self) -> bool {
+        !matches!(
+            self.staged,
+            Change::None | Change::Untracked | Change::Conflicted
+        )
+    }
+
+    /// Staged and nothing left in the worktree (`M `, `A `), lazygit's
+    /// "fully staged": a file that is also modified again (`MM`) is not.
+    pub fn is_fully_staged(&self) -> bool {
+        self.has_staged() && self.worktree == Change::None
+    }
+
     /// `XY path`, the way porcelain lays it out.
     pub fn display(&self) -> String {
         format!(

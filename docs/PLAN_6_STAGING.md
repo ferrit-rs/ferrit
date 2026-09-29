@@ -321,8 +321,14 @@ pub fn render_diff(
 - **V-select range**: `selectedLineBgColor` (the blue bar), same as a left-pane
   multi-select would look.
 - **staged vs unstaged**, Files pane: phase 2 already colours the `XY` code via
-  `theme::file_line`. No change; a file with both sides non-`None` already
-  renders e.g. `MM`.
+  `theme::file_line`; a file with both sides non-`None` renders e.g. `MM`.
+  The row also colours by staging state, measured on lazygit: the NAME of a
+  fully staged file (index side set, worktree clean: `M `, `A `) is green
+  like its letter; unstaged, untracked and `MM` names stay default. A
+  directory row's arrow and name (the `/` root included) are green when every
+  file under it is fully staged, yellow when only part is staged, default
+  when none is (`tree::dir_stage_state`, `theme::dir_line`). The selected row
+  keeps these colours (blue bar and bold only), `theme::keep_colours_on_selection`.
 - **granule hint** in the right-pane title: `Unstaged changes` becomes
   `Unstaged changes  (hunk 1/3)` or `(lines 41-42)` while in `Mode::Diff`, so
   it is obvious what `<space>` will hit. lazygit shows the range in the view

@@ -697,7 +697,7 @@ pub(crate) use error::AppError;
 mod tests;
 
 use diff_query::{DiffQueryState, RightKey};
-use tree::{FileRow, commit_drill_files, drill_tree_rows, tree_rows};
+use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
 
 impl App {
     fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
@@ -1787,7 +1787,13 @@ impl App {
                         depth,
                         expanded,
                         ..
-                    } => Some(theme::dir_line(&self.palette, name, *depth, *expanded)),
+                    } => Some(theme::dir_line(
+                        &self.palette,
+                        name,
+                        *depth,
+                        *expanded,
+                        StageState::None,
+                    )),
                     FileRow::File { index, depth } => drill
                         .files
                         .get(*index)
@@ -1851,11 +1857,17 @@ impl App {
             .iter()
             .filter_map(|row| match row {
                 FileRow::Dir {
+                    path,
                     name,
                     depth,
                     expanded,
-                    ..
-                } => Some(theme::dir_line(&self.palette, name, *depth, *expanded)),
+                } => Some(theme::dir_line(
+                    &self.palette,
+                    name,
+                    *depth,
+                    *expanded,
+                    dir_stage_state(&self.files, path),
+                )),
                 FileRow::File { index, depth } => self
                     .files
                     .get(*index)

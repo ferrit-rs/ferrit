@@ -24,6 +24,34 @@ pub(super) enum FileRow {
     File { index: usize, depth: usize },
 }
 
+/// How much of a directory (or of the whole tree, for the root) is staged.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum StageState {
+    None,
+    Partial,
+    All,
+}
+
+/// Staging aggregate over the files under `dir` (empty path: all of them),
+/// lazygit's rule: `All` when every file is fully staged, `Partial` when any
+/// has something in the index, `None` otherwise.
+pub(super) fn dir_stage_state(files: &[git::model::FileEntry], dir: &Path) -> StageState {
+    let mut under = files.iter().filter(|f| f.path.starts_with(dir)).peekable();
+    if under.peek().is_none() {
+        return StageState::None;
+    }
+    let (mut all, mut any) = (true, false);
+    for file in under {
+        all &= file.is_fully_staged();
+        any |= file.has_staged();
+    }
+    match (all, any) {
+        (true, _) => StageState::All,
+        (false, true) => StageState::Partial,
+        _ => StageState::None,
+    }
+}
+
 /// One level of the Files tree, name -> child. `BTreeMap` for free
 /// alphabetical iteration (matches lazygit: siblings sorted by name,
 /// directories and files interleaved, not directories-first).

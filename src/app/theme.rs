@@ -11,6 +11,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
+use super::tree::StageState;
 use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
@@ -115,25 +116,51 @@ pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> 
             |n| n.to_string_lossy().into_owned(),
         )
     };
+    // lazygit greens the name of a fully staged file, letters included.
+    let name_style = if entry.is_fully_staged() {
+        fg(p.add)
+    } else {
+        Style::new()
+    };
     Line::from(vec![
         Span::raw(indent(depth)),
         Span::styled(staged, fg(staged_color)),
         Span::styled(unstaged, fg(p.del)),
-        Span::raw(format!(" {name}")),
+        Span::styled(format!(" {name}"), name_style),
     ])
 }
 
 /// Directory row in the Files tree: an expand/collapse arrow (`▼`/`▶`, like
 /// lazygit) then the directory's own name, indented to its depth. No status
-/// code — files carry their own, a directory's would need aggregating
-/// several and lazygit doesn't bother either.
-pub fn dir_line(p: &Palette, name: &str, depth: usize, expanded: bool) -> Line<'static> {
+/// code; the arrow and name are green when everything under the directory is
+/// staged and yellow when only part of it is, as in lazygit.
+pub(super) fn dir_line(
+    p: &Palette,
+    name: &str,
+    depth: usize,
+    expanded: bool,
+    stage: StageState,
+) -> Line<'static> {
     let arrow = if expanded { "\u{25bc} " } else { "\u{25b6} " };
+    let (arrow_style, name_style) = match stage {
+        StageState::All => (fg(p.add), fg(p.add)),
+        StageState::Partial => (fg(p.warn), fg(p.warn)),
+        StageState::None => (fg(p.idle), Style::new()),
+    };
     Line::from(vec![
         Span::raw(indent(depth)),
-        Span::styled(arrow, fg(p.idle)),
-        Span::styled(name.to_owned(), Style::new().add_modifier(Modifier::BOLD)),
+        Span::styled(arrow, arrow_style),
+        Span::styled(name.to_owned(), name_style.add_modifier(Modifier::BOLD)),
     ])
+}
+
+/// The selected row keeps the colours its spans carry (lazygit only adds the
+/// bar and bold); spans with no colour of their own take `selection_fg`.
+/// Pair with `selection_style` minus its `fg`.
+pub fn keep_colours_on_selection(p: &Palette, line: &mut Line<'static>) {
+    for span in &mut line.spans {
+        span.style.fg.get_or_insert(p.selection_fg);
+    }
 }
 
 /// Relative age, lazygit's branch-list recency column and Log panel `Date:`
