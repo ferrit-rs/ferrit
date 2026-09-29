@@ -332,3 +332,36 @@ fn discard_asks_first_and_only_runs_on_y() {
         "confirmed discard reverted the worktree"
     );
 }
+
+/// Lazygit parity: a flat change list still opens on the `▼ /` root row
+/// ("1 of 3"), `j` reaches the first file, and Space on the root stages
+/// everything under it.
+#[test]
+fn a_flat_file_list_starts_on_the_root_row() {
+    let dir = TempDir::new("app-stage-root-first");
+    let repo = Repository::init(dir.path()).unwrap();
+    fs::write(dir.path().join("README.md"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("README.md"), "one\ntwo\n").unwrap();
+    fs::write(dir.path().join("FLOW_NOTES.md"), "notes\n").unwrap();
+
+    let mut app = App::open(dir.path()).unwrap();
+    app.feed_key(char_key('2'));
+    assert_eq!(app.selected(Pane::Files), 0);
+    assert_eq!(app.counter(Pane::Files), Some((1, 3)));
+    assert!(app.files_selection_is_dir());
+
+    app.feed_key(char_key('j'));
+    assert_eq!(app.selected(Pane::Files), 1);
+    assert!(!app.files_selection_is_dir());
+
+    app.feed_key(char_key('k'));
+    app.feed_key(char_key(' '));
+    let staged = repo.statuses(None).unwrap();
+    assert!(
+        staged
+            .iter()
+            .all(|e| e.status().is_index_modified() || e.status().is_index_new()),
+        "Space on the root stages every changed file"
+    );
+}

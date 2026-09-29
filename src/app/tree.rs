@@ -91,17 +91,20 @@ fn flatten_file_tree(
 }
 
 /// Lazygit-style directory tree over any file list: nested paths get a
-/// collapsible root plus one `Dir` row per directory, flat paths skip the
-/// tree and list files directly. Shared by the Files pane (`self.files`) and
+/// collapsible root plus one `Dir` row per directory. With `always_root`
+/// (the Files pane, as lazygit) a non-empty list gets the root row even when
+/// flat; otherwise flat paths skip the tree. Shared by the Files pane (`self.files`) and
 /// a drilled commit's own changed-file list (`CommitDrill::files`).
 pub(super) fn tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
+    always_root: bool,
 ) -> Vec<FileRow> {
     let nested = files
         .iter()
         .any(|f| f.path.parent().is_some_and(|p| p != Path::new("")));
-    if !nested {
+    let with_root = nested || (always_root && !files.is_empty());
+    if !with_root {
         return (0..files.len())
             .map(|index| FileRow::File { index, depth: 0 })
             .collect();

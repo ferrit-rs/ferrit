@@ -133,6 +133,7 @@ fn dirty_app(tag: &str) -> (TempDir, App) {
 fn the_panel_shows_the_command_ferrit_just_ran() {
     let _serial = serial();
     let (_dir, mut app) = dirty_app("log-panel");
+    app.feed_key(char_key('j')); // off the root row
     app.feed_key(char_key(' ')); // stage a.txt
 
     let out = frame(&mut app, 120, 40);
@@ -167,6 +168,7 @@ fn the_author_label_shows_even_with_no_command_to_its_left() {
 fn at_opens_the_viewer_and_esc_closes_it() {
     let _serial = serial();
     let (_dir, mut app) = dirty_app("log-viewer");
+    app.feed_key(char_key('j')); // off the root row
     app.feed_key(char_key(' '));
     app.feed_key(char_key('@'));
 

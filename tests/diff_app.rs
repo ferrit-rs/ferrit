@@ -298,7 +298,8 @@ fn a_short_diff_has_no_scrollbar() {
     app.select(Pane::Files, files_row(&app, "s.txt"));
     let out = render(&mut app, 100, 40);
     assert!(
-        !out.contains('\u{2588}') && !out.contains('\u{25bc}'),
+        // One `▼` is the Files root row, not a scrollbar arrow.
+        !out.contains('\u{2588}') && out.matches('\u{25bc}').count() <= 1,
         "a diff that fits draws no scrollbar:\n{out}"
     );
 }
@@ -495,11 +496,10 @@ fn files_pane_groups_nested_files_into_a_tree() {
     );
 }
 
-/// The common case (every changed file directly at the repo root, no
-/// subdirectory) stays a flat list — no root row, no directory headers —
-/// same as before the tree view existed.
+/// Every changed file directly at the repo root: lazygit still shows the
+/// `▼ /` root row first, so the pane has one row per file plus the root.
 #[test]
-fn files_pane_stays_flat_with_no_nesting() {
+fn files_pane_has_a_root_row_even_with_no_nesting() {
     let dir = TempDir::new("app-files-flat");
     let repo = Repository::init(dir.path()).unwrap();
     fs::write(dir.path().join("a.txt"), "a\n").unwrap();
@@ -511,8 +511,13 @@ fn files_pane_stays_flat_with_no_nesting() {
     let app = App::open(dir.path()).unwrap();
     assert_eq!(
         app.row_count(Pane::Files),
-        2,
-        "one row per file, no root or directory rows"
+        3,
+        "the root row plus one row per file"
+    );
+    assert_eq!(
+        app.selected(Pane::Files),
+        0,
+        "the cursor starts on the root"
     );
 }
 

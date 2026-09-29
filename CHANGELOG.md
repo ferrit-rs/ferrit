@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- The Files pane always starts on the `▼ /` root row, like lazygit, even when every changed file sits at the repo root: the counter reads "1 of 3" with two changed files, the right pane shows the diff of all changes, `j` reaches the first file, and Space on the root stages everything. Before, a flat list started on the first file, so the same keys landed on different files in the two programs.
+
 ## [0.7.0] - 2026-09-29
 
 - `a` no longer stages a conflicted file that still holds markers on git 2.50, where an excluded unmerged path was staged anyway; the paths to stage are now listed instead of excluded.

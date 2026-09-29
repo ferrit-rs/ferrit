@@ -1122,7 +1122,7 @@ impl App {
         let Some(drill) = &self.commit_drill else {
             return;
         };
-        let rows = tree_rows(&drill.files, &self.collapsed_dirs);
+        let rows = tree_rows(&drill.files, &self.collapsed_dirs, false);
         let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Commits)) else {
             return;
         };
@@ -1191,21 +1191,20 @@ impl App {
         }
     }
 
-    /// Files pane rows, lazygit-style directory tree: a flat list when every
-    /// changed file sits directly at the repo root (nothing to nest — most
-    /// working trees most of the time), otherwise grouped under directory
-    /// header rows plus an always-present root ("/"). Built fresh from
+    /// Files pane rows, lazygit-style directory tree: an always-present root
+    /// ("/") first, with changed files grouped under directory header rows
+    /// below it. Empty when nothing changed. Built fresh from
     /// `self.files` and `self.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.files, &self.collapsed_dirs)
+        tree_rows(&self.files, &self.collapsed_dirs, true)
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
     /// changed files instead of the worktree's. Empty while not drilled.
     fn commit_tree_rows(&self) -> Vec<FileRow> {
         match &self.commit_drill {
-            Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs),
+            Some(drill) => tree_rows(&drill.files, &self.collapsed_dirs, false),
             None => Vec::new(),
         }
     }

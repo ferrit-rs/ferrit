@@ -424,14 +424,14 @@ shown by their own name rather than the full path), not a flat list of
 full paths. ferrit's had a flat list since phase 1 (`theme::file_line`,
 one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
 
-- **Flat when there's nothing to nest.** The common case — every changed
-  file directly at the repo root — stays exactly the flat list it always
-  was: no root row, no directory headers, `row_count(Pane::Files) ==
-  self.files.len()`. The tree only appears once at least one changed file
-  has a parent directory (`App::files_tree_rows`, `src/app/mod.rs`) — matches
-  lazygit's own behaviour and keeps the previous, simpler rendering (and
-  every test built around it) valid for the case most working trees are in
-  most of the time.
+- **Root row always.** Like lazygit, the Files pane always starts on the
+  `▼ /` root row (cursor on it, right pane showing the diff of everything),
+  even when every changed file sits directly at the repo root: two changed
+  files read "1 of 3", `j` reaches the first file, and Space on the root
+  stages everything. Only an empty list has no rows. `tree_rows(files,
+  collapsed, always_root)` (`src/app/tree.rs`): the Files pane passes
+  `true`; a drilled commit's file list passes `false` and stays flat when
+  nothing is nested.
 - **Building the tree.** `build_file_tree` (`src/app/mod.rs`) groups
   `self.files` (already a flat, path-sorted `Vec<FileEntry>` from
   `git::status::files`) into nested `BTreeMap<String, TreeNode>` levels —
@@ -463,8 +463,9 @@ one `Line` per `FileEntry`, unchanged since the M6 lazygit re-skin).
   aggregating several files', and lazygit doesn't bother either).
 - **Tests**: `tests/diff_app.rs` — `files_pane_groups_nested_files_into_a_tree`
   (root + directory header + nested file, and the nested file's own diff
-  still resolves correctly by row), `files_pane_stays_flat_with_no_nesting`
-  (the common case is unaffected), `enter_on_a_files_directory_row_toggles_it`
+  still resolves correctly by row), `files_pane_has_a_root_row_even_with_no_nesting`
+  (flat list still gets the root row), `a_flat_file_list_starts_on_the_root_row`
+  in `tests/app_stage.rs`, `enter_on_a_files_directory_row_toggles_it`
   (`row_count` shrinks and grows back around one `Enter`). `tests/mouse.rs`
   — `click_on_a_files_directory_row_toggles_it`, the same shrink/grow check
   but through a real `feed_mouse` click. Existing tests keyed off

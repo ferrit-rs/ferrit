@@ -116,6 +116,7 @@ fn a_plain_d_asks_to_discard_but_ctrl_d_no_longer_does() {
         app.confirm_message().is_none(),
         "Ctrl-d used to fall through to `d` and open the discard prompt"
     );
+    app.feed_key(char_key('j')); // off the root row
     app.feed_key(char_key('d'));
     assert!(app.confirm_message().is_some_and(|m| m.contains("discard")));
 }
@@ -177,18 +178,19 @@ fn the_diff_cursor_context_wins_over_the_pane_and_global_ones() {
         width: 80,
         height: 12,
     });
+    app.select(Pane::Files, 1); // off the root row: Enter on it collapses
     app.feed_key(KeyEvent::from(KeyCode::Enter)); // into the diff
     app.feed_key(char_key('j'));
     assert_eq!(
         app.selected(Pane::Files),
-        0,
+        1,
         "j moved the cursor inside the diff, not the file selection"
     );
     app.feed_key(KeyEvent::from(KeyCode::Esc)); // back to the file list
     app.feed_key(char_key('j'));
     assert_eq!(
         app.selected(Pane::Files),
-        1,
+        2,
         "outside the diff j is the selection"
     );
 }

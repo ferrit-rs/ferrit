@@ -274,6 +274,7 @@ fn stash_keys_are_no_ops_on_an_empty_stash_pane() {
 #[test]
 fn space_on_files_still_stages_and_d_still_asks_to_discard() {
     let (dir, mut app) = dirty_app("app-stash-prior");
+    app.feed_key(char_key('j')); // off the root row
     app.feed_key(char_key('d'));
     assert!(
         app.confirm_message().is_some_and(|m| m.contains("discard")),
