@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- README comparison table lists three planned capabilities lazygit does not have: a repository statistics dashboard, editing the Git config, and creating the remote repository from the interface (`docs/PLAN_13_DASHBOARD.md`, `PLAN_14_GIT_CONFIG.md`, `PLAN_15_CREATE_REMOTE.md`).
+
 - The Files pane colours by staging state like lazygit: the name of a fully staged file is green with its letter and one staged then changed again (`MM`) is yellow, a directory's arrow and name (and the `/` root) are green when everything under it is staged and yellow when only part is, and the selected row keeps those colours on its bar.
 - The Files tree has lazygit's shape: a chain of single-child directories folds into one row (`▼ x/y/z`), and the `/` root row only shows when the root has two or more children (a lone directory or file is first, no root).
 - `n` on Branches creates the new branch from the selected branch, not from the checked-out one, and the prompt names it (`branch is off of '<selected>'`); no upstream is set from it. Same as lazygit; with the current branch selected nothing changes.
