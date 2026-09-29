@@ -1,0 +1,27 @@
+# Files colours for a partly staged file and a partly staged directory. Kept as
+# its own flow: lazygit's rule for a file staged and modified again (MM) is not
+# in the other flows' screenshots, and a directory with one of two files staged
+# is the yellow case. Names are green only for fully staged files.
+repo .
+focus "colours of the Files rows by staging state: an MM file (staged, then modified again) and a directory with only one of its two files staged; letters, names and the arrow of each row, selected and not"
+not "how the panels are sized, launch screen, mouse and scrolling (ui-mouse); commit workflows (stage-commit, feature-workflow); Space on a directory (stage-directory)"
+
+sh "git reset -q --hard && git clean -fdq && git checkout -q main"
+sh "printf '\nfirst edit\n' >> README.md; mkdir -p Zdir; printf 'x\n' > Zdir/one.txt; printf 'y\n' > Zdir/two.txt"
+note "README.md is modified and Zdir/ holds two untracked files. Nothing is staged."
+
+step 01_start
+step 02_focus_files 2
+step 03_on_readme j
+note "Stage README.md: a fully staged file, letter and name."
+step 04_stage_readme Space
+
+sh "printf 'second edit\n' >> README.md"
+note "An editor changed README.md again behind the programs' back: it is now staged and modified (MM). Look at the letters and the name."
+step 05_readme_mm 2
+
+note "Move to Zdir/one.txt and stage it: the directory now has one staged and one untracked file."
+step 06_on_one j j
+step 07_stage_one Space
+note "Select the last file so the root, the directory, README.md (MM) and one.txt are all drawn unselected."
+step 08_move_away j
