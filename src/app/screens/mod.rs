@@ -98,9 +98,14 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     if show_help {
         let lines = app.help_lines();
+        // Above the key bar, which shows the help's own keys.
+        let above_bar = Rect {
+            height: area.height.saturating_sub(keybar.height),
+            ..area
+        };
         let rows = popups::draw_help(
             frame,
-            area,
+            above_bar,
             app.theme_config.color(),
             &lines,
             app.help_scroll(),
@@ -713,10 +718,13 @@ fn command_log_lines(app: &App) -> Vec<Line<'static>> {
 /// The hints are generated from the live keymap (`app::hints`), so a remapped
 /// key shows as remapped, and are cut to the terminal's width. Context
 /// sensitive: an operation stopped mid-way wins, then the focused pane's own
-/// keys (`d` means delete, discard or drop depending on the pane).
+/// keys (`d` means delete, discard or drop depending on the pane). The help
+/// screen wins over all of it: only its own keys work while it is up.
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
-    let bar = if app.operation.is_some() {
+    let bar = if app.show_help {
+        Bar::Help
+    } else if app.operation.is_some() {
         Bar::Operation
     } else if app.right_focused() {
         Bar::RightPane

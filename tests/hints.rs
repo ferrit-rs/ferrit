@@ -286,28 +286,72 @@ fn the_help_reaches_every_line_on_a_24_row_terminal_by_scrolling() {
     );
 }
 
+/// The frame without its bottom rows (command log, then key bar). The command
+/// log is one process-wide ring that every parallel test's git commands
+/// write to, so whole-frame comparisons flaked when another test logged a
+/// command between two frames.
+fn above_the_log(frame: &str) -> String {
+    let lines: Vec<&str> = frame.lines().collect();
+    lines[..lines.len().saturating_sub(5)].join("\n")
+}
+
 #[test]
 fn help_scroll_keys_stop_at_both_ends_and_closing_resets_the_position() {
     let (_dir, mut app) = app_with("hints-ends", "");
     app.feed_key(key('?'));
-    let top = frame(&mut app, 100, 24);
+    let top = above_the_log(&frame(&mut app, 100, 24));
     app.feed_key(key('k'));
-    assert_eq!(frame(&mut app, 100, 24), top, "already at the top");
+    assert_eq!(
+        above_the_log(&frame(&mut app, 100, 24)),
+        top,
+        "already at the top"
+    );
 
     app.feed_key(KeyEvent::from(KeyCode::End));
-    let bottom = frame(&mut app, 100, 24);
+    let bottom = above_the_log(&frame(&mut app, 100, 24));
     assert_ne!(bottom, top);
     app.feed_key(key('j'));
-    assert_eq!(frame(&mut app, 100, 24), bottom, "already at the bottom");
+    assert_eq!(
+        above_the_log(&frame(&mut app, 100, 24)),
+        bottom,
+        "already at the bottom"
+    );
 
     app.feed_key(KeyEvent::from(KeyCode::Home));
-    assert_eq!(frame(&mut app, 100, 24), top);
+    assert_eq!(above_the_log(&frame(&mut app, 100, 24)), top);
     app.feed_key(KeyEvent::from(KeyCode::PageDown));
-    assert_ne!(frame(&mut app, 100, 24), top, "a page moves it");
+    assert_ne!(
+        above_the_log(&frame(&mut app, 100, 24)),
+        top,
+        "a page moves it"
+    );
 
     app.feed_key(key('?')); // close, scrolled
     app.feed_key(key('?')); // reopen
-    assert_eq!(frame(&mut app, 100, 24), top, "back at the top");
+    assert_eq!(
+        above_the_log(&frame(&mut app, 100, 24)),
+        top,
+        "back at the top"
+    );
+}
+
+#[test]
+fn while_the_help_is_open_the_bar_shows_only_the_keys_that_work_in_it() {
+    let (_dir, mut app) = app_with("hints-help-bar", "");
+    for pane in ['1', '2', '3', '4', '5'] {
+        app.feed_key(key(pane));
+        app.feed_key(key('?'));
+        let last = frame(&mut app, 100, 24)
+            .lines()
+            .last()
+            .unwrap()
+            .trim_matches(|c: char| c == '"' || c.is_whitespace())
+            .to_owned();
+        assert_eq!(last, "Close: esc/? | Scroll: j/k", "pane {pane}");
+        app.feed_key(key('?'));
+        let back = frame(&mut app, 100, 24);
+        assert!(!back.lines().last().unwrap().contains("Close"), "{back}");
+    }
 }
 
 #[test]

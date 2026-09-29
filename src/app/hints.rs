@@ -132,7 +132,13 @@ pub enum Bar {
     RightPane,
     /// A merge, rebase, cherry-pick or revert is stopped: `m` is the way out.
     Operation,
+    /// The help screen is up: only its own fixed keys work (`help_key`), so
+    /// only those are shown (lazygit swaps the bar for the popup's keys too).
+    Help,
 }
+
+/// The help screen's bar. Not remappable and not clickable, like the keys.
+const HELP_BAR: &str = "Close: esc/? | Scroll: j/k";
 
 /// One hint segment: the actions whose keys it shows, each in its home context.
 type Segment = &'static [(Context, Action)];
@@ -206,6 +212,7 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Files, Action::StageAll)],
             &[(Context::Global, Action::Commit)],
         ],
+        Bar::Help => &[],
     }
 }
 
@@ -280,6 +287,12 @@ pub struct Keybar {
 /// the pinned `Help` and `Quit` (last one first).
 pub fn keybar_layout(keymap: &Keymap, bar: Bar, width: usize) -> Keybar {
     const SEPARATOR: &str = " | ";
+    if bar == Bar::Help {
+        return Keybar {
+            text: HELP_BAR.to_owned(),
+            hits: Vec::new(),
+        };
+    }
     let mut segments: Vec<Rendered> = body(bar)
         .iter()
         .filter_map(|&segment| segment_text(keymap, segment))

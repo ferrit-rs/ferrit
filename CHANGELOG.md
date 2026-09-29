@@ -7,6 +7,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- While the help is open the key bar shows the help's own keys, `Close: esc/? | Scroll: j/k`, instead of the focused pane's keys, and the help no longer covers the bar; like lazygit swapping in the popup's keys.
 - ferrit opens on the Files pane with the first row selected and its diff on the right, like lazygit; the Status pane (`1`) keeps the welcome screen with the logo.
 - `s` (squash) on Commits asks first, like drop and like lazygit: `squash <hash> <subject> into <hash> <subject>?`, `Enter`/`y` confirms, `n`/`Esc` rewrites nothing. On the oldest commit it still just says there is no commit below. `S` (fixup) still acts at once.
 - Enter confirms every key-bar question (drop, apply / pop / drop stash, delete branch, discard, force-push, abort), like lazygit's popups; `y` still does, `n` / `Esc` cancel. The prompt reads `Enter/y yes`. On Branches the Enter no longer risks opening the commits.
