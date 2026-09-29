@@ -7,33 +7,37 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-29
+
+### Added
+
 - `D` opens a full-screen repository dashboard, which lazygit does not have: the totals and the commits since the last tag as stat tiles, the activity over time as a line chart, the kinds of change (`feat`, `fix`, `docs`…) as a donut, contributors with their share of the commits and of the lines added and removed, a commits-per-day heat map (squares in a colour ramp, glyph density with `NO_COLOR`), the files most often changed (lockfiles and changelogs left out, and said so), and the branches with their state against the main branch (`stale` after 60 days). Shares read as percentages first, and as counts when the whole is under 20 items or after `n`. `t` / `T` change the window (7 days, 30 days, 90 days, 1 year, all), `r` recomputes, `Esc`, `q` or `D` leave, the wheel and `j`/`k` scroll. The numbers are computed in the background and the screen appears at once, the lines added and removed following. The page is one thin border, at most 110 columns wide and centred, with thin bars and no boxes between sections. The key can be rebound (`dashboard`).
+- `M` on a branch other than the current one opens a Merge menu, like lazygit, and merges nothing until a row is chosen (`Esc` leaves the repo untouched): merge (fast-forward when possible), merge with `--no-ff`, squash and leave the changes staged, squash and commit. A line under the menu explains the highlighted row. On the current branch `M` still runs the plain merge at once. Before, `M` merged immediately.
+- A branch level with its upstream shows a tick (`✓`) in the Status line and on its Branches row, like lazygit (`ferrit → main ✓`). A branch with no upstream, or ahead or behind, shows none.
+- The branch Log prints each commit's message body under its subject, and its Author line ends with the author's email (`Author: Name <email>`), like lazygit.
+- The Stash right pane starts with the stash's subject (`stash@{0}: On main: wip`, yellow) and the `git stash show --stat` summary above the patch, like lazygit.
 
-- README comparison table lists three planned capabilities lazygit does not have: a repository statistics dashboard, editing the Git config, and creating the remote repository from the interface (`docs/PLAN_13_DASHBOARD.md`, `PLAN_14_GIT_CONFIG.md`, `PLAN_15_CREATE_REMOTE.md`).
+### Changed
 
-- The Files pane colours by staging state like lazygit: the name of a fully staged file is green with its letter and one staged then changed again (`MM`) is yellow, a directory's arrow and name (and the `/` root) are green when everything under it is staged and yellow when only part is, and the selected row keeps those colours on its bar.
-- The Files tree has lazygit's shape: a chain of single-child directories folds into one row (`▼ x/y/z`), and the `/` root row only shows when the root has two or more children (a lone directory or file is first, no root).
+- ferrit opens on the Files pane with the first row selected and its diff on the right, like lazygit; the Status pane (`1`) keeps the welcome screen with the logo.
+- Enter confirms every key-bar question (drop, apply / pop / drop stash, delete branch, discard, force-push, abort), like lazygit's popups; `y` still does, `n` / `Esc` cancel. The prompt reads `Enter/y yes`. On Branches the Enter no longer risks opening the commits.
+- `s` (squash) on Commits asks first, like drop and like lazygit: `squash <hash> <subject> into <hash> <subject>?`, `Enter`/`y` confirms, `n`/`Esc` rewrites nothing. On the oldest commit it still just says there is no commit below. `S` (fixup) still acts at once.
 - `n` on Branches creates the new branch from the selected branch, not from the checked-out one, and the prompt names it (`branch is off of '<selected>'`); no upstream is set from it. Same as lazygit; with the current branch selected nothing changes.
 - While the help is open the key bar shows the help's own keys, `Close: esc/? | Scroll: j/k`, instead of the focused pane's keys, and the help no longer covers the bar; like lazygit swapping in the popup's keys.
-- ferrit opens on the Files pane with the first row selected and its diff on the right, like lazygit; the Status pane (`1`) keeps the welcome screen with the logo.
-- `s` (squash) on Commits asks first, like drop and like lazygit: `squash <hash> <subject> into <hash> <subject>?`, `Enter`/`y` confirms, `n`/`Esc` rewrites nothing. On the oldest commit it still just says there is no commit below. `S` (fixup) still acts at once.
-- Enter confirms every key-bar question (drop, apply / pop / drop stash, delete branch, discard, force-push, abort), like lazygit's popups; `y` still does, `n` / `Esc` cancel. The prompt reads `Enter/y yes`. On Branches the Enter no longer risks opening the commits.
-- The Infos box shows every line git printed after a write (at most 8), not only the first: after a commit the `[branch hash] subject` line, the stat and `create mode`, like lazygit's command log; the box grows to fit and the `@` viewer lists the same lines.
-- With no stash entries the Stash right pane says `No stash entries`, like lazygit. Before it was empty.
-- The Stash right pane starts with the stash's subject (`stash@{0}: On main: wip`, yellow) and the `git stash show --stat` summary above the patch, like lazygit.
-- `x` on a row with no extra actions does nothing, like lazygit. Before it set a red `error: no extra actions for this row` in Status that stayed until the next refresh.
+- The Files tree has lazygit's shape: a chain of single-child directories folds into one row (`▼ x/y/z`), and the `/` root row shows when the root has two or more entries (two changed files at the repo root read "1 of 3", the right pane then shows the diff of all changes, `j` reaches the first file and Space on the root stages everything); a lone directory or a lone changed file comes first with no root row ("1 of 1"). Before, a flat list started on the first file, so the same keys landed on different files in the two programs.
+- The Files pane colours by staging state like lazygit: the name of a fully staged file is green with its letter and one staged then changed again (`MM`) is yellow, a directory's arrow and name (and the `/` root) are green when everything under it is staged and yellow when only part is, and the selected row keeps those colours on its bar.
 - With nothing changed the Files key bar shows `Commit`, `Stash`, `Reword`, `Fetch/Pull/Push`, `Help` and `Quit`, like lazygit; Stage, All, Discard and Amend have nothing to act on and are gone. Before it offered them.
-- A branch level with its upstream shows a tick (`✓`) in the Status line and on its Branches row, like lazygit (`ferrit → main ✓`). A branch with no upstream, or ahead or behind, shows none.
-- On a branch with no upstream the commit hashes are no longer red: yellow, or green when merged into `origin/main`, like lazygit. Before, every commit there counted as not pushed yet. With an upstream nothing changes.
-- The branch Log prints each commit's message body under its subject, like lazygit; a commit with no body looks as before.
-- The Author line of the branch Log ends with the author's email, `Author: Name <email>`, like lazygit.
-- With no stash entries the Stash pane's key bar shows only `Help: ?` and `Quit: q`, like lazygit. Before it offered Apply, Pop and Drop, which do nothing there.
-- Enter on a commit lists its changed files expanded, like lazygit: no root row, single-child directories folded (`▼ test/flows`, then `A stash.flow`, "1 of 2"). Before it showed one collapsed `▶ /` row, because the same Enter also toggled the first row, and the Files pane's collapsed directories leaked into the list.
+- With no stash entries the Stash right pane says `No stash entries` and the key bar shows only `Help: ?` and `Quit: q`, like lazygit. Before the pane was empty and the bar offered Apply, Pop and Drop, which do nothing there.
 - After a confirmed Apply (`Space`) or Pop (`g`) on the Stash pane, the focus moves to Files with the first restored file selected and its diff on the right, like lazygit. Before, the focus stayed on Stash (after Pop, on an empty pane). Drop, a conflict and a failed Apply or Pop leave the focus where it was.
-- `M` on a branch other than the current one opens a Merge menu, like lazygit, and merges nothing until a row is chosen (`Esc` leaves the repo untouched): merge (fast-forward when possible), merge with `--no-ff`, squash and leave the changes staged, squash and commit. A line under the menu explains the highlighted row. On the current branch `M` still runs the plain merge at once. Before, `M` merged immediately.
+- The Infos box shows every line git printed after a write (at most 8), not only the first: after a commit the `[branch hash] subject` line, the stat and `create mode`, like lazygit's command log; the box grows to fit and the `@` viewer lists the same lines.
+- README comparison table lists three planned capabilities lazygit does not have: a repository statistics dashboard, editing the Git config, and creating the remote repository from the interface (`docs/PLAN_13_DASHBOARD.md`, `PLAN_14_GIT_CONFIG.md`, `PLAN_15_CREATE_REMOTE.md`).
 
+### Fixed
+
+- `x` on a row with no extra actions does nothing, like lazygit. Before it set a red `error: no extra actions for this row` in Status that stayed until the next refresh.
+- Enter on a commit lists its changed files expanded, like lazygit: no root row, single-child directories folded (`▼ test/flows`, then `A stash.flow`, "1 of 2"). Before it showed one collapsed `▶ /` row, because the same Enter also toggled the first row, and the Files pane's collapsed directories leaked into the list.
+- On a branch with no upstream the commit hashes are no longer red: yellow, or green when merged into `origin/main`, like lazygit. Before, every commit there counted as not pushed yet. With an upstream nothing changes.
 - Clicking the right (Patch / Diff) pane focuses only that pane, like lazygit: the left pane you came from is drawn unfocused (no green border, no blue selection bar), and the key bar shows `Switch view: tab | Back: esc | Help | Quit` instead of that pane's actions. `Tab`, `Shift-Tab` and `1`-`5` also hand focus back to a left pane.
-- The Files pane always starts on the `▼ /` root row, like lazygit, even when every changed file sits at the repo root: the counter reads "1 of 3" with two changed files, the right pane shows the diff of all changes, `j` reaches the first file, and Space on the root stages everything. A lone changed file at the repo root has no root row ("1 of 1"), as in lazygit. Before, a flat list started on the first file, so the same keys landed on different files in the two programs.
 
 ## [0.7.0] - 2026-09-29
 
@@ -401,7 +405,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ferrit-rs/ferrit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ferrit-rs/ferrit/compare/v0.4.0...v0.5.0
