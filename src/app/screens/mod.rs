@@ -582,7 +582,14 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // files, no commits) just leaves the pane blank.
     if !app.is_mock() {
         let empty_files = app.focus == Pane::Files && app.row_count(Pane::Files) == 0;
-        let text = if empty_files { "No changed files" } else { "" };
+        let empty_stash = app.focus == Pane::Stash && app.row_count(Pane::Stash) == 0;
+        let text = if empty_files {
+            "No changed files"
+        } else if empty_stash {
+            "No stash entries"
+        } else {
+            ""
+        };
         frame.render_widget(Paragraph::new(text).block(block), area);
         return;
     }

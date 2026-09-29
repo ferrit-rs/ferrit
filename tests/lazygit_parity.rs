@@ -118,6 +118,18 @@ fn an_empty_working_tree_gives_a_diff_pane_that_says_so() {
     assert!(!out.contains("No changed files"), "{out}");
 }
 
+/// Done when: with no stash entries and the Stash pane focused, the right pane says
+/// "No stash entries", as lazygit's does (repo-tour step 8).
+#[test]
+fn an_empty_stash_pane_says_no_stash_entries() {
+    let repo = Repo::new("empty-stash");
+    repo.commit("a.txt", "one\n", "init");
+    let mut app = repo.app();
+    key(&mut app, '5');
+    let out = frame(&mut app);
+    assert!(out.contains("No stash entries"), "{out}");
+}
+
 /// Done when: with a stash selected, the right pane starts with the stash's own
 /// subject, then its stat, then the patch (stash step 6).
 #[test]

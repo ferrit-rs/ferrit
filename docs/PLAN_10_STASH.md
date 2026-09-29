@@ -240,7 +240,7 @@ up top for why `mock::KEYBAR` is unchanged).
 
 ### Right pane
 
-The empty-stash text stays as the empty state. With an
+With no entry the right pane says `No stash entries`, as lazygit does. With an
 entry selected, the right pane shows `stash@{n}: <message>` (yellow), a blank
 line, `git stash show --stat -p` (the stat, a blank line, the patch) for its oid through the existing async
 diff worker (`diff_query::load`), so it inherits scroll, the scrollbar,
