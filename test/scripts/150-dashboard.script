@@ -1,0 +1,49 @@
+# Phase 13, the repository dashboard: `D` replaces the panes with one full-screen
+# view of the statistics, `t` changes the window, `n` swaps percentages and
+# counts, `Esc` gives the panes back untouched.
+fixture history
+size 200x50
+
+key D
+expect-text "Dashboard"
+expect-text "window: 90 days (t)"
+expect-text "What was done"
+expect-text "Contributors"
+expect-text "Branches"
+expect-text "In progress"
+expect-text "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?"
+expect-no-text "[2] Files"                # the panes are not drawn behind it
+# The fixture's commits are months old: nothing in 90 days, and it says so.
+expect-text "no commits in this window"
+
+key t
+expect-text "window: 1 year (t)"
+expect-no-text "no commits in this window"
+expect-text "Ferrit Fixture"              # the one author of the fixture
+expect-text "no conventional prefixes"     # none of its subjects says feat: or fix:
+expect-no-text "%"                         # a whole of 4 commits is counted, not shared
+snapshot year
+
+key n                                      # counts first, percentages after
+snapshot counts
+key n
+
+key T
+expect-text "window: 90 days (t)"
+key t
+
+key j j
+key esc
+expect-no-text "Dashboard"
+expect-text "[2] Files"
+expect-text "[4] Commits"
+
+# The key that opens it closes it, and q leaves it without quitting ferrit.
+key D
+expect-text "Dashboard"
+key D
+expect-no-text "Dashboard"
+key D
+key q
+expect-no-text "Dashboard"
+expect-text "[4] Commits"

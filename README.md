@@ -26,7 +26,7 @@ the commit flow.
 | Repository profile drawer | ✅ | ❌ | Settings and repository activity in one place |
 | Contributor ranking | ✅ | ❌ | Commit count by author |
 | Recent activity across local and fetched remote branches | ✅ | ❌ | Includes unmerged branch activity |
-| Repository statistics dashboard | ⚠️ | ❌ | Planned for Ferrit: activity over time, contributors, kinds of change, branch health |
+| Repository statistics dashboard | ✅ | ❌ | `D`: activity over time, contributors, kinds of change, hot files, branch health, with charts |
 | Edit Git config from the interface | ⚠️ | ❌ | Planned for Ferrit: every key with its scope, edited through `git config` |
 | Create the remote repository from the interface | ⚠️ | ❌ | Planned for Ferrit: GitHub through `gh`, private by default, then push |
 | Custom commands | ⚠️ | ✅ | Planned for Ferrit; lazygit supports user-defined commands |

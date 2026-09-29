@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+- `D` opens a full-screen repository dashboard, which lazygit does not have: totals and the commits since the last tag, the activity over time as a line chart, the kinds of change (`feat`, `fix`, `docs`…) as a donut, contributors with their share of the commits and of the lines added and removed, a commits-per-day heat map, the files most often changed (lockfiles and changelogs left out, and said so), and the branches with their state against the main branch (`stale` after 60 days). Shares read as percentages first, and as counts when the whole is under 20 items or after `n`. `t` / `T` change the window (7 days, 30 days, 90 days, 1 year, all), `r` recomputes, `Esc`, `q` or `D` leave, the wheel and `j`/`k` scroll. The numbers are computed in the background and the screen appears at once, the lines added and removed following. The key can be rebound (`dashboard`).
+
 - README comparison table lists three planned capabilities lazygit does not have: a repository statistics dashboard, editing the Git config, and creating the remote repository from the interface (`docs/PLAN_13_DASHBOARD.md`, `PLAN_14_GIT_CONFIG.md`, `PLAN_15_CREATE_REMOTE.md`).
 
 - The Files pane colours by staging state like lazygit: the name of a fully staged file is green with its letter and one staged then changed again (`MM`) is yellow, a directory's arrow and name (and the `/` root) are green when everything under it is staged and yellow when only part is, and the selected row keeps those colours on its bar.
