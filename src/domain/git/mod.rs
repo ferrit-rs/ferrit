@@ -21,6 +21,7 @@ pub mod config_keys;
 pub mod diff;
 pub mod error;
 mod exec;
+pub mod host;
 pub mod log;
 pub mod model;
 pub mod operation;
