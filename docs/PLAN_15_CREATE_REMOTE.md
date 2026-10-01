@@ -1,6 +1,6 @@
 # Plan: phase 15, create a remote repository from ferrit
 
-**Status: in progress (R0 to R4 done: `src/domain/git/host.rs` validates, checks `gh` and creates the repository through it; the popups, the `x` menu entry and the push after creating exist; the replay script and the docs are R5).** lazygit cannot create a remote
+**Status: built (R0 to R5).** `x` with no remote offers it. lazygit cannot create a remote
 repository, so this phase is not compared with it; it is checked with the replay
 harness (with a fake `gh`) and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -211,7 +211,7 @@ conventions as the other popups and key-bar questions, but for the public case).
 | user cancels the credential popup | the push fails with git's message; same as any push |
 | the URL `gh` wrote is wrong for the user's SSH setup | untick "Push after creating", fix it with `git remote set-url` in a shell, then `P` |
 | folder name is not a valid repo name (spaces, unicode) | the default is a sanitised version, editable, validated before running |
-| running under the replay harness | uses the injected fake program; without one, the entry is inert (no real `gh` call from tests) |
+| running under the replay harness | the runner installs a fake `gh` for every session (`src/replay/fake_gh.rs`): the replay never runs a real one; tests of other features never reach the entry |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
@@ -246,8 +246,9 @@ conventions as the other popups and key-bar questions, but for the public case).
 - **R3** ✅ the popups (checking, form, confirm with the Enter-does-not-confirm
   public case) and the `x` menu entry (`tests/create_remote_screen.rs`).
 - **R4** ✅ push through `push_with_upstream`, the partial-failure notes.
-- **R5** error and edge-case coverage, replay script, README row, CHANGELOG line,
-  update `PLAN_9_REMOTE.md` ("no remote" row of its edge cases).
+- **R5** ✅ edge-case coverage, replay script (`src/replay/fake_gh.rs` installs the
+  fake for every session), README row, CHANGELOG line, `PLAN_9_REMOTE.md` ("no
+  remote" row of its edge cases).
 
 ## Definition of done (phase 15)
 

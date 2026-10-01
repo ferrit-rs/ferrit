@@ -397,7 +397,7 @@ username, `yes/no`). Only a key not already in `ssh-agent` reaches it.
 | `f`/`p`/`P` pressed while one is already running | ignored outright (`remote_busy.is_some()`), no queueing |
 | a background fetch/pull/push finishes while a *local* `refresh()` (fs-watch, poll, `r`) also fires | both call `refresh()`; idempotent, same as phase 7's "commit finishes, fs-watch also fires" case |
 | `App::mock()` (no repo) | `f`/`p`/`P` no-op immediately, no thread spawned — `repo_handle()` returns `None` before `thread::spawn` |
-| no remote configured, `P` pressed | editable prompt suggests `origin`; Git error shown on submit |
+| no remote configured, `P` pressed | editable prompt suggests `origin`; Git error shown on submit. Publishing the repository first is the `x` menu's "Create a repository on GitHub" (`PLAN_15_CREATE_REMOTE.md`), which pushes through this phase's own push path |
 | quitting ferrit (`q`/`Ctrl-c`) while a fetch/pull/push is mid-flight | the spawned thread is detached (`thread::spawn`, not joined); the process exits and the child `git` either finishes writing (harmless, nothing left to read the result) or is killed with it — no different from `Ctrl-c`-ing `git fetch` running standalone in a shell |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
