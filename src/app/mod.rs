@@ -669,6 +669,7 @@ pub struct App {
     full_screen: FullScreen,
     dashboard: dashboard::Dashboard,
     git_config: git_config::GitConfigScreen,
+    create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -698,6 +699,7 @@ mod askpass;
 mod branch_actions;
 mod commit;
 mod context_menu;
+pub mod create_remote;
 pub mod dashboard;
 pub mod diff_query;
 mod dispatch;
@@ -833,6 +835,7 @@ impl App {
             full_screen: FullScreen::None,
             dashboard: dashboard::Dashboard::default(),
             git_config: git_config::GitConfigScreen::default(),
+            create_remote: create_remote::CreateRemote::default(),
             status_note: None,
             event_sender: None,
             refresh_query: RefreshQueryState::default(),
@@ -1525,6 +1528,7 @@ impl App {
             AppEvent::DiffDone(completion) => self.on_diff_done(completion),
             AppEvent::ImageDone(completion) => self.on_image_done(completion),
             AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
+            AppEvent::RemoteCreated(result) => self.on_remote_created(result),
             AppEvent::Askpass { prompt, reply } => self.on_askpass(prompt, reply),
             AppEvent::StatsDone(completion) => self.on_stats_done(completion),
             AppEvent::Input(_) => {},

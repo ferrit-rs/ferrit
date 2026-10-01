@@ -47,9 +47,12 @@ pub enum AppEvent {
         op: RemoteOp,
         message: Result<String, String>,
     },
+    /// `gh repo create` finished: the repository's web URL, or why not
+    /// (`app::create_remote`).
+    RemoteCreated(Result<String, String>),
 }
 
-/// Which of the three network operations finished. Distinct from
+/// Which of the network operations finished. Distinct from
 /// `git::error::GitError`'s own per-operation variants: this is *which action ran*,
 /// not *why it failed* — `App::remote_busy_label` and the eventual result
 /// both need to know which of the three is in flight / just finished.
@@ -58,6 +61,9 @@ pub enum RemoteOp {
     Fetch,
     Pull,
     Push,
+    /// `gh repo create` (`app::create_remote`): it has its own start, since it
+    /// takes a form's fields, but it shares the slot with the other three.
+    Create,
 }
 
 /// Debounce window for filesystem bursts. `git` touches a dozen files per

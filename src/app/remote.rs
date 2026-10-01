@@ -189,6 +189,8 @@ impl App {
                     set_upstream_current,
                     &cancel,
                 ),
+                // Started by `start_create_remote`, never through here.
+                events::RemoteOp::Create => Ok(String::new()),
             })
             .map_err(|error| error.to_string())
             .and_then(|result| result.map_err(|error| error.to_string()));
@@ -237,6 +239,7 @@ impl App {
             events::RemoteOp::Fetch => Some("Fetching\u{2026}"),
             events::RemoteOp::Pull => Some("Pulling\u{2026}"),
             events::RemoteOp::Push => Some("Pushing\u{2026}"),
+            events::RemoteOp::Create => Some("Creating repository\u{2026}"),
         }
     }
 
@@ -246,6 +249,7 @@ impl App {
             events::RemoteOp::Fetch => "Fetching",
             events::RemoteOp::Pull => "Pulling",
             events::RemoteOp::Push => "Pushing",
+            events::RemoteOp::Create => "Creating",
         };
         let elapsed = self.remote_busy_started?.elapsed().as_millis();
         let frame = ["●∙∙", "∙●∙", "∙∙●", "∙●∙"]
