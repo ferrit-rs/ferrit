@@ -102,12 +102,27 @@ fn run_command(
     err: &impl Fn(String) -> GitError,
 ) -> GitResult<Output> {
     let mut command = exec::git(workdir);
+    command.args(args);
+    askpass::configure(&mut command);
+    run_child(command, "git", REMOTE_TIMEOUT, cancel, err)
+}
+
+/// Run an already-built `command` to completion: piped output, stdin closed,
+/// its own process group, recorded in the command log, stopped when `cancel`
+/// is set or `timeout` passes. `name` is how the program is called in the
+/// messages (`git`, `gh`). Shared by git's network commands and `gh`
+/// (`domain::git::host`).
+pub(super) fn run_child(
+    mut command: Command,
+    name: &str,
+    timeout: Duration,
+    cancel: Option<&AtomicBool>,
+    err: &impl Fn(String) -> GitError,
+) -> GitResult<Output> {
     command
-        .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    askpass::configure(&mut command);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -116,36 +131,36 @@ fn run_command(
     let tracked = exec::track(&command);
     let mut child = command
         .spawn()
-        .map_err(|e| err(format!("cannot run git: {e}")))?;
+        .map_err(|e| err(format!("cannot run {name}: {e}")))?;
     let pid = child.id();
     let stdout = child.stdout.take().ok_or_else(|| {
         stop_process_group(&mut child, pid);
-        err("cannot capture git stdout".to_owned())
+        err(format!("cannot capture {name} stdout"))
     })?;
     let stderr = child.stderr.take().ok_or_else(|| {
         stop_process_group(&mut child, pid);
-        err("cannot capture git stderr".to_owned())
+        err(format!("cannot capture {name} stderr"))
     })?;
     let stdout_reader = thread::spawn(move || read_all(stdout));
     let stderr_reader = thread::spawn(move || read_all(stderr));
-    let deadline = Instant::now() + REMOTE_TIMEOUT;
+    let deadline = Instant::now() + timeout;
 
     let status = loop {
         if cancel.is_some_and(|flag| flag.load(Ordering::Acquire)) {
             stop_process_group(&mut child, pid);
-            let output = collect_output(stdout_reader, stderr_reader);
+            let output = collect_output(stdout_reader, stderr_reader, name);
             return Err(err(with_diagnostics("cancelled during shutdown", &output)));
         }
         if Instant::now() >= deadline {
             stop_process_group(&mut child, pid);
-            let output = collect_output(stdout_reader, stderr_reader);
-            let reason = format!("timed out after {} seconds", REMOTE_TIMEOUT.as_secs());
+            let output = collect_output(stdout_reader, stderr_reader, name);
+            let reason = format!("timed out after {} seconds", timeout.as_secs());
             return Err(err(with_diagnostics(&reason, &output)));
         }
         match child.try_wait() {
             Err(e) => {
                 stop_process_group(&mut child, pid);
-                return Err(err(format!("cannot wait for git: {e}")));
+                return Err(err(format!("cannot wait for {name}: {e}")));
             },
             Ok(Some(status)) => break status,
             Ok(None) => thread::sleep(POLL_INTERVAL),
@@ -154,12 +169,12 @@ fn run_command(
     tracked.finish(status.code());
     let stdout = stdout_reader
         .join()
-        .map_err(|_| err("git stdout reader panicked".to_owned()))?
-        .map_err(|e| err(format!("cannot read git stdout: {e}")))?;
+        .map_err(|_| err(format!("{name} stdout reader panicked")))?
+        .map_err(|e| err(format!("cannot read {name} stdout: {e}")))?;
     let stderr = stderr_reader
         .join()
-        .map_err(|_| err("git stderr reader panicked".to_owned()))?
-        .map_err(|e| err(format!("cannot read git stderr: {e}")))?;
+        .map_err(|_| err(format!("{name} stderr reader panicked")))?
+        .map_err(|e| err(format!("cannot read {name} stderr: {e}")))?;
     let out = Output {
         status,
         stdout,
@@ -177,9 +192,10 @@ fn read_all(mut reader: impl Read) -> io::Result<Vec<u8>> {
 fn collect_output(
     stdout_reader: JoinHandle<io::Result<Vec<u8>>>,
     stderr_reader: JoinHandle<io::Result<Vec<u8>>>,
+    name: &str,
 ) -> String {
-    let stdout = read_output(stdout_reader, "stdout");
-    let stderr = read_output(stderr_reader, "stderr");
+    let stdout = read_output(stdout_reader, "stdout", name);
+    let stderr = read_output(stderr_reader, "stderr", name);
     [stdout, stderr]
         .into_iter()
         .filter(|part| !part.is_empty())
@@ -187,11 +203,11 @@ fn collect_output(
         .join("\n")
 }
 
-fn read_output(reader: JoinHandle<io::Result<Vec<u8>>>, stream: &str) -> String {
+fn read_output(reader: JoinHandle<io::Result<Vec<u8>>>, stream: &str, name: &str) -> String {
     match reader.join() {
         Ok(Ok(bytes)) => String::from_utf8_lossy(&bytes).trim().to_owned(),
-        Ok(Err(error)) => format!("cannot read git {stream}: {error}"),
-        Err(_) => format!("git {stream} reader panicked"),
+        Ok(Err(error)) => format!("cannot read {name} {stream}: {error}"),
+        Err(_) => format!("{name} {stream} reader panicked"),
     }
 }
 
