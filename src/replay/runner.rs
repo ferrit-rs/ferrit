@@ -15,6 +15,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthStr;
 
+use super::fake_gh;
 use super::fixture::{self, Fixture};
 use super::script::{Directive, Expect, Script, Step};
 use crate::app::config::{Config, ConfigLoad};
@@ -169,6 +170,7 @@ impl Session {
 
     fn reopen(&mut self, load: ConfigLoad) -> Result<(), String> {
         self.app = App::open_with(&self.fixture.dir, load).map_err(|e| e.to_string())?;
+        fake_gh::install(&self.fixture.root, &mut self.app);
         self.draw()
     }
 
@@ -317,7 +319,8 @@ pub fn run(script: &Script, options: &Options) -> Result<Outcome, Failure> {
     }
     let fixture = Fixture::build(&name, options.keep_fixture_in.as_deref())
         .map_err(|message| fail(0, message, ""))?;
-    let app = App::open(&fixture.dir).map_err(|e| fail(0, e.to_string(), ""))?;
+    let mut app = App::open(&fixture.dir).map_err(|e| fail(0, e.to_string(), ""))?;
+    fake_gh::install(&fixture.root, &mut app);
     let (width, height) = options.size;
     let terminal = Terminal::new(TestBackend::new(width, height))
         .map_err(|e| fail(0, format!("cannot make a terminal: {e}"), ""))?;

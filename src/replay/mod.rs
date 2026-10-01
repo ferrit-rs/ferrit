@@ -7,6 +7,7 @@
 //! - `script`: the format and its parser (shared by the runner and the
 //!   `vhs` tape generator, so a directive is added in one place).
 //! - `fixture`: named, deterministic repositories.
+//! - `fake_gh`: a stand-in for `gh`, so the repository creation can be replayed.
 //! - `runner`: steps a script through an `App` and a `TestBackend`.
 //! - `tape`: turns a script into a `vhs` tape for human-facing screenshots.
 //!
@@ -15,6 +16,7 @@
 //! inspects repositories rather than operating one on the user's behalf.
 
 pub mod cli;
+pub mod fake_gh;
 pub mod fixture;
 pub mod runner;
 pub mod script;

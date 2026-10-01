@@ -1,0 +1,51 @@
+# Phase 15, create the repository on GitHub from the `x` menu. `gh` is a fake
+# that makes a bare repository next to the fixture, so nothing reaches GitHub.
+# The form is private by default, a public repository takes a `y` and never
+# Enter, `Esc` at the question goes back, and the creation pushes the branch.
+fixture canonical
+size 120x40
+
+# A repository with no remote can be published; the entry is optional.
+key 1
+key x
+expect-text "Create a repository on GitHub"
+key g
+expect-text "Create on GitHub"
+expect-text "(•) private"
+expect-text "( ) public"
+expect-text "after creating"
+snapshot form
+
+# The last question for a private repository: Enter creates, Esc goes back.
+key enter
+expect-text "PRIVATE repository"
+expect-text "add remote `origin`"
+expect-text "Enter/y: create"
+key esc
+expect-text "Create on GitHub"
+git remote => ""
+
+# Public: the question is red-worded, Enter does nothing, only y creates.
+key tab space enter
+expect-text "PUBLIC repository"
+expect-text "Everyone can read its history."
+expect-text "y: create (Enter does not)"
+snapshot public
+key enter
+expect-text "PUBLIC repository"
+git remote => ""
+
+# Back to private, then create: the branch is pushed to what gh made.
+key esc
+key space
+key enter
+expect-text "PRIVATE repository"
+async-key y
+git remote => "origin"
+git ls-remote origin -> "refs/heads/main"
+git rev-parse --abbrev-ref @{u} => "origin/main"
+snapshot created
+
+# With a remote the entry is gone.
+key x
+expect-no-text "Create a repository on GitHub"
