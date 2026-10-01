@@ -1,6 +1,6 @@
 # Plan: phase 15, create a remote repository from ferrit
 
-**Status: in progress (R0 to R2 done: `src/domain/git/host.rs` validates, checks `gh` and creates the repository through it; no screen and no key yet).** lazygit cannot create a remote
+**Status: in progress (R0 to R3 done: `src/domain/git/host.rs` validates, checks `gh` and creates the repository through it; the popups and the `x` menu entry exist; the push after creating is R4).** lazygit cannot create a remote
 repository, so this phase is not compared with it; it is checked with the replay
 harness (with a fake `gh`) and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -243,8 +243,8 @@ conventions as the other popups and key-bar questions, but for the public case).
   through the same timeout (the child-process runner of `remote.rs` is shared).
 - **R2** ✅ `create_remote.rs` state, `RemoteOp::Create`, `AppEvent::RemoteCreated`,
   busy label, the draft kept across the operation (`tests/app_create_remote.rs`).
-- **R3** the popups (checking, form, confirm with the Enter-does-not-confirm
-  public case) and the `x` menu entry.
+- **R3** ✅ the popups (checking, form, confirm with the Enter-does-not-confirm
+  public case) and the `x` menu entry (`tests/create_remote_screen.rs`).
 - **R4** push through `push_with_upstream`, the partial-failure notes.
 - **R5** error and edge-case coverage, replay script, README row, CHANGELOG line,
   update `PLAN_9_REMOTE.md` ("no remote" row of its edge cases).

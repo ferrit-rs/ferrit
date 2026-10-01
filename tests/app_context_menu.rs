@@ -156,6 +156,12 @@ fn branch_names(dir: &Path) -> Vec<String> {
 fn the_branches_menu_offers_rename_and_no_ff_for_the_selected_branch() {
     let dir = history("x-branches");
     git(dir.path(), &["branch", "topic"]);
+    // A published repository: with no remote the menu also offers to create one
+    // (`tests/app_create_remote.rs`).
+    git(
+        dir.path(),
+        &["remote", "add", "origin", "https://example.com/x.git"],
+    );
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('3'));
     app.feed_key(char_key('x'));

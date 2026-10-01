@@ -71,7 +71,7 @@ impl App {
             return;
         }
         let index = self.selected(self.focus);
-        let (title, items) = match self.focus {
+        let (title, mut items) = match self.focus {
             Pane::Files if self.mode == Mode::Nav => match self.selected_file() {
                 Some(file)
                     if file.staged == git::model::Change::Conflicted
@@ -125,9 +125,26 @@ impl App {
             },
             _ => (String::new(), Vec::new()),
         };
+        // A repository with no remote can be published: optional, any time.
+        let publishable = self.remotes.is_empty()
+            && (self.focus == Pane::Status
+                || (self.focus == Pane::Branches && self.branch_drill.is_none()));
+        if publishable {
+            items.push(MenuItem {
+                label: "Create a repository on GitHub",
+                shortcut: 'g',
+                action: MenuAction::CreateRemote,
+                hint: "Needs gh. Private by default; asks again before creating.",
+            });
+        }
         if items.is_empty() {
             return;
         }
+        let title = if title.is_empty() {
+            "Repository".to_owned()
+        } else {
+            title
+        };
         self.popup = Some(Popup::Menu(MenuState {
             title,
             items,
@@ -199,7 +216,8 @@ impl App {
             MenuAction::Continue
             | MenuAction::Skip
             | MenuAction::Abort
-            | MenuAction::ConfigValue(_) => {},
+            | MenuAction::ConfigValue(_)
+            | MenuAction::CreateRemote => {},
         }
     }
 
