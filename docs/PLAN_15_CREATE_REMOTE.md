@@ -1,6 +1,6 @@
 # Plan: phase 15, create a remote repository from ferrit
 
-**Status: planned.** Nothing here exists yet. lazygit cannot create a remote
+**Status: in progress (R0 done: `src/domain/git/host.rs` validates, builds `gh`'s arguments and checks `gh`; nothing is created yet and no screen exists).** lazygit cannot create a remote
 repository, so this phase is not compared with it; it is checked with the replay
 harness (with a fake `gh`) and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -232,9 +232,11 @@ conventions as the other popups and key-bar questions, but for the public case).
 
 ## Milestones
 
-- **R0** `host.rs`: types, name / owner / description validation, argument
-  building, `gh_status`, the injected-program seam, tests with a fake `gh`.
-- **R1** `exec::program` and `create_repo` with timeout and cancel, tests.
+- **R0** ✅ `host.rs`: types, name / owner / description validation, argument
+  building (`tests/git_host.rs`); then `exec::program`, `gh_status` and the
+  injected `GhProgram`, tested with a fake `gh` script.
+- **R1** `create_repo` and `Repo::set_gh_program` with timeout and cancel, tests;
+  `gh_status` goes through the same timeout.
 - **R2** `create_remote.rs` state, `RemoteOp::Create`, `AppEvent::RemoteCreated`,
   busy label, the draft kept across the operation.
 - **R3** the popups (checking, form, confirm with the Enter-does-not-confirm

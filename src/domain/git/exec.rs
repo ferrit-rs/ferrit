@@ -7,6 +7,7 @@
 //! `output` runs and records in one call, `track` records a command the
 //! caller manages itself.
 
+use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -21,6 +22,13 @@ pub(super) fn git(workdir: &Path) -> Command {
     let mut cmd = Command::new("git");
     cmd.arg("-C").arg(workdir);
     cmd
+}
+
+/// A command for an external program other than git (`gh`), ready for the
+/// caller to add arguments. Built here, beside `git()`, so the command log sees
+/// it too: `track` records it under the program's own name.
+pub(super) fn program(program: &OsStr) -> Command {
+    Command::new(program)
 }
 
 /// Run `cmd` to completion, capturing its output, and record it.
@@ -39,6 +47,29 @@ pub(super) fn output(cmd: &mut Command) -> io::Result<Output> {
 /// (spawn failure, early return, cancellation), so a command is recorded
 /// exactly once on every path.
 pub(super) fn track(cmd: &Command) -> Tracked {
+    // A program other than git is recorded as it is: no `-C` pair to drop, no
+    // config secrets to mask.
+    let name = Path::new(cmd.get_program())
+        .file_name()
+        .map_or_else(|| "git".to_owned(), |n| n.to_string_lossy().into_owned());
+    if name != "git" {
+        let rest: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        let kind = command_log::classify_program(&rest);
+        let argv = std::iter::once(name)
+            .chain(rest.iter().map(|a| redact(a)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        return Tracked {
+            argv,
+            kind,
+            started: Instant::now(),
+            exit: None,
+            output: Vec::new(),
+        };
+    }
     let mut args = cmd.get_args().map(|a| a.to_string_lossy().into_owned());
     // Drop the `-C <workdir>` pair `git()` adds: noise in a log line.
     let first = args.next();
@@ -134,6 +165,21 @@ mod tests {
         assert!(lines.len() > 1, "more than the first line");
         assert!(lines.len() <= crate::domain::git::command_log::MAX_OUTPUT_LINES);
         assert!(lines.iter().all(|line| !line.is_empty()));
+    }
+
+    #[test]
+    fn another_program_is_recorded_under_its_own_name() {
+        let mut cmd = super::program(std::ffi::OsStr::new("true"));
+        cmd.args(["auth", "status", "zz-program-marker"]);
+        assert!(output(&mut cmd).is_ok());
+        let records: Vec<_> = recent(usize::MAX, true)
+            .into_iter()
+            .filter(|entry| entry.argv.contains("zz-program-marker"))
+            .collect();
+        assert_eq!(records.len(), 1, "{records:?}");
+        let argv = records.first().map(|r| r.argv.as_str());
+        assert_eq!(argv, Some("true auth status zz-program-marker"));
+        assert_eq!(records.first().and_then(|r| r.exit), Some(0));
     }
 
     #[test]

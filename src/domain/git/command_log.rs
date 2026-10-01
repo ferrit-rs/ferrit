@@ -102,6 +102,17 @@ pub(super) fn classify(subcommand: &str, verb: Option<&str>) -> CommandKind {
     }
 }
 
+/// Read or write for a program other than git. Only `gh`'s own checks read:
+/// `--version` and `auth status`; creating a repository, or anything unknown,
+/// is a write.
+pub(super) fn classify_program(args: &[String]) -> CommandKind {
+    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    match words.as_slice() {
+        ["--version"] | ["auth", "status", ..] => CommandKind::Read,
+        _ => CommandKind::Write,
+    }
+}
+
 /// The arguments of a `git config` call with everything after a secret key
 /// (its new value, the old one it replaces) hidden. Other commands are left alone.
 pub(super) fn mask_config_secrets(args: Vec<String>) -> Vec<String> {
@@ -137,7 +148,19 @@ pub(super) fn redact(arg: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandKind, classify, redact};
+    use super::{CommandKind, classify, classify_program, redact};
+
+    #[test]
+    fn only_the_status_checks_of_another_program_read() {
+        let words = |text: &str| -> Vec<String> { text.split(' ').map(str::to_owned).collect() };
+        assert_eq!(classify_program(&words("--version")), CommandKind::Read);
+        assert_eq!(classify_program(&words("auth status")), CommandKind::Read);
+        assert_eq!(
+            classify_program(&words("repo create a/b --private")),
+            CommandKind::Write
+        );
+        assert_eq!(classify_program(&[]), CommandKind::Write);
+    }
 
     #[test]
     fn redact_hides_a_password_and_keeps_the_rest() {

@@ -6,8 +6,10 @@
 //!
 //! The target is typed as `name` or `owner/name`; there is no separate owner.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
+
+use crate::domain::git::exec;
 
 /// Longest repository name GitHub takes.
 const NAME_MAX: usize = 100;
@@ -15,6 +17,38 @@ const NAME_MAX: usize = 100;
 const OWNER_MAX: usize = 39;
 /// Longest repository description GitHub takes.
 const DESCRIPTION_MAX: usize = 350;
+
+/// The program to run for `gh`: `gh` from `PATH`, unless a test hands in a
+/// fake script. An injected value, not an environment variable: the crate
+/// forbids `unsafe`, so a test cannot set one in-process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GhProgram(OsString);
+
+impl Default for GhProgram {
+    fn default() -> Self {
+        Self("gh".into())
+    }
+}
+
+impl GhProgram {
+    pub fn new<P: Into<OsString>>(program: P) -> Self {
+        Self(program.into())
+    }
+
+    pub(super) fn program(&self) -> &OsStr {
+        &self.0
+    }
+}
+
+/// Whether `gh` can create a repository right now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GhStatus {
+    /// Not installed, or it does not run.
+    Missing,
+    /// Installed, no account: the user runs `gh auth login` in a shell.
+    SignedOut,
+    Ready,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Visibility {
@@ -180,4 +214,25 @@ pub fn build_create_args(req: &CreateRequest, workdir: &Path) -> Result<Vec<OsSt
         args.extend(["--description".into(), req.description.clone().into()]);
     }
     Ok(args)
+}
+
+/// Run `gh <args>` and say whether it exited 0. A program that cannot be
+/// started counts as a failure. Both calls are recorded in the command log.
+fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
+    let mut cmd = exec::program(gh.program());
+    cmd.args(args);
+    exec::output(&mut cmd).is_ok_and(|out| out.status.success())
+}
+
+/// `gh --version`, then `gh auth status`. It reaches the network, so the app
+/// calls it from a worker, never from the UI thread.
+#[must_use]
+pub fn gh_status(gh: &GhProgram) -> GhStatus {
+    if !gh_succeeds(gh, &["--version"]) {
+        GhStatus::Missing
+    } else if gh_succeeds(gh, &["auth", "status"]) {
+        GhStatus::Ready
+    } else {
+        GhStatus::SignedOut
+    }
 }
