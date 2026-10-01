@@ -215,6 +215,13 @@ impl App {
         // completion preserves this operation's failure as the final Status
         // line; eventless callers refresh synchronously, then set it here.
         self.request_refresh();
+        let message = match message {
+            Err(line) => Err(self.explain_push_after_creation(line)),
+            ok => {
+                self.create_remote_push_done();
+                ok
+            },
+        };
         match message {
             Ok(line) => {
                 self.remote_refresh_error = None;

@@ -60,7 +60,8 @@ impl Project {
                  if [ -f \"$here/name-taken\" ]; then echo 'Name already exists on this account' >&2; exit 1; fi\n\
                  target=\"$3\"\n\
                  while [ $# -gt 0 ]; do [ \"$1\" = --source ] && src=\"$2\"; shift; done\n\
-                 git -C \"$src\" remote add origin \"https://github.com/$target.git\"\n\
+                 url=$(cat \"$here/origin-url\" 2>/dev/null || echo \"https://github.com/$target.git\")\n\
+                 git -C \"$src\" remote add origin \"$url\"\n\
                  echo \"https://github.com/$target\"; exit 0 ;;\n\
              esac\n\
              exit 0\n",
@@ -702,4 +703,189 @@ fn the_row_waits_while_a_network_operation_runs() {
         Shown::Note("another network operation is running".to_owned())
     );
     drop(rx);
+}
+
+// ------------------------------------------------- the push after creating
+
+impl Project {
+    fn commit(&self) {
+        fs::write(self.work.join("a.txt"), "a").unwrap();
+        self.git(&["add", "-A"]);
+        self.git(&[
+            "-c",
+            "user.name=T",
+            "-c",
+            "user.email=t@e.x",
+            "commit",
+            "-q",
+            "-m",
+            "one",
+        ]);
+    }
+
+    /// A bare repository the fake `gh` will set as `origin`'s URL.
+    fn bare_origin(&self) -> PathBuf {
+        let bare = self.dir.join("remote.git");
+        let status = Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        fs::write(self.dir.join("origin-url"), bare.display().to_string()).unwrap();
+        bare
+    }
+
+    fn branch(&self) -> String {
+        self.git(&["rev-parse", "--abbrev-ref", "HEAD"])
+    }
+}
+
+fn bare_refs(bare: &std::path::Path) -> String {
+    let out = Command::new("git")
+        .arg("--git-dir")
+        .arg(bare)
+        .args(["for-each-ref", "--format=%(refname:short)"])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
+}
+
+/// Deliver events, refreshes included, until the push's `RemoteDone` arrives.
+fn wait_for_push(app: &mut App, rx: &mpsc::Receiver<AppEvent>) {
+    loop {
+        match rx.recv_timeout(Duration::from_secs(30)) {
+            Ok(event @ AppEvent::RemoteDone { .. }) => {
+                app.deliver_event(event);
+                return;
+            },
+            Ok(other) => app.deliver_event(other),
+            Err(error) => panic!("no RemoteDone: {error}"),
+        }
+    }
+}
+
+fn status_text(app: &App) -> String {
+    app.status_lines()
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn a_ticked_form_pushes_the_branch_and_sets_its_upstream() {
+    let project = Project::new("cr-push");
+    project.commit();
+    let bare = project.bare_origin();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    assert_eq!(
+        app.remote_busy_label(),
+        Some("Pushing\u{2026}"),
+        "the push follows without a key"
+    );
+    wait_for_push(&mut app, &rx);
+
+    let branch = project.branch();
+    assert_eq!(bare_refs(&bare), branch);
+    assert_eq!(
+        project.git(&["rev-parse", "--abbrev-ref", "@{u}"]),
+        format!("origin/{branch}")
+    );
+    assert_eq!(project.git(&["remote"]), "origin");
+}
+
+#[test]
+fn an_unticked_form_creates_and_leaves_the_push_to_p() {
+    let project = Project::new("cr-nopush");
+    project.commit();
+    let bare = project.bare_origin();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Char(' '));
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+
+    assert!(app.remote_busy_label().is_none(), "nothing is pushed");
+    assert_eq!(bare_refs(&bare), "");
+    assert_eq!(project.remotes(), "origin");
+    assert!(
+        status_text(&app).contains("origin is set; P pushes"),
+        "{}",
+        status_text(&app)
+    );
+}
+
+#[test]
+fn with_no_commit_or_a_detached_head_the_push_is_skipped_with_a_note() {
+    let project = Project::new("cr-skip-empty");
+    let bare = project.bare_origin();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    assert!(app.remote_busy_label().is_none());
+    assert_eq!(bare_refs(&bare), "");
+    assert!(
+        status_text(&app).contains("No commits yet: commit first"),
+        "{}",
+        status_text(&app)
+    );
+
+    let project = Project::new("cr-skip-detached");
+    project.commit();
+    project.git(&["checkout", "-q", "--detach"]);
+    let _bare = project.bare_origin();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    assert!(app.remote_busy_label().is_none());
+    assert!(
+        status_text(&app).contains("HEAD is detached"),
+        "{}",
+        status_text(&app)
+    );
+}
+
+#[test]
+fn a_failed_push_says_the_repository_exists_and_that_p_retries() {
+    let project = Project::new("cr-push-fails");
+    project.commit();
+    fs::write(
+        project.dir.join("origin-url"),
+        "/nonexistent/ferrit-test/x.git",
+    )
+    .unwrap();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
+
+    let shown = status_text(&app);
+    assert!(shown.contains("P retries the push"), "{shown}");
+    assert!(shown.contains("https://github.com/work"), "{shown}");
+    assert_eq!(project.remotes(), "origin", "the remote stays");
+}
+
+#[test]
+fn an_ordinary_push_failure_later_is_not_dressed_as_a_creation() {
+    let project = Project::new("cr-plain-push");
+    let (mut app, _rx) = ready_app(&project);
+    app.on_remote_done(RemoteOp::Push, Err("plain failure".to_owned()));
+    let shown = status_text(&app);
+    assert!(shown.contains("plain failure"), "{shown}");
+    assert!(!shown.contains("P retries"), "{shown}");
 }

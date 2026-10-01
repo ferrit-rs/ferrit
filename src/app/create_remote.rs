@@ -236,6 +236,8 @@ pub struct CreateRemote {
     gh: GhProgram,
     /// Bumped each time the check starts or is abandoned.
     generation: u64,
+    /// The push in flight is the one that follows a creation.
+    pushing_after: bool,
 }
 
 impl App {
@@ -473,7 +475,8 @@ impl App {
 
     /// `AppEvent::RemoteCreated` arrived. The slot is freed and the panes
     /// refresh (`gh` added `origin`). A success keeps the web URL and drops the
-    /// draft; a refusal keeps the draft and says why, nothing was configured.
+    /// draft, then pushes if the form asked; a refusal keeps the draft and says
+    /// why, nothing was configured.
     pub fn on_remote_created(&mut self, result: Result<String, String>) {
         self.remote_busy = None;
         self.remote_busy_started = None;
@@ -483,11 +486,16 @@ impl App {
         self.request_refresh();
         match result {
             Ok(url) => {
-                self.create_remote.draft = None;
+                let push = self
+                    .create_remote
+                    .draft
+                    .take()
+                    .is_some_and(|d| d.push_after);
                 self.create_remote.error = None;
                 self.last_error = None;
                 self.status_note = Some(format!("Created {url}"));
-                self.create_remote.web_url = Some(url);
+                self.create_remote.web_url = Some(url.clone());
+                self.after_creation(&url, push);
             },
             Err(message) => {
                 self.create_remote.error = Some(message.clone());
@@ -495,6 +503,45 @@ impl App {
                 self.reopen_form(message.clone());
                 self.report_error(AppError::Background(message));
             },
+        }
+    }
+
+    /// What follows a creation: the push of the current branch through the same
+    /// path as `P` (so the credential popup and the SSH setup apply), or a note
+    /// saying why not. The repository and `origin` stay whatever happens.
+    fn after_creation(&mut self, url: &str, push: bool) {
+        if !push {
+            self.status_note = Some(format!("Created {url}. origin is set; P pushes."));
+        } else if self.header.detached {
+            self.status_note = Some(format!("Created {url}. HEAD is detached: nothing to push."));
+        } else if self.commits.is_empty() {
+            self.status_note = Some(format!(
+                "Created {url}. No commits yet: commit first, then P pushes."
+            ));
+        } else {
+            let branch = self.header.branch.clone();
+            self.push_with_upstream("origin".to_owned(), branch);
+            // Only a push that really started is the one to explain if it fails.
+            self.create_remote.pushing_after = self.remote_busy.is_some();
+        }
+    }
+
+    /// A push finished well: it was no longer "the one after a creation".
+    pub(super) fn create_remote_push_done(&mut self) {
+        self.create_remote.pushing_after = false;
+    }
+
+    /// The failure of the push that followed a creation says the repository
+    /// exists and how to retry; any other failure is left as it is.
+    pub(super) fn explain_push_after_creation(&mut self, failure: String) -> String {
+        if !std::mem::take(&mut self.create_remote.pushing_after) {
+            return failure;
+        }
+        match &self.create_remote.web_url {
+            Some(url) => format!(
+                "{failure}\nThe repository {url} exists and origin is set: P retries the push."
+            ),
+            None => failure,
         }
     }
 }
