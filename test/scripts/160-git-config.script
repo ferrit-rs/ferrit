@@ -1,0 +1,88 @@
+# Phase 14, the git config editor: `C` replaces the panes with every git config
+# value and where it comes from. `/` filters, Space flips a boolean, Enter edits
+# (a picker for an enum), `a` adds, `d` unsets after a question, `s` changes the
+# scope writes go to, and a write to the global file asks first. Only the local
+# scope is written here: the global question is answered no.
+fixture canonical
+size 140x40
+
+exec config --local pull.rebase merges
+exec config --local commit.gpgsign true
+
+key C
+expect-text "Git config"
+expect-text "scope for changes: [L]ocal"
+expect-text "pull.rebase"
+expect-text "Edit: e | Add: a | Unset: d | Scope: s | Filter: / | Back: esc"
+expect-no-text "[2] Files"                # the panes are not drawn behind it
+snapshot listing
+
+# The filter narrows by key; Esc clears it.
+key /
+type "pull"
+expect-text "filter: pull"
+expect-text "pull.rebase"
+expect-no-text "commit.gpgsign"
+key esc
+expect-text "commit.gpgsign"
+
+# Space flips a known boolean; the file says so.
+key /
+type "gpgsign"
+key enter
+key space
+git config --local commit.gpgsign => "false"
+expect-text "commit.gpgsign changed in local"
+key space
+git config --local commit.gpgsign => "true"
+
+# An enum opens the allowed values; a row sets it.
+key esc
+key /
+type "pull.rebase"
+key enter
+key enter
+expect-text "pull.rebase (local)"
+expect-text "interactive"
+key 1
+git config --local pull.rebase => "false"
+
+# Add a key: its name, then its value.
+key esc
+key a
+type "alias.co\n"
+expect-text "alias.co (local)"
+type "checkout\n"
+git config --local alias.co => "checkout"
+
+# Unset asks first; n changes nothing, y removes the value.
+key /
+type "alias.co"
+key enter
+key d
+expect-text "unset alias.co = checkout in local?"
+key n
+git config --local alias.co => "checkout"
+key d
+key y
+git config --local alias.co => ""
+expect-text "unset alias.co in local"
+
+# The global file asks before the first write, naming itself.
+key esc
+key /
+type "pull.rebase"
+key enter
+key s
+expect-text "[G]lobal"
+key e
+expect-text "write to "
+expect-text "Asked once this session"
+key n
+git config --local pull.rebase => "false"
+key s
+expect-text "[L]ocal"
+
+key C
+expect-no-text "Git config"
+expect-text "[2] Files"
