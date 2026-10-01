@@ -82,10 +82,7 @@ fn repo_config_reads_the_local_scope_of_a_real_repository() {
         assert!(status.success());
     }
     // Read-only: whatever the user's own global file says, the local value is the last word.
-    let view = ferrit::domain::git::Repo::open(&dir)
-        .unwrap()
-        .config()
-        .unwrap();
+    let view = Repo::open(&dir).unwrap().config().unwrap();
     let winner = view.effective("pull.rebase").unwrap();
     assert_eq!(
         (winner.scope, winner.value.as_str()),

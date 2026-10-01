@@ -283,9 +283,7 @@ mod tests {
         }
 
         fn git(&self, args: &[&str]) {
-            let out = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&self.dir)
+            let out = exec::git(&self.dir)
                 .args(args)
                 .envs(self.envs())
                 .output()
@@ -298,9 +296,7 @@ mod tests {
         }
 
         fn get(&self, key: &str) -> Vec<(Scope, String)> {
-            let out = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&self.dir)
+            let out = exec::git(&self.dir)
                 .args(["config", "--list", "--show-origin", "--show-scope", "-z"])
                 .envs(self.envs())
                 .output()
