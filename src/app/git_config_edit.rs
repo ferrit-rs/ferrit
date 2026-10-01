@@ -63,7 +63,7 @@ impl App {
             return;
         };
         let key = row.entry.key.clone();
-        if let Some(reason) = self.git_config_read_only(&row.entry.key, row.entry.scope) {
+        if let Some(reason) = Self::git_config_read_only(&row.entry.key, row.entry.scope) {
             self.git_config.note = Some(reason);
             return;
         }
@@ -71,61 +71,58 @@ impl App {
         let replacing = self.replacing_in(scope, &row.entry.key, row.entry.scope, &row.entry.value);
         let known = lookup(&key).map(|k| k.kind);
         let title = format!("{key} ({})", scope_name(scope));
-        match known {
-            Some(kind @ (KeyType::Bool | KeyType::Enum(_))) => {
-                let values = match kind {
-                    KeyType::Enum(values) => values,
-                    _ => BOOL_VALUES,
-                };
-                let items = values
-                    .iter()
-                    .zip('1'..)
-                    .map(|(label, shortcut)| MenuItem {
-                        label,
-                        shortcut,
-                        action: MenuAction::ConfigValue(usize::from(shortcut as u8 - b'1')),
-                        hint: "",
-                    })
-                    .collect();
-                let selected = values
-                    .iter()
-                    .position(|v| *v == row.entry.value)
-                    .unwrap_or(0);
-                self.git_config.pick = Some(PickTarget {
-                    key,
-                    kind: kind.value_kind(),
-                    replacing,
-                    values,
-                });
-                self.popup = Some(Popup::Menu(MenuState {
-                    title,
-                    items,
-                    selected,
-                }));
-            },
-            _ => {
-                let secret = is_secret_key(&key);
-                let kind = known.map_or(ValueKind::Text, KeyType::value_kind);
-                let (title, input) = if secret {
-                    (
-                        format!("{title}: new value, the old one stays hidden"),
-                        TextInput::default(),
-                    )
-                } else {
-                    (title, TextInput::from_text(&row.entry.value))
-                };
-                self.open_name(
-                    NameKind::ConfigValue(ConfigOp::Set {
-                        key,
-                        value: String::new(),
-                        kind,
-                        replacing,
-                    }),
-                    title,
-                    input,
-                );
-            },
+        if let Some(kind @ (KeyType::Bool | KeyType::Enum(_))) = known {
+            let values = match kind {
+                KeyType::Enum(values) => values,
+                _ => BOOL_VALUES,
+            };
+            let items = values
+                .iter()
+                .zip('1'..)
+                .map(|(label, shortcut)| MenuItem {
+                    label,
+                    shortcut,
+                    action: MenuAction::ConfigValue(usize::from(shortcut as u8 - b'1')),
+                    hint: "",
+                })
+                .collect();
+            let selected = values
+                .iter()
+                .position(|v| *v == row.entry.value)
+                .unwrap_or(0);
+            self.git_config.pick = Some(PickTarget {
+                key,
+                kind: kind.value_kind(),
+                replacing,
+                values,
+            });
+            self.popup = Some(Popup::Menu(MenuState {
+                title,
+                items,
+                selected,
+            }));
+            return;
         }
+        let secret = is_secret_key(&key);
+        let kind = known.map_or(ValueKind::Text, KeyType::value_kind);
+        let (title, input) = if secret {
+            (
+                format!("{title}: new value, the old one stays hidden"),
+                TextInput::default(),
+            )
+        } else {
+            (title, TextInput::from_text(&row.entry.value))
+        };
+        self.open_name(
+            NameKind::ConfigValue(ConfigOp::Set {
+                key,
+                value: String::new(),
+                kind,
+                replacing,
+            }),
+            title,
+            input,
+        );
     }
 
     /// `Space`: flip a known boolean key.
@@ -138,7 +135,7 @@ impl App {
             self.git_config.note = Some(format!("{key} is not a boolean: Enter edits it"));
             return;
         }
-        if let Some(reason) = self.git_config_read_only(&key, row.entry.scope) {
+        if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
             self.git_config.note = Some(reason);
             return;
         }
@@ -245,7 +242,7 @@ impl App {
     }
 
     /// Why this value cannot be edited here, if it cannot.
-    fn git_config_read_only(&self, key: &str, scope: Scope) -> Option<String> {
+    fn git_config_read_only(key: &str, scope: Scope) -> Option<String> {
         let lower = key.to_ascii_lowercase();
         if lower == "include.path" || lower.starts_with("includeif.") {
             return Some("an include: edit that file directly".to_owned());
