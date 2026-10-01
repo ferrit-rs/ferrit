@@ -477,6 +477,23 @@ impl Repo {
         config::replace_all(&self.inner, scope, key, value, kind)
     }
 
+    /// Change one value of a multi-valued key (`--fixed-value`), leaving the others.
+    pub fn config_replace_value(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        old: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        config::replace_value(&self.inner, scope, key, value, old, kind)
+    }
+
+    /// Remove one value of a multi-valued key, leaving the others.
+    pub fn config_unset_value(&self, scope: WriteScope, key: &str, old: &str) -> GitResult<()> {
+        config::unset_value(&self.inner, scope, key, old)
+    }
+
     /// `git config --unset-all`: drop the key from `scope` only.
     pub fn config_unset(&self, scope: WriteScope, key: &str) -> GitResult<()> {
         config::unset(&self.inner, scope, key)

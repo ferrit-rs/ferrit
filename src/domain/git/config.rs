@@ -65,6 +65,19 @@ impl ConfigView {
     }
 }
 
+impl ConfigView {
+    /// Whether `entry` was read from a file the scope's own file includes:
+    /// the first entry of a scope always comes from its main file, and git
+    /// lists an included file's entries right after the `include.path` line.
+    #[must_use]
+    pub fn is_included(&self, entry: &ConfigEntry) -> bool {
+        self.entries
+            .iter()
+            .find(|e| e.scope == entry.scope)
+            .is_some_and(|first| first.origin != entry.origin)
+    }
+}
+
 fn parse_scope(text: &str) -> Scope {
     match text {
         "system" => Scope::System,
@@ -234,6 +247,36 @@ pub(super) fn replace_all(
         key,
         value,
         kind,
+    )
+}
+
+/// Change the one value `old` of a multi-valued `key` in `scope`, leaving its
+/// siblings alone (`--fixed-value`: `old` is text, not a pattern).
+pub(super) fn replace_value(
+    repo: &Repository,
+    scope: WriteScope,
+    key: &str,
+    value: &str,
+    old: &str,
+    kind: ValueKind,
+) -> GitResult<()> {
+    let mut args = vec![scope.flag()];
+    args.extend(kind.flag());
+    args.extend(["--fixed-value", "--", key, value, old]);
+    run(workdir(repo)?, &[], &args)
+}
+
+/// Remove only the value `old` of `key` in `scope`.
+pub(super) fn unset_value(
+    repo: &Repository,
+    scope: WriteScope,
+    key: &str,
+    old: &str,
+) -> GitResult<()> {
+    run(
+        workdir(repo)?,
+        &[],
+        &[scope.flag(), "--fixed-value", "--unset", "--", key, old],
     )
 }
 

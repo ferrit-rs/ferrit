@@ -194,3 +194,61 @@ fn known_keys_are_real_git_keys_and_their_values_are_accepted_by_git() {
     assert!(lookup("url.x.insteadof").is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn one_value_of_a_multi_valued_key_changes_or_goes_alone() {
+    let dir = std::env::temp_dir().join(format!("ferrit-gitconfig-v-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let repo = Repo::open(&dir).unwrap();
+    let local = || {
+        repo.config()
+            .unwrap()
+            .entries
+            .into_iter()
+            .filter(|e| e.scope == Scope::Local && e.key == "credential.helper")
+            .map(|e| e.value)
+            .collect::<Vec<_>>()
+    };
+    for value in ["a.*", "b"] {
+        repo.config_add(
+            WriteScope::Local,
+            "credential.helper",
+            value,
+            ValueKind::Text,
+        )
+        .unwrap();
+    }
+    // `a.*` would match `b` as a pattern: `--fixed-value` makes it literal.
+    repo.config_replace_value(
+        WriteScope::Local,
+        "credential.helper",
+        "c",
+        "a.*",
+        ValueKind::Text,
+    )
+    .unwrap();
+    assert_eq!(local(), ["c", "b"]);
+    repo.config_unset_value(WriteScope::Local, "credential.helper", "b")
+        .unwrap();
+    assert_eq!(local(), ["c"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_value_from_an_included_file_is_told_apart_from_the_main_file() {
+    let view = parse(
+        "local\0file:.git/config\0core.bare\nfalse\0\
+local\0file:.git/config\0include.path\ninc\0\
+local\0file:.git/inc\0inc.k\nv\0\
+global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0",
+    );
+    let flags: Vec<bool> = view.entries.iter().map(|e| view.is_included(e)).collect();
+    assert_eq!(flags, [false, false, true, false]);
+}
