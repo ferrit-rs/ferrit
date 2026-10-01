@@ -3,6 +3,7 @@
 //! Drawing is `screens/git_config.rs`; every read and write is `Repo::config*`,
 //! so git stays the owner of the file format.
 
+use super::keymap::{Action, Context, KeyBinding};
 use super::{App, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use crate::domain::git::config::{
     ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value,
@@ -217,6 +218,15 @@ impl App {
     pub(super) fn git_config_key(&mut self, key: KeyEvent) {
         if self.git_config.filtering {
             self.git_config_filter_key(key);
+            return;
+        }
+        // The key that opens the screen closes it, whatever it is bound to.
+        let toggles = self
+            .keymap
+            .resolve(&[Context::Global], KeyBinding::from_event(key))
+            == Some(Action::GitConfig);
+        if toggles {
+            self.close_git_config();
             return;
         }
         match key.code {

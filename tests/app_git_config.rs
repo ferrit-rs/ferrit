@@ -601,6 +601,25 @@ fn unsetting_in_global_names_the_file_and_counts_as_the_confirmation_and_hides_s
 }
 
 #[test]
+fn capital_c_opens_the_screen_from_the_panes_and_closes_it_again() {
+    let fx = Fixture::new("gc-toggle");
+    let mut app = fx.app();
+    assert_eq!(app.full_screen(), FullScreen::None);
+
+    app.feed_key(key('C'));
+    assert_eq!(app.full_screen(), FullScreen::GitConfig);
+    app.feed_key(key('C'));
+    assert_eq!(app.full_screen(), FullScreen::None);
+
+    // While typing a filter, `C` is a letter.
+    app.feed_key(key('C'));
+    app.feed_key(key('/'));
+    app.feed_key(key('C'));
+    assert_eq!(app.full_screen(), FullScreen::GitConfig);
+    assert_eq!(app.git_config().filter, "C");
+}
+
+#[test]
 fn a_new_filter_selects_its_first_match_and_a_reread_stays_near() {
     let fx = Fixture::new("gc-filter-top");
     fx.git(&["config", "--local", "zz.last", "x"]);

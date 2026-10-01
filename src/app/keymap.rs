@@ -95,6 +95,8 @@ pub enum Action {
     CommandLog,
     /// The full-screen repository dashboard (`docs/PLAN_13_DASHBOARD.md`).
     Dashboard,
+    /// The full-screen git config editor (`docs/PLAN_14_GIT_CONFIG.md`).
+    GitConfig,
     OperationMenu,
     /// The menu of extra actions for the selected row.
     ContextMenu,
@@ -170,6 +172,7 @@ impl Action {
             Self::Help => "help",
             Self::CommandLog => "command_log",
             Self::Dashboard => "dashboard",
+            Self::GitConfig => "git_config",
             Self::OperationMenu => "operation_menu",
             Self::ContextMenu => "context_menu",
             Self::Back => "back",
@@ -372,6 +375,7 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Global, "?", Action::Help),
     (Context::Global, "@", Action::CommandLog),
     (Context::Global, "D", Action::Dashboard),
+    (Context::Global, "C", Action::GitConfig),
     (Context::Global, "m", Action::OperationMenu),
     (Context::Global, "x", Action::ContextMenu),
     (Context::Global, "esc", Action::Back),
