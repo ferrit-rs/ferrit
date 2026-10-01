@@ -16,10 +16,20 @@ use super::{App, BranchesTab, Mode, Pane, Popup, TextInput, git};
 /// What a name popup will do with the text typed into it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum NameKind {
-    RenameBranch { from: String },
-    BranchAt { hash: String },
-    RenameStash { oid: String },
+    RenameBranch {
+        from: String,
+    },
+    BranchAt {
+        hash: String,
+    },
+    RenameStash {
+        oid: String,
+    },
     StashKeepIndex,
+    /// A git config value being typed (`app::git_config_edit`).
+    ConfigValue(super::git_config_edit::ConfigOp),
+    /// The key of a config entry about to be added.
+    ConfigKey,
 }
 
 /// A name popup's purpose and its title (which may name a commit).
@@ -38,6 +48,8 @@ impl NameTarget {
             },
             NameKind::BranchAt { .. } => "Create: Enter | Cancel: Esc",
             NameKind::StashKeepIndex => "Stash: Enter | Cancel: Esc",
+            NameKind::ConfigKey => "Next: Enter | Cancel: Esc",
+            NameKind::ConfigValue(_) => "Save: Enter | Cancel: Esc",
         }
     }
 }
@@ -184,11 +196,14 @@ impl App {
                 let result = repo.take_side(&path, action == MenuAction::TakeOurs);
                 self.finish_apply(result);
             },
-            MenuAction::Continue | MenuAction::Skip | MenuAction::Abort => {},
+            MenuAction::Continue
+            | MenuAction::Skip
+            | MenuAction::Abort
+            | MenuAction::ConfigValue(_) => {},
         }
     }
 
-    fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
+    pub(super) fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
         self.popup = Some(Popup::Name(NameTarget { kind, title }, input));
     }
 
@@ -201,6 +216,13 @@ impl App {
         };
         let kind = target.kind.clone();
         let text = input.text();
+        if matches!(kind, NameKind::ConfigKey | NameKind::ConfigValue(_)) {
+            // A value keeps its spaces; a refusal keeps the popup for a retry.
+            if self.submit_git_config_name(&kind, &text) {
+                self.popup = None;
+            }
+            return;
+        }
         let name = text.trim();
         let Some(repo) = &mut self.repo else { return };
         let result = match &kind {
@@ -216,6 +238,8 @@ impl App {
             },
             NameKind::RenameStash { oid } => repo.stash_rename(oid, name),
             NameKind::StashKeepIndex => repo.stash_push_keeping_index(name),
+            // Handled above: a config value keeps its spaces.
+            NameKind::ConfigKey | NameKind::ConfigValue(_) => return,
         };
         match result {
             Ok(()) => {

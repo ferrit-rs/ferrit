@@ -699,6 +699,7 @@ mod dispatch;
 mod drill_nav;
 mod error;
 pub mod git_config;
+mod git_config_edit;
 pub mod image_query;
 mod input;
 mod menu;

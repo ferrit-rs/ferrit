@@ -27,6 +27,8 @@ pub(super) enum MenuAction {
     RenameStash,
     TakeOurs,
     TakeTheirs,
+    // The git config screen's allowed-values menu: the index of the row.
+    ConfigValue(usize),
 }
 
 /// One row: what it says, the key that runs it from anywhere in the menu, and
@@ -126,6 +128,7 @@ impl App {
 
     fn run_menu_action(&mut self, action: MenuAction) {
         match action {
+            MenuAction::ConfigValue(index) => self.pick_config_value(index),
             MenuAction::Continue => self.apply_operation_step(Step::Continue),
             MenuAction::Skip => self.apply_operation_step(Step::Skip),
             MenuAction::RenameBranch

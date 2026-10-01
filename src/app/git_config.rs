@@ -39,6 +39,8 @@ pub struct GitConfigScreen {
     pub scope: WriteScope,
     /// What the last action did, for the footer.
     pub note: Option<String>,
+    /// The allowed-values menu that is up, and what choosing a row sets.
+    pub(super) pick: Option<super::git_config_edit::PickTarget>,
 }
 
 impl Default for GitConfigScreen {
@@ -51,6 +53,7 @@ impl Default for GitConfigScreen {
             selected: 0,
             scope: WriteScope::Local,
             note: None,
+            pick: None,
         }
     }
 }
@@ -189,7 +192,9 @@ impl App {
             KeyCode::Char('r') => {
                 self.reread_git_config();
             },
-            _ => {},
+            _ => {
+                self.git_config_edit_key(key);
+            },
         }
     }
 
