@@ -26,6 +26,7 @@ use crate::domain::image::preview::Preview;
 
 pub mod dashboard;
 mod diff;
+pub mod git_config;
 mod popups;
 pub(super) mod profile;
 
@@ -35,10 +36,10 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let palette = app.palette();
 
     let show_help = app.show_help;
-    let keybar = if app.full_screen() == FullScreen::Dashboard {
-        draw_dashboard(frame, app, area)
-    } else {
-        draw_panes(frame, app, area)
+    let keybar = match app.full_screen() {
+        FullScreen::Dashboard => draw_dashboard(frame, app, area),
+        FullScreen::GitConfig => draw_git_config(frame, app, area),
+        FullScreen::None => draw_panes(frame, app, area),
     };
 
     if show_help {
@@ -186,6 +187,27 @@ fn draw_dashboard(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     };
     let max_scroll = dashboard::draw(frame, page, &view);
     app.clamp_dashboard_scroll(max_scroll);
+    draw_keybar(frame, keybar, app);
+    keybar
+}
+
+/// The git config screen above its key bar; returns the key bar's area.
+fn draw_git_config(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+    let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+    let screen = app.git_config();
+    let view = git_config::View {
+        rows: &screen.rows,
+        selected: screen.selected,
+        offset: screen.offset(),
+        scope: screen.scope,
+        total: screen.total(),
+        filter: &screen.filter,
+        filtering: screen.filtering,
+        note: screen.note.as_deref(),
+        palette: app.palette(),
+    };
+    let offset = git_config::draw(frame, page, &view);
+    app.set_git_config_offset(offset);
     draw_keybar(frame, keybar, app);
     keybar
 }
@@ -779,6 +801,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Help
     } else if app.full_screen() == FullScreen::Dashboard {
         Bar::Dashboard
+    } else if app.full_screen() == FullScreen::GitConfig {
+        Bar::GitConfig
     } else if app.operation.is_some() {
         Bar::Operation
     } else if app.right_focused() {

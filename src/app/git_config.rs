@@ -37,6 +37,9 @@ pub struct GitConfigScreen {
     /// Typing goes to the filter.
     pub filtering: bool,
     pub selected: usize,
+    /// The first list item of the last frame, kept so the view scrolls only
+    /// when the selection leaves it.
+    offset: usize,
     /// The file a write lands in: local or global, `s` flips it.
     pub scope: WriteScope,
     /// What the last action did, for the footer.
@@ -55,6 +58,7 @@ impl Default for GitConfigScreen {
             filter: String::new(),
             filtering: false,
             selected: 0,
+            offset: 0,
             scope: WriteScope::Local,
             note: None,
             pick: None,
@@ -67,6 +71,10 @@ impl GitConfigScreen {
     /// Every value git knows, filter or not.
     pub fn total(&self) -> usize {
         self.view.entries.len()
+    }
+
+    pub const fn offset(&self) -> usize {
+        self.offset
     }
 
     /// The value git uses for `key`.
@@ -165,6 +173,11 @@ impl App {
             self.git_config.note = None;
             self.full_screen = FullScreen::GitConfig;
         }
+    }
+
+    /// The renderer's word on where the list starts: keep it.
+    pub(crate) const fn set_git_config_offset(&mut self, offset: usize) {
+        self.git_config.offset = offset;
     }
 
     pub fn close_git_config(&mut self) {

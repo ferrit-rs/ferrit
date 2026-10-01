@@ -139,7 +139,13 @@ pub enum Bar {
     /// The full-screen dashboard is up (`docs/PLAN_13_DASHBOARD.md`): its own
     /// keys, fixed like the help screen's.
     Dashboard,
+    /// The full-screen git config editor is up (`docs/PLAN_14_GIT_CONFIG.md`):
+    /// its own keys, fixed like the dashboard's.
+    GitConfig,
 }
+
+/// The git config screen's bar. Not remappable and not clickable, like its keys.
+const GIT_CONFIG_BAR: &str = "Edit: e | Add: a | Unset: d | Scope: s | Filter: / | Back: esc";
 
 /// The dashboard's bar. Not remappable and not clickable, like its keys.
 const DASHBOARD_BAR: &str = "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?";
@@ -219,7 +225,7 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Files, Action::StageAll)],
             &[(Context::Global, Action::Commit)],
         ],
-        Bar::Help | Bar::Dashboard => &[],
+        Bar::Help | Bar::Dashboard | Bar::GitConfig => &[],
     }
 }
 
@@ -297,6 +303,7 @@ pub fn keybar_layout(keymap: &Keymap, bar: Bar, width: usize) -> Keybar {
     let fixed = match bar {
         Bar::Help => Some(HELP_BAR),
         Bar::Dashboard => Some(DASHBOARD_BAR),
+        Bar::GitConfig => Some(GIT_CONFIG_BAR),
         _ => None,
     };
     if let Some(text) = fixed {

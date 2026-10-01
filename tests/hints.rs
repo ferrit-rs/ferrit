@@ -120,6 +120,11 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
         "the dashboard's own keys, fixed like the help screen's"
     );
     assert_eq!(
+        bar(&map, Bar::GitConfig, 120),
+        "Edit: e | Add: a | Unset: d | Scope: s | Filter: / | Back: esc",
+        "the git config screen's own keys, fixed like the dashboard's"
+    );
+    assert_eq!(
         bar(&map, Bar::FilesEmpty, 120),
         "Commit: c | Stash: s | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q",
         "nothing to stage, discard or amend"
