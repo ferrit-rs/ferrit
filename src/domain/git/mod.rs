@@ -17,6 +17,7 @@ pub mod branch;
 pub mod command_log;
 pub mod commit;
 pub mod config;
+pub mod config_keys;
 pub mod diff;
 pub mod error;
 mod exec;

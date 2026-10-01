@@ -147,3 +147,50 @@ fn repo_writes_local_config_through_git_and_reads_it_back() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn known_keys_are_real_git_keys_and_their_values_are_accepted_by_git() {
+    use ferrit::domain::git::config_keys::{KNOWN_KEYS, KeyType, lookup};
+
+    let out = std::process::Command::new("git")
+        .args(["help", "-c"])
+        .output()
+        .unwrap();
+    let real: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(str::to_lowercase)
+        .collect();
+    assert!(real.len() > 100, "`git help -c` listed {} keys", real.len());
+
+    let dir = std::env::temp_dir().join(format!("ferrit-gitconfig-k-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let repo = Repo::open(&dir).unwrap();
+
+    for known in KNOWN_KEYS {
+        assert!(
+            real.iter().any(|k| k == known.key),
+            "{} is not a git key",
+            known.key
+        );
+        assert_eq!(lookup(&known.key.to_uppercase()), Some(known));
+        let samples: Vec<&str> = match known.kind {
+            KeyType::Bool => vec!["true", "false"],
+            KeyType::Enum(values) => values.to_vec(),
+            KeyType::Text => vec!["sample"],
+        };
+        for value in samples {
+            let written =
+                repo.config_set(WriteScope::Local, known.key, value, known.kind.value_kind());
+            assert!(written.is_ok(), "{} = {value}: {written:?}", known.key);
+        }
+    }
+    assert!(lookup("url.x.insteadof").is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
