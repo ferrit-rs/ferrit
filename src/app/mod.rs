@@ -382,14 +382,15 @@ fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
     hasher.finish()
 }
 
-/// A view that takes the whole terminal in place of the five panes. Nothing but
-/// the dashboard yet; the git config editor of `docs/PLAN_14_GIT_CONFIG.md`
-/// adds its own.
+/// A view that takes the whole terminal in place of the five panes: the
+/// dashboard (`docs/PLAN_13_DASHBOARD.md`) and the git config editor
+/// (`docs/PLAN_14_GIT_CONFIG.md`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FullScreen {
     #[default]
     None,
     Dashboard,
+    GitConfig,
 }
 
 /// Modal state that owns all input while it is up, the same idea as
@@ -662,6 +663,7 @@ pub struct App {
     /// The view that replaces the five panes, if any (`docs/PLAN_13_DASHBOARD.md`).
     full_screen: FullScreen,
     dashboard: dashboard::Dashboard,
+    git_config: git_config::GitConfigScreen,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -696,6 +698,7 @@ pub mod diff_query;
 mod dispatch;
 mod drill_nav;
 mod error;
+pub mod git_config;
 pub mod image_query;
 mod input;
 mod menu;
@@ -823,6 +826,7 @@ impl App {
             remote_worker: None,
             full_screen: FullScreen::None,
             dashboard: dashboard::Dashboard::default(),
+            git_config: git_config::GitConfigScreen::default(),
             status_note: None,
             event_sender: None,
             refresh_query: RefreshQueryState::default(),
@@ -1477,6 +1481,16 @@ impl App {
     #[doc(hidden)]
     pub fn is_quitting(&self) -> bool {
         self.should_quit
+    }
+
+    /// Point the repository's `git config` calls at a throwaway global file
+    /// (`Repo::isolate_config`). Integration-test seam: lets a test write the
+    /// global scope without touching the real `~/.gitconfig`.
+    #[doc(hidden)]
+    pub fn isolate_git_config(&mut self, global: &Path) {
+        if let Some(repo) = &mut self.repo {
+            repo.isolate_config(global);
+        }
     }
 
     /// Feed one mouse event to the handler. Integration-test seam.

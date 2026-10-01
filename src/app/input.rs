@@ -71,6 +71,10 @@ impl App {
             self.dashboard_key(key);
             return;
         }
+        if self.full_screen == FullScreen::GitConfig {
+            self.git_config_key(key);
+            return;
+        }
 
         if !self.author_overlay.is_closed() {
             if let KeyCode::Char(key @ AUTHOR_KEY_START..=AUTHOR_KEY_END) = key.code {
@@ -338,6 +342,10 @@ impl App {
         // answer clicks. The wheel scrolls the dashboard.
         if self.full_screen == FullScreen::Dashboard {
             self.dashboard_mouse(ev);
+            return;
+        }
+        if self.full_screen == FullScreen::GitConfig {
+            self.git_config_mouse(ev);
             return;
         }
 
