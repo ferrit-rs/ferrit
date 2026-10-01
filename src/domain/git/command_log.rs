@@ -9,6 +9,8 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
+use crate::domain::git::config::is_secret_key;
+
 /// Entries kept; older ones are dropped.
 const CAPACITY: usize = 200;
 
@@ -88,13 +90,31 @@ pub fn recent(count: usize, include_reads: bool) -> Vec<CommandRecord> {
     picked
 }
 
-/// Read or write, from the subcommand and, for `stash`, its verb.
+/// Read or write, from the subcommand and, for `stash` and `config`, its verb.
 pub(super) fn classify(subcommand: &str, verb: Option<&str>) -> CommandKind {
-    if READ_ONLY.contains(&subcommand) || (subcommand == "stash" && verb == Some("show")) {
+    if READ_ONLY.contains(&subcommand)
+        || (subcommand == "stash" && verb == Some("show"))
+        || (subcommand == "config" && verb == Some("--list"))
+    {
         CommandKind::Read
     } else {
         CommandKind::Write
     }
+}
+
+/// The arguments of a `git config` call with everything after a secret key
+/// (its new value, the old one it replaces) hidden. Other commands are left alone.
+pub(super) fn mask_config_secrets(args: Vec<String>) -> Vec<String> {
+    if args.first().map(String::as_str) != Some("config") {
+        return args;
+    }
+    let Some(key) = args.iter().position(|a| is_secret_key(a)) else {
+        return args;
+    };
+    args.into_iter()
+        .enumerate()
+        .map(|(i, arg)| if i > key { "***".to_owned() } else { arg })
+        .collect()
 }
 
 /// `scheme://user:secret@host/path` becomes `scheme://user:***@host/path`.

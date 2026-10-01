@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use git2::Repository;
 
+use crate::domain::git::command_log::redact;
 use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
@@ -75,6 +76,30 @@ impl ConfigView {
             .iter()
             .find(|e| e.scope == entry.scope)
             .is_some_and(|first| first.origin != entry.origin)
+    }
+}
+
+/// Words that make a key's value a secret to keep off the screen and out of
+/// the command log. `credential.helper` names a program, not a secret.
+const SECRET_WORDS: [&str; 4] = ["password", "token", "secret", "credential"];
+
+/// Whether the value of `key` must never be shown.
+#[must_use]
+pub fn is_secret_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    !key.ends_with(".helper") && SECRET_WORDS.iter().any(|word| key.contains(word))
+}
+
+/// A value as the screen may show it: hidden for a secret key, with the
+/// password of a URL hidden otherwise.
+#[must_use]
+pub fn display_value(key: &str, value: &str) -> String {
+    if value.is_empty() {
+        String::new()
+    } else if is_secret_key(key) {
+        "***".to_owned()
+    } else {
+        redact(value)
     }
 }
 

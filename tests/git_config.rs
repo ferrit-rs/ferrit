@@ -8,7 +8,9 @@
 //! See `docs/PLAN_14_GIT_CONFIG.md` milestone G0.
 
 use ferrit::domain::git::Repo;
-use ferrit::domain::git::config::{Origin, Scope, ValueKind, WriteScope, parse};
+use ferrit::domain::git::config::{
+    Origin, Scope, ValueKind, WriteScope, display_value, is_secret_key, parse,
+};
 
 const SAMPLE: &str = "system\0file:/etc/gitconfig\0core.autocrlf\ninput\0\
 global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0\
@@ -251,4 +253,70 @@ global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0",
     );
     let flags: Vec<bool> = view.entries.iter().map(|e| view.is_included(e)).collect();
     assert_eq!(flags, [false, false, true, false]);
+}
+
+#[test]
+fn secrets_are_hidden_on_screen_and_in_the_command_log() {
+    use ferrit::domain::git::command_log::recent;
+
+    assert!(is_secret_key("http.proxyPassword"));
+    assert!(is_secret_key("credential.https://x.example.token"));
+    assert!(!is_secret_key("credential.helper"));
+    assert!(!is_secret_key("pull.rebase"));
+    assert_eq!(display_value("github.token", "ghp_abc"), "***");
+    assert_eq!(display_value("github.token", ""), "");
+    assert_eq!(
+        display_value("remote.origin.url", "https://me:pw@host/r.git"),
+        "https://me:***@host/r.git"
+    );
+    assert_eq!(display_value("core.editor", "nvim"), "nvim");
+
+    let dir = std::env::temp_dir().join(format!("ferrit-gitconfig-s-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let repo = Repo::open(&dir).unwrap();
+    repo.config_set(
+        WriteScope::Local,
+        "zz.apitoken",
+        "hunter2-first",
+        ValueKind::Text,
+    )
+    .unwrap();
+    repo.config_replace_value(
+        WriteScope::Local,
+        "zz.apitoken",
+        "hunter2-second",
+        "hunter2-first",
+        ValueKind::Text,
+    )
+    .unwrap();
+    let _ = repo.config().unwrap();
+
+    let logged: Vec<_> = recent(usize::MAX, true)
+        .into_iter()
+        .filter(|r| r.argv.contains("zz.apitoken"))
+        .collect();
+    assert_eq!(logged.len(), 2, "{logged:?}");
+    for record in &logged {
+        assert!(!record.argv.contains("hunter2"), "{}", record.argv);
+        assert!(record.argv.ends_with("***"), "{}", record.argv);
+    }
+    // The listing carries every secret on stdout: it is a read, so the log keeps none of it.
+    let listing = recent(usize::MAX, true)
+        .into_iter()
+        .rev()
+        .find(|r| r.argv.contains("--show-origin"))
+        .unwrap();
+    assert!(listing.output.is_empty());
+    assert_eq!(
+        listing.kind,
+        ferrit::domain::git::command_log::CommandKind::Read
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }

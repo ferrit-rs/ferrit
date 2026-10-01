@@ -52,7 +52,11 @@ pub(super) fn track(cmd: &Command) -> Tracked {
         rest.get(1).map(String::as_str),
     );
     let argv = std::iter::once("git".to_owned())
-        .chain(rest.iter().map(|a| redact(a)))
+        .chain(
+            command_log::mask_config_secrets(rest)
+                .iter()
+                .map(|a| redact(a)),
+        )
         .collect::<Vec<_>>()
         .join(" ");
     Tracked {
