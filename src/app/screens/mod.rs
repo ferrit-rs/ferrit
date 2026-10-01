@@ -74,6 +74,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         Some(PopupView::CommitAllConfirm(state)) => {
             popups::draw_commit_all_confirm(frame, area, state, accent, &palette);
         },
+        Some(PopupView::CreateRemote(view)) => {
+            popups::draw_create_remote(frame, area, &view, accent, &palette);
+        },
         Some(PopupView::Note(message)) => popups::draw_note(frame, area, message, &palette),
         Some(PopupView::Menu(view)) => popups::draw_menu(frame, area, &view, accent, &palette),
         Some(PopupView::CommandLog(view)) => {

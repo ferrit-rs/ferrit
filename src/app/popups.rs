@@ -33,6 +33,7 @@ enum PopupKind {
     Menu,
     Upstream,
     Askpass,
+    CreateRemote,
     Note,
 }
 
@@ -49,6 +50,7 @@ impl App {
             Popup::Menu(_) => PopupKind::Menu,
             Popup::Upstream(_) => PopupKind::Upstream,
             Popup::Askpass(_) => PopupKind::Askpass,
+            Popup::CreateRemote(_) => PopupKind::CreateRemote,
             Popup::Note(_) => PopupKind::Note,
         };
         match kind {
@@ -63,6 +65,7 @@ impl App {
             PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
             PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
             PopupKind::Askpass => self.askpass_popup().map(PopupView::Askpass),
+            PopupKind::CreateRemote => self.create_remote_view().map(PopupView::CreateRemote),
             PopupKind::Note => self.note_popup().map(PopupView::Note),
         }
     }
@@ -222,6 +225,10 @@ impl App {
             self.menu_key(key);
             return;
         }
+        if matches!(self.popup, Some(Popup::CreateRemote(_))) {
+            self.create_remote_key(key);
+            return;
+        }
         let mut dismiss = false;
         let mut create_branch_now = false;
         let mut stash_now = false;
@@ -237,7 +244,11 @@ impl App {
             },
             // Both are routed to their own handlers above.
             Some(
-                Popup::Commit(_) | Popup::CommitAllConfirm | Popup::Menu(_) | Popup::Askpass(_),
+                Popup::Commit(_)
+                | Popup::CommitAllConfirm
+                | Popup::Menu(_)
+                | Popup::Askpass(_)
+                | Popup::CreateRemote(_),
             ) => {},
             Some(Popup::NewBranch(buf)) => match key.code {
                 KeyCode::Esc => dismiss = true,

@@ -16,10 +16,11 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
-use ferrit::app::create_remote::CreateDraft;
+use ferrit::app::create_remote::{CreateDraft, CreateRemoteView, Field};
 use ferrit::app::events::{AppEvent, RemoteOp};
+use ferrit::app::{App, PopupView};
 use ferrit::domain::git::host::{GhProgram, Visibility};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// A repository and a fake `gh` that logs its calls, adds `origin` like the
 /// real one and answers with the web URL, or fails while `name-taken` exists.
@@ -52,6 +53,8 @@ impl Project {
              here=$(dirname \"$0\")\n\
              echo \"$@\" >> \"$here/calls.log\"\n\
              case \"$1\" in\n\
+               --version) echo 'gh version 2.50.0'; exit 0 ;;\n\
+               auth) [ -f \"$here/signed-out\" ] && exit 1; exit 0 ;;\n\
                repo)\n\
                  [ -f \"$here/sleep\" ] && sleep 2\n\
                  if [ -f \"$here/name-taken\" ]; then echo 'Name already exists on this account' >&2; exit 1; fi\n\
@@ -236,4 +239,385 @@ fn it_takes_the_slot_of_the_other_network_operations() {
     let calls = project.calls();
     assert_eq!(calls.len(), 1, "{calls:?}");
     assert!(calls[0].starts_with("repo create tool "), "{}", calls[0]);
+}
+
+// ---------------------------------------------------------------- the popups
+
+fn press(app: &mut App, code: KeyCode) {
+    app.feed_key(KeyEvent::from(code));
+}
+
+fn type_text(app: &mut App, text: &str) {
+    for c in text.chars() {
+        app.feed_key(KeyEvent::from(KeyCode::Char(c)));
+    }
+}
+
+/// What the create popup shows, flattened to text for an assertion.
+#[derive(Debug, PartialEq, Eq)]
+enum Shown {
+    Nothing,
+    Checking,
+    Form {
+        name: String,
+        description: String,
+        visibility: Visibility,
+        push_after: bool,
+        focus: Field,
+        error: Option<String>,
+    },
+    Confirm {
+        title: String,
+        visibility: Visibility,
+        lines: Vec<String>,
+    },
+    Note(String),
+}
+
+fn shown(app: &mut App) -> Shown {
+    match app.popup_view() {
+        None => Shown::Nothing,
+        Some(PopupView::Note(message)) => Shown::Note(message.to_owned()),
+        Some(PopupView::CreateRemote(view)) => match view {
+            CreateRemoteView::Checking => Shown::Checking,
+            CreateRemoteView::Form(form) => Shown::Form {
+                name: form.name.text(),
+                description: form.description.text(),
+                visibility: form.visibility,
+                push_after: form.push_after,
+                focus: form.focus,
+                error: form.error.map(str::to_owned),
+            },
+            CreateRemoteView::Confirm(confirm) => Shown::Confirm {
+                title: confirm.title,
+                visibility: confirm.visibility,
+                lines: confirm.lines,
+            },
+        },
+        Some(_) => panic!("another popup"),
+    }
+}
+
+fn clear_name(app: &mut App) {
+    for _ in 0..80 {
+        press(app, KeyCode::Backspace);
+    }
+}
+
+/// An app on a project with a ready `gh` and a way to receive events.
+fn ready_app(project: &Project) -> (App, mpsc::Receiver<AppEvent>) {
+    let mut app = project.app();
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx);
+    (app, rx)
+}
+
+/// Deliver the `gh` check's answer and open the form.
+fn open_form(app: &mut App, rx: &mpsc::Receiver<AppEvent>) {
+    app.open_create_remote();
+    assert_eq!(shown(app), Shown::Checking);
+    match rx.recv_timeout(Duration::from_secs(20)) {
+        Ok(event @ AppEvent::GhChecked { .. }) => app.deliver_event(event),
+        other => panic!("expected GhChecked, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_check_runs_off_the_ui_thread_then_the_form_opens_on_the_folder_name() {
+    let project = Project::new("cr-form");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+
+    let Shown::Form {
+        name,
+        description,
+        visibility,
+        push_after,
+        focus,
+        error,
+    } = shown(&mut app)
+    else {
+        panic!("a form")
+    };
+    assert_eq!(name, "work", "the folder's name");
+    assert_eq!(description, "");
+    assert_eq!(visibility, Visibility::Private, "private by default");
+    assert!(push_after);
+    assert_eq!(focus, Field::Name);
+    assert_eq!(error, None);
+    assert_eq!(project.calls(), ["--version", "auth status"]);
+}
+
+#[test]
+fn a_missing_or_signed_out_gh_says_what_to_do_and_shows_no_form() {
+    let project = Project::new("cr-nogh");
+    let mut app = project.app();
+    app.set_gh_program(GhProgram::new("/nonexistent/ferrit-test/gh"));
+    app.open_create_remote();
+    let Shown::Note(message) = shown(&mut app) else {
+        panic!("a note")
+    };
+    assert!(
+        message.contains("gh is required: https://cli.github.com"),
+        "{message}"
+    );
+
+    let project = Project::new("cr-signedout");
+    fs::write(project.dir.join("signed-out"), "").unwrap();
+    let mut app = project.app();
+    app.open_create_remote();
+    let Shown::Note(message) = shown(&mut app) else {
+        panic!("a note")
+    };
+    assert!(message.contains("gh auth login"), "{message}");
+    assert_eq!(project.remotes(), "");
+}
+
+#[test]
+fn closing_while_gh_is_checked_ignores_the_late_answer() {
+    let project = Project::new("cr-late");
+    let (mut app, rx) = ready_app(&project);
+    app.open_create_remote();
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(shown(&mut app), Shown::Nothing);
+    match rx.recv_timeout(Duration::from_secs(20)) {
+        Ok(event @ AppEvent::GhChecked { .. }) => app.deliver_event(event),
+        other => panic!("expected GhChecked, got {other:?}"),
+    }
+    assert_eq!(
+        shown(&mut app),
+        Shown::Nothing,
+        "no form pops up behind the user's back"
+    );
+}
+
+#[test]
+fn a_repository_that_has_a_remote_gets_a_note_and_no_check() {
+    let project = Project::new("cr-has-remote");
+    project.git(&["remote", "add", "upstream", "https://example.com/x.git"]);
+    let (mut app, rx) = ready_app(&project);
+    app.open_create_remote();
+    assert_eq!(
+        shown(&mut app),
+        Shown::Note("this repository already has a remote".to_owned())
+    );
+    assert!(rx.try_recv().is_err());
+    assert!(project.calls().is_empty());
+}
+
+#[test]
+fn the_form_edits_its_fields_with_tab_arrows_and_space() {
+    let project = Project::new("cr-keys");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+
+    clear_name(&mut app);
+    type_text(&mut app, "acme/tool");
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Char(' '));
+    press(&mut app, KeyCode::Tab);
+    type_text(&mut app, "A small tool");
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Char(' '));
+    assert_eq!(
+        shown(&mut app),
+        Shown::Form {
+            name: "acme/tool".to_owned(),
+            description: "A small tool".to_owned(),
+            visibility: Visibility::Public,
+            push_after: false,
+            focus: Field::Push,
+            error: None,
+        }
+    );
+    // Shift-Tab goes back, and the arrows flip the visibility.
+    press(&mut app, KeyCode::BackTab);
+    press(&mut app, KeyCode::BackTab);
+    press(&mut app, KeyCode::Right);
+    let Shown::Form {
+        visibility, focus, ..
+    } = shown(&mut app)
+    else {
+        panic!("a form")
+    };
+    assert_eq!(
+        (visibility, focus),
+        (Visibility::Private, Field::Visibility)
+    );
+}
+
+#[test]
+fn a_bad_name_stays_on_the_form_with_the_reason_until_it_is_edited() {
+    let project = Project::new("cr-invalid");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    clear_name(&mut app);
+    type_text(&mut app, "my repo");
+    press(&mut app, KeyCode::Enter);
+
+    let Shown::Form { error, .. } = shown(&mut app) else {
+        panic!("still the form")
+    };
+    assert!(error.unwrap().contains("not allowed in a name"));
+    type_text(&mut app, "x");
+    let Shown::Form { error, .. } = shown(&mut app) else {
+        panic!("a form")
+    };
+    assert_eq!(error, None, "typing clears the reason");
+}
+
+#[test]
+fn the_last_question_names_what_will_happen_and_a_private_one_takes_enter() {
+    let project = Project::new("cr-confirm");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    clear_name(&mut app);
+    type_text(&mut app, "tool");
+    press(&mut app, KeyCode::Enter);
+
+    let Shown::Confirm {
+        title,
+        visibility,
+        lines,
+    } = shown(&mut app)
+    else {
+        panic!("the question")
+    };
+    assert_eq!(title, "Create tool");
+    assert_eq!(visibility, Visibility::Private);
+    assert_eq!(lines[0], "PRIVATE repository");
+    assert!(
+        lines[1].starts_with("then: add remote `origin`, push "),
+        "{lines:?}"
+    );
+    assert_eq!(project.calls().len(), 2, "only the two status reads so far");
+
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(shown(&mut app), Shown::Nothing);
+    assert_eq!(app.remote_busy_label(), Some("Creating repository\u{2026}"));
+    wait_for_created(&mut app, &rx);
+    assert_eq!(project.remotes(), "origin");
+}
+
+#[test]
+fn a_public_repository_is_confirmed_by_y_alone_and_enter_does_nothing() {
+    let project = Project::new("cr-public-confirm");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Char(' '));
+    press(&mut app, KeyCode::Enter);
+
+    let Shown::Confirm {
+        visibility, lines, ..
+    } = shown(&mut app)
+    else {
+        panic!("the question")
+    };
+    assert_eq!(visibility, Visibility::Public);
+    assert_eq!(lines[0], "PUBLIC repository");
+    assert_eq!(lines[1], "Everyone can read its history.");
+
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Char(' '));
+    assert!(
+        matches!(shown(&mut app), Shown::Confirm { .. }),
+        "Enter and Space are not a yes"
+    );
+    assert!(app.remote_busy_label().is_none());
+    assert!(project.calls().iter().all(|c| !c.starts_with("repo ")));
+
+    app.feed_key(KeyEvent::from(KeyCode::Char('y')));
+    assert_eq!(app.remote_busy_label(), Some("Creating repository\u{2026}"));
+    wait_for_created(&mut app, &rx);
+    assert!(
+        project
+            .calls()
+            .iter()
+            .any(|c| c.starts_with("repo create work --public "))
+    );
+}
+
+#[test]
+fn n_and_esc_at_the_question_go_back_to_the_form_with_its_fields() {
+    let project = Project::new("cr-back");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    clear_name(&mut app);
+    type_text(&mut app, "tool");
+    for key in [KeyCode::Char('n'), KeyCode::Esc] {
+        press(&mut app, KeyCode::Enter);
+        assert!(matches!(shown(&mut app), Shown::Confirm { .. }));
+        press(&mut app, key);
+        let Shown::Form { name, .. } = shown(&mut app) else {
+            panic!("the form")
+        };
+        assert_eq!(name, "tool");
+    }
+}
+
+#[test]
+fn cancelling_at_any_step_leaves_no_remote_and_gh_untouched_beyond_its_checks() {
+    let project = Project::new("cr-cancel");
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(shown(&mut app), Shown::Nothing);
+
+    // The typed fields are remembered for the next time.
+    app.open_create_remote();
+    match rx.recv_timeout(Duration::from_secs(20)) {
+        Ok(event) => app.deliver_event(event),
+        other => panic!("expected GhChecked, got {other:?}"),
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(matches!(shown(&mut app), Shown::Confirm { .. }));
+    press(&mut app, KeyCode::Esc);
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(shown(&mut app), Shown::Nothing);
+
+    assert_eq!(project.remotes(), "");
+    assert!(
+        project
+            .calls()
+            .iter()
+            .all(|c| c == "--version" || c == "auth status"),
+        "{:?}",
+        project.calls()
+    );
+}
+
+#[test]
+fn a_refusal_reopens_the_form_on_the_name_with_every_field_kept() {
+    let project = Project::new("cr-reopen");
+    fs::write(project.dir.join("name-taken"), "").unwrap();
+    let (mut app, rx) = ready_app(&project);
+    open_form(&mut app, &rx);
+    clear_name(&mut app);
+    type_text(&mut app, "tool");
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    type_text(&mut app, "my words");
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+
+    let Shown::Form {
+        name,
+        description,
+        focus,
+        error,
+        ..
+    } = shown(&mut app)
+    else {
+        panic!("the form is back")
+    };
+    assert_eq!((name.as_str(), description.as_str()), ("tool", "my words"));
+    assert_eq!(focus, Field::Name);
+    assert!(
+        error
+            .unwrap()
+            .contains("Name already exists on this account")
+    );
+    assert_eq!(project.remotes(), "");
 }

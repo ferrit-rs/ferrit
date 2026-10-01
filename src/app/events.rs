@@ -50,6 +50,12 @@ pub enum AppEvent {
     /// `gh repo create` finished: the repository's web URL, or why not
     /// (`app::create_remote`).
     RemoteCreated(Result<String, String>),
+    /// `gh` was asked whether it is installed and signed in; `generation`
+    /// tells which popup asked (`app::create_remote`).
+    GhChecked {
+        generation: u64,
+        status: crate::domain::git::host::GhStatus,
+    },
 }
 
 /// Which of the network operations finished. Distinct from

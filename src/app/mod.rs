@@ -120,6 +120,7 @@ pub enum PopupView<'a> {
     Menu(MenuView),
     Upstream(CommitPopupView<'a>),
     Askpass(CommitPopupView<'a>),
+    CreateRemote(create_remote::CreateRemoteView<'a>),
     Note(&'a str),
 }
 
@@ -427,6 +428,9 @@ enum Popup {
     CommandLog {
         from_bottom: usize,
     },
+    /// Creating the GitHub repository: the `gh` check, the form, the last
+    /// question (`app::create_remote`).
+    CreateRemote(create_remote::Step),
     /// A dismissible message: a commit failure, "empty commit message", a
     /// branch-op failure, or a merge conflict.
     Note(String),
@@ -1529,6 +1533,7 @@ impl App {
             AppEvent::ImageDone(completion) => self.on_image_done(completion),
             AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             AppEvent::RemoteCreated(result) => self.on_remote_created(result),
+            AppEvent::GhChecked { generation, status } => self.on_gh_checked(generation, status),
             AppEvent::Askpass { prompt, reply } => self.on_askpass(prompt, reply),
             AppEvent::StatsDone(completion) => self.on_stats_done(completion),
             AppEvent::Input(_) => {},

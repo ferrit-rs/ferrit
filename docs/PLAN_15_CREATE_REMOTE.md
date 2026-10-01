@@ -190,7 +190,9 @@ replaced by the status-pane indicator; nothing modal blocks the UI.
 
 No new global key. In the popups: `Tab` / `Shift-Tab` move between fields, arrows
 or `Space` choose visibility, `Enter` continues, `Enter`/`y` confirm a private
-creation and `y` alone a public one, `Esc`/`n` cancel at any step (the same
+creation and `y` alone a public one, `Esc` closes the form, `n`/`Esc` at the last
+question go back to the form with its fields (nothing was created), and `Esc`
+closes at any other step (the same
 conventions as the other popups and key-bar questions, but for the public case).
 
 ## Edge cases

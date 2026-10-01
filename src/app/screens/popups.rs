@@ -6,6 +6,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
+use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
 use crate::app::hints::HelpLine;
 use crate::app::theme;
 use crate::app::{CommandLogView, CommitPopupView, MenuView};
@@ -19,6 +20,7 @@ use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
+use crate::domain::git::host::Visibility;
 
 const CONFIRM_DIALOG_WIDTH_PERCENT: u16 = 70;
 const CONFIRM_DIALOG_HEIGHT_PERCENT: u16 = 34;
@@ -431,6 +433,170 @@ pub(super) fn draw_menu(
             },
             Style::new().fg(palette.idle),
         )),
+        dialog.footer,
+    );
+}
+
+/// The popups of creating the GitHub repository: the `gh` check, the form, and
+/// the last question (`docs/PLAN_15_CREATE_REMOTE.md`).
+pub(super) fn draw_create_remote(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &CreateRemoteView<'_>,
+    accent: ratatui::style::Color,
+    palette: &Palette,
+) {
+    match view {
+        CreateRemoteView::Checking => {
+            let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
+            let dialog = Dialog::new(Line::styled(" Create on GitHub ", focused))
+                .fit_content(44.min(area.width), 1, 1)
+                .border_style(focused)
+                .render(frame, area);
+            frame.render_widget(
+                Paragraph::new(Line::styled(
+                    " checking gh\u{2026}",
+                    Style::new().fg(palette.idle),
+                )),
+                dialog.body,
+            );
+            frame.render_widget(
+                Paragraph::new(KeyBar::hints("Cancel: Esc", palette).line()),
+                dialog.footer,
+            );
+        },
+        CreateRemoteView::Form(form) => draw_create_form(frame, area, form, accent, palette),
+        CreateRemoteView::Confirm(confirm) => {
+            draw_create_confirm(frame, area, confirm, accent, palette);
+        },
+    }
+}
+
+/// Cells the field labels take.
+const LABEL_WIDTH: u16 = 13;
+
+fn draw_create_form(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    form: &FormView<'_>,
+    accent: ratatui::style::Color,
+    palette: &Palette,
+) {
+    let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
+    let idle = Style::new().fg(palette.idle);
+    let dialog = Dialog::new(Line::styled(" Create on GitHub ", focused))
+        .fit_content(64.min(area.width), 5, 1)
+        .border_style(focused)
+        .render(frame, area);
+    let rows = Layout::vertical([Constraint::Length(1); 5]).split(dialog.body);
+    let label = |text: &str, field: Field| {
+        let style = if form.focus == field { focused } else { idle };
+        Paragraph::new(Line::styled(format!(" {text}"), style))
+    };
+    let split = |row: Rect| {
+        Layout::horizontal([Constraint::Length(LABEL_WIDTH), Constraint::Min(1)]).split(row)
+    };
+    let at = |i: usize| rows.get(i).copied().unwrap_or_default();
+
+    let [name_label, name_input] = split_pair(&split(at(0)));
+    frame.render_widget(label("Name", Field::Name), name_label);
+    if form.focus == Field::Name {
+        form.name.render(frame, name_input);
+    } else {
+        form.name.render_inactive(frame, name_input);
+    }
+
+    let [vis_label, vis_value] = split_pair(&split(at(1)));
+    frame.render_widget(label("Visibility", Field::Visibility), vis_label);
+    let radio = |on: bool| if on { "(\u{2022})" } else { "( )" };
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![Span::raw(format!(
+            "{} private   {} public",
+            radio(form.visibility == Visibility::Private),
+            radio(form.visibility == Visibility::Public)
+        ))])),
+        vis_value,
+    );
+
+    let [desc_label, desc_input] = split_pair(&split(at(2)));
+    frame.render_widget(label("Description", Field::Description), desc_label);
+    if form.focus == Field::Description {
+        form.description.render(frame, desc_input);
+    } else {
+        form.description.render_inactive(frame, desc_input);
+    }
+
+    let push_style = if form.focus == Field::Push {
+        focused
+    } else {
+        idle
+    };
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!(" Push {} after creating   ", form.branch),
+                push_style,
+            ),
+            Span::raw(if form.push_after { "[x]" } else { "[ ]" }),
+        ])),
+        at(3),
+    );
+
+    if let Some(error) = form.error {
+        frame.render_widget(
+            Paragraph::new(Line::styled(
+                format!(" {error}"),
+                Style::new().fg(palette.del),
+            )),
+            at(4),
+        );
+    }
+    frame.render_widget(
+        Paragraph::new(KeyBar::hints("Next: Tab   Continue: Enter   Cancel: Esc", palette).line()),
+        dialog.footer,
+    );
+}
+
+fn split_pair(cells: &[Rect]) -> [Rect; 2] {
+    [
+        cells.first().copied().unwrap_or_default(),
+        cells.get(1).copied().unwrap_or_default(),
+    ]
+}
+
+fn draw_create_confirm(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    confirm: &ConfirmView,
+    accent: ratatui::style::Color,
+    palette: &Palette,
+) {
+    // A public repository takes the colour of the discard prompt.
+    let border = match confirm.visibility {
+        Visibility::Private => Style::new().fg(accent).add_modifier(Modifier::BOLD),
+        Visibility::Public => Style::new().fg(palette.del).add_modifier(Modifier::BOLD),
+    };
+    let rows = u16::try_from(confirm.lines.len())
+        .unwrap_or(u16::MAX)
+        .max(1);
+    let hint_width = u16::try_from(confirm.hint.chars().count() + 4).unwrap_or(u16::MAX);
+    let title_width = u16::try_from(confirm.title.chars().count() + 6).unwrap_or(u16::MAX);
+    let dialog = Dialog::new(Line::styled(format!(" {} ", confirm.title), border))
+        .fit_content(48.max(hint_width).max(title_width).min(area.width), rows, 1)
+        .border_style(border)
+        .render(frame, area);
+    let lines: Vec<Line<'static>> = confirm
+        .lines
+        .iter()
+        .enumerate()
+        .map(|(i, text)| {
+            let style = if i == 0 { border } else { Style::new() };
+            Line::styled(format!(" {text}"), style)
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines), dialog.body);
+    frame.render_widget(
+        Paragraph::new(Line::styled(confirm.hint, Style::new().fg(palette.idle))),
         dialog.footer,
     );
 }
