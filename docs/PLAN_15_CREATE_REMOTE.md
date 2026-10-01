@@ -1,6 +1,6 @@
 # Plan: phase 15, create a remote repository from ferrit
 
-**Status: in progress (R0 done: `src/domain/git/host.rs` validates, builds `gh`'s arguments and checks `gh`; nothing is created yet and no screen exists).** lazygit cannot create a remote
+**Status: in progress (R0 and R1 done: `src/domain/git/host.rs` validates, checks `gh` and creates the repository through it; no screen and no key yet).** lazygit cannot create a remote
 repository, so this phase is not compared with it; it is checked with the replay
 harness (with a fake `gh`) and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -107,12 +107,14 @@ pub(super) fn create_repo(repo: &Repository, gh: &GhProgram, req: &CreateRequest
   runs `gh` the way `remote.rs` runs git: piped output, its own process group,
   the 300-second timeout, cancellable, stdin null.
 - **The program is injected, not read from the environment.** `GhProgram` is the
-  program to run, `gh` from `PATH` by default; `Repo::set_gh_program(path)` and its
-  `#[doc(hidden)]` twin on `App` let a test point at a fake script that records
-  its arguments and prints a canned answer, the same shape as
-  `Repo::isolate_config` (`PLAN_14_GIT_CONFIG.md`). The crate forbids `unsafe`, so
-  a test cannot set an environment variable in-process; the replay runner sets the
-  program the same way. It is a seam, not a config key.
+  program to run, `gh` from `PATH` by default, with the timeout (`with_timeout`
+  lets a test make it short). `App` holds it (`App::set_gh_program`, a
+  `#[doc(hidden)]` seam) and hands it to the worker, which opens its own `Repo`
+  and so could not carry it; a test points it at a fake script that records its
+  arguments and prints a canned answer, in the spirit of `Repo::isolate_config`
+  (`PLAN_14_GIT_CONFIG.md`). The crate forbids `unsafe`, so a test cannot set an
+  environment variable in-process; the replay runner sets the program the same
+  way. It is a seam, not a config key.
 - **One place builds an external command.** `exec.rs` gains `exec::program`
   beside `exec::git`, and `Tracked` writes the program's own name in the log
   (`gh repo create …`, not `git …`). `tests/git_exec.rs` keeps scanning the
@@ -212,7 +214,7 @@ conventions as the other popups and key-bar questions, but for the public case).
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
 - `tests/git_host.rs`: a fake `gh` shell script (created in a temp dir, handed to
-  `Repo::set_gh_program`) that records its arguments to a file and answers
+  `App::set_gh_program`) that records its arguments to a file and answers
   `--version`, `auth status` and `repo create`. Asserts the exact argument list
   for private, public, organisation and description cases, that `--push`,
   `--add-readme`, `--gitignore` and `--license` are never passed, the name /
@@ -235,8 +237,8 @@ conventions as the other popups and key-bar questions, but for the public case).
 - **R0** ✅ `host.rs`: types, name / owner / description validation, argument
   building (`tests/git_host.rs`); then `exec::program`, `gh_status` and the
   injected `GhProgram`, tested with a fake `gh` script.
-- **R1** `create_repo` and `Repo::set_gh_program` with timeout and cancel, tests;
-  `gh_status` goes through the same timeout.
+- **R1** ✅ `Repo::create_repo` with timeout and cancel, tests; `gh_status` goes
+  through the same timeout (the child-process runner of `remote.rs` is shared).
 - **R2** `create_remote.rs` state, `RemoteOp::Create`, `AppEvent::RemoteCreated`,
   busy label, the draft kept across the operation.
 - **R3** the popups (checking, form, confirm with the Enter-does-not-confirm

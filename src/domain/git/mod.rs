@@ -44,6 +44,7 @@ use self::commit::{CommitKind, CommitOpts};
 use self::config::{ConfigView, ValueKind, WriteScope};
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
+use self::host::{CreateRequest, CreatedRepo, GhProgram};
 use self::stash::StashOutcome;
 use crate::domain::git::model::{
     BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader,
@@ -444,6 +445,18 @@ impl Repo {
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)
+    }
+
+    /// Create the repository on GitHub through `gh` and add it as `origin`
+    /// (not pushed). Slow and network-crossing: call it off the main thread.
+    /// See `docs/PLAN_15_CREATE_REMOTE.md`.
+    pub fn create_repo(
+        &self,
+        gh: &GhProgram,
+        req: &CreateRequest,
+        cancel: &AtomicBool,
+    ) -> GitResult<CreatedRepo> {
+        host::create_repo(&self.inner, gh, req, cancel)
     }
 
     /// Point this handle's `git config` calls at `global` as the global file

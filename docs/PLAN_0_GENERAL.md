@@ -59,7 +59,7 @@ into its own crate remains deferred.
 | 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (eight slices P0 to P7) | ✅ done |
 | 13 | `PLAN_13_DASHBOARD.md` | full-screen repository dashboard (`D`): totals, weekly activity, contributors, kinds of change, hot files, branch health, work in progress; computed off the UI thread | ✅ done (D0-D5; config keys for the charts open) |
 | 14 | `PLAN_14_GIT_CONFIG.md` | git config editor (`C`): every key with its scope and origin, edit / add / unset at local or global scope through `git config`, typed toggles, secrets redacted | ✅ done (G0-G5) |
-| 15 | `PLAN_15_CREATE_REMOTE.md` | create the GitHub repository from ferrit through `gh` (optional, from the `x` menu, private by default), wire `origin`, push with the existing credential popup | 🔄 in progress (R0) |
+| 15 | `PLAN_15_CREATE_REMOTE.md` | create the GitHub repository from ferrit through `gh` (optional, from the `x` menu, private by default), wire `origin`, push with the existing credential popup | 🔄 in progress (R0, R1) |
 | 16 | (no file) | start ferrit outside a repository: a welcome screen offering `git init`, then the usual panes | 👉 todo |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo

@@ -26,7 +26,7 @@ use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
 use crate::domain::git::model::RemoteEntry;
 
-const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
+pub(super) const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
 const TERMINATE_GRACE: Duration = Duration::from_secs(2);
 const POLL_INTERVAL: Duration = Duration::from_millis(40);
 
@@ -67,7 +67,7 @@ pub(super) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
 /// (git puts progress and the human summary on stderr, machine-parseable
 /// bits, when there are any, on stdout); ferrit does not parse either,
 /// just shows them.
-fn combined_output(out: &Output) -> String {
+pub(super) fn combined_output(out: &Output) -> String {
     let out_text = String::from_utf8_lossy(&out.stdout).trim().to_owned();
     let err_text = String::from_utf8_lossy(&out.stderr).trim().to_owned();
     match (out_text.is_empty(), err_text.is_empty()) {

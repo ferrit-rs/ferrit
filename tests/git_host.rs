@@ -12,7 +12,13 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+
+use ferrit::domain::git::Repo;
 use ferrit::domain::git::command_log::{CommandKind, recent};
+use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::host::{
     CreateRequest, GhProgram, GhStatus, HostError, Visibility, build_create_args, gh_status,
     parse_target, sanitize_name, validate_description,
@@ -233,8 +239,15 @@ impl FakeGh {
              here=$(dirname \"$0\")\n\
              echo \"$@\" >> \"$here/calls.log\"\n\
              case \"$1\" in\n\
-               --version) echo 'gh version 2.50.0'; exit 0 ;;\n\
+               --version) [ -f \"$here/slow-version\" ] && sleep 30; echo 'gh version 2.50.0'; exit 0 ;;\n\
                auth) if [ -f \"$here/signed-out\" ]; then echo 'You are not logged in' >&2; exit 1; fi; exit 0 ;;\n\
+               repo)\n\
+                 [ -f \"$here/sleep\" ] && sleep 30\n\
+                 if [ -f \"$here/name-taken\" ]; then echo 'GraphQL: Name already exists on this account (createRepository)' >&2; exit 1; fi\n\
+                 target=\"$3\"\n\
+                 while [ $# -gt 0 ]; do [ \"$1\" = --source ] && src=\"$2\"; shift; done\n\
+                 git -C \"$src\" remote add origin \"https://github.com/$target.git\"\n\
+                 echo \"https://github.com/$target\"; exit 0 ;;\n\
              esac\n\
              exit 0\n",
         )
@@ -303,4 +316,220 @@ fn the_status_checks_are_logged_as_reads_under_gh_s_name() {
         assert!(found.iter().all(|r| r.kind == CommandKind::Read));
         assert!(found.iter().any(|r| r.exit == Some(0)));
     }
+}
+
+/// A repository to create from, next to its fake `gh`.
+struct Project {
+    fake: FakeGh,
+    work: PathBuf,
+}
+
+impl Project {
+    fn new(tag: &str) -> Self {
+        let fake = FakeGh::new(tag);
+        let work = fake.dir.join("work");
+        fs::create_dir_all(&work).unwrap();
+        // What git reports for the working tree: the real path, not a symlink.
+        let work = fs::canonicalize(work).unwrap();
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(&work)
+            .args(["init", "-q", "."])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        Self { fake, work }
+    }
+
+    fn repo(&self) -> Repo {
+        Repo::open(&self.work).unwrap()
+    }
+
+    fn remote_url(&self) -> Option<String> {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&self.work)
+            .args(["remote", "get-url", "origin"])
+            .output()
+            .unwrap();
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    }
+
+    /// The `gh repo create` calls the fake saw.
+    fn creates(&self) -> Vec<String> {
+        self.fake
+            .calls()
+            .into_iter()
+            .filter(|c| c.starts_with("repo "))
+            .collect()
+    }
+}
+
+fn cancel_flag() -> AtomicBool {
+    AtomicBool::new(false)
+}
+
+#[test]
+fn creating_runs_gh_with_the_checked_arguments_and_returns_the_web_url() {
+    let project = Project::new("host-create");
+    let req = request(Some("acme"), "tool", Visibility::Private, "A small tool");
+    let created = project
+        .repo()
+        .create_repo(&project.fake.program(), &req, &cancel_flag())
+        .unwrap();
+
+    assert_eq!(created.web_url, "https://github.com/acme/tool");
+    assert_eq!(
+        project.creates(),
+        [format!(
+            "repo create acme/tool --private --source {}/ --remote origin --description A small tool",
+            project.work.display()
+        )]
+    );
+    // `gh` adds the remote itself, and nothing was pushed or initialised.
+    assert_eq!(
+        project.remote_url().as_deref(),
+        Some("https://github.com/acme/tool.git")
+    );
+    assert!(!project.creates()[0].contains("--push"));
+}
+
+#[test]
+fn a_public_request_passes_public() {
+    let project = Project::new("host-public");
+    let req = request(None, "tool", Visibility::Public, "");
+    project
+        .repo()
+        .create_repo(&project.fake.program(), &req, &cancel_flag())
+        .unwrap();
+    assert!(project.creates()[0].starts_with("repo create tool --public "));
+}
+
+#[test]
+fn a_name_gh_refuses_comes_back_as_its_message_and_nothing_is_configured() {
+    let project = Project::new("host-taken");
+    fs::write(project.fake.dir.join("name-taken"), "").unwrap();
+    let req = request(None, "tool", Visibility::Private, "");
+    let err = project
+        .repo()
+        .create_repo(&project.fake.program(), &req, &cancel_flag())
+        .unwrap_err();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("Name already exists on this account")),
+        "{err:?}"
+    );
+    assert_eq!(project.remote_url(), None);
+}
+
+#[test]
+fn a_bad_target_or_an_existing_origin_never_reaches_gh() {
+    let project = Project::new("host-guard");
+    let repo = project.repo();
+    let bad = request(None, "my repo", Visibility::Private, "");
+    let err = repo
+        .create_repo(&project.fake.program(), &bad, &cancel_flag())
+        .unwrap_err();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("not allowed in a name")),
+        "{err:?}"
+    );
+
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(&project.work)
+        .args(["remote", "add", "origin", "https://example.com/x.git"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let ok = request(None, "tool", Visibility::Private, "");
+    let err = project
+        .repo()
+        .create_repo(&project.fake.program(), &ok, &cancel_flag())
+        .unwrap_err();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("origin already exists")),
+        "{err:?}"
+    );
+    assert!(
+        project.fake.calls().is_empty(),
+        "gh was never called: {:?}",
+        project.fake.calls()
+    );
+}
+
+#[test]
+fn a_cancelled_creation_stops_gh_and_configures_nothing() {
+    let project = Project::new("host-cancel");
+    fs::write(project.fake.dir.join("sleep"), "").unwrap();
+    let cancel = std::sync::Arc::new(cancel_flag());
+    let flag = std::sync::Arc::clone(&cancel);
+    let stopper = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(300));
+        flag.store(true, Ordering::Release);
+    });
+    let started = Instant::now();
+    let req = request(None, "tool", Visibility::Private, "");
+    let err = project
+        .repo()
+        .create_repo(&project.fake.program(), &req, &cancel)
+        .unwrap_err();
+    stopper.join().unwrap();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("cancelled")),
+        "{err:?}"
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "gh was left running"
+    );
+    assert_eq!(project.remote_url(), None);
+}
+
+#[test]
+fn a_creation_that_outlasts_the_timeout_fails_and_configures_nothing() {
+    let project = Project::new("host-timeout");
+    fs::write(project.fake.dir.join("sleep"), "").unwrap();
+    let gh = project.fake.program().with_timeout(Duration::from_secs(1));
+    let started = Instant::now();
+    let req = request(None, "tool", Visibility::Private, "");
+    let err = project
+        .repo()
+        .create_repo(&gh, &req, &cancel_flag())
+        .unwrap_err();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("timed out after 1 seconds")),
+        "{err:?}"
+    );
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(project.remote_url(), None);
+}
+
+#[test]
+fn a_gh_that_hangs_on_its_status_check_reads_as_missing() {
+    let fake = FakeGh::new("host-slow");
+    fs::write(fake.dir.join("slow-version"), "").unwrap();
+    let started = Instant::now();
+    let gh = fake.program().with_timeout(Duration::from_secs(1));
+    assert_eq!(gh_status(&gh), GhStatus::Missing);
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[test]
+fn the_create_call_is_logged_as_a_write_under_gh_s_name() {
+    let project = Project::new("host-logged");
+    let req = request(None, "logged-tool", Visibility::Private, "");
+    project
+        .repo()
+        .create_repo(&project.fake.program(), &req, &cancel_flag())
+        .unwrap();
+    let mark = format!("--source {}/", project.work.display());
+    let found: Vec<_> = recent(usize::MAX, true)
+        .into_iter()
+        .filter(|r| r.argv.starts_with("gh repo create logged-tool") && r.argv.contains(&mark))
+        .collect();
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found.first().map(|r| r.kind), Some(CommandKind::Write));
+    assert_eq!(found.first().and_then(|r| r.exit), Some(0));
 }

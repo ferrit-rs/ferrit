@@ -108,6 +108,12 @@ pub enum GitError {
     /// `docs/PLAN_14_GIT_CONFIG.md`.
     #[error("git config failed: {0}")]
     ConfigFailed(String),
+    /// `gh repo create` was refused before it ran (a bad name, an `origin`
+    /// that already exists) or exited non-zero, timed out or was cancelled.
+    /// Holds what the user needs to read: ferrit's reason or `gh`'s own message.
+    /// See `docs/PLAN_15_CREATE_REMOTE.md`.
+    #[error("creating the repository failed: {0}")]
+    HostFailed(String),
     /// A long read (`Repo::stats`) was stopped by its cancel flag. Not a
     /// failure: the caller asked for it and drops the result.
     #[error("cancelled")]
