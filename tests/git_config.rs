@@ -320,3 +320,37 @@ fn secrets_are_hidden_on_screen_and_in_the_command_log() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn an_isolated_repo_writes_the_global_scope_into_its_own_file_only() {
+    let dir = std::env::temp_dir().join(format!("ferrit-gitconfig-i-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let global = dir.join("sandbox-global");
+    let mut repo = Repo::open(&dir).unwrap();
+    repo.isolate_config(&global);
+
+    repo.config_set(WriteScope::Global, "pull.rebase", "true", ValueKind::Bool)
+        .unwrap();
+    assert!(
+        std::fs::read_to_string(&global)
+            .unwrap()
+            .contains("rebase = true")
+    );
+    let view = repo.config().unwrap();
+    let global_entries: Vec<_> = view
+        .entries
+        .iter()
+        .filter(|e| e.scope == Scope::Global)
+        .collect();
+    assert_eq!(global_entries.len(), 1);
+    assert_eq!(global_entries[0].origin, Origin::File(global.clone()));
+    assert!(view.entries.iter().all(|e| e.scope != Scope::System));
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -145,6 +145,9 @@ pub struct Repo {
     /// Path used to discover this repository. Lets the TUI reopen an owned
     /// handle inside a refresh worker; `git2::Repository` itself stays local.
     reopen_path: std::path::PathBuf,
+    /// A throwaway global config file, set by `isolate_config`. `None` in
+    /// real use: git then reads the user's own files.
+    config_global: Option<std::path::PathBuf>,
 }
 
 /// Everything the wired panes need from one refresh.
@@ -178,7 +181,11 @@ impl Repo {
                 GitError::Open(e)
             }
         })?;
-        Ok(Self { inner, reopen_path })
+        Ok(Self {
+            inner,
+            reopen_path,
+            config_global: None,
+        })
     }
 
     /// Path for opening a fresh handle in a background worker.
@@ -438,10 +445,28 @@ impl Repo {
         branch::merge_branch(&self.inner, name)
     }
 
+    /// Point this handle's `git config` calls at `global` as the global file
+    /// and an empty system file, so a test can write the global scope without
+    /// touching the user's real `~/.gitconfig`. Nothing else is affected.
+    pub fn isolate_config(&mut self, global: &Path) {
+        self.config_global = Some(global.to_path_buf());
+    }
+
+    fn config_envs(&self) -> Vec<(&'static str, &std::ffi::OsStr)> {
+        self.config_global
+            .as_deref()
+            .map_or_else(Vec::new, |global| {
+                vec![
+                    ("GIT_CONFIG_GLOBAL", global.as_os_str()),
+                    ("GIT_CONFIG_SYSTEM", std::ffi::OsStr::new("/dev/null")),
+                ]
+            })
+    }
+
     /// Every git config value with its scope and origin.
     /// See `docs/PLAN_14_GIT_CONFIG.md`.
     pub fn config(&self) -> GitResult<ConfigView> {
-        config::read(&self.inner)
+        config::read(&self.inner, &self.config_envs())
     }
 
     /// `git config <scope> <key> <value>`; git validates a typed value.
@@ -452,7 +477,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::set(&self.inner, scope, key, value, kind)
+        config::set(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// `git config --add`: one more value for a multi-valued key.
@@ -463,7 +488,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::add(&self.inner, scope, key, value, kind)
+        config::add(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// `git config --replace-all`: every value of the key in `scope` becomes this one.
@@ -474,7 +499,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::replace_all(&self.inner, scope, key, value, kind)
+        config::replace_all(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// Change one value of a multi-valued key (`--fixed-value`), leaving the others.
@@ -486,17 +511,25 @@ impl Repo {
         old: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::replace_value(&self.inner, scope, key, value, old, kind)
+        config::replace_value(
+            &self.inner,
+            &self.config_envs(),
+            scope,
+            key,
+            value,
+            old,
+            kind,
+        )
     }
 
     /// Remove one value of a multi-valued key, leaving the others.
     pub fn config_unset_value(&self, scope: WriteScope, key: &str, old: &str) -> GitResult<()> {
-        config::unset_value(&self.inner, scope, key, old)
+        config::unset_value(&self.inner, &self.config_envs(), scope, key, old)
     }
 
     /// `git config --unset-all`: drop the key from `scope` only.
     pub fn config_unset(&self, scope: WriteScope, key: &str) -> GitResult<()> {
-        config::unset(&self.inner, scope, key)
+        config::unset(&self.inner, &self.config_envs(), scope, key)
     }
 
     /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.

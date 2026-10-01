@@ -145,9 +145,10 @@ pub fn parse(raw: &str) -> ConfigView {
     ConfigView { entries }
 }
 
-pub(super) fn read(repo: &Repository) -> GitResult<ConfigView> {
+pub(super) fn read(repo: &Repository, envs: &[(&str, &OsStr)]) -> GitResult<ConfigView> {
     let mut cmd = exec::git(workdir(repo)?);
     cmd.args(["config", "--list", "--show-origin", "--show-scope", "-z"]);
+    cmd.envs(envs.iter().copied());
     let out = exec::output(&mut cmd)
         .map_err(|e| GitError::ConfigFailed(format!("cannot run git: {e}")))?;
     if !out.status.success() {
@@ -237,28 +238,31 @@ fn write(
 /// several values there; use `replace_all`.
 pub(super) fn set(
     repo: &Repository,
+    envs: &[(&str, &OsStr)],
     scope: WriteScope,
     key: &str,
     value: &str,
     kind: ValueKind,
 ) -> GitResult<()> {
-    write(workdir(repo)?, &[], None, scope, key, value, kind)
+    write(workdir(repo)?, envs, None, scope, key, value, kind)
 }
 
 /// Add one more value to a multi-valued key.
 pub(super) fn add(
     repo: &Repository,
+    envs: &[(&str, &OsStr)],
     scope: WriteScope,
     key: &str,
     value: &str,
     kind: ValueKind,
 ) -> GitResult<()> {
-    write(workdir(repo)?, &[], Some("--add"), scope, key, value, kind)
+    write(workdir(repo)?, envs, Some("--add"), scope, key, value, kind)
 }
 
 /// Replace every value of `key` in `scope` with this one.
 pub(super) fn replace_all(
     repo: &Repository,
+    envs: &[(&str, &OsStr)],
     scope: WriteScope,
     key: &str,
     value: &str,
@@ -266,7 +270,7 @@ pub(super) fn replace_all(
 ) -> GitResult<()> {
     write(
         workdir(repo)?,
-        &[],
+        envs,
         Some("--replace-all"),
         scope,
         key,
@@ -279,6 +283,7 @@ pub(super) fn replace_all(
 /// siblings alone (`--fixed-value`: `old` is text, not a pattern).
 pub(super) fn replace_value(
     repo: &Repository,
+    envs: &[(&str, &OsStr)],
     scope: WriteScope,
     key: &str,
     value: &str,
@@ -288,28 +293,34 @@ pub(super) fn replace_value(
     let mut args = vec![scope.flag()];
     args.extend(kind.flag());
     args.extend(["--fixed-value", "--", key, value, old]);
-    run(workdir(repo)?, &[], &args)
+    run(workdir(repo)?, envs, &args)
 }
 
 /// Remove only the value `old` of `key` in `scope`.
 pub(super) fn unset_value(
     repo: &Repository,
+    envs: &[(&str, &OsStr)],
     scope: WriteScope,
     key: &str,
     old: &str,
 ) -> GitResult<()> {
     run(
         workdir(repo)?,
-        &[],
+        envs,
         &[scope.flag(), "--fixed-value", "--unset", "--", key, old],
     )
 }
 
 /// Remove every value of `key` in `scope`; the other scopes keep theirs.
-pub(super) fn unset(repo: &Repository, scope: WriteScope, key: &str) -> GitResult<()> {
+pub(super) fn unset(
+    repo: &Repository,
+    envs: &[(&str, &OsStr)],
+    scope: WriteScope,
+    key: &str,
+) -> GitResult<()> {
     run(
         workdir(repo)?,
-        &[],
+        envs,
         &[scope.flag(), "--unset-all", "--", key],
     )
 }
