@@ -9,10 +9,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Widget};
 
 use super::charts::NO_COMMITS;
-use super::text::{
-    MIN_WHOLE, compact, cut_end, cut_middle, figure, figure_columns, plural, relative_time,
-};
+use super::text::{MIN_WHOLE, compact, figure, figure_columns, plural, relative_time};
 use super::{Ctx, note};
+use crate::components::ui::cut::{cut_end, cut_middle};
 use crate::components::ui::share_bar::{percent_label, single_bar, stacked_bar};
 use crate::domain::git::stats::HotFiles;
 use crate::domain::git::stats::branches::BranchHealth;

@@ -2,6 +2,7 @@
 
 pub mod chart_palette;
 pub mod color_picker;
+pub mod cut;
 pub mod dialog;
 pub mod donut;
 pub mod drawer;
