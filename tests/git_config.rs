@@ -7,7 +7,8 @@
 //! `git config --list --show-origin --show-scope -z` output.
 //! See `docs/PLAN_14_GIT_CONFIG.md` milestone G0.
 
-use ferrit::domain::git::config::{Origin, Scope, parse};
+use ferrit::domain::git::Repo;
+use ferrit::domain::git::config::{Origin, Scope, ValueKind, WriteScope, parse};
 
 const SAMPLE: &str = "system\0file:/etc/gitconfig\0core.autocrlf\ninput\0\
 global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0\
@@ -89,6 +90,63 @@ fn repo_config_reads_the_local_scope_of_a_real_repository() {
     assert_eq!(
         (winner.scope, winner.value.as_str()),
         (Scope::Local, "merges")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn repo_writes_local_config_through_git_and_reads_it_back() {
+    let dir = std::env::temp_dir().join(format!("ferrit-gitconfig-w-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let repo = Repo::open(&dir).unwrap();
+    let local = |key: &str| {
+        let view = repo.config().unwrap();
+        view.entries
+            .iter()
+            .filter(|e| e.scope == Scope::Local && e.key == key)
+            .map(|e| e.value.clone())
+            .collect::<Vec<_>>()
+    };
+
+    repo.config_set(WriteScope::Local, "commit.gpgsign", "on", ValueKind::Bool)
+        .unwrap();
+    assert_eq!(local("commit.gpgsign"), ["true"]);
+    repo.config_add(
+        WriteScope::Local,
+        "remote.origin.fetch",
+        "a",
+        ValueKind::Text,
+    )
+    .unwrap();
+    repo.config_add(
+        WriteScope::Local,
+        "remote.origin.fetch",
+        "b",
+        ValueKind::Text,
+    )
+    .unwrap();
+    assert_eq!(local("remote.origin.fetch"), ["a", "b"]);
+    repo.config_replace_all(
+        WriteScope::Local,
+        "remote.origin.fetch",
+        "c",
+        ValueKind::Text,
+    )
+    .unwrap();
+    assert_eq!(local("remote.origin.fetch"), ["c"]);
+    repo.config_unset(WriteScope::Local, "commit.gpgsign")
+        .unwrap();
+    assert!(local("commit.gpgsign").is_empty());
+    assert!(
+        repo.config_unset(WriteScope::Local, "commit.gpgsign")
+            .is_err()
     );
     let _ = std::fs::remove_dir_all(&dir);
 }

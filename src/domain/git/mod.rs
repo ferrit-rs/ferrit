@@ -39,7 +39,7 @@ use self::apply::{ApplyDir, ApplyTarget};
 use self::blob::Rev;
 use self::branch::MergeOutcome;
 use self::commit::{CommitKind, CommitOpts};
-use self::config::ConfigView;
+use self::config::{ConfigView, ValueKind, WriteScope};
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
 use self::stash::StashOutcome;
@@ -441,6 +441,44 @@ impl Repo {
     /// See `docs/PLAN_14_GIT_CONFIG.md`.
     pub fn config(&self) -> GitResult<ConfigView> {
         config::read(&self.inner)
+    }
+
+    /// `git config <scope> <key> <value>`; git validates a typed value.
+    pub fn config_set(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        config::set(&self.inner, scope, key, value, kind)
+    }
+
+    /// `git config --add`: one more value for a multi-valued key.
+    pub fn config_add(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        config::add(&self.inner, scope, key, value, kind)
+    }
+
+    /// `git config --replace-all`: every value of the key in `scope` becomes this one.
+    pub fn config_replace_all(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        config::replace_all(&self.inner, scope, key, value, kind)
+    }
+
+    /// `git config --unset-all`: drop the key from `scope` only.
+    pub fn config_unset(&self, scope: WriteScope, key: &str) -> GitResult<()> {
+        config::unset(&self.inner, scope, key)
     }
 
     /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.

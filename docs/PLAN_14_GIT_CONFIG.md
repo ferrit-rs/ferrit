@@ -1,6 +1,6 @@
 # Plan: phase 14, git config editor
 
-**Status: in progress (G0 done: `src/domain/git/config.rs` reads and parses; no screen, no write yet).** lazygit has no git config screen, so
+**Status: in progress (G0 and G1 done: `src/domain/git/config.rs` reads, parses and writes; no screen yet).** lazygit has no git config screen, so
 this phase is not compared with it; it is checked with the replay harness and
 screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -206,7 +206,7 @@ Scope: s | Filter: / | Back: esc` (`Bar::GitConfig`).
 ## Milestones
 
 - **G0** ✅ `config.rs` read: parser, `ConfigView`, tests on captured output (`tests/git_config.rs`).
-- **G1** writes: `set` / `add` / `unset`, `WriteScope`, typed values, tests.
+- **G1** ✅ writes: `set` / `add` / `unset`, `WriteScope`, typed values, tests.
 - **G2** `KNOWN_KEYS` and validation through git.
 - **G3** `git_config.rs` state, edit popup, toggle and picker, confirmations.
 - **G4** `screens/git_config.rs`, redaction, shadowed rows, three widths.
