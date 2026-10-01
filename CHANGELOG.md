@@ -7,6 +7,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Added
+
+- `C` opens a full-screen git config editor, which lazygit does not have: every key with the level it was set at (`S` system, `G` global, `L` local, `W` worktree) and the file it came from, grouped by section. When a key is set at several levels the one git uses is marked (`← wins (local)`) and the others are dimmed; a value from an included file says `inherited`. `/` filters by key or value, `Enter` or `e` edits the selected value (a text popup, or a menu of the allowed values for a known boolean or enum like `pull.rebase` or `push.default`), `Space` flips a boolean, `a` adds a key, `d` unsets it after a question, `s` switches the file changes go to between local and global, `r` re-reads. Every change is one `git config` call, so git validates the value and a bad one leaves the file alone. The first write to `~/.gitconfig` of a session asks once; the system file, `include` lines and included files are read-only. Values of keys named `password`, `token`, `secret` or `credential` are hidden on screen and in the command log. The key can be rebound (`git_config`).
+
 ## [0.8.0] - 2026-09-29
 
 ### Added

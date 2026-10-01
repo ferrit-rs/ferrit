@@ -58,7 +58,7 @@ into its own crate remains deferred.
 | 11 | `PLAN_11_REBASE.md` | reword / drop / squash / fixup / edit on any commit, autosquash, in-progress operation menu (continue / skip / abort), conflict marking | ✅ done |
 | 12 | `PLAN_12_POLISH.md` | real command log, config file, keymap customization, generated help and keybars, `x` menu, palette and themes (eight slices P0 to P7) | ✅ done |
 | 13 | `PLAN_13_DASHBOARD.md` | full-screen repository dashboard (`D`): totals, weekly activity, contributors, kinds of change, hot files, branch health, work in progress; computed off the UI thread | ✅ done (D0-D5; config keys for the charts open) |
-| 14 | `PLAN_14_GIT_CONFIG.md` | git config editor (`C`): every key with its scope and origin, edit / add / unset at local or global scope through `git config`, typed toggles, secrets redacted | 🔄 in progress (G0 to G3) |
+| 14 | `PLAN_14_GIT_CONFIG.md` | git config editor (`C`): every key with its scope and origin, edit / add / unset at local or global scope through `git config`, typed toggles, secrets redacted | ✅ done (G0-G5) |
 | 15 | `PLAN_15_CREATE_REMOTE.md` | create the GitHub repository from ferrit through `gh` (private by default), wire `origin`, push with the existing credential popup | 📅 planned |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
@@ -70,7 +70,7 @@ Cross-cutting:
   applies to every phase from 1 on. Status: the `TestBackend` frame tests
   (mechanism 1) and the `App` seam tests (`tests/app_*.rs`, `feed_key`) exist
   and are what phases 3 to 12 were tested with; the replay harness
-  (`ferrit::replay`, `--replay`, 23 scripts in `test/scripts/`, run by
+  (`ferrit::replay`, `--replay`, 25 scripts in `test/scripts/`, run by
   `tests/replay.rs`) is built. `vhs` rendering and reference screenshots
   (ST4, ST5) are not.
 - Live refresh (`src/app/events.rs`) is already wired: every phase from 3 on that

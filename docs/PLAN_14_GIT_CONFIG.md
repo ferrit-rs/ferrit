@@ -1,6 +1,6 @@
 # Plan: phase 14, git config editor
 
-**Status: in progress (G0 to G3 done: the backend and `src/app/git_config*.rs` state, editing and confirmations; no screen drawn and no key bound yet).** lazygit has no git config screen, so
+**Status: built (G0 to G5).** `C` opens it. lazygit has no git config screen, so
 this phase is not compared with it; it is checked with the replay harness and
 screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -9,8 +9,9 @@ screenshots (`PLAN_SELF_TESTING.md`).
 View and change the git configuration from inside ferrit: what is set, at which
 level (local repository or global), what wins when a key is set twice, and a safe
 way to edit, add or remove a key without opening `~/.gitconfig` in an editor.
-Today the only writes ferrit offers are the identity choice in the profile drawer
-and its own `config.toml` (`PLAN_12_POLISH.md` P1, which is a different file:
+Before this phase ferrit wrote no git key at all (the identity choice in the
+profile drawer lives in memory and leaves git's files alone) and only its own
+`config.toml` (`PLAN_12_POLISH.md` P1, which is a different file:
 ferrit's settings, not git's). Everything else (`pull.rebase`, `push.default`,
 `commit.gpgsign`, `core.editor`, aliases) means leaving for the shell.
 
@@ -38,8 +39,7 @@ included file in place, ferrit's own `config.toml`.
 ## The gap this fixes
 
 - `git::Repo::user_name` and the profile module read identities; nothing lists
-  the whole configuration, and no code writes a git key except the identity
-  choice.
+  the whole configuration, and no code writes a git key.
 - The keys that decide how ferrit itself behaves are git's: it deliberately
   honours `pull.rebase`, `push.default`, `commit.gpgSign` and `diff.*`
   (`PLAN_7_COMMIT.md`, `PLAN_9_REMOTE.md`). A user cannot see or change them
@@ -159,7 +159,7 @@ pub(super) fn add(...);   pub(super) fn unset(...);
 | Key | Where | Action |
 | --- | --- | --- |
 | `C` | global | open the git config screen (rebindable, `Action::GitConfig`) |
-| `Esc`, `q`, `C` | screen | close it |
+| `Esc`, `q`, `C` | screen | close it (`Esc` clears a kept filter first) |
 | `j` `k` `PgUp` `PgDn` `Home` `End` | screen | move |
 | `/` | screen | filter by key or value (`Esc` clears it) |
 | `e`, `Enter` | screen | edit the selected key (popup, toggle or picker by type) |
@@ -177,7 +177,7 @@ Scope: s | Filter: / | Back: esc` (`Bar::GitConfig`).
 
 | Case | Behaviour |
 | --- | --- |
-| not in a repository (bare, or no `.git`) | only the global scope is offered; the local column is hidden |
+| not in a repository (bare, or no `.git`) | not reachable: ferrit needs a repository to open, so the local scope is always there |
 | `~/.gitconfig` missing | the first global write creates it, after the global confirmation |
 | the file is read-only or locked (`config.lock` exists) | git's message is shown; nothing changes |
 | a key set at several levels | all values listed; unset removes the write scope's value only, and the message says which value now wins |
@@ -185,7 +185,7 @@ Scope: s | Filter: / | Back: esc` (`Bar::GitConfig`).
 | invalid value | git's stderr in a note; file untouched |
 | `includeIf` condition not matching here | its entries are absent from the list, as for git |
 | the key being edited changes under it (edited elsewhere) | the write happens, then the re-read shows the real state |
-| identity keys | edited here or in the profile drawer; both end in the same `set`, and the drawer's choice is refreshed after |
+| identity keys | `user.name` and `user.email` are edited here like any key; the profile drawer's choice stays in memory and never writes git, so there is nothing to route, and the identities it lists refresh after every write |
 | very long list (300+ keys) | filter and scroll; no truncation |
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
@@ -210,8 +210,8 @@ Scope: s | Filter: / | Back: esc` (`Bar::GitConfig`).
 - **G2** ✅ `KNOWN_KEYS` (`src/domain/git/config_keys.rs`) and validation through git.
 - **G3** ✅ `git_config.rs` state, edit popup, toggle and picker, confirmations.
 - **G4** `screens/git_config.rs`, redaction, shadowed rows, three widths.
-- **G5** keymap entry, key bar, help, route the identity choice through `set`,
-  replay script, README row, CHANGELOG line.
+- **G5** ✅ keymap entry, key bar, help, replay script, README row, CHANGELOG
+  line (the identity choice needed no routing: it never wrote git).
 
 ## Definition of done (phase 14)
 
