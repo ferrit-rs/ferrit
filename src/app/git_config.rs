@@ -4,7 +4,9 @@
 //! so git stays the owner of the file format.
 
 use super::{App, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
-use crate::domain::git::config::{ConfigEntry, ConfigView, Scope, WriteScope, display_value};
+use crate::domain::git::config::{
+    ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value,
+};
 
 /// Rows `PgUp` / `PgDn` move.
 const PAGE: isize = 10;
@@ -41,6 +43,8 @@ pub struct GitConfigScreen {
     pub note: Option<String>,
     /// The allowed-values menu that is up, and what choosing a row sets.
     pub(super) pick: Option<super::git_config_edit::PickTarget>,
+    /// The first write to the global file was confirmed: it is asked once a session.
+    pub(super) global_confirmed: bool,
 }
 
 impl Default for GitConfigScreen {
@@ -54,6 +58,7 @@ impl Default for GitConfigScreen {
             scope: WriteScope::Local,
             note: None,
             pick: None,
+            global_confirmed: false,
         }
     }
 }
@@ -62,6 +67,23 @@ impl GitConfigScreen {
     /// Every value git knows, filter or not.
     pub fn total(&self) -> usize {
         self.view.entries.len()
+    }
+
+    /// The value git uses for `key`.
+    pub fn effective(&self, key: &str) -> Option<&ConfigEntry> {
+        self.view.effective(key)
+    }
+
+    /// The file the global scope reads and writes, as the listing shows it.
+    pub(super) fn global_file(&self) -> Option<&std::path::Path> {
+        self.view
+            .entries
+            .iter()
+            .find(|e| e.scope == Scope::Global)
+            .and_then(|e| match &e.origin {
+                Origin::File(path) => Some(path.as_path()),
+                Origin::CommandLine | Origin::Other(_) => None,
+            })
     }
 
     pub fn selected_row(&self) -> Option<&ConfigRow> {

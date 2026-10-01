@@ -6,8 +6,8 @@
 
 use super::context_menu::NameKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, KeyCode, KeyEvent, Popup, TextInput};
-use crate::domain::git::config::{Scope, ValueKind, WriteScope, is_secret_key};
+use super::{App, ConfirmAction, ConfirmPrompt, KeyCode, KeyEvent, Popup, TextInput};
+use crate::domain::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use crate::domain::git::config_keys::{KeyType, lookup};
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
@@ -29,6 +29,16 @@ pub(super) enum ConfigOp {
         value: String,
         kind: ValueKind,
     },
+    /// Remove one value (or the whole key when the value is empty or unknown).
+    Unset { key: String, value: Option<String> },
+}
+
+/// What to carry on with once the first global write is confirmed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GlobalResume {
+    Edit,
+    Toggle,
+    Add,
 }
 
 /// What a menu row will set, remembered while the menu is up.
@@ -65,6 +75,9 @@ impl App {
         let key = row.entry.key.clone();
         if let Some(reason) = Self::git_config_read_only(&row.entry.key, row.entry.scope) {
             self.git_config.note = Some(reason);
+            return;
+        }
+        if self.ask_before_global_write(GlobalResume::Edit) {
             return;
         }
         let scope = self.git_config.scope;
@@ -139,6 +152,9 @@ impl App {
             self.git_config.note = Some(reason);
             return;
         }
+        if self.ask_before_global_write(GlobalResume::Toggle) {
+            return;
+        }
         let scope = self.git_config.scope;
         let replacing = self.replacing_in(scope, &key, row.entry.scope, &row.entry.value);
         let value = if truthy(&row.entry.value) {
@@ -156,12 +172,101 @@ impl App {
 
     /// `a`: ask for a key, then its value.
     pub(super) fn add_git_config_key(&mut self) {
+        if self.ask_before_global_write(GlobalResume::Add) {
+            return;
+        }
         let scope = self.git_config.scope;
         self.open_name(
             NameKind::ConfigKey,
             format!("New key ({})", scope_name(scope)),
             TextInput::default(),
         );
+    }
+
+    /// `d`: unset the selected value in the write scope, after asking.
+    pub(super) fn unset_git_config_value(&mut self) {
+        let Some(row) = self.git_config.selected_row().cloned() else {
+            return;
+        };
+        let key = row.entry.key.clone();
+        if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
+            self.git_config.note = Some(reason);
+            return;
+        }
+        let scope = self.git_config.scope;
+        if scope_of(row.entry.scope) != Some(scope) {
+            self.git_config.note = Some(format!(
+                "{key} is not set in {}: press s to switch the scope",
+                scope_name(scope)
+            ));
+            return;
+        }
+        if row.included {
+            self.git_config.note = Some(format!(
+                "{key} comes from an included file: edit that file directly"
+            ));
+            return;
+        }
+        let shown = display_value(&key, &row.entry.value);
+        let file = if scope == WriteScope::Global && !self.git_config.global_confirmed {
+            format!(" ({})", self.global_file_label())
+        } else {
+            String::new()
+        };
+        let value = (!row.entry.value.is_empty()).then(|| row.entry.value.clone());
+        self.pending_confirm = Some(ConfirmPrompt {
+            message: format!("unset {key} = {shown} in {}{file}?", scope_name(scope)),
+            action: ConfirmAction::ConfigUnset(ConfigOp::Unset { key, value }),
+        });
+    }
+
+    /// `y` on the unset question. Asking named the file, so for the global
+    /// scope this is also the session's global confirmation.
+    pub(super) fn confirm_git_config_unset(&mut self, op: &ConfigOp) {
+        if self.git_config.scope == WriteScope::Global {
+            self.git_config.global_confirmed = true;
+        }
+        self.perform_git_config_op(op);
+    }
+
+    /// The first write to the global file of a session asks once, naming the
+    /// file. `true` when it asked (the caller stops; `resume_git_config_edit`
+    /// carries on after the yes).
+    fn ask_before_global_write(&mut self, resume: GlobalResume) -> bool {
+        if self.git_config.scope != WriteScope::Global || self.git_config.global_confirmed {
+            return false;
+        }
+        self.pending_confirm = Some(ConfirmPrompt {
+            message: format!(
+                "write to {}? Asked once this session.",
+                self.global_file_label()
+            ),
+            action: ConfirmAction::ConfigGlobal(resume),
+        });
+        true
+    }
+
+    /// `y` on the global question: remember it, then do what was asked.
+    pub(super) fn resume_git_config_edit(&mut self, resume: GlobalResume) {
+        self.git_config.global_confirmed = true;
+        match resume {
+            GlobalResume::Edit => self.edit_git_config_value(),
+            GlobalResume::Toggle => self.toggle_git_config_bool(),
+            GlobalResume::Add => self.add_git_config_key(),
+        }
+    }
+
+    /// The global file as the user would write it: `~/.gitconfig`.
+    fn global_file_label(&self) -> String {
+        let Some(path) = self.git_config.global_file() else {
+            return "~/.gitconfig".to_owned();
+        };
+        std::env::var_os("HOME")
+            .and_then(|home| path.strip_prefix(home).ok())
+            .map_or_else(
+                || path.display().to_string(),
+                |rest| format!("~/{}", rest.display()),
+            )
     }
 
     /// A menu row of the allowed values was chosen.
@@ -234,6 +339,8 @@ impl App {
                         value: text.to_owned(),
                         kind,
                     },
+                    // Never typed into a popup: it has its own question.
+                    unset @ ConfigOp::Unset { .. } => unset,
                 };
                 self.perform_git_config_op(&op)
             },
@@ -293,14 +400,39 @@ impl App {
                 replacing: None,
             } => repo.config_set(scope, key, value, *kind),
             ConfigOp::Add { key, value, kind } => repo.config_add(scope, key, value, *kind),
+            ConfigOp::Unset {
+                key,
+                value: Some(old),
+            } => repo.config_unset_value(scope, key, old),
+            ConfigOp::Unset { key, value: None } => repo.config_unset(scope, key),
         };
         if let Err(e) = result {
             self.report_error(e);
             return false;
         }
-        let (ConfigOp::Set { key, .. } | ConfigOp::Add { key, .. }) = op;
+        let (ConfigOp::Set { key, .. } | ConfigOp::Add { key, .. } | ConfigOp::Unset { key, .. }) =
+            op;
         self.reread_git_config();
-        self.git_config.note = Some(format!("{key} changed in {}", scope_name(scope)));
+        let note = match op {
+            ConfigOp::Unset { .. } => {
+                let wins = self.git_config.effective(key).map(|e| {
+                    format!(
+                        "{} value {} now wins",
+                        scope_label(e.scope),
+                        display_value(key, &e.value)
+                    )
+                });
+                format!(
+                    "unset {key} in {}; {}",
+                    scope_name(scope),
+                    wins.unwrap_or_else(|| "no value left".to_owned())
+                )
+            },
+            ConfigOp::Set { .. } | ConfigOp::Add { .. } => {
+                format!("{key} changed in {}", scope_name(scope))
+            },
+        };
+        self.git_config.note = Some(note);
         self.request_refresh();
         true
     }
@@ -311,9 +443,20 @@ impl App {
             KeyCode::Char('e') | KeyCode::Enter => self.edit_git_config_value(),
             KeyCode::Char(' ') => self.toggle_git_config_bool(),
             KeyCode::Char('a') => self.add_git_config_key(),
+            KeyCode::Char('d') => self.unset_git_config_value(),
             _ => return false,
         }
         true
+    }
+}
+
+const fn scope_label(scope: Scope) -> &'static str {
+    match scope {
+        Scope::System => "system",
+        Scope::Global => "global",
+        Scope::Local => "local",
+        Scope::Worktree => "worktree",
+        Scope::Command => "command-line",
     }
 }
 

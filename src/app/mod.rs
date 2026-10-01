@@ -305,6 +305,11 @@ enum ConfirmAction {
     RestoreStash { oid: String, pop: bool },
     /// Push a branch known to be behind its upstream, using a lease guard.
     ForcePush,
+    /// First write to the global git config of this session: once confirmed,
+    /// the edit that asked carries on (`app::git_config_edit`).
+    ConfigGlobal(git_config_edit::GlobalResume),
+    /// `d` on the git config screen: unset one value.
+    ConfigUnset(git_config_edit::ConfigOp),
 }
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a

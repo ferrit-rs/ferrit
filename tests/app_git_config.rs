@@ -438,3 +438,153 @@ fn an_include_line_is_read_only() {
         .unwrap();
     assert!(included.included);
 }
+
+#[test]
+fn d_asks_then_unsets_one_value_and_says_which_one_wins() {
+    let fx = Fixture::new("gc-unset");
+    fx.git(&["config", "--local", "core.editor", "vim"]);
+    let mut app = fx.app();
+    app.open_git_config();
+
+    select(&mut app, "core.editor", Scope::Local);
+    app.feed_key(key('d'));
+    assert_eq!(
+        app.confirm_message(),
+        Some("unset core.editor = vim in local?")
+    );
+    app.feed_key(key('n'));
+    assert!(app.confirm_message().is_none());
+    assert_eq!(get(&fx, "--local", "core.editor"), ["vim"]);
+
+    app.feed_key(key('d'));
+    app.feed_key(key('y'));
+    assert_eq!(get(&fx, "--local", "core.editor"), Vec::<String>::new());
+    assert_eq!(get(&fx, "--global", "core.editor"), ["nvim"]);
+    assert_eq!(
+        app.git_config().note.as_deref(),
+        Some("unset core.editor in local; global value nvim now wins")
+    );
+
+    // A key set nowhere else says so.
+    select(&mut app, "pull.rebase", Scope::Local);
+    app.feed_key(key('d'));
+    app.feed_key(key('y'));
+    assert!(
+        app.git_config()
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("global value true now wins")
+    );
+}
+
+#[test]
+fn d_removes_only_the_selected_value_of_a_multi_valued_key() {
+    let fx = Fixture::new("gc-unset-multi");
+    fx.git(&["config", "--local", "credential.helper", "a"]);
+    fx.git(&["config", "--local", "--add", "credential.helper", "b"]);
+    let mut app = fx.app();
+    app.open_git_config();
+
+    select(&mut app, "credential.helper", Scope::Local);
+    app.feed_key(key('d'));
+    app.feed_key(key('y'));
+    assert_eq!(get(&fx, "--local", "credential.helper"), ["b"]);
+}
+
+#[test]
+fn d_on_a_value_from_another_scope_points_at_s() {
+    let fx = Fixture::new("gc-unset-scope");
+    let mut app = fx.app();
+    app.open_git_config();
+
+    select(&mut app, "core.editor", Scope::Global);
+    app.feed_key(key('d'));
+    assert!(app.confirm_message().is_none());
+    assert!(
+        app.git_config()
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("press s")
+    );
+    assert_eq!(get(&fx, "--global", "core.editor"), ["nvim"]);
+}
+
+#[test]
+fn the_first_global_write_asks_once_and_carries_on_after_the_yes() {
+    let fx = Fixture::new("gc-global");
+    fx.git(&["config", "--global", "commit.gpgsign", "true"]);
+    let mut app = fx.app();
+    app.open_git_config();
+    app.feed_key(key('s'));
+
+    select(&mut app, "commit.gpgsign", Scope::Global);
+    app.feed_key(key(' '));
+    let question = app.confirm_message().unwrap().to_owned();
+    assert!(question.starts_with("write to "), "{question}");
+    assert!(question.contains("sandbox-global"), "{question}");
+    app.feed_key(key('n'));
+    assert_eq!(get(&fx, "--global", "commit.gpgsign"), ["true"]);
+
+    app.feed_key(key(' '));
+    app.feed_key(key('y'));
+    assert_eq!(get(&fx, "--global", "commit.gpgsign"), ["false"]);
+    // Asked once: the next write goes straight through.
+    app.feed_key(key(' '));
+    assert!(app.confirm_message().is_none());
+    assert_eq!(get(&fx, "--global", "commit.gpgsign"), ["true"]);
+}
+
+#[test]
+fn a_global_edit_opens_its_popup_after_the_yes_and_keeps_what_is_typed() {
+    let fx = Fixture::new("gc-global-edit");
+    let mut app = fx.app();
+    app.open_git_config();
+    app.feed_key(key('s'));
+
+    select(&mut app, "core.editor", Scope::Global);
+    press(&mut app, KeyCode::Enter);
+    assert!(popup_text(&mut app).is_none(), "the question comes first");
+    app.feed_key(key('y'));
+    let (title, text) = popup_text(&mut app).unwrap();
+    assert_eq!(
+        (title.as_str(), text.as_str()),
+        ("core.editor (global)", "nvim")
+    );
+    type_text(&mut app, "!");
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(get(&fx, "--global", "core.editor"), ["nvim!"]);
+
+    // `a` after the yes needs no second question.
+    app.feed_key(key('a'));
+    assert!(app.confirm_message().is_none());
+    assert!(popup_text(&mut app).is_some());
+}
+
+#[test]
+fn unsetting_in_global_names_the_file_and_counts_as_the_confirmation_and_hides_secrets() {
+    let fx = Fixture::new("gc-global-unset");
+    let mut app = fx.app();
+    app.open_git_config();
+    app.feed_key(key('s'));
+
+    select(&mut app, "github.token", Scope::Global);
+    app.feed_key(key('d'));
+    let question = app.confirm_message().unwrap().to_owned();
+    assert!(question.contains("sandbox-global"), "{question}");
+    assert!(
+        question.contains("***") && !question.contains("ghp_secret"),
+        "{question}"
+    );
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(get(&fx, "--global", "github.token"), ["ghp_secret"]);
+
+    app.feed_key(key('d'));
+    app.feed_key(key('y'));
+    assert_eq!(get(&fx, "--global", "github.token"), Vec::<String>::new());
+    // The one question already covered the session.
+    select(&mut app, "core.editor", Scope::Global);
+    app.feed_key(key(' '));
+    assert!(app.confirm_message().is_none());
+}

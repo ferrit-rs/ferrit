@@ -508,6 +508,8 @@ impl App {
             ConfirmAction::AbortOperation => {
                 self.apply_operation_step(git::operation::Step::Abort);
             },
+            ConfirmAction::ConfigGlobal(resume) => self.resume_git_config_edit(resume),
+            ConfirmAction::ConfigUnset(op) => self.confirm_git_config_unset(&op),
             ConfirmAction::ForcePush => {
                 if let Some(sender) = self.event_sender.clone() {
                     self.start_remote_op_with_force(
