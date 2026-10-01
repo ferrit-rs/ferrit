@@ -16,6 +16,7 @@ pub mod blob;
 pub mod branch;
 pub mod command_log;
 pub mod commit;
+pub mod config;
 pub mod diff;
 pub mod error;
 mod exec;
@@ -38,6 +39,7 @@ use self::apply::{ApplyDir, ApplyTarget};
 use self::blob::Rev;
 use self::branch::MergeOutcome;
 use self::commit::{CommitKind, CommitOpts};
+use self::config::ConfigView;
 use self::diff::{Diff, DiffOpts, DiffSide};
 use self::error::{GitError, GitResult};
 use self::stash::StashOutcome;
@@ -433,6 +435,12 @@ impl Repo {
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branch::merge_branch(&self.inner, name)
+    }
+
+    /// Every git config value with its scope and origin.
+    /// See `docs/PLAN_14_GIT_CONFIG.md`.
+    pub fn config(&self) -> GitResult<ConfigView> {
+        config::read(&self.inner)
     }
 
     /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.

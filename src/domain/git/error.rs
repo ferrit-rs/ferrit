@@ -103,6 +103,11 @@ pub enum GitError {
     /// `StashFailed` because git exits 0 here and the message is stable.
     #[error("no local changes to save")]
     NothingToStash,
+    /// A `git config` subprocess exited non-zero: a value git rejects, a
+    /// locked file, an unreadable one. Holds stderr. See
+    /// `docs/PLAN_14_GIT_CONFIG.md`.
+    #[error("git config failed: {0}")]
+    ConfigFailed(String),
     /// A long read (`Repo::stats`) was stopped by its cancel flag. Not a
     /// failure: the caller asked for it and drops the result.
     #[error("cancelled")]
