@@ -168,6 +168,17 @@ fn navigation_filter_scope_and_close_keys() {
     assert_eq!(app.git_config().filter, "");
     assert!(app.git_config().rows.len() > 2);
 
+    // A kept filter is cleared by the first Esc; the second leaves.
+    app.feed_key(key('/'));
+    type_text(&mut app, "pull");
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.git_config().filter, "");
+    assert_eq!(app.full_screen(), FullScreen::GitConfig);
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.full_screen(), FullScreen::None);
+
+    app.open_git_config();
     app.feed_key(key('q'));
     assert_eq!(app.full_screen(), FullScreen::None);
 }
@@ -587,4 +598,28 @@ fn unsetting_in_global_names_the_file_and_counts_as_the_confirmation_and_hides_s
     select(&mut app, "core.editor", Scope::Global);
     app.feed_key(key(' '));
     assert!(app.confirm_message().is_none());
+}
+
+#[test]
+fn a_new_filter_selects_its_first_match_and_a_reread_stays_near() {
+    let fx = Fixture::new("gc-filter-top");
+    fx.git(&["config", "--local", "zz.last", "x"]);
+    let mut app = fx.app();
+    app.open_git_config();
+    press(&mut app, KeyCode::End);
+    assert_eq!(
+        app.git_config().selected_row().unwrap().entry.key,
+        "zz.last"
+    );
+    app.feed_key(key('/'));
+    type_text(&mut app, "pull");
+    assert_eq!(
+        app.git_config().selected,
+        0,
+        "the old row is not in the matches"
+    );
+    assert_eq!(
+        app.git_config().selected_row().unwrap().entry.key,
+        "pull.rebase"
+    );
 }

@@ -108,16 +108,18 @@ impl GitConfigScreen {
     pub(super) fn set_view(&mut self, view: ConfigView) {
         let before = self.selected_id();
         self.view = view;
-        self.rebuild(before);
+        self.rebuild(before, false);
     }
 
     pub(super) fn set_filter(&mut self, filter: String) {
         let before = self.selected_id();
         self.filter = filter;
-        self.rebuild(before);
+        self.rebuild(before, true);
     }
 
-    fn rebuild(&mut self, before: Option<RowId>) {
+    /// `top`: when the selected value is gone from the rows, go to the first
+    /// one (a new filter) instead of staying near where it was (a re-read).
+    fn rebuild(&mut self, before: Option<RowId>, top: bool) {
         let needle = self.filter.to_lowercase();
         let mut order: Vec<&ConfigEntry> = self.view.entries.iter().collect();
         order.sort_by(|a, b| a.key.cmp(&b.key));
@@ -150,8 +152,13 @@ impl GitConfigScreen {
                 })
                 .or_else(|| self.rows.iter().position(|r| r.entry.key == key))
         });
-        self.selected =
-            found.unwrap_or_else(|| self.selected.min(self.rows.len().saturating_sub(1)));
+        self.selected = found.unwrap_or_else(|| {
+            if top {
+                0
+            } else {
+                self.selected.min(self.rows.len().saturating_sub(1))
+            }
+        });
     }
 
     fn move_by(&mut self, rows: isize) {
@@ -213,6 +220,10 @@ impl App {
             return;
         }
         match key.code {
+            // A kept filter goes first; the next `Esc` leaves.
+            KeyCode::Esc if !self.git_config.filter.is_empty() => {
+                self.git_config.set_filter(String::new());
+            },
             KeyCode::Esc | KeyCode::Char('q') => self.close_git_config(),
             KeyCode::Char('j') | KeyCode::Down => self.git_config.move_by(1),
             KeyCode::Char('k') | KeyCode::Up => self.git_config.move_by(-1),
