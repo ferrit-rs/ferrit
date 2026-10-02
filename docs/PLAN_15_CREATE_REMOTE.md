@@ -1,6 +1,6 @@
 # Plan: phase 15, create a remote repository from ferrit
 
-**Status: built (R0 to R5).** `x` with no remote offers it. lazygit cannot create a remote
+**Status: built (R0 to R5).** `G`, or `x` then `g`, with no remote. lazygit cannot create a remote
 repository, so this phase is not compared with it; it is checked with the replay
 harness (with a fake `gh`) and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -15,7 +15,8 @@ never undoes anything on its own.
 
 **It is optional and can happen at any time.** A repository may live locally for
 as long as the user likes; nothing nags them to publish it. The action sits in
-the `x` menu and is there whenever the repository has no remote.
+the `x` menu, and has a key of its own, `G` (as in GitHub), from any pane; both are
+there whenever the repository has no remote.
 
 ```
  x (Status or Branches), the repository has no remote
@@ -134,10 +135,13 @@ any process starts.
 - `src/app/create_remote.rs` (new): the popup state (step, fields, focus), the
   confirmation, the busy flag, `AppEvent::RemoteCreated`. `App::start_create_remote`,
   `create_remote_key`, `on_remote_created`.
-- **Entry point, no new key and no change to `P`.** The `x` menu
-  (`src/app/context_menu.rs`) offers "Create a repository on GitHub" on Status
-  and Branches whenever the repository has **no remote at all**. With any remote
-  already there (named `origin` or not) the entry is hidden.
+- **Entry points: `G`, and the `x` menu; no change to `P`.** `G` is the global
+  action `create_remote` (rebindable, `[keys.global]`): from any pane it starts the
+  flow, and with a remote already there it says so in a note and asks `gh`
+  nothing. The `x` menu (`src/app/context_menu.rs`) also offers "Create a
+  repository on GitHub" on Status and Branches whenever the repository has **no
+  remote at all**, so the action can be found without knowing the key; with any
+  remote already there (named `origin` or not) that entry is hidden.
 - **The `gh` check is off the UI thread.** Choosing the entry starts a worker that
   runs `gh_status` (it reaches the network); the popup reads "checking gh…" and
   turns into the form on `Ready`, or into the message for `Missing` / `SignedOut`.
@@ -188,7 +192,7 @@ replaced by the status-pane indicator; nothing modal blocks the UI.
 
 ## Keybindings
 
-No new global key. In the popups: `Tab` / `Shift-Tab` move between fields, arrows
+One global key, `G` (`Action::CreateRemote`). In the popups: `Tab` / `Shift-Tab` move between fields, arrows
 or `Space` choose visibility, `Enter` continues, `Enter`/`y` confirm a private
 creation and `y` alone a public one, `Esc` closes the form, `n`/`Esc` at the last
 question go back to the form with its fields (nothing was created), and `Esc`
@@ -222,7 +226,9 @@ conventions as the other popups and key-bar questions, but for the public case).
   `--add-readme`, `--gitignore` and `--license` are never passed, the name /
   owner / description validation, the timeout and cancel paths, and the
   signed-out and missing-`gh` states.
-- `tests/app_create_remote.rs`: the `x` entry shows only with no remote at all;
+- `tests/app_create_remote.rs`: `G` opens it from any pane and says so when there is
+  a remote, and is a letter inside the form; the `x` entry shows only with no
+  remote at all;
   the check runs off the UI thread; each step's keys; public needs `y` and
   **Enter cancels it**; cancelling at every step leaves `git remote` empty and
   the fake `gh` uncalled beyond the status reads; a refusal reopens the form with
@@ -252,7 +258,7 @@ conventions as the other popups and key-bar questions, but for the public case).
 
 ## Definition of done (phase 15)
 
-On a repository with no remote and `gh` signed in, `x` walks to "created and
+On a repository with no remote and `gh` signed in, `G` walks to "created and
 pushed" in a handful of keypresses plus the name, and `git remote -v` and
 `git status` match what `gh repo create` followed by `git push -u origin
 <branch>` would give. With `gh` missing or signed out the user gets the exact
