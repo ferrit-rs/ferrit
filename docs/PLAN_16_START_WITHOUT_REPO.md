@@ -1,6 +1,6 @@
 # Plan: phase 16, start ferrit outside a repository
 
-**Status: in progress (W0 and W1 done: `Repo::init`, `App::attach_repository`, `Events::watch`; no screen yet).** lazygit exits with an error
+**Status: in progress (W0 to W2 done: the welcome screen works through `App::welcome`; `main.rs` does not use it yet).** lazygit exits with an error
 outside a repository, so this phase is not compared with it; it is checked with
 the replay harness (a fixture with no repository) and screenshots
 (`PLAN_SELF_TESTING.md`).
@@ -156,8 +156,8 @@ for every other confirm.
 - **W0** ✅ `Repo::init`, `GitError::InitFailed`, tests (`tests/git_init.rs`).
 - **W1** ✅ `App::attach_repository` and `Events::watch`, tests on an `App::mock`
   (`tests/app_attach.rs`).
-- **W2** `App::welcome`, the screen's state and keys, the `git init` question,
-  the rendering and the key bar.
+- **W2** ✅ `App::welcome`, the screen's state and keys, the `git init` question,
+  the rendering and the key bar (`tests/app_welcome.rs`, `tests/welcome_screen.rs`).
 - **W3** `main.rs` (`Option` path, the explicit-path rule), the CLI test, the
   replay fixture and script.
 - **W4** README row, CHANGELOG line, plans.

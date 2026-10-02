@@ -143,7 +143,13 @@ pub enum Bar {
     /// The full-screen git config editor is up (`docs/PLAN_14_GIT_CONFIG.md`):
     /// its own keys, fixed like the dashboard's.
     GitConfig,
+    /// The welcome screen of a folder with no repository
+    /// (`docs/PLAN_16_START_WITHOUT_REPO.md`): its own keys, fixed.
+    Welcome,
 }
+
+/// The welcome screen's bar. Not remappable and not clickable, like its keys.
+const WELCOME_BAR: &str = "Init: i | Quit: q";
 
 /// The git config screen's bar. Not remappable and not clickable, like its keys.
 const GIT_CONFIG_BAR: &str = "Edit: e | Add: a | Unset: d | Scope: s | Filter: / | Back: esc";
@@ -226,7 +232,7 @@ fn body(bar: Bar) -> &'static [Segment] {
             &[(Context::Files, Action::StageAll)],
             &[(Context::Global, Action::Commit)],
         ],
-        Bar::Help | Bar::Dashboard | Bar::GitConfig => &[],
+        Bar::Help | Bar::Dashboard | Bar::GitConfig | Bar::Welcome => &[],
     }
 }
 
@@ -305,6 +311,7 @@ pub fn keybar_layout(keymap: &Keymap, bar: Bar, width: usize) -> Keybar {
         Bar::Help => Some(HELP_BAR),
         Bar::Dashboard => Some(DASHBOARD_BAR),
         Bar::GitConfig => Some(GIT_CONFIG_BAR),
+        Bar::Welcome => Some(WELCOME_BAR),
         _ => None,
     };
     if let Some(text) = fixed {

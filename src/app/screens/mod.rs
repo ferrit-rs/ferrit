@@ -29,6 +29,7 @@ mod diff;
 pub mod git_config;
 mod popups;
 pub(super) mod profile;
+pub mod welcome;
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
@@ -39,6 +40,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let keybar = match app.full_screen() {
         FullScreen::Dashboard => draw_dashboard(frame, app, area),
         FullScreen::GitConfig => draw_git_config(frame, app, area),
+        FullScreen::Welcome => draw_welcome(frame, app, area),
         FullScreen::None => draw_panes(frame, app, area),
     };
 
@@ -190,6 +192,21 @@ fn draw_dashboard(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     };
     let max_scroll = dashboard::draw(frame, page, &view);
     app.clamp_dashboard_scroll(max_scroll);
+    draw_keybar(frame, keybar, app);
+    keybar
+}
+
+/// The welcome screen above its key bar; returns the key bar's area.
+fn draw_welcome(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+    let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+    if let Some(dir) = app.welcome_dir() {
+        let view = welcome::View {
+            dir,
+            palette: app.palette(),
+            accent: app.theme_config.color(),
+        };
+        welcome::draw(frame, page, &view);
+    }
     draw_keybar(frame, keybar, app);
     keybar
 }
@@ -806,6 +823,8 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Dashboard
     } else if app.full_screen() == FullScreen::GitConfig {
         Bar::GitConfig
+    } else if app.full_screen() == FullScreen::Welcome {
+        Bar::Welcome
     } else if app.operation.is_some() {
         Bar::Operation
     } else if app.right_focused() {

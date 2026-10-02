@@ -1,0 +1,213 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "integration test scaffolding: a failed setup is the assertion"
+)]
+//! The welcome screen (`docs/PLAN_16_START_WITHOUT_REPO.md`, W2): ferrit in a
+//! folder with no repository. Nothing is created without the yes to a question
+//! that names the folder.
+
+use std::fs;
+use std::path::PathBuf;
+
+use ferrit::app::config::ConfigLoad;
+use ferrit::app::{App, FullScreen};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new(tag: &str) -> Self {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = fs::canonicalize(std::env::temp_dir())
+            .unwrap()
+            .join(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&path).unwrap();
+        Self(path)
+    }
+
+    fn welcome(&self) -> App {
+        App::welcome(&self.0, ConfigLoad::default())
+    }
+
+    fn has_repo(&self) -> bool {
+        self.0.join(".git").exists()
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn key(c: char) -> KeyEvent {
+    KeyEvent::from(KeyCode::Char(c))
+}
+
+fn press(app: &mut App, code: KeyCode) {
+    app.feed_key(KeyEvent::from(code));
+}
+
+fn status_text(app: &App) -> String {
+    app.status_lines()
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn it_starts_on_the_welcome_screen_about_the_absolute_folder() {
+    let dir = TempDir::new("welcome-start");
+    let app = dir.welcome();
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+    assert_eq!(app.welcome_dir(), Some(dir.0.as_path()));
+    assert!(!dir.has_repo());
+}
+
+#[test]
+fn q_and_esc_leave_without_creating_anything() {
+    for code in [KeyCode::Char('q'), KeyCode::Esc] {
+        let dir = TempDir::new("welcome-quit");
+        let mut app = dir.welcome();
+        assert!(!app.is_quitting());
+        press(&mut app, code);
+        assert!(app.is_quitting());
+        assert!(!dir.has_repo());
+    }
+}
+
+#[test]
+fn i_asks_naming_the_folder_and_creates_nothing_yet() {
+    let dir = TempDir::new("welcome-ask");
+    let mut app = dir.welcome();
+    app.feed_key(key('i'));
+
+    let question = app.confirm_message().unwrap();
+    assert_eq!(question, format!("run git init in {}?", dir.0.display()));
+    assert!(!dir.has_repo());
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+}
+
+#[test]
+fn the_home_folder_is_called_out_in_the_question() {
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        return;
+    };
+    let Ok(home) = fs::canonicalize(home) else {
+        return;
+    };
+    let mut app = App::welcome(&home, ConfigLoad::default());
+    app.feed_key(key('i'));
+    // Only the question is asked: the answer is never given, nothing is created.
+    let question = app.confirm_message().unwrap();
+    assert!(
+        question.ends_with("This is your home folder."),
+        "{question}"
+    );
+}
+
+#[test]
+fn n_and_esc_at_the_question_create_nothing_and_stay() {
+    for answer in [KeyCode::Char('n'), KeyCode::Esc] {
+        let dir = TempDir::new("welcome-no");
+        let mut app = dir.welcome();
+        app.feed_key(key('i'));
+        press(&mut app, answer);
+        assert!(app.confirm_message().is_none());
+        assert!(!dir.has_repo());
+        assert_eq!(app.full_screen(), FullScreen::Welcome);
+        assert!(
+            !app.is_quitting(),
+            "an Esc that answers a question does not quit"
+        );
+    }
+}
+
+#[test]
+fn y_and_enter_create_the_repository_and_open_the_panes() {
+    for answer in [KeyCode::Char('y'), KeyCode::Enter] {
+        let dir = TempDir::new("welcome-yes");
+        fs::write(dir.0.join("notes.txt"), "hello").unwrap();
+        let mut app = dir.welcome();
+        app.feed_key(key('i'));
+        press(&mut app, answer);
+
+        assert!(dir.has_repo());
+        assert_eq!(app.full_screen(), FullScreen::None);
+        assert!(app.welcome_dir().is_none());
+        assert!(
+            status_text(&app).contains("welcome-yes"),
+            "{}",
+            status_text(&app)
+        );
+        assert!(
+            app.file_lines()
+                .iter()
+                .any(|l| l.to_string().contains("notes.txt")),
+            "the folder's file shows as untracked"
+        );
+    }
+}
+
+#[test]
+fn a_refused_init_says_why_and_the_welcome_screen_stays() {
+    let dir = TempDir::new("welcome-refused");
+    let mut app = dir.welcome();
+    app.feed_key(key('i'));
+    // The folder disappears between the question and the yes.
+    fs::remove_dir_all(&dir.0).unwrap();
+    app.feed_key(key('y'));
+
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+    assert!(
+        status_text(&app).contains("git init failed"),
+        "{}",
+        status_text(&app)
+    );
+    assert!(!dir.0.exists());
+}
+
+#[test]
+fn no_pane_action_runs_without_a_repository() {
+    let dir = TempDir::new("welcome-inert");
+    let mut app = dir.welcome();
+    for c in [
+        'x', 'j', 'D', 'C', 'c', 'f', 'p', 'P', '?', '@', '1', 's', 'd',
+    ] {
+        app.feed_key(key(c));
+        assert_eq!(app.full_screen(), FullScreen::Welcome, "{c}");
+        assert!(app.confirm_message().is_none(), "{c}");
+        assert!(!app.is_quitting(), "{c}");
+    }
+    app.feed_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+    assert!(app.is_quitting(), "Ctrl-C still quits, as everywhere");
+}
+
+#[test]
+fn the_mouse_does_nothing() {
+    let dir = TempDir::new("welcome-mouse");
+    let mut app = dir.welcome();
+    for kind in [
+        MouseEventKind::Down(MouseButton::Left),
+        MouseEventKind::Down(MouseButton::Right),
+        MouseEventKind::ScrollDown,
+    ] {
+        app.feed_mouse(MouseEvent {
+            kind,
+            column: 10,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        });
+    }
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+    assert!(app.confirm_message().is_none());
+}

@@ -311,6 +311,8 @@ enum ConfirmAction {
     ConfigGlobal(git_config_edit::GlobalResume),
     /// `d` on the git config screen: unset one value.
     ConfigUnset(git_config_edit::ConfigOp),
+    /// `i` on the welcome screen: `git init` in this folder.
+    InitRepo(PathBuf),
 }
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a
@@ -397,6 +399,9 @@ pub enum FullScreen {
     None,
     Dashboard,
     GitConfig,
+    /// No repository: ferrit started in a folder that is not one
+    /// (`docs/PLAN_16_START_WITHOUT_REPO.md`).
+    Welcome,
 }
 
 /// Modal state that owns all input while it is up, the same idea as
@@ -676,6 +681,8 @@ pub struct App {
     /// Set when the app was rebuilt on a new repository: `run` points the
     /// filesystem watch at this root and clears it.
     watch_request: Option<PathBuf>,
+    /// The folder the welcome screen is about; `None` once there is a repository.
+    welcome_dir: Option<PathBuf>,
     create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
@@ -701,6 +708,7 @@ pub struct App {
 }
 
 mod tree;
+mod welcome;
 
 mod askpass;
 mod branch_actions;
@@ -843,6 +851,7 @@ impl App {
             dashboard: dashboard::Dashboard::default(),
             git_config: git_config::GitConfigScreen::default(),
             watch_request: None,
+            welcome_dir: None,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
             event_sender: None,
@@ -871,14 +880,38 @@ impl App {
         let mut app = Self::base(Some(git::Repo::open(path)?), config);
         app.config_file = file;
         app.refresh();
-        if !issues.is_empty() {
-            let location = app
-                .config_file
-                .as_deref()
-                .map_or_else(String::new, |f| format!(" {}", f.display()));
-            app.report_error(format!("config{location}: {}", issues.join("; ")));
-        }
+        app.report_config_issues(&issues);
         Ok(app)
+    }
+
+    /// Whatever was wrong with the configuration file, reported once, as an
+    /// error toast.
+    fn report_config_issues(&mut self, issues: &[String]) {
+        if issues.is_empty() {
+            return;
+        }
+        let location = self
+            .config_file
+            .as_deref()
+            .map_or_else(String::new, |f| format!(" {}", f.display()));
+        self.report_error(format!("config{location}: {}", issues.join("; ")));
+    }
+
+    /// The app for a folder with no repository in it or above it: the welcome
+    /// screen, offering `git init`. No panes are drawn, so none of their data
+    /// is needed. `dir` is made absolute for the question.
+    pub fn welcome(dir: &Path, load: config::ConfigLoad) -> Self {
+        let config::ConfigLoad {
+            config,
+            file,
+            issues,
+        } = load;
+        let mut app = Self::base(None, config);
+        app.config_file = file;
+        app.full_screen = FullScreen::Welcome;
+        app.welcome_dir = Some(dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()));
+        app.report_config_issues(&issues);
+        app
     }
 
     /// The help screen's content for the focused pane, from the live keymap.

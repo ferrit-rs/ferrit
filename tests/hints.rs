@@ -125,6 +125,11 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
         "the git config screen's own keys, fixed like the dashboard's"
     );
     assert_eq!(
+        bar(&map, Bar::Welcome, 120),
+        "Init: i | Quit: q",
+        "the welcome screen's own keys, fixed"
+    );
+    assert_eq!(
         bar(&map, Bar::FilesEmpty, 120),
         "Commit: c | Stash: s | Reword: w | Fetch/Pull/Push: f/p/P | Help: ? | Quit: q",
         "nothing to stage, discard or amend"
