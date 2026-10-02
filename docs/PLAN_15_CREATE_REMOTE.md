@@ -29,14 +29,16 @@ there whenever the repository has no remote.
 │ Name        ferrit                    │      organisation; no separate owner.
 │ Visibility  ( ) public   (•) private  │
 │ Description                           │      `gh` missing or signed out: the
-│ Push main after creating   [x]        │      popup says what to run instead
-└ Tab: next   Enter: continue   Esc ────┘      and the form never shows.
+│ Initial commit, empty README.md  [x]  │      popup says what to run instead
+│ Push main after creating   [x]        │      and the form never shows. The
+└ Tab: next   Enter: continue   Esc ────┘      commit row exists only with no commit.
         │ Enter
         ▼
 ┌ Create richard-lavoura/ferrit ────────┐      public: the word PUBLIC in the
 │ PRIVATE repository                    │      discard prompt's warning colour,
-│ then: add remote `origin`, push main  │      and only `y` confirms; Enter
-│ Enter/y: create        n/Esc: cancel  │      cancels.
+│ first: commit an empty README.md      │      and only `y` confirms; Enter
+│ then: add remote `origin`, push main  │      cancels.
+│ Enter/y: create        n/Esc: cancel  │
 └───────────────────────────────────────┘
         │ Enter/y        ← last way back: nothing exists yet
         ▼
@@ -184,9 +186,20 @@ replaced by the status-pane indicator; nothing modal blocks the UI.
   rejected key), the repository exists and the remote is configured; ferrit says
   so, shows the web URL, and leaves `P` to retry. It never deletes a remote
   repository: that is irreversible, so it is not offered here at all.
-- No file is added to the repository: no README, `.gitignore` or licence
-  (`gh`'s `--add-readme`, `--gitignore`, `--license` are not passed), because the
-  local history is what the user wants published, unchanged.
+- No file is added to the repository, with one exception the user asks for: the
+  **initial commit**. `gh`'s `--add-readme`, `--gitignore` and `--license` are never
+  passed, and no `.gitignore` or licence is made. When the repository has **no
+  commit at all**, the form offers (ticked) a first commit holding an empty
+  `README.md` (an existing one is committed as it is, never overwritten), so a
+  new project can be published and pushed with nothing else to set up. Only that
+  file goes in: other files of the folder stay untracked, and anything the user
+  staged stays staged. A repository that already has a commit never gets the
+  row, and asking twice commits once. The commit is local and made **before**
+  anything is created: if it fails (a hook, no identity), nothing exists
+  anywhere and the form reopens with git's message. If the creation is then
+  refused, the commit stays and a retry does not make a second one. It is
+  `git commit`, so hooks, signing and the identity are the user's own, and the
+  author chosen in the profile drawer applies.
 - Nothing about the user's account is stored: not the login, not the URL beyond
   the remote git already keeps.
 
@@ -209,7 +222,8 @@ conventions as the other popups and key-bar questions, but for the public case).
 | owner is an organisation the user cannot create in | `gh`'s permission message; nothing created; the form reopens |
 | the repository has a remote (any name) | the menu entry is hidden; if the action is reached anyway it says so and does not create |
 | detached HEAD | nothing to push: creation is offered, the push step is skipped with a note |
-| no commits yet | creation works, the push step is skipped ("commit first") |
+| no commits yet | the form offers the first commit (ticked), which makes the push possible; unticked, creation still works and the push is skipped ("commit first") |
+| the first commit fails (a `pre-commit` hook, no identity) | nothing is created; the form reopens on the name with git's message |
 | network drops during create | timeout or `gh` error; nothing configured locally (`gh` adds the remote only once it succeeds) |
 | created, push rejected or cancelled | the repository and the remote stay; a note gives the web URL and says `P` retries |
 | user cancels the credential popup | the push fails with git's message; same as any push |
