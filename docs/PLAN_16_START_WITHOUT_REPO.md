@@ -24,8 +24,8 @@ a question that names the folder.
 │     q   Quit                                          │
 │                                                       │
 └───────────────────────────────────────────────────────┘
- Init: i | Quit: q
-        │ i
+ Move: ↑/↓ | Choose: enter | Init: i | Quit: q
+        │ i  (or Enter on the highlighted row)
         ▼
  run git init in /Users/me/projects/new?   Enter/y yes  n/Esc cancel
         │ y
@@ -96,8 +96,11 @@ impl Repo {
   Config problems are reported like `open_with` does.
 - `src/app/welcome.rs` (new): the screen's state and keys. `i` asks the question
   (`ConfirmAction::InitRepo`, the key-bar confirm: `Enter` / `y` yes, `n` / `Esc`
-  no), `q` and `Esc` quit (exit code 0: the user chose it), nothing else does
-  anything. Mouse and the other keys are ignored.
+  no), `q` and `Esc` quit (exit code 0: the user chose it). The two rows are a
+  menu like the others: `↑` / `↓` (or `j` / `k`, `Home` / `End`) move the
+  highlight, which starts on `git init`, and `Enter` runs the highlighted row, so
+  the whole thing can be done without a letter. Nothing else does anything.
+  Mouse and the other keys are ignored.
 - The question names the absolute folder. When the folder is the user's home
   directory it says so in the same line, because `git init` there is the
   mistake this question exists to catch.
@@ -114,8 +117,9 @@ impl Repo {
 
 `screens/welcome.rs`: a `Dialog` centred on the screen, with the folder (cut in
 the middle when it is longer than the dialog), the sentence, and the two rows;
-the key bar shows `Init: i | Quit: q` (`Bar::Welcome`, fixed like the dashboard's
-and the git config screen's). While the question is up the key bar shows it, as
+the highlighted row has the marker `▸` and the selection bar of the other menus;
+the key bar shows `Move: ↑/↓ | Choose: enter | Init: i | Quit: q` (`Bar::Welcome`,
+fixed like the dashboard's and the git config screen's). While the question is up the key bar shows it, as
 for every other confirm.
 
 ## Edge cases
