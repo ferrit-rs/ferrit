@@ -1,6 +1,6 @@
 # Plan: phase 16, start ferrit outside a repository
 
-**Status: planned.** Nothing here exists yet. lazygit exits with an error
+**Status: in progress (W0 done: `Repo::init`; no screen yet).** lazygit exits with an error
 outside a repository, so this phase is not compared with it; it is checked with
 the replay harness (a fixture with no repository) and screenshots
 (`PLAN_SELF_TESTING.md`).
@@ -153,7 +153,7 @@ for every other confirm.
 
 ## Milestones
 
-- **W0** `Repo::init`, `GitError::InitFailed`, tests.
+- **W0** ✅ `Repo::init`, `GitError::InitFailed`, tests (`tests/git_init.rs`).
 - **W1** `App::attach_repository` and `Events::watch`, tests on an `App::mock`.
 - **W2** `App::welcome`, the screen's state and keys, the `git init` question,
   the rendering and the key bar.

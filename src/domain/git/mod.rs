@@ -22,6 +22,7 @@ pub mod diff;
 pub mod error;
 mod exec;
 pub mod host;
+mod init;
 pub mod log;
 pub mod model;
 pub mod operation;

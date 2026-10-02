@@ -114,6 +114,10 @@ pub enum GitError {
     /// See `docs/PLAN_15_CREATE_REMOTE.md`.
     #[error("creating the repository failed: {0}")]
     HostFailed(String),
+    /// `git init` failed: a folder that cannot be written or does not exist.
+    /// Holds git's own message. See `docs/PLAN_16_START_WITHOUT_REPO.md`.
+    #[error("git init failed: {0}")]
+    InitFailed(String),
     /// A long read (`Repo::stats`) was stopped by its cancel flag. Not a
     /// failure: the caller asked for it and drops the result.
     #[error("cancelled")]
