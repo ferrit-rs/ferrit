@@ -92,7 +92,8 @@ pub struct Events {
     rx: Receiver<AppEvent>,
     /// Held only to keep the filesystem watch alive; never read. Boxed so the
     /// debouncer's concrete type never leaks into this signature.
-    _watch: Option<Box<dyn Any + Send>>,
+    #[allow(dead_code, reason = "owning it is what keeps the watch running")]
+    watcher: Option<Box<dyn Any + Send>>,
     watch_error: Option<String>,
 }
 
@@ -115,9 +116,22 @@ impl Events {
         Ok(Self {
             tx,
             rx,
-            _watch: watch,
+            watcher: watch,
             watch_error,
         })
+    }
+
+    /// Point the filesystem watch at `root`, replacing the one there was (none,
+    /// when ferrit started outside a repository and a `git init` has since made
+    /// one). A watcher that fails to start is the same non-fatal polling
+    /// fallback as at startup: `watch_error` says so.
+    pub fn watch(&mut self, root: &Path) {
+        let (watch, error) = match spawn_watch(self.tx.clone(), root) {
+            Ok(watch) => (watch, None),
+            Err(error) => (None, Some(error.to_string())),
+        };
+        self.watcher = watch;
+        self.watch_error = error;
     }
 
     /// Block until the next event. `Err` only once every sender is gone.

@@ -673,6 +673,9 @@ pub struct App {
     full_screen: FullScreen,
     dashboard: dashboard::Dashboard,
     git_config: git_config::GitConfigScreen,
+    /// Set when the app was rebuilt on a new repository: `run` points the
+    /// filesystem watch at this root and clears it.
+    watch_request: Option<PathBuf>,
     create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
@@ -839,6 +842,7 @@ impl App {
             full_screen: FullScreen::None,
             dashboard: dashboard::Dashboard::default(),
             git_config: git_config::GitConfigScreen::default(),
+            watch_request: None,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
             event_sender: None,
@@ -945,6 +949,32 @@ impl App {
             self.invalidate_image_query();
             self.update_right_pane();
         }
+    }
+
+    /// Open the repository at `path` and become an app on it: the identity, the
+    /// profile and the first snapshot are all computed from the repository, so
+    /// the app is rebuilt rather than patched. What only `main` and `run` had
+    /// set (the graphics probe, the event sender) is carried over, the loaded
+    /// configuration is kept, and `run` is asked to watch the new worktree.
+    /// Used after a `git init` from the welcome screen
+    /// (`docs/PLAN_16_START_WITHOUT_REPO.md`). On error nothing changes.
+    pub fn attach_repository(&mut self, path: &Path) -> GitResult<()> {
+        let load = config::ConfigLoad {
+            config: self.config.clone(),
+            file: self.config_file.clone(),
+            issues: Vec::new(),
+        };
+        let mut fresh = Self::open_with(path, load)?;
+        fresh.event_sender = self.event_sender.take();
+        fresh.picker = self.picker.clone();
+        fresh.watch_request = fresh.watch_root();
+        *self = fresh;
+        Ok(())
+    }
+
+    /// The worktree `run` should watch, once, after `attach_repository`.
+    pub(crate) fn take_watch_request(&mut self) -> Option<PathBuf> {
+        self.watch_request.take()
     }
 
     /// Re-read the wired panes. On error keep the old snapshot and stash the
@@ -1960,7 +1990,7 @@ impl App {
     /// Bounded batches avoid repainting for every auto-repeat key while still
     /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
-        let events = Events::new(self.watch_root().as_deref(), self.poll_interval())?;
+        let mut events = Events::new(self.watch_root().as_deref(), self.poll_interval())?;
         self.watch_error = events.watch_error().map(|error| {
             format!("filesystem watcher unavailable; polling fallback active: {error}")
         });
@@ -2035,6 +2065,14 @@ impl App {
                 if self.should_quit {
                     break;
                 }
+            }
+            // The app was rebuilt on a new repository: watch its worktree.
+            if let Some(root) = self.take_watch_request() {
+                events.watch(&root);
+                self.watch_error = events.watch_error().map(|error| {
+                    format!("filesystem watcher unavailable; polling fallback active: {error}")
+                });
+                self.last_error = self.watch_error.clone();
             }
             if self.author_overlay.is_animating() && was_animating {
                 self.author_overlay.tick(overlay_tick.elapsed());
