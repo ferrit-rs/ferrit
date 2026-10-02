@@ -173,3 +173,64 @@ fn the_check_popup_and_tiny_terminals_do_not_panic() {
         let _ = render(&mut app, w, h);
     }
 }
+
+#[test]
+fn a_repository_with_no_commit_shows_the_first_commit_row_ticked_and_the_question_says_it() {
+    let project = Project::new("crs-first");
+    let mut app = project.app_with_form();
+    let shown = text(&render(&mut app, 100, 30));
+    assert!(
+        shown.contains("Initial commit with an empty README.md"),
+        "{shown}"
+    );
+    assert!(shown.contains("[x]"));
+
+    press(&mut app, KeyCode::Enter);
+    let shown = text(&render(&mut app, 100, 30));
+    assert!(
+        shown.contains("first: commit an empty README.md"),
+        "{shown}"
+    );
+    assert!(shown.contains("add remote `origin`"), "{shown}");
+}
+
+#[test]
+fn unticked_the_row_says_so_and_the_question_drops_the_line() {
+    let project = Project::new("crs-first-off");
+    let mut app = project.app_with_form();
+    for _ in 0..3 {
+        press(&mut app, KeyCode::Tab);
+    }
+    press(&mut app, KeyCode::Char(' '));
+    let shown = text(&render(&mut app, 100, 30));
+    let row = shown
+        .lines()
+        .find(|l| l.contains("Initial commit"))
+        .unwrap();
+    assert!(row.contains("[ ]"), "{row}");
+    press(&mut app, KeyCode::Enter);
+    assert!(!text(&render(&mut app, 100, 30)).contains("first: commit"));
+}
+
+#[test]
+fn with_a_commit_there_is_no_such_row() {
+    let project = Project::new("crs-first-none");
+    let work = project.dir.join("work");
+    for args in [
+        &["config", "user.name", "T"][..],
+        &["config", "user.email", "t@e.x"],
+        &["commit", "-q", "--allow-empty", "-m", "one"],
+    ] {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(&work)
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+    let mut app = project.app_with_form();
+    let shown = text(&render(&mut app, 100, 30));
+    assert!(!shown.contains("Initial commit"), "{shown}");
+    assert!(shown.contains("after creating"));
+}

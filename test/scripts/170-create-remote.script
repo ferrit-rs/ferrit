@@ -8,6 +8,7 @@ size 120x40
 # G opens the creation from anywhere, and Esc closes it without a trace.
 key G
 expect-text "Create on GitHub"
+expect-no-text "Initial commit"          # the repository has commits: no first commit
 key esc
 expect-no-text "Create on GitHub"
 git remote => ""

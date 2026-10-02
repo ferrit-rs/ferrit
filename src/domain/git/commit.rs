@@ -148,6 +148,11 @@ fn run(
     head_hash(repo)
 }
 
+/// Whether `HEAD` points at a commit (an unborn branch has none).
+pub(super) fn has_commits(repo: &Repository) -> bool {
+    repo.head().is_ok()
+}
+
 /// The file the first commit holds.
 const INITIAL_FILE: &str = "README.md";
 

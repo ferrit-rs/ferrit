@@ -381,6 +381,11 @@ impl Repo {
         commit::commit(&self.inner, kind, message, opts)
     }
 
+    /// Whether the current branch has a commit; a new repository has none.
+    pub fn has_commits(&self) -> bool {
+        commit::has_commits(&self.inner)
+    }
+
     /// The first commit of a repository with none: an empty `README.md`.
     /// `Ok(false)` when there is already a commit. See
     /// `docs/PLAN_15_CREATE_REMOTE.md`.

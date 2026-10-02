@@ -484,11 +484,14 @@ fn draw_create_form(
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(palette.idle);
+    // Name, visibility, description, [first commit,] push, and a line for an error.
+    let row_count: u16 = if form.initial_commit.is_some() { 6 } else { 5 };
     let dialog = Dialog::new(Line::styled(" Create on GitHub ", focused))
-        .fit_content(64.min(area.width), 5, 1)
+        .fit_content(64.min(area.width), row_count, 1)
         .border_style(focused)
         .render(frame, area);
-    let rows = Layout::vertical([Constraint::Length(1); 5]).split(dialog.body);
+    let rows =
+        Layout::vertical(vec![Constraint::Length(1); usize::from(row_count)]).split(dialog.body);
     let label = |text: &str, field: Field| {
         let style = if form.focus == field { focused } else { idle };
         Paragraph::new(Line::styled(format!(" {text}"), style))
@@ -526,6 +529,23 @@ fn draw_create_form(
         form.description.render_inactive(frame, desc_input);
     }
 
+    let mut next = 3;
+    if let Some(ticked) = form.initial_commit {
+        let style = if form.focus == Field::Initial {
+            focused
+        } else {
+            idle
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(" Initial commit with an empty README.md   ", style),
+                Span::raw(if ticked { "[x]" } else { "[ ]" }),
+            ])),
+            at(next),
+        );
+        next += 1;
+    }
+
     let push_style = if form.focus == Field::Push {
         focused
     } else {
@@ -539,8 +559,9 @@ fn draw_create_form(
             ),
             Span::raw(if form.push_after { "[x]" } else { "[ ]" }),
         ])),
-        at(3),
+        at(next),
     );
+    next += 1;
 
     if let Some(error) = form.error {
         frame.render_widget(
@@ -548,7 +569,7 @@ fn draw_create_form(
                 format!(" {error}"),
                 Style::new().fg(palette.del),
             )),
-            at(4),
+            at(next),
         );
     }
     frame.render_widget(

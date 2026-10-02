@@ -51,7 +51,23 @@ git rev-parse --is-inside-work-tree => "true"
 git rev-list --all --count => "0"
 snapshot initialised
 
-# It is a repository like any other: with no remote, the x menu offers to publish.
-key 1
-key x
-expect-text "Create a repository on GitHub"
+# It is a repository like any other. With no commit and no remote, G publishes it
+# in one go: the first commit (an empty README.md), the repository, the push.
+exec config user.name "Ferrit Fixture"
+exec config user.email "fixture@example.com"
+key G
+expect-text "Create on GitHub"
+expect-text "Initial commit with an empty README.md"
+key enter
+expect-text "first: commit an empty README.md"
+async-key y
+git log --format=%s => "Initial commit"
+git ls-tree -r --name-only HEAD => "README.md"
+git cat-file -s HEAD:README.md => "0"
+git remote => "origin"
+git ls-remote origin -> "refs/heads/"
+snapshot published
+
+# With a remote the action is gone.
+key G
+expect-text "already has a remote"
