@@ -150,7 +150,9 @@ struct App {
   `last_error` instead of propagating, leaves the old snapshot in place.
 - `r` key triggers `refresh()`. Filesystem watching (`notify`) shipped as phase 2.5 (`src/app/events.rs`).
 - Not a git repo: `Repo::open` fails, `main` prints a plain message and
-  exits non-zero. No alt-screen garbage.
+  exits non-zero. No alt-screen garbage. Since phase 16 that holds for a path
+  named with `--path`; with no `--path`, ferrit opens a welcome screen that
+  offers `git init` (`PLAN_16_START_WITHOUT_REPO.md`).
 
 Reads are synchronous in phase 2. Moving them off the UI thread (gitui's
 `asyncgit` discipline) is deferred; note it here, revisit when a pane read
@@ -364,8 +366,9 @@ script test still waits on `PLAN_SELF_TESTING.md`).
 - `src/domain/git/` has no `ratatui` dependency; `cargo tree -e no-dev` proves it.
 - Status and Files panes show real data for the repo `ferrit` was pointed
   at (`-p/--path`, default `.`).
-- A non-git directory produces a one-line message and a non-zero exit,
-  terminal untouched.
+- A non-git directory named with `--path` produces a one-line message and a
+  non-zero exit, terminal untouched (with no `--path`, phase 16's welcome
+  screen opens instead).
 - A `GitError` during `refresh()` shows in the Status pane; the app keeps
   running.
 - `cargo clippy --all-targets` clean.

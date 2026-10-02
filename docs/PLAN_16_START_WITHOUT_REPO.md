@@ -1,6 +1,6 @@
 # Plan: phase 16, start ferrit outside a repository
 
-**Status: in progress (W0 to W2 done: the welcome screen works through `App::welcome`; `main.rs` does not use it yet).** lazygit exits with an error
+**Status: built (W0 to W4).** `ferrit` with no `--path` in a folder with no repository opens it. lazygit exits with an error
 outside a repository, so this phase is not compared with it; it is checked with
 the replay harness (a fixture with no repository) and screenshots
 (`PLAN_SELF_TESTING.md`).
@@ -147,7 +147,9 @@ for every other confirm.
 - `tests/welcome_screen.rs`: the dialog at 120, 80 and 40 columns, the long folder
   cut in the middle, the question in the key bar, tiny terminals.
 - `tests/cli.rs`: the binary with `--path` on a folder that is not a repository
-  prints the one-line error and exits non-zero (no terminal needed).
+  prints the one-line error and exits non-zero (no terminal needed). The
+  no-argument start needs a terminal, so `App::open_or_welcome` is tested
+  directly in `tests/app_welcome.rs`.
 - `test/scripts/180-welcome.script`: a fixture with no repository, `i`, `n`, `i`,
   `y`, then the panes and `git rev-parse --is-inside-work-tree => "true"`.
 
@@ -158,9 +160,9 @@ for every other confirm.
   (`tests/app_attach.rs`).
 - **W2** ✅ `App::welcome`, the screen's state and keys, the `git init` question,
   the rendering and the key bar (`tests/app_welcome.rs`, `tests/welcome_screen.rs`).
-- **W3** `main.rs` (`Option` path, the explicit-path rule), the CLI test, the
-  replay fixture and script.
-- **W4** README row, CHANGELOG line, plans.
+- **W3** ✅ `main.rs` (`Option` path, the explicit-path rule, `App::open_or_welcome`),
+  the CLI test, the replay fixture (`norepo`) and script.
+- **W4** ✅ README row, CHANGELOG line, plans.
 
 ## Definition of done (phase 16)
 

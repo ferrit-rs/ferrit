@@ -273,5 +273,5 @@ passes, and the README table marks the row ✅.
 - listing the user's organisations (typed as `org/name`)
 - signing in to `gh` from ferrit
 - editing the remote URL from ferrit
-- starting ferrit in a folder that is not a repository (an own phase: a welcome
-  screen offering `git init`)
+- starting ferrit in a folder that is not a repository (phase 16: a welcome
+  screen offering `git init`, `PLAN_16_START_WITHOUT_REPO.md`)

@@ -28,6 +28,7 @@ the commit flow.
 | Recent activity across local and fetched remote branches | ✅ | ❌ | Includes unmerged branch activity |
 | Repository statistics dashboard | ✅ | ❌ | `D`: activity over time, contributors, kinds of change, hot files, branch health, with charts |
 | Edit Git config from the interface | ✅ | ❌ | `C`: every key with its scope and origin, edited through `git config`, secrets hidden |
+| Start in a folder that is not a repository | ✅ | ❌ | A welcome screen offers `git init` after a question that names the folder; `--path` keeps the error |
 | Create the remote repository from the interface | ✅ | ❌ | `x` with no remote: GitHub through `gh`, private by default, then push |
 | Custom commands | ⚠️ | ✅ | Planned for Ferrit; lazygit supports user-defined commands |
 | Worktree management | ⚠️ | ✅ | Planned for Ferrit; lazygit has built-in worktree actions |
