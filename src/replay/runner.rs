@@ -169,7 +169,8 @@ impl Session {
     }
 
     fn reopen(&mut self, load: ConfigLoad) -> Result<(), String> {
-        self.app = App::open_with(&self.fixture.dir, load).map_err(|e| e.to_string())?;
+        self.app =
+            App::open_or_welcome(&self.fixture.dir, false, load).map_err(|e| e.to_string())?;
         fake_gh::install(&self.fixture.root, &mut self.app);
         self.draw()
     }
@@ -319,7 +320,8 @@ pub fn run(script: &Script, options: &Options) -> Result<Outcome, Failure> {
     }
     let fixture = Fixture::build(&name, options.keep_fixture_in.as_deref())
         .map_err(|message| fail(0, message, ""))?;
-    let mut app = App::open(&fixture.dir).map_err(|e| fail(0, e.to_string(), ""))?;
+    let mut app = App::open_or_welcome(&fixture.dir, false, ConfigLoad::default())
+        .map_err(|e| fail(0, e.to_string(), ""))?;
     fake_gh::install(&fixture.root, &mut app);
     let (width, height) = options.size;
     let terminal = Terminal::new(TestBackend::new(width, height))

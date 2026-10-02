@@ -11,7 +11,14 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// The fixtures `Fixture::build` knows.
-pub const NAMES: &[&str] = &["canonical", "history", "conflict", "detached", "remote"];
+pub const NAMES: &[&str] = &[
+    "canonical",
+    "history",
+    "conflict",
+    "detached",
+    "remote",
+    "norepo",
+];
 
 /// `2026-01-01 12:00:00 UTC`; each commit is one minute later.
 const EPOCH: u64 = 1_767_268_800;
@@ -169,6 +176,9 @@ impl Fixture {
                 builder.git(&["checkout", "-q", "--detach"])?;
             },
             "remote" => remote(&mut fixture)?,
+            // A folder that is not a repository: what the welcome screen is for.
+            "norepo" => std::fs::create_dir_all(&fixture.dir)
+                .map_err(|e| format!("{}: {e}", fixture.dir.display()))?,
             _ => {},
         }
         Ok(fixture)

@@ -1,0 +1,48 @@
+# Phase 16, start outside a repository: in a folder that is not one, ferrit opens
+# a welcome screen instead of exiting. `i` asks, naming the folder, and creates
+# nothing until the yes; then the panes open on an empty repository, and the
+# phase-15 action that publishes it is there.
+fixture norepo
+size 120x40
+
+expect-text "is not a git repository."
+expect-text "Initialise a repository here (git init)"
+expect-text "q   Quit"
+expect-text "Init: i | Quit: q"
+expect-no-text "[2] Files"                # no pane is drawn
+snapshot welcome
+
+# Nothing else does anything: no pane action can run without a repository.
+key x j D C c f p P 1 ? @
+expect-text "is not a git repository."
+expect-no-text "Dashboard"
+
+# The question names the folder; no creates nothing.
+key i
+expect-text "run git init in"
+expect-text "norepo?"
+snapshot question
+key n
+expect-text "is not a git repository."
+git rev-parse --git-dir -> "not a git repository"
+
+# Esc at the question is an answer, not a quit.
+key i
+key esc
+expect-text "is not a git repository."
+git rev-parse --git-dir -> "not a git repository"
+
+# The yes: the repository exists and the panes open on it, with nothing committed.
+key i
+key y
+expect-no-text "is not a git repository."
+expect-text "[2] Files"
+expect-text "[4] Commits"
+git rev-parse --is-inside-work-tree => "true"
+git rev-list --all --count => "0"
+snapshot initialised
+
+# It is a repository like any other: with no remote, the x menu offers to publish.
+key 1
+key x
+expect-text "Create a repository on GitHub"
