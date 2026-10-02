@@ -134,7 +134,7 @@ impl App {
                 label: "Create a repository on GitHub",
                 shortcut: 'g',
                 action: MenuAction::CreateRemote,
-                hint: "Needs gh. Private by default; asks again before creating.",
+                hint: "G from anywhere. Needs gh. Private by default; asks again before creating.",
             });
         }
         if items.is_empty() {

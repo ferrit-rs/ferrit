@@ -5,7 +5,14 @@
 fixture canonical
 size 120x40
 
-# A repository with no remote can be published; the entry is optional.
+# G opens the creation from anywhere, and Esc closes it without a trace.
+key G
+expect-text "Create on GitHub"
+key esc
+expect-no-text "Create on GitHub"
+git remote => ""
+
+# The x menu offers the same action; both are optional.
 key 1
 key x
 expect-text "Create a repository on GitHub"

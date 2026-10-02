@@ -51,6 +51,7 @@ impl Action {
             Self::CommandLog => "open the command log",
             Self::Dashboard => "open the repository dashboard",
             Self::GitConfig => "open the git config editor",
+            Self::CreateRemote => "create the repository on GitHub (no remote yet)",
             Self::OperationMenu => "continue / skip / abort a stopped operation",
             Self::ContextMenu => "more actions for this row (or right-click)",
             Self::Back => "back out of the diff or a drill",

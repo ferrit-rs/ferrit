@@ -64,6 +64,7 @@ impl App {
             Action::CommandLog => self.open_command_log(),
             Action::Dashboard => self.open_dashboard(),
             Action::GitConfig => self.open_git_config(),
+            Action::CreateRemote => self.open_create_remote(),
             Action::OperationMenu => self.open_operation_menu(),
             Action::ContextMenu => self.open_context_menu(),
             Action::Back => {

@@ -97,6 +97,9 @@ pub enum Action {
     Dashboard,
     /// The full-screen git config editor (`docs/PLAN_14_GIT_CONFIG.md`).
     GitConfig,
+    /// Create the GitHub repository, for a repository with no remote
+    /// (`docs/PLAN_15_CREATE_REMOTE.md`).
+    CreateRemote,
     OperationMenu,
     /// The menu of extra actions for the selected row.
     ContextMenu,
@@ -173,6 +176,7 @@ impl Action {
             Self::CommandLog => "command_log",
             Self::Dashboard => "dashboard",
             Self::GitConfig => "git_config",
+            Self::CreateRemote => "create_remote",
             Self::OperationMenu => "operation_menu",
             Self::ContextMenu => "context_menu",
             Self::Back => "back",
@@ -376,6 +380,7 @@ const DEFAULTS: &[(Context, &str, Action)] = &[
     (Context::Global, "@", Action::CommandLog),
     (Context::Global, "D", Action::Dashboard),
     (Context::Global, "C", Action::GitConfig),
+    (Context::Global, "G", Action::CreateRemote),
     (Context::Global, "m", Action::OperationMenu),
     (Context::Global, "x", Action::ContextMenu),
     (Context::Global, "esc", Action::Back),
