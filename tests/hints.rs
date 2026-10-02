@@ -126,7 +126,7 @@ fn the_default_bars_read_exactly_as_the_hand_written_ones_did() {
     );
     assert_eq!(
         bar(&map, Bar::Welcome, 120),
-        "Init: i | Quit: q",
+        "Move: \u{2191}/\u{2193} | Choose: enter | Init: i | Quit: q",
         "the welcome screen's own keys, fixed"
     );
     assert_eq!(

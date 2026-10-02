@@ -280,3 +280,90 @@ fn the_injected_gh_survives_the_git_init() {
         other => panic!("expected the missing-gh note, got {}", other.is_some()),
     }
 }
+
+// ------------------------------------------------- arrows and Enter
+
+#[test]
+fn enter_on_the_first_row_asks_about_git_init() {
+    let dir = TempDir::new("welcome-enter-init");
+    let mut app = dir.welcome();
+    assert_eq!(app.welcome_selected(), 0, "git init is highlighted first");
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(
+        app.confirm_message(),
+        Some(format!("run git init in {}?", dir.0.display()).as_str())
+    );
+    assert!(!dir.has_repo(), "asked, not done");
+    assert!(!app.is_quitting());
+}
+
+#[test]
+fn down_then_enter_quits() {
+    for down in [KeyCode::Down, KeyCode::Char('j')] {
+        let dir = TempDir::new("welcome-down-enter");
+        let mut app = dir.welcome();
+        press(&mut app, down);
+        assert_eq!(app.welcome_selected(), 1);
+        press(&mut app, KeyCode::Enter);
+        assert!(app.is_quitting());
+        assert!(!dir.has_repo());
+    }
+}
+
+#[test]
+fn up_comes_back_and_the_highlight_stops_at_both_ends() {
+    let dir = TempDir::new("welcome-ends");
+    let mut app = dir.welcome();
+    press(&mut app, KeyCode::Up);
+    assert_eq!(app.welcome_selected(), 0, "no row above the first");
+    for _ in 0..3 {
+        press(&mut app, KeyCode::Down);
+    }
+    assert_eq!(app.welcome_selected(), 1, "no row below the last");
+    press(&mut app, KeyCode::Char('k'));
+    assert_eq!(app.welcome_selected(), 0);
+    press(&mut app, KeyCode::End);
+    assert_eq!(app.welcome_selected(), 1);
+    press(&mut app, KeyCode::Home);
+    assert_eq!(app.welcome_selected(), 0);
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+}
+
+#[test]
+fn the_letters_still_work_from_any_highlighted_row() {
+    let dir = TempDir::new("welcome-letters");
+    let mut app = dir.welcome();
+    press(&mut app, KeyCode::Down);
+    app.feed_key(key('i'));
+    assert!(
+        app.confirm_message().is_some(),
+        "i asks even with quit highlighted"
+    );
+    press(&mut app, KeyCode::Char('n'));
+    app.feed_key(key('q'));
+    assert!(app.is_quitting());
+}
+
+#[test]
+fn arrows_then_enter_then_enter_walks_the_whole_init() {
+    let dir = TempDir::new("welcome-keyboard-only");
+    let mut app = dir.welcome();
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Up);
+    press(&mut app, KeyCode::Enter);
+    assert!(app.confirm_message().is_some());
+    assert!(!dir.has_repo());
+    press(&mut app, KeyCode::Enter);
+    assert!(dir.has_repo(), "Enter answers the question like y");
+    assert_eq!(app.full_screen(), FullScreen::None);
+}
+
+#[test]
+fn the_arrows_move_nothing_while_the_question_is_up() {
+    let dir = TempDir::new("welcome-question-arrows");
+    let mut app = dir.welcome();
+    app.feed_key(key('i'));
+    press(&mut app, KeyCode::Down);
+    assert_eq!(app.welcome_selected(), 0, "the question owns the keys");
+    assert!(app.confirm_message().is_some());
+}

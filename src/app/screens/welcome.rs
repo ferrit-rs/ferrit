@@ -10,6 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
+use unicode_width::UnicodeWidthStr;
 
 use crate::components::ui::cut::cut_middle;
 use crate::components::ui::dialog::Dialog;
@@ -26,12 +27,29 @@ const PAD: usize = 2;
 #[derive(Debug)]
 pub struct View<'a> {
     pub dir: &'a Path,
+    /// The highlighted row: 0 is `git init`, 1 is quit.
+    pub selected: usize,
     pub palette: Palette,
     pub accent: ratatui::style::Color,
 }
 
-/// One row of the menu: `▸ i   Initialise…` or `  q   Quit`.
-fn choice(marker: &str, key: &str, text: &str, palette: &Palette) -> Line<'static> {
+/// One row of the menu: `▸ i   Initialise…` or `  q   Quit`. The highlighted
+/// row has the marker and the selection bar of the other menus, across the
+/// dialog.
+fn choice(selected: bool, key: &str, text: &str, width: usize, palette: &Palette) -> Line<'static> {
+    let marker = if selected { "\u{25b8}" } else { " " };
+    if selected {
+        let row = format!("{}{marker} {key}   {text}", " ".repeat(PAD));
+        let used = UnicodeWidthStr::width(row.as_str());
+        let padded = format!("{row}{}", " ".repeat(width.saturating_sub(used)));
+        return Line::styled(
+            padded,
+            Style::new()
+                .fg(palette.selection_fg)
+                .bg(palette.selection)
+                .add_modifier(Modifier::BOLD),
+        );
+    }
     Line::from(vec![
         Span::raw(format!("{}{marker} ", " ".repeat(PAD))),
         Span::styled(
@@ -61,12 +79,19 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, view: &View<'_>) {
         Line::raw(format!("{}is not a git repository.", " ".repeat(PAD))),
         Line::raw(""),
         choice(
-            "\u{25b8}",
+            view.selected == 0,
             "i",
             "Initialise a repository here (git init)",
+            usize::from(dialog.body.width),
             &view.palette,
         ),
-        choice(" ", "q", "Quit", &view.palette),
+        choice(
+            view.selected == 1,
+            "q",
+            "Quit",
+            usize::from(dialog.body.width),
+            &view.palette,
+        ),
     ];
     frame.render_widget(Paragraph::new(lines), dialog.body);
 }

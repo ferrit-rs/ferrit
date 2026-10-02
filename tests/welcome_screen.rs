@@ -16,6 +16,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::style::Color;
 
 fn render(app: &mut App, width: u16, height: u16) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
@@ -50,7 +51,10 @@ fn the_dialog_names_the_folder_and_lists_both_choices() {
         "{shown}"
     );
     assert!(shown.contains("q   Quit"), "{shown}");
-    assert!(shown.contains("Init: i | Quit: q"), "the key bar: {shown}");
+    assert!(
+        shown.contains("Move: \u{2191}/\u{2193} | Choose: enter | Init: i | Quit: q"),
+        "the key bar: {shown}"
+    );
     assert!(!shown.contains("[2] Files"), "no pane is drawn behind it");
 }
 
@@ -90,7 +94,7 @@ fn the_question_replaces_the_key_bar_and_names_the_folder() {
         shown.contains("run git init in /no/such/folder/new-project?"),
         "{shown}"
     );
-    assert!(!shown.contains("Init: i | Quit: q"));
+    assert!(!shown.contains("Choose: enter"));
 }
 
 #[test]
@@ -103,4 +107,44 @@ fn narrow_and_tiny_terminals_do_not_panic() {
     for (w, h) in [(40, 12), (10, 3), (1, 1)] {
         let _ = render(&mut app, w, h);
     }
+}
+
+/// The row (screen line) holding `needle`.
+fn row_of(buf: &Buffer, needle: &str) -> u16 {
+    let at = text(buf).lines().position(|l| l.contains(needle)).unwrap();
+    u16::try_from(at).unwrap()
+}
+
+#[test]
+fn the_highlight_is_a_bar_with_the_marker_and_it_follows_the_arrows() {
+    let mut app = welcome("/no/such/folder");
+    let first = render(&mut app, 100, 24);
+    let init = row_of(&first, "Initialise a repository");
+    let quit = row_of(&first, "q   Quit");
+    let bar = |buf: &Buffer, row: u16| {
+        (0..buf.area.width).any(|x| buf[(x, row)].style().bg == Some(Color::Blue))
+    };
+    assert!(
+        bar(&first, init) && !bar(&first, quit),
+        "git init is highlighted first"
+    );
+    assert!(
+        text(&first).contains("\u{25b8} i   Initialise"),
+        "{}",
+        text(&first)
+    );
+    assert!(!text(&first).contains("\u{25b8} q"));
+
+    app.feed_key(KeyEvent::from(KeyCode::Down));
+    let second = render(&mut app, 100, 24);
+    assert!(
+        bar(&second, quit) && !bar(&second, init),
+        "the bar moved to quit"
+    );
+    assert!(
+        text(&second).contains("\u{25b8} q   Quit"),
+        "{}",
+        text(&second)
+    );
+    assert!(!text(&second).contains("\u{25b8} i"));
 }

@@ -202,6 +202,7 @@ fn draw_welcome(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     if let Some(dir) = app.welcome_dir() {
         let view = welcome::View {
             dir,
+            selected: app.welcome_selected(),
             palette: app.palette(),
             accent: app.theme_config.color(),
         };

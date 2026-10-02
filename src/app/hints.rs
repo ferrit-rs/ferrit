@@ -149,7 +149,7 @@ pub enum Bar {
 }
 
 /// The welcome screen's bar. Not remappable and not clickable, like its keys.
-const WELCOME_BAR: &str = "Init: i | Quit: q";
+const WELCOME_BAR: &str = "Move: \u{2191}/\u{2193} | Choose: enter | Init: i | Quit: q";
 
 /// The git config screen's bar. Not remappable and not clickable, like its keys.
 const GIT_CONFIG_BAR: &str = "Edit: e | Add: a | Unset: d | Scope: s | Filter: / | Back: esc";

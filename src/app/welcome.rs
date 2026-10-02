@@ -6,19 +6,35 @@ use std::path::{Path, PathBuf};
 
 use super::{App, ConfirmAction, ConfirmPrompt, KeyCode, KeyEvent, git};
 
+/// The rows of the screen, in order: `git init`, then quit.
+const WELCOME_ROWS: usize = 2;
+
 impl App {
+    /// The highlighted row: 0 is `git init`, 1 is quit.
+    pub fn welcome_selected(&self) -> usize {
+        self.welcome_selected
+    }
+
     /// The folder the welcome screen is about, while it is up.
     pub fn welcome_dir(&self) -> Option<&Path> {
         self.welcome_dir.as_deref()
     }
 
     /// Every key on the welcome screen (after a pending question, which owns
-    /// input before it): `i` asks about `git init`, `q` and `Esc` leave, and
-    /// nothing else does anything, so no pane action can run without a
-    /// repository.
+    /// input before it): the arrows or `j` / `k` move the highlight, `Enter`
+    /// runs the highlighted row, and its own letters run a row from anywhere,
+    /// `i` to ask about `git init` and `q` or `Esc` to leave. Nothing else does
+    /// anything, so no pane action can run without a repository.
     pub(super) fn welcome_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::End => {
+                self.welcome_selected = (self.welcome_selected + 1).min(WELCOME_ROWS - 1);
+            },
+            KeyCode::Up | KeyCode::Char('k') | KeyCode::Home => {
+                self.welcome_selected = self.welcome_selected.saturating_sub(1);
+            },
+            KeyCode::Enter if self.welcome_selected == 0 => self.ask_init(),
+            KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('i') => self.ask_init(),
             _ => {},
         }

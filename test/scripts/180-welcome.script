@@ -8,12 +8,20 @@ size 120x40
 expect-text "is not a git repository."
 expect-text "Initialise a repository here (git init)"
 expect-text "q   Quit"
-expect-text "Init: i | Quit: q"
+expect-text "Choose: enter | Init: i | Quit: q"
 expect-no-text "[2] Files"                # no pane is drawn
 snapshot welcome
 
-# Nothing else does anything: no pane action can run without a repository.
-key x j D C c f p P 1 ? @
+# The arrows move the highlight and Enter runs the highlighted row; the letters
+# i and q still work from anywhere. Nothing else does anything: no pane action
+# can run without a repository.
+expect-text "▸ i   Initialise"
+key down
+expect-text "▸ q   Quit"
+snapshot highlight
+key up
+expect-text "▸ i   Initialise"
+key x D C c f p P 1 ? @
 expect-text "is not a git repository."
 expect-no-text "Dashboard"
 
@@ -32,9 +40,10 @@ key esc
 expect-text "is not a git repository."
 git rev-parse --git-dir -> "not a git repository"
 
-# The yes: the repository exists and the panes open on it, with nothing committed.
-key i
-key y
+# The yes, keyboard only: Enter on the highlighted row asks, Enter answers.
+key enter
+expect-text "run git init in"
+key enter
 expect-no-text "is not a git repository."
 expect-text "[2] Files"
 expect-text "[4] Commits"

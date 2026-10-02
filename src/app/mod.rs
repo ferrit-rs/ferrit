@@ -683,6 +683,8 @@ pub struct App {
     watch_request: Option<PathBuf>,
     /// The folder the welcome screen is about; `None` once there is a repository.
     welcome_dir: Option<PathBuf>,
+    /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.
+    welcome_selected: usize,
     create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
@@ -852,6 +854,7 @@ impl App {
             git_config: git_config::GitConfigScreen::default(),
             watch_request: None,
             welcome_dir: None,
+            welcome_selected: 0,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
             event_sender: None,
