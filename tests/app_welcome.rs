@@ -211,3 +211,72 @@ fn the_mouse_does_nothing() {
     assert_eq!(app.full_screen(), FullScreen::Welcome);
     assert!(app.confirm_message().is_none());
 }
+
+// ------------------------------------------------------- how ferrit starts
+
+#[test]
+fn with_no_path_a_folder_without_a_repository_opens_the_welcome_screen() {
+    let dir = TempDir::new("welcome-start-implicit");
+    let app = App::open_or_welcome(&dir.0, false, ConfigLoad::default()).unwrap();
+    assert_eq!(app.full_screen(), FullScreen::Welcome);
+    assert_eq!(app.welcome_dir(), Some(dir.0.as_path()));
+}
+
+#[test]
+fn a_path_named_on_purpose_keeps_the_error() {
+    let dir = TempDir::new("welcome-start-explicit");
+    let err = App::open_or_welcome(&dir.0, true, ConfigLoad::default())
+        .err()
+        .unwrap();
+    assert!(
+        matches!(err, ferrit::domain::git::error::GitError::NotARepository(_)),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn a_folder_with_a_repository_opens_it_either_way() {
+    let dir = TempDir::new("welcome-start-repo");
+    ferrit::domain::git::Repo::init(&dir.0).unwrap();
+    for explicit in [false, true] {
+        let app = App::open_or_welcome(&dir.0, explicit, ConfigLoad::default()).unwrap();
+        assert_eq!(app.full_screen(), FullScreen::None, "explicit: {explicit}");
+        assert!(app.welcome_dir().is_none());
+    }
+}
+
+#[test]
+fn a_folder_below_a_repository_opens_that_repository() {
+    let dir = TempDir::new("welcome-start-below");
+    ferrit::domain::git::Repo::init(&dir.0).unwrap();
+    let below = dir.0.join("deep/er");
+    fs::create_dir_all(&below).unwrap();
+    let app = App::open_or_welcome(&below, false, ConfigLoad::default()).unwrap();
+    assert_eq!(
+        app.full_screen(),
+        FullScreen::None,
+        "no welcome inside a repository"
+    );
+}
+
+#[test]
+fn the_injected_gh_survives_the_git_init() {
+    use ferrit::app::PopupView;
+    use ferrit::domain::git::host::GhProgram;
+
+    let dir = TempDir::new("welcome-gh");
+    let mut app = dir.welcome();
+    app.set_gh_program(GhProgram::new("/nonexistent/ferrit-test/gh"));
+    app.feed_key(key('i'));
+    app.feed_key(key('y'));
+    assert_eq!(app.full_screen(), FullScreen::None);
+
+    // The rebuilt app still runs the injected program, not the real `gh`.
+    app.open_create_remote();
+    match app.popup_view() {
+        Some(PopupView::Note(message)) => {
+            assert!(message.contains("gh is required"), "{message}");
+        },
+        other => panic!("expected the missing-gh note, got {}", other.is_some()),
+    }
+}

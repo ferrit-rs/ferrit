@@ -240,6 +240,14 @@ pub struct CreateRemote {
     pushing_after: bool,
 }
 
+impl CreateRemote {
+    /// Keep the `gh` program a test or the replay injected when the app is
+    /// rebuilt on a new repository (`App::attach_repository`).
+    pub(super) fn carry_program_from(&mut self, previous: &Self) {
+        self.gh = previous.gh.clone();
+    }
+}
+
 impl App {
     /// The creation's state, for the popups and for tests.
     pub fn create_remote(&self) -> &CreateRemote {

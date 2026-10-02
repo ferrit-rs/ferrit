@@ -13,9 +13,10 @@ use ferrit::app::terminal as tui;
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Path to the git repository to open.
-    #[arg(short, long, default_value = ".")]
-    path: PathBuf,
+    /// Path to the git repository to open. Without it ferrit opens the folder
+    /// it is run in, and offers `git init` there when it is not a repository.
+    #[arg(short, long)]
+    path: Option<PathBuf>,
 
     /// Print where the configuration file is (or would be) and exit.
     #[arg(long)]
@@ -69,9 +70,13 @@ fn main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    // Open the repo before touching the terminal, so a non-repo path is a
-    // plain one-line message and a non-zero exit, no alt-screen garbage.
-    let mut app = match App::open_with(&cli.path, Config::load()) {
+    // Open the repo before touching the terminal, so a non-repo path named with
+    // `--path` is a plain one-line message and a non-zero exit, no alt-screen
+    // garbage. With no `--path`, a folder that is not a repository opens the
+    // welcome screen instead (`docs/PLAN_16_START_WITHOUT_REPO.md`).
+    let explicit = cli.path.is_some();
+    let path = cli.path.unwrap_or_else(|| PathBuf::from("."));
+    let mut app = match App::open_or_welcome(&path, explicit, Config::load()) {
         Ok(app) => app,
         Err(e) => {
             // The TUI has not taken the screen yet: stderr is the only channel,

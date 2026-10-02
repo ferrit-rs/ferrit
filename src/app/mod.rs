@@ -884,6 +884,24 @@ impl App {
         Ok(app)
     }
 
+    /// The app `ferrit` starts with: the repository at or above `path`, or, when
+    /// there is none and `explicit` is false (no `--path` was given), the
+    /// welcome screen that offers `git init`. A path named on purpose keeps the
+    /// error: scripts rely on it, and a typo must not offer to create a
+    /// repository somewhere else. Any other failure is an error either way.
+    pub fn open_or_welcome(
+        path: &Path,
+        explicit: bool,
+        load: config::ConfigLoad,
+    ) -> GitResult<Self> {
+        match Self::open_with(path, load.clone()) {
+            Err(git::error::GitError::NotARepository(_)) if !explicit => {
+                Ok(Self::welcome(path, load))
+            },
+            other => other,
+        }
+    }
+
     /// Whatever was wrong with the configuration file, reported once, as an
     /// error toast.
     fn report_config_issues(&mut self, issues: &[String]) {
@@ -1000,6 +1018,7 @@ impl App {
         let mut fresh = Self::open_with(path, load)?;
         fresh.event_sender = self.event_sender.take();
         fresh.picker = self.picker.clone();
+        fresh.create_remote.carry_program_from(&self.create_remote);
         fresh.watch_request = fresh.watch_root();
         *self = fresh;
         Ok(())
