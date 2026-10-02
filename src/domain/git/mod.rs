@@ -381,6 +381,13 @@ impl Repo {
         commit::commit(&self.inner, kind, message, opts)
     }
 
+    /// The first commit of a repository with none: an empty `README.md`.
+    /// `Ok(false)` when there is already a commit. See
+    /// `docs/PLAN_15_CREATE_REMOTE.md`.
+    pub fn initial_commit(&self, author: Option<String>) -> GitResult<bool> {
+        commit::initial_commit(&self.inner, author)
+    }
+
     /// The `commit.template` file's message, comments removed (`None`: no
     /// template, or an empty one).
     pub fn commit_template(&self) -> Option<String> {

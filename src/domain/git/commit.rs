@@ -65,6 +65,18 @@ pub(super) fn commit(
     message: &str,
     opts: CommitOpts,
 ) -> GitResult<String> {
+    run(repo, kind, message, opts, None)
+}
+
+/// `commit`, optionally limited to one path (`--only -- <path>`): whatever else
+/// is staged stays staged and out of the commit.
+fn run(
+    repo: &Repository,
+    kind: &CommitKind,
+    message: &str,
+    opts: CommitOpts,
+    only: Option<&str>,
+) -> GitResult<String> {
     let workdir = workdir(repo)?;
     let writes_message = !matches!(kind, CommitKind::Fixup { .. });
 
@@ -91,6 +103,9 @@ pub(super) fn commit(
     if writes_message {
         args.push("-F".to_owned());
         args.push("-".to_owned());
+    }
+    if let Some(path) = only {
+        args.extend(["--only".to_owned(), "--".to_owned(), path.to_owned()]);
     }
 
     let mut cmd = exec::git(workdir);
@@ -131,6 +146,49 @@ pub(super) fn commit(
     }
 
     head_hash(repo)
+}
+
+/// The file the first commit holds.
+const INITIAL_FILE: &str = "README.md";
+
+/// The first commit of a repository with none: an empty `README.md` (an
+/// existing one is committed as it is, never overwritten), message `Initial
+/// commit`. Only that file goes in: anything else staged stays staged, and the
+/// other files of the folder stay as they are. `Ok(false)` and nothing done when
+/// the repository already has a commit, so asking twice is harmless. Hooks,
+/// signing and the identity are `git commit`'s own. See
+/// `docs/PLAN_15_CREATE_REMOTE.md`.
+pub(super) fn initial_commit(repo: &Repository, author: Option<String>) -> GitResult<bool> {
+    match repo.head() {
+        Ok(_) => return Ok(false),
+        Err(e) if e.code() == git2::ErrorCode::UnbornBranch => {},
+        Err(e) => return Err(GitError::Read(e)),
+    }
+    let workdir = workdir(repo)?;
+    let readme = workdir.join(INITIAL_FILE);
+    if !readme.exists() {
+        std::fs::write(&readme, "")
+            .map_err(|e| GitError::CommitFailed(format!("cannot create {INITIAL_FILE}: {e}")))?;
+    }
+    let mut add = exec::git(workdir);
+    add.args(["add", "--", INITIAL_FILE]);
+    let out = exec::output(&mut add)
+        .map_err(|e| GitError::CommitFailed(format!("cannot run git: {e}")))?;
+    if !out.status.success() {
+        return Err(GitError::CommitFailed(stderr(&out)));
+    }
+    let opts = CommitOpts {
+        author,
+        ..CommitOpts::default()
+    };
+    run(
+        repo,
+        &CommitKind::Normal,
+        "Initial commit",
+        opts,
+        Some(INITIAL_FILE),
+    )?;
+    Ok(true)
 }
 
 /// `HEAD`'s full hash, read straight after a successful `git commit`
