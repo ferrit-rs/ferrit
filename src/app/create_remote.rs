@@ -7,6 +7,7 @@
 //! so one network operation runs at a time, the Status pane shows it, and quit
 //! cancels it the way it cancels them.
 
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
@@ -17,8 +18,9 @@ use super::{
 use crate::domain::git::error::GitError;
 use crate::domain::git::host::{
     self, CreateRequest, GhProgram, GhStatus, Visibility, parse_target, sanitize_name,
-    validate_description,
+    ssh_remote_url, validate_description, validate_ssh_host,
 };
+use crate::domain::git::ssh_config::read_github_aliases;
 
 /// What the form holds. Kept on the app while `gh` runs, so a refusal can
 /// reopen the form with every field as typed.
@@ -33,6 +35,9 @@ pub struct CreateDraft {
     /// Make the first commit first (an empty `README.md`), for a repository
     /// that has none. Meaningless, and harmless, when it already has one.
     pub initial_commit: bool,
+    /// The SSH host `origin` is written with (`github.com-personal`), so the
+    /// push reaches the key that alias names. Empty keeps the URL `gh` wrote.
+    pub ssh_host: String,
 }
 
 impl CreateDraft {
@@ -47,6 +52,7 @@ impl CreateDraft {
             description: String::new(),
             push_after: true,
             initial_commit: false,
+            ssh_host: String::new(),
         }
     }
 }
@@ -57,16 +63,19 @@ pub enum Field {
     Name,
     Visibility,
     Description,
+    /// The SSH host of the remote's URL.
+    Host,
     /// The first commit; only there for a repository with no commit.
     Initial,
     Push,
 }
 
 impl Field {
-    const ORDER: [Self; 5] = [
+    const ORDER: [Self; 6] = [
         Self::Name,
         Self::Visibility,
         Self::Description,
+        Self::Host,
         Self::Initial,
         Self::Push,
     ];
@@ -92,6 +101,7 @@ impl Field {
 pub(super) struct Form {
     name: TextInput,
     description: TextInput,
+    host: TextInput,
     visibility: Visibility,
     push_after: bool,
     /// The repository has no commit, so a first one can be made.
@@ -106,6 +116,7 @@ impl Form {
         Self {
             name: TextInput::from_text(&draft.target),
             description: TextInput::from_text(&draft.description),
+            host: TextInput::from_text(&draft.ssh_host),
             visibility: draft.visibility,
             push_after: draft.push_after,
             can_initial,
@@ -122,6 +133,7 @@ impl Form {
             description: self.description.text(),
             push_after: self.push_after,
             initial_commit: self.can_initial && self.initial_commit,
+            ssh_host: self.host.text().trim().to_owned(),
         }
     }
 
@@ -130,6 +142,7 @@ impl Form {
         let draft = self.draft();
         parse_target(&draft.target).map_err(|e| e.to_string())?;
         validate_description(&draft.description).map_err(|e| e.to_string())?;
+        validate_ssh_host(&draft.ssh_host).map_err(|e| e.to_string())?;
         Ok(draft)
     }
 
@@ -154,6 +167,10 @@ impl Form {
                     self.error = None;
                     self.description
                         .handle_key_event(key, TextInputMode::SingleLine);
+                },
+                Field::Host => {
+                    self.error = None;
+                    self.host.handle_key_event(key, TextInputMode::SingleLine);
                 },
                 Field::Visibility => {
                     if matches!(
@@ -242,6 +259,8 @@ pub enum CreateRemoteView<'a> {
 pub struct FormView<'a> {
     pub name: &'a TextInput,
     pub description: &'a TextInput,
+    /// The SSH host of the remote's URL; empty keeps the one `gh` writes.
+    pub ssh_host: &'a TextInput,
     pub visibility: Visibility,
     pub push_after: bool,
     /// `Some` (ticked or not) for a repository with no commit, `None` when a
@@ -276,6 +295,9 @@ pub struct CreateRemote {
     generation: u64,
     /// The push in flight is the one that follows a creation.
     pushing_after: bool,
+    /// The ssh config the host aliases are read from; `None` is
+    /// `~/.ssh/config`. A test points it elsewhere.
+    ssh_config: Option<PathBuf>,
 }
 
 impl CreateRemote {
@@ -283,6 +305,15 @@ impl CreateRemote {
     /// rebuilt on a new repository (`App::attach_repository`).
     pub(super) fn carry_program_from(&mut self, previous: &Self) {
         self.gh = previous.gh.clone();
+        self.ssh_config.clone_from(&previous.ssh_config);
+    }
+
+    /// The GitHub aliases of the ssh config, in the order it lists them.
+    fn ssh_aliases(&self) -> Vec<String> {
+        let path = self.ssh_config.clone().or_else(|| {
+            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/config"))
+        });
+        path.map_or_else(Vec::new, |path| read_github_aliases(&path))
     }
 }
 
@@ -290,6 +321,13 @@ impl App {
     /// The creation's state, for the popups and for tests.
     pub fn create_remote(&self) -> &CreateRemote {
         &self.create_remote
+    }
+
+    /// Read the ssh host aliases from this file instead of `~/.ssh/config`.
+    /// Integration-test seam: a test must not depend on the user's own config.
+    #[doc(hidden)]
+    pub fn set_ssh_config_path(&mut self, path: PathBuf) {
+        self.create_remote.ssh_config = Some(path);
     }
 
     /// Run this program for `gh` (a fake script in a test). Integration-test
@@ -358,6 +396,14 @@ impl App {
                     .clone()
                     .unwrap_or_else(|| CreateDraft {
                         initial_commit: true,
+                        // The user's own alias, when they have one: the key it
+                        // names is the one that unlocks the push.
+                        ssh_host: self
+                            .create_remote
+                            .ssh_aliases()
+                            .into_iter()
+                            .next()
+                            .unwrap_or_default(),
                         ..CreateDraft::new(sanitize_name(&self.repo_name))
                     });
                 let can_initial = self.repo_has_no_commit();
@@ -403,6 +449,7 @@ impl App {
             Step::Form(form) => CreateRemoteView::Form(FormView {
                 name: &form.name,
                 description: &form.description,
+                ssh_host: &form.host,
                 visibility: form.visibility,
                 push_after: form.push_after,
                 initial_commit: form.can_initial.then_some(form.initial_commit),
@@ -423,10 +470,18 @@ impl App {
                 if draft.initial_commit {
                     lines.push("first: commit an empty README.md".to_owned());
                 }
-                lines.push(if draft.push_after {
-                    format!("then: add remote `origin`, push {}", self.header.branch)
+                let over = if draft.ssh_host.is_empty() {
+                    String::new()
                 } else {
-                    "then: add remote `origin` (nothing is pushed)".to_owned()
+                    format!(" over ssh host {}", draft.ssh_host)
+                };
+                lines.push(if draft.push_after {
+                    format!(
+                        "then: add remote `origin`{over}, push {}",
+                        self.header.branch
+                    )
+                } else {
+                    format!("then: add remote `origin`{over} (nothing is pushed)")
                 });
                 CreateRemoteView::Confirm(ConfirmView {
                     title: format!("Create {}", draft.target),
@@ -566,16 +621,14 @@ impl App {
         self.request_refresh();
         match result {
             Ok(url) => {
-                let push = self
-                    .create_remote
-                    .draft
-                    .take()
-                    .is_some_and(|d| d.push_after);
+                let draft = self.create_remote.draft.take();
+                let push = draft.as_ref().is_some_and(|d| d.push_after);
+                let ssh_host = draft.map(|d| d.ssh_host).unwrap_or_default();
                 self.create_remote.error = None;
                 self.last_error = None;
                 self.status_note = Some(format!("Created {url}"));
                 self.create_remote.web_url = Some(url.clone());
-                self.after_creation(&url, push);
+                self.after_creation(&url, push, &ssh_host);
             },
             Err(message) => {
                 self.create_remote.error = Some(message.clone());
@@ -586,19 +639,44 @@ impl App {
         }
     }
 
-    /// What follows a creation: the push of the current branch through the same
-    /// path as `P` (so the credential popup and the SSH setup apply), or a note
-    /// saying why not. The repository and `origin` stay whatever happens.
-    fn after_creation(&mut self, url: &str, push: bool) {
+    /// What follows a creation: `origin` rewritten over the chosen SSH host (so
+    /// the push reaches the key that alias names, and ferrit's passphrase popup
+    /// answers for it, as for `P`), then the push of the current branch through
+    /// the same path as `P`, or a note saying why not. The repository and
+    /// `origin` stay whatever happens.
+    fn after_creation(&mut self, url: &str, push: bool, ssh_host: &str) {
+        let mut created = format!("Created {url}.");
+        if !ssh_host.is_empty() {
+            let Some(remote) = ssh_remote_url(ssh_host, url) else {
+                self.status_note = Some(format!(
+                    "{created} Its owner and name could not be read from that URL: origin keeps \
+                     the URL gh wrote."
+                ));
+                return;
+            };
+            let set = self
+                .repo
+                .as_ref()
+                .map(|repo| repo.set_remote_url("origin", &remote));
+            if let Some(Err(error)) = set {
+                self.status_note = Some(format!(
+                    "{created} {error}. origin keeps the URL gh wrote; fix it with git remote \
+                     set-url, then P pushes."
+                ));
+                return;
+            }
+            created = format!("{created} origin is {remote}.");
+        }
         if !push {
-            self.status_note = Some(format!("Created {url}. origin is set; P pushes."));
+            self.status_note = Some(format!("{created} origin is set; P pushes."));
         } else if self.header.detached {
-            self.status_note = Some(format!("Created {url}. HEAD is detached: nothing to push."));
+            self.status_note = Some(format!("{created} HEAD is detached: nothing to push."));
         } else if self.repo_has_no_commit() {
             self.status_note = Some(format!(
-                "Created {url}. No commits yet: commit first, then P pushes."
+                "{created} No commits yet: commit first, then P pushes."
             ));
         } else {
+            self.status_note = Some(created);
             let branch = self.header.branch.clone();
             self.push_with_upstream("origin".to_owned(), branch);
             // Only a push that really started is the one to explain if it fails.

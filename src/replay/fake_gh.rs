@@ -21,18 +21,29 @@ case \"$1\" in
   auth) exit 0 ;;
   repo)
     target=\"$3\"
+    case \"$target\" in */*) path=\"$target\" ;; *) path=\"fake-user/$target\" ;; esac
     while [ $# -gt 0 ]; do [ \"$1\" = --source ] && src=\"$2\"; shift; done
     git init -q --bare \"$here/created.git\"
     git -C \"$src\" remote add origin \"$here/created.git\"
-    echo \"https://github.com/$target\"
+    git -C \"$src\" config \"url.$here/created.git.insteadOf\" \"git@replay-alias:$path.git\"
+    echo \"https://github.com/$path\"
     exit 0 ;;
 esac
 exit 0
 ";
 
-/// Write the fake into `root` and point `app` at it. Not unix: nothing is
+/// An ssh config with the GitHub alias the replay's form presets, so the
+/// creation rewrites `origin` over it. The fake's `insteadOf` above sends a push
+/// to that alias to the bare repository it made.
+const SSH_CONFIG: &str = "Host replay-alias\n  HostName github.com\n  User git\n";
+
+/// Write the fake and an ssh config into `root` and point `app` at them. Not unix: nothing is
 /// installed, and the real `gh` stays the program (no script uses it there).
 pub fn install(root: &Path, app: &mut App) {
+    let ssh_config = root.join("ssh_config");
+    if std::fs::write(&ssh_config, SSH_CONFIG).is_ok() {
+        app.set_ssh_config_path(ssh_config);
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

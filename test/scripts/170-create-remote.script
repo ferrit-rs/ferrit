@@ -24,6 +24,11 @@ expect-text "( ) public"
 expect-text "after creating"
 snapshot form
 
+# The form presets the user's own ssh alias (from the ssh config the replay
+# installs), so the push reaches the key that alias names.
+expect-text "SSH host"
+expect-text "replay-alias"
+
 # The last question for a private repository: Enter creates, Esc goes back.
 key enter
 expect-text "PRIVATE repository"
@@ -50,6 +55,7 @@ key enter
 expect-text "PRIVATE repository"
 async-key y
 git remote => "origin"
+git config --get remote.origin.url => "git@replay-alias:fake-user/canonical.git"
 git ls-remote origin -> "refs/heads/main"
 git rev-parse --abbrev-ref @{u} => "origin/main"
 snapshot created

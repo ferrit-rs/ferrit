@@ -47,10 +47,20 @@ impl Project {
         Self { dir }
     }
 
+    /// The same, reading the ssh host aliases from `config`.
+    fn app_with_form_over(&self, config: &std::path::Path) -> App {
+        let mut app = App::open(&self.dir.join("work")).unwrap();
+        app.set_gh_program(GhProgram::new(self.dir.join("gh")));
+        app.set_ssh_config_path(config.to_path_buf());
+        app.open_create_remote();
+        app
+    }
+
     /// An app with the check answered: the form is up.
     fn app_with_form(&self) -> App {
         let mut app = App::open(&self.dir.join("work")).unwrap();
         app.set_gh_program(GhProgram::new(self.dir.join("gh")));
+        app.set_ssh_config_path(self.dir.join("no-ssh-config"));
         app.open_create_remote();
         app
     }
@@ -198,7 +208,7 @@ fn a_repository_with_no_commit_shows_the_first_commit_row_ticked_and_the_questio
 fn unticked_the_row_says_so_and_the_question_drops_the_line() {
     let project = Project::new("crs-first-off");
     let mut app = project.app_with_form();
-    for _ in 0..3 {
+    for _ in 0..4 {
         press(&mut app, KeyCode::Tab);
     }
     press(&mut app, KeyCode::Char(' '));
@@ -233,4 +243,33 @@ fn with_a_commit_there_is_no_such_row() {
     let shown = text(&render(&mut app, 100, 30));
     assert!(!shown.contains("Initial commit"), "{shown}");
     assert!(shown.contains("after creating"));
+}
+
+#[test]
+fn the_form_shows_the_ssh_host_row_with_the_users_alias_and_the_question_says_it() {
+    let project = Project::new("crs-host");
+    let config = project.dir.join("ssh_config");
+    fs::write(&config, "Host github.com-personal\n  HostName github.com\n").unwrap();
+    let mut app = project.app_with_form_over(&config);
+    let shown = text(&render(&mut app, 100, 30));
+    assert!(shown.contains("SSH host"), "{shown}");
+    assert!(shown.contains("github.com-personal"), "{shown}");
+
+    press(&mut app, KeyCode::Enter);
+    let shown = text(&render(&mut app, 100, 30));
+    assert!(
+        shown.contains("over ssh host github.com-personal"),
+        "{shown}"
+    );
+}
+
+#[test]
+fn with_no_alias_the_ssh_host_row_is_there_and_empty() {
+    let project = Project::new("crs-host-empty");
+    let mut app = project.app_with_form();
+    let shown = text(&render(&mut app, 100, 30));
+    let row = shown.lines().find(|l| l.contains("SSH host")).unwrap();
+    assert!(!row.contains("github.com-"), "{row}");
+    press(&mut app, KeyCode::Enter);
+    assert!(!text(&render(&mut app, 100, 30)).contains("over ssh host"));
 }

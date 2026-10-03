@@ -9,6 +9,7 @@
 //! R2): the slot, the busy label, the answer. No popups yet. `gh` is a fake
 //! script, so nothing here reaches GitHub.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -65,7 +66,8 @@ impl Project {
                  while [ $# -gt 0 ]; do [ \"$1\" = --source ] && src=\"$2\"; shift; done\n\
                  url=$(cat \"$here/origin-url\" 2>/dev/null || echo \"https://github.com/$target.git\")\n\
                  git -C \"$src\" remote add origin \"$url\"\n\
-                 echo \"https://github.com/$target\"; exit 0 ;;\n\
+                 case \"$target\" in */*) path=\"$target\" ;; *) path=\"fake-user/$target\" ;; esac\n\
+                 echo \"https://github.com/$path\"; exit 0 ;;\n\
              esac\n\
              exit 0\n",
         )
@@ -92,6 +94,8 @@ impl Project {
     fn app(&self) -> App {
         let mut app = App::open(&self.work).unwrap();
         app.set_gh_program(GhProgram::new(self.dir.join("gh")));
+        // Never the user's own ~/.ssh/config: it would pick the host.
+        app.set_ssh_config_path(self.dir.join("no-ssh-config"));
         app
     }
 
@@ -105,6 +109,19 @@ impl Project {
 
     fn remotes(&self) -> String {
         self.git(&["remote"])
+    }
+
+    /// Where `origin` points, if it exists.
+    fn remote_url(&self) -> Option<String> {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&self.work)
+            .args(["remote", "get-url", "origin"])
+            .output()
+            .unwrap();
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
     }
 }
 
@@ -275,6 +292,7 @@ enum Shown {
         visibility: Visibility,
         push_after: bool,
         initial_commit: Option<bool>,
+        ssh_host: String,
         focus: Field,
         error: Option<String>,
     },
@@ -300,6 +318,7 @@ fn shown(app: &mut App) -> Shown {
                 visibility: form.visibility,
                 push_after: form.push_after,
                 initial_commit: form.initial_commit,
+                ssh_host: form.ssh_host.text(),
                 focus: form.focus,
                 error: form.error.map(str::to_owned),
             },
@@ -349,12 +368,17 @@ fn the_check_runs_off_the_ui_thread_then_the_form_opens_on_the_folder_name() {
         visibility,
         push_after,
         initial_commit,
+        ssh_host,
         focus,
         error,
     } = shown(&mut app)
     else {
         panic!("a form")
     };
+    assert_eq!(
+        ssh_host, "",
+        "no alias in the (test) ssh config: nothing is preset"
+    );
     assert_eq!(
         initial_commit,
         Some(true),
@@ -438,7 +462,9 @@ fn the_form_edits_its_fields_with_tab_arrows_and_space() {
     press(&mut app, KeyCode::Char(' '));
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "A small tool");
-    // The first commit (only there with no commit yet), then the push.
+    // The SSH host, then the first commit (only there with no commit yet), then the push.
+    press(&mut app, KeyCode::Tab);
+    type_text(&mut app, "my-alias");
     press(&mut app, KeyCode::Tab);
     press(&mut app, KeyCode::Char(' '));
     press(&mut app, KeyCode::Tab);
@@ -451,12 +477,13 @@ fn the_form_edits_its_fields_with_tab_arrows_and_space() {
             visibility: Visibility::Public,
             push_after: false,
             initial_commit: Some(false),
+            ssh_host: "my-alias".to_owned(),
             focus: Field::Push,
             error: None,
         }
     );
     // Shift-Tab goes back, and the arrows flip the visibility.
-    for _ in 0..3 {
+    for _ in 0..4 {
         press(&mut app, KeyCode::BackTab);
     }
     press(&mut app, KeyCode::Right);
@@ -830,9 +857,9 @@ fn an_unticked_form_creates_and_leaves_the_push_to_p() {
     let bare = project.bare_origin();
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
-    press(&mut app, KeyCode::Tab);
-    press(&mut app, KeyCode::Tab);
-    press(&mut app, KeyCode::Tab);
+    for _ in 0..4 {
+        press(&mut app, KeyCode::Tab);
+    }
     press(&mut app, KeyCode::Char(' '));
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Enter);
@@ -855,7 +882,7 @@ fn with_no_commit_or_a_detached_head_the_push_is_skipped_with_a_note() {
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
     // The first commit is unticked here: nothing to push, and it says so.
-    for _ in 0..3 {
+    for _ in 0..4 {
         press(&mut app, KeyCode::Tab);
     }
     press(&mut app, KeyCode::Char(' '));
@@ -905,7 +932,10 @@ fn a_failed_push_says_the_repository_exists_and_that_p_retries() {
 
     let shown = status_text(&app);
     assert!(shown.contains("P retries the push"), "{shown}");
-    assert!(shown.contains("https://github.com/work"), "{shown}");
+    assert!(
+        shown.contains("https://github.com/fake-user/work"),
+        "{shown}"
+    );
     assert_eq!(project.remotes(), "origin", "the remote stays");
 }
 
@@ -1054,10 +1084,11 @@ fn with_a_commit_already_there_the_first_commit_is_not_offered_or_made() {
     };
     assert_eq!(initial_commit, None, "no such row");
 
-    // Tab skips the missing row: name, visibility, description, push, back.
+    // Tab skips the missing row: name, visibility, description, host, push, back.
     for expected in [
         Field::Visibility,
         Field::Description,
+        Field::Host,
         Field::Push,
         Field::Name,
     ] {
@@ -1142,4 +1173,142 @@ fn a_refused_creation_keeps_the_commit_and_a_retry_does_not_make_a_second() {
     wait_for_created(&mut app, &rx);
     assert_eq!(project.remotes(), "origin");
     assert_eq!(project.commit_count(), "1", "still one commit");
+}
+
+// ------------------------------------------------------- the SSH host
+
+impl Project {
+    /// An ssh config next to the project, with these `Host` aliases for GitHub.
+    fn ssh_config(&self, aliases: &[&str]) -> PathBuf {
+        let path = self.dir.join("ssh_config");
+        let mut text = String::new();
+        for alias in aliases {
+            let _ = write!(text, "Host {alias}\n  HostName github.com\n  User git\n");
+        }
+        fs::write(&path, text).unwrap();
+        path
+    }
+}
+
+#[test]
+fn the_form_starts_with_the_users_github_alias_from_their_ssh_config() {
+    let project = Project::new("cr-host-default");
+    let mut app = project.app();
+    app.set_ssh_config_path(project.ssh_config(&["github.com-personal", "github.com-work"]));
+    app.open_create_remote();
+    let Shown::Form { ssh_host, .. } = shown(&mut app) else {
+        panic!("a form")
+    };
+    assert_eq!(ssh_host, "github.com-personal", "the first alias");
+
+    press(&mut app, KeyCode::Enter);
+    let Shown::Confirm { lines, .. } = shown(&mut app) else {
+        panic!("the question")
+    };
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("add remote `origin` over ssh host github.com-personal")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_bad_ssh_host_is_refused_on_the_form_with_the_reason() {
+    let project = Project::new("cr-host-bad");
+    let mut app = project.app();
+    app.open_create_remote();
+    for _ in 0..3 {
+        press(&mut app, KeyCode::Tab);
+    }
+    type_text(&mut app, "git@evil host");
+    press(&mut app, KeyCode::Enter);
+    let Shown::Form { error, .. } = shown(&mut app) else {
+        panic!("still the form")
+    };
+    assert!(error.unwrap().contains("is not allowed in an SSH host"));
+}
+
+#[test]
+fn origin_is_rewritten_over_the_alias_and_the_push_reaches_it() {
+    let project = Project::new("cr-host-push");
+    project.commit();
+    let bare = project.bare_origin_for_alias("my-alias", "acme/tool");
+    let (mut app, rx) = ready_app(&project);
+    app.set_ssh_config_path(project.ssh_config(&["my-alias"]));
+    open_form(&mut app, &rx);
+    clear_name(&mut app);
+    type_text(&mut app, "acme/tool");
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
+
+    // The raw value: `git remote get-url` would show the `insteadOf` rewrite.
+    assert_eq!(
+        project.git(&["config", "--get", "remote.origin.url"]),
+        "git@my-alias:acme/tool.git"
+    );
+    let branch = project.branch();
+    assert_eq!(
+        bare_refs(&bare),
+        branch,
+        "the push went through the alias URL"
+    );
+    assert_eq!(
+        project.git(&["rev-parse", "--abbrev-ref", "@{u}"]),
+        format!("origin/{branch}")
+    );
+}
+
+#[test]
+fn with_no_ssh_host_origin_keeps_the_url_gh_wrote() {
+    let project = Project::new("cr-host-none");
+    let mut app = project.app();
+    let (tx, rx) = mpsc::channel();
+    let mut plain = draft("acme/tool");
+    plain.push_after = false;
+    app.start_create_remote(plain, tx);
+    wait_for_created(&mut app, &rx);
+    assert_eq!(
+        project.remote_url().as_deref(),
+        Some("https://github.com/acme/tool.git")
+    );
+}
+
+#[test]
+fn the_note_names_the_new_url_of_origin() {
+    let project = Project::new("cr-host-note");
+    let mut app = project.app();
+    let (tx, rx) = mpsc::channel();
+    let mut aliased = draft("acme/tool");
+    aliased.push_after = false;
+    aliased.ssh_host = "my-alias".to_owned();
+    app.start_create_remote(aliased, tx);
+    wait_for_created(&mut app, &rx);
+    assert!(
+        status_text(&app).contains("origin is git@my-alias:acme/tool.git."),
+        "{}",
+        status_text(&app)
+    );
+}
+
+impl Project {
+    /// A bare repository that `git@<host>:<path>.git` is rewritten to (git's own
+    /// `insteadOf`), so a push to the alias URL lands there with no network.
+    fn bare_origin_for_alias(&self, host: &str, path: &str) -> PathBuf {
+        let bare = self.dir.join("alias-remote.git");
+        let status = Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        self.git(&[
+            "config",
+            &format!("url.{}.insteadOf", bare.display()),
+            &format!("git@{host}:{path}.git"),
+        ]);
+        bare
+    }
 }

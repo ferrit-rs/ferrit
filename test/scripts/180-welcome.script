@@ -65,6 +65,7 @@ git log --format=%s => "Initial commit"
 git ls-tree -r --name-only HEAD => "README.md"
 git cat-file -s HEAD:README.md => "0"
 git remote => "origin"
+git config --get remote.origin.url => "git@replay-alias:fake-user/norepo.git"
 git ls-remote origin -> "refs/heads/"
 snapshot published
 

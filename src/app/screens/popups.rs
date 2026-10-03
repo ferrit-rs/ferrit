@@ -484,8 +484,9 @@ fn draw_create_form(
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(palette.idle);
-    // Name, visibility, description, [first commit,] push, and a line for an error.
-    let row_count: u16 = if form.initial_commit.is_some() { 6 } else { 5 };
+    // Name, visibility, description, SSH host, [first commit,] push, and a line
+    // for an error.
+    let row_count: u16 = if form.initial_commit.is_some() { 7 } else { 6 };
     let dialog = Dialog::new(Line::styled(" Create on GitHub ", focused))
         .fit_content(64.min(area.width), row_count, 1)
         .border_style(focused)
@@ -529,7 +530,15 @@ fn draw_create_form(
         form.description.render_inactive(frame, desc_input);
     }
 
-    let mut next = 3;
+    let [host_label, host_input] = split_pair(&split(at(3)));
+    frame.render_widget(label("SSH host", Field::Host), host_label);
+    if form.focus == Field::Host {
+        form.ssh_host.render(frame, host_input);
+    } else {
+        form.ssh_host.render_inactive(frame, host_input);
+    }
+
+    let mut next = 4;
     if let Some(ticked) = form.initial_commit {
         let style = if form.focus == Field::Initial {
             focused
@@ -602,8 +611,22 @@ fn draw_create_confirm(
         .max(1);
     let hint_width = u16::try_from(confirm.hint.chars().count() + 4).unwrap_or(u16::MAX);
     let title_width = u16::try_from(confirm.title.chars().count() + 6).unwrap_or(u16::MAX);
+    // The widest line shows whole (a long SSH host, a long branch name).
+    let text_width = confirm
+        .lines
+        .iter()
+        .map(|line| u16::try_from(line.chars().count() + 4).unwrap_or(u16::MAX))
+        .max()
+        .unwrap_or(0);
     let dialog = Dialog::new(Line::styled(format!(" {} ", confirm.title), border))
-        .fit_content(48.max(hint_width).max(title_width).min(area.width), rows, 1)
+        .fit_content(
+            48.max(hint_width)
+                .max(title_width)
+                .max(text_width)
+                .min(area.width),
+            rows,
+            1,
+        )
         .border_style(border)
         .render(frame, area);
     let lines: Vec<Line<'static>> = confirm
