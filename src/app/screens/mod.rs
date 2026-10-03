@@ -89,6 +89,11 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if let Some(toast) = &mut app.toast {
         toast.render(frame, area, &palette);
     }
+    // Last, over everything drawn: a painted theme turns the unset and the ANSI
+    // colours of the frame into its own (`docs/PLAN_18_THEMES.md`).
+    if let Some(scheme) = app.theme_config.scheme() {
+        scheme.paint(frame.buffer_mut());
+    }
 }
 
 /// The five panes, the command log and the key bar; returns the key bar's area.

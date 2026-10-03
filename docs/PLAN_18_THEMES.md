@@ -1,6 +1,6 @@
 # Plan: phase 18, painted themes (a real dark and a real light)
 
-**Status: planned.** Written after phase 17 (the settings sheet) shipped a "Theme:
+**Status: in progress (P0 done: `theme.scheme` and the paint pass, set from the config file; no switch in the sheet yet).** Written after phase 17 (the settings sheet) shipped a "Theme:
 Dark / Light" row that does not paint anything. lazygit has no such setting (it only
 sets foreground colours and leaves the terminal's background alone), so this phase is
 not compared with it; it is checked with buffer tests and screenshots
@@ -202,7 +202,7 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 
 ## Milestones
 
-- **P0** `Scheme`, `theme.scheme` config and its tests; the two scheme structs and
+- **P0** ✅ `Scheme`, `theme.scheme` config and its tests; the two scheme structs and
   the paint pass with its buffer tests; wired into `screens::draw`. No UI yet: the
   config key alone switches the theme.
 - **P1** the settings sheet: the three-choice Theme row, the "Terminal is" row, live

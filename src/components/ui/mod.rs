@@ -13,6 +13,7 @@ pub mod palette;
 pub mod pane_list;
 pub mod panel;
 pub mod radio_card;
+pub mod scheme;
 pub mod scroll_bar;
 pub mod select_list;
 pub mod separator;
