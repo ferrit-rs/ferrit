@@ -128,6 +128,7 @@ fn the_scripts_cover_each_named_flow() {
         "121-take-side",
         "130-theme",
         "140-commit-settings",
+        "190-settings",
     ] {
         assert!(
             names.iter().any(|n| n == wanted),

@@ -312,3 +312,18 @@ fn small_terminals_do_not_panic_and_a_short_one_scrolls_to_the_selected_row() {
     let text = render(&mut app, 80, 12).join("\n");
     assert!(text.contains("\u{25b8} Show read commands"), "{text}");
 }
+
+#[test]
+fn turning_the_mouse_off_says_the_sheet_is_keyboard_only_from_now_on() {
+    let fx = Fixture::new("sheet-mouse-off");
+    let mut app = fx.app_with_sheet();
+    assert!(!shown(&mut app).contains("keyboard only"));
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Char(' '));
+    assert!(shown(&mut app).contains("Mouse is off: keyboard only"));
+    // A click now does nothing: the sheet is still up.
+    click(&mut app, 2, 20);
+    settle(&mut app);
+    assert!(shown(&mut app).contains("Wheel step"));
+}

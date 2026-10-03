@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthStr;
 
@@ -120,6 +122,8 @@ fn key_event(binding: KeyBinding) -> KeyEvent {
 
 impl Session {
     fn draw(&mut self) -> Result<(), String> {
+        // No clock in a replay: a drawer is fully open or closed at each frame.
+        self.app.finish_animations();
         let app = &mut self.app;
         self.terminal
             .draw(|f| screens::draw(f, app))
@@ -175,6 +179,14 @@ impl Session {
         self.draw()
     }
 
+    fn config_path(&self) -> PathBuf {
+        self.fixture.root.join("config.toml")
+    }
+
+    fn reopen_from_file(&mut self) -> Result<(), String> {
+        self.reopen(Config::load_from(&self.config_path()))
+    }
+
     fn step(&mut self, step: &Step) -> Result<(), String> {
         match &step.directive {
             Directive::Fixture(_) => Err("`fixture` must be the first directive".to_owned()),
@@ -228,6 +240,31 @@ impl Session {
                     file: None,
                     issues,
                 })
+            },
+            Directive::ConfigFile(text) => {
+                let path = self.config_path();
+                std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+                self.reopen_from_file()
+            },
+            Directive::Reopen => self.reopen_from_file(),
+            Directive::ClickText(text) => {
+                let (column, row) = self
+                    .frame
+                    .lines()
+                    .enumerate()
+                    .find_map(|(row, line)| {
+                        line.find(text.as_str()).map(|byte| {
+                            (line.get(..byte).map_or(0, |head| head.chars().count()), row)
+                        })
+                    })
+                    .ok_or_else(|| format!("{text:?} is not on screen to click"))?;
+                self.app.feed_mouse(MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: u16::try_from(column).unwrap_or(u16::MAX),
+                    row: u16::try_from(row).unwrap_or(u16::MAX),
+                    modifiers: KeyModifiers::NONE,
+                });
+                self.draw()
             },
             Directive::Snapshot(label) => {
                 let index = self.frames.len() + 1;

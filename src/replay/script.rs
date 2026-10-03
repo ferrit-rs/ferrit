@@ -46,6 +46,14 @@ pub enum Directive {
     },
     /// `config "toml"`: reopen the app with this `config.toml` text.
     Config(String),
+    /// `config-file "toml"`: write `config.toml` in the fixture's root and
+    /// reopen the app reading it, so what the app saves goes to a real file.
+    ConfigFile(String),
+    /// `reopen`: reopen the app reading that same `config.toml`, as a new start.
+    Reopen,
+    /// `click-text "text"`: a left click on the first cell of the first
+    /// occurrence of the text on screen.
+    ClickText(String),
     /// `snapshot LABEL`: keep the current frame, named.
     Snapshot(String),
     ExpectText(String),
@@ -213,6 +221,14 @@ fn directive(tokens: &[Token]) -> Result<Directive, String> {
             _ => Err("`write` takes a path and a string".to_owned()),
         },
         "config" => Ok(Directive::Config(exactly_one("config", args)?.text.clone())),
+        "config-file" => Ok(Directive::ConfigFile(
+            exactly_one("config-file", args)?.text.clone(),
+        )),
+        "reopen" if args.is_empty() => Ok(Directive::Reopen),
+        "reopen" => Err("`reopen` takes no argument".to_owned()),
+        "click-text" => Ok(Directive::ClickText(
+            exactly_one("click-text", args)?.text.clone(),
+        )),
         "snapshot" => {
             let label = &exactly_one("snapshot", args)?.text;
             if label.is_empty()

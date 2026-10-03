@@ -61,7 +61,7 @@ into its own crate remains deferred.
 | 14 | `PLAN_14_GIT_CONFIG.md` | git config editor (`C`): every key with its scope and origin, edit / add / unset at local or global scope through `git config`, typed toggles, secrets redacted | ✅ done (G0-G5) |
 | 15 | `PLAN_15_CREATE_REMOTE.md` | create the GitHub repository from ferrit through `gh` (optional, from the `x` menu, private by default), wire `origin`, push with the existing credential popup | ✅ done (R0-R5) |
 | 16 | `PLAN_16_START_WITHOUT_REPO.md` | start ferrit outside a repository: a welcome screen offering `git init` (with a question naming the folder), then the usual panes; `--path` keeps its error | ✅ done (W0-W4) |
-| 17 | `PLAN_17_SETTINGS.md` | the settings sheet (click the author's name): ferrit's own settings only (theme dark or light, accent with the colour picker, mouse, wheel, refresh, diff, sign-off, command log), saved at once to `config.toml`; git identities and activity leave it | 🔄 in progress (U0) |
+| 17 | `PLAN_17_SETTINGS.md` | the settings sheet (click the author's name): ferrit's own settings only (theme dark or light, accent with the colour picker, mouse, wheel, refresh, diff, sign-off, command log), saved at once to `config.toml`; git identities and activity leave it | ✅ done |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).

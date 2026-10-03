@@ -40,6 +40,9 @@ pub fn tape(name: &str, script: &Script) -> Result<String, String> {
             Directive::Exec(_)
             | Directive::Write { .. }
             | Directive::Config(_)
+            | Directive::ConfigFile(_)
+            | Directive::Reopen
+            | Directive::ClickText(_)
             | Directive::AsyncKey(_) => {
                 return Err(format!(
                     "line {}: it changes the repository or the configuration from outside the terminal, which a tape cannot do",

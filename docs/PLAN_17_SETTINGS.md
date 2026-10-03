@@ -1,6 +1,6 @@
 # Plan: phase 17, the settings sheet
 
-**Status: in progress (U0 to U3 done: `Config::save_sections`, the rows, live changes and autosave, and the sheet itself, drawn by `screens/settings.rs`; the author line in the commit popup is next).** lazygit has no settings screen
+**Status: done (U0 to U5: `Config::save_sections`, the rows, live changes and autosave, and the sheet itself, drawn by `screens/settings.rs`; the author line in the commit popup; the replay script `190-settings`).** lazygit has no settings screen
 (its config is a YAML file), so this phase is not compared with it; it is checked
 with the replay harness and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -126,11 +126,11 @@ it. The sheet needs no mouse to be used.
 
 ## Backend
 
-- `Config::save_sections(path, &[(&str, toml::Value)])` in `app/config/mod.rs`;
-  `save_theme` becomes a call to it. No change to what is read.
-- `src/app/settings.rs` (new, state and keys; drawing is `screens/settings.rs`): the
-  rows, the selected row, the colour picker's own state (moved from the `theme_*`
-  fields of `App`), `change`, `save`. The live `Config` is `App::config`, so every
+- `Config::save_sections(path, &Config, &[Section])` in `app/config/mod.rs`;
+  `save_theme` is a call to it. No change to what is read.
+- `src/app/settings.rs` (new, state, keys and clicks; drawing is `screens/settings.rs`): the
+  rows, the selected row, the colour picker's functions (the `theme_*` fields stay on `App`),
+  `change_setting`, `save_settings`. The live `Config` is `App::config`, so every
   other part of ferrit already reads the new value (`diff_opts()`, the wheel, the
   commit popup, the log panel).
 - Live effects that need the run loop: switching mouse capture on or off, and the new
@@ -154,7 +154,7 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
 | --- | --- |
 | no `config.toml` yet | the first change creates it, with the header and only the sections touched |
 | the file has unknown sections or keys | kept untouched on every save |
-| the file has `[keys]` entries | kept untouched; the sheet says remapping is done in the file |
+| the file has `[keys]` entries | kept untouched (the footer shows the file's path; remapping is done there) |
 | a value the user typed in the file is out of range (`wheel_step = 200`) | the load already reports and clamps it; the sheet shows the clamped value and a change saves a valid one |
 | `ui.mouse` turned off from the sheet | the click that did it was the last click: from then on the sheet is keyboard-only, and the footer says so |
 | a very small terminal | the sheet scrolls; nothing draws outside the drawer |
@@ -176,8 +176,9 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
   identities or activity.
 - `tests/app_commit.rs`: the author line in the commit popup and `Ctrl-A`.
 - `test/scripts/190-settings.script`: click the author's name, change the theme, a
-  toggle and a number, close, and check the file with `git`-free checks (`config`
-  directive reopen) that the values stay.
+  number and a toggle, close, `reopen` (new directive: a new start reading the
+  `config.toml` the app wrote) and check that the values stay. The replay got
+  `click-text`, `config-file` and `reopen` for it.
 
 ## Milestones
 
@@ -190,8 +191,8 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
   it, the old drawer's identity and activity blocks and keys go, `domain/profile/activity.rs`
   and `Repo::activity` go with them (the refresh no longer walks two years of commits for it).
 - **U3** folded into U1 (the live mouse switch and refresh interval).
-- **U4** the author line and `Ctrl-A` in the commit popup.
-- **U5** the replay script and a last pass over README, CHANGELOG and plans.
+- **U4** ✅ the author line and `Ctrl-A` in the commit popup (`tests/app_commit.rs`).
+- **U5** ✅ the replay script (`click-text`, `config-file`, `reopen`) and a last pass over README, CHANGELOG and plans.
 
 ## Definition of done (phase 17)
 

@@ -1,0 +1,43 @@
+# Phase 17, the settings sheet: a click on the author's name opens ferrit's own
+# settings and nothing of git's or the dashboard's. Every change is applied and
+# written at once to config.toml, so a new start (`reopen`) finds it as left.
+fixture canonical
+size 120x50
+config-file ""
+
+click-text "Ferrit Fixture"
+expect-text "Settings"
+expect-text "Appearance"
+expect-text "(•) Dark"
+expect-text "Wheel step"
+expect-text "Show read commands"
+expect-no-text "Global Git users"
+expect-no-text "Contributors"
+expect-no-text "[ Save ]"
+snapshot sheet
+
+# The theme: Right flips dark to light; it is on disk before anything is closed.
+key right
+expect-text "(•) Light"
+expect-text "Saved ·"
+
+# A number (Context lines is five rows down) and a toggle (Sign-off, two more).
+key down down down down down
+expect-text "▸ Context lines"
+key right right
+expect-text "‹ 5 ›"
+key down down space
+expect-text "Sign-off by default   [x]"
+snapshot changed
+
+# Esc closes the sheet.
+key esc
+expect-no-text "Wheel step"
+
+# A new start reads config.toml: the sheet is as it was left.
+reopen
+click-text "Ferrit Fixture"
+expect-text "(•) Light"
+expect-text "‹ 5 ›"
+expect-text "Sign-off by default   [x]"
+snapshot reopened

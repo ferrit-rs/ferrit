@@ -25,6 +25,9 @@ in `tests/replay.rs`, and the harness itself is tested in
   C` (several keys, `KeyBinding` syntax: `ctrl-d`, `space`, `pgdn`),
   `async-key K`, `exec ARGS` (run `git` in the fixture, no assertion), `write
   PATH "content"`, `config "toml"` (reopen the app with that configuration),
+  `config-file "toml"` (write a real `config.toml` in the fixture and reopen reading it, so
+  saves land in it), `reopen` (a new start reading that same file), `click-text "text"` (a left
+  click on the first cell where the text shows),
   `refresh`, and `=>` (exact) beside `->` (contains). `{dir}`, `{origin}` and
   `{other}` expand in `exec`, `write` and `git`.
 - **`async-key` replaces the `wait-for` of `PLAN_9_REMOTE.md`.** It gives the
