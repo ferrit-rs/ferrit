@@ -70,6 +70,16 @@ fn an_empty_repository_gets_one_commit_holding_an_empty_readme() {
     assert_eq!(dir.git(&["rev-list", "--count", "HEAD"]), "1");
     assert_eq!(dir.git(&["log", "-1", "--format=%s"]), "Initial commit");
     assert_eq!(
+        dir.git(&["log", "-1", "--format=%b"]),
+        "This initial commit and the remote repository were created by Ferrit.",
+        "the body says who made it"
+    );
+    assert_eq!(
+        dir.git(&["log", "-1", "--format=%B"]).trim_end(),
+        ferrit::domain::git::commit::INITIAL_MESSAGE.trim_end(),
+        "always the same message"
+    );
+    assert_eq!(
         dir.git(&["ls-tree", "-r", "--name-only", "HEAD"]),
         "README.md"
     );

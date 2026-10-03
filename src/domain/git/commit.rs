@@ -156,9 +156,14 @@ pub(super) fn has_commits(repo: &Repository) -> bool {
 /// The file the first commit holds.
 const INITIAL_FILE: &str = "README.md";
 
+/// The message of the first commit: always this one, and it says who made the
+/// commit and the remote repository, so the history is honest about it.
+pub const INITIAL_MESSAGE: &str =
+    "Initial commit\n\nThis initial commit and the remote repository were created by Ferrit.\n";
+
 /// The first commit of a repository with none: an empty `README.md` (an
-/// existing one is committed as it is, never overwritten), message `Initial
-/// commit`. Only that file goes in: anything else staged stays staged, and the
+/// existing one is committed as it is, never overwritten), message
+/// `INITIAL_MESSAGE`. Only that file goes in: anything else staged stays staged, and the
 /// other files of the folder stay as they are. `Ok(false)` and nothing done when
 /// the repository already has a commit, so asking twice is harmless. Hooks,
 /// signing and the identity are `git commit`'s own. See
@@ -189,7 +194,7 @@ pub(super) fn initial_commit(repo: &Repository, author: Option<String>) -> GitRe
     run(
         repo,
         &CommitKind::Normal,
-        "Initial commit",
+        INITIAL_MESSAGE,
         opts,
         Some(INITIAL_FILE),
     )?;
