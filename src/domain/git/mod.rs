@@ -29,6 +29,7 @@ pub mod operation;
 pub mod rebase;
 pub mod refs;
 pub mod remote;
+pub mod ssh_config;
 pub mod stash;
 pub mod stats;
 pub mod status;
