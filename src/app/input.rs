@@ -65,7 +65,7 @@ impl App {
             return;
         }
 
-        if !self.author_overlay.is_closed() {
+        if !self.sheet_overlay.is_closed() {
             self.settings_key(key);
             return;
         }
@@ -115,7 +115,7 @@ impl App {
             return;
         }
         if matches!(ev.kind, MouseEventKind::Moved) {
-            let over_author = self.author_overlay.is_closed()
+            let over_author = self.sheet_overlay.is_closed()
                 && self
                     .author_click_area
                     .contains(Position::new(ev.column, ev.row));
@@ -138,7 +138,7 @@ impl App {
             return;
         }
 
-        if !self.author_overlay.is_closed() {
+        if !self.sheet_overlay.is_closed() {
             self.settings_mouse(ev);
             return;
         }
@@ -179,10 +179,7 @@ impl App {
             .contains(Position::new(ev.column, ev.row))
         {
             self.mouse_pointer.request(false);
-            self.theme_mode = super::theme_config::ThemeMode::Idle;
-            self.settings_scroll = 0;
-            self.settings.follow = true;
-            self.author_overlay.open();
+            self.open_sheet(super::sheet::Sheet::Settings);
             return;
         }
 

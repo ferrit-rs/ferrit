@@ -326,6 +326,14 @@ impl App {
             .unwrap_or(SettingsRow::Theme)
     }
 
+    /// The sheet is about to open: back on the rows, at the top, the selected row
+    /// scrolled into view.
+    pub(super) fn prepare_settings_sheet(&mut self) {
+        self.theme_mode = ThemeMode::Idle;
+        self.settings_scroll = 0;
+        self.settings.follow = true;
+    }
+
     /// Every key while the sheet is up. It owns the keyboard: `↑` `↓` move
     /// between rows, `←` `→` and `Space` change the value, `Enter` opens the
     /// colour picker on the accent, `Esc` goes back (picker) or closes.
@@ -344,7 +352,7 @@ impl App {
         let last = SettingsRow::ALL.len() - 1;
         let row = self.selected_row();
         match key.code {
-            KeyCode::Esc => self.author_overlay.close(),
+            KeyCode::Esc => self.close_sheet(),
             KeyCode::Up | KeyCode::Char('k') => {
                 self.settings.selected = self.settings.selected.saturating_sub(1);
                 self.settings.follow = true;
@@ -431,11 +439,11 @@ impl App {
                         Click::Step(up) => self.change_setting(row, up),
                     }
                 } else if !self
-                    .author_overlay
+                    .sheet_overlay
                     .overlay_rect()
                     .is_some_and(|rect| rect.contains(point))
                 {
-                    self.author_overlay.close();
+                    self.close_sheet();
                 }
             },
             _ => {},

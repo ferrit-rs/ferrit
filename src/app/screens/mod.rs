@@ -13,6 +13,7 @@ use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::hints::{self, Bar};
+use crate::app::sheet::Sheet;
 use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
 use crate::app::{mock, theme};
 use crate::components::ui::chart_palette::{ChartPalette, charts_mode_from_env};
@@ -142,10 +143,12 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     draw_command_log(frame, app, log);
     draw_keybar(frame, keybar, app);
 
-    if app.author_overlay.is_closed() {
+    if app.sheet_overlay.is_closed() {
         app.settings_hits = crate::app::settings::SettingsHits::default();
     } else {
-        settings::draw(frame, area, app, &palette);
+        match app.sheet {
+            Sheet::Settings => settings::draw(frame, area, app, &palette),
+        }
     }
     keybar
 }

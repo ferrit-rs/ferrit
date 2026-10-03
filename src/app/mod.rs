@@ -626,8 +626,10 @@ pub struct App {
     keybar_hits: Vec<hints::KeybarHit>,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
-    /// Animated side sheet opened by clicking that author.
-    pub(crate) author_overlay: OverlayState,
+    /// The side sheet's drawer: one for every sheet (`app::sheet`).
+    pub(crate) sheet_overlay: OverlayState,
+    /// Which sheet the drawer holds while it is not closed.
+    sheet: sheet::Sheet,
     /// Backdrop state for the commit editor modal.
     pub(crate) commit_overlay: OverlayState,
     /// Persistent bottom-right error notification, dismissed by clicking `x`.
@@ -743,6 +745,7 @@ mod popups;
 mod rebase_actions;
 mod remote;
 pub mod settings;
+pub mod sheet;
 mod staging;
 mod stash_actions;
 
@@ -835,7 +838,8 @@ impl App {
             keybar_area: Rect::ZERO,
             keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),
-            author_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
+            sheet_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
+            sheet: sheet::Sheet::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
             left_areas: EnumMap::default(),
@@ -2094,7 +2098,7 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
-            let was_animating = self.author_overlay.is_animating();
+            let was_animating = self.sheet_overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
             let remote_animating = self.remote_busy.is_some();
             // Frames while something animates; a slower tick while a toast is up,
@@ -2112,7 +2116,7 @@ impl App {
                     Ok(Some(batch)) => batch,
                     Ok(None) => {
                         let elapsed = overlay_tick.elapsed();
-                        self.author_overlay.tick(elapsed);
+                        self.sheet_overlay.tick(elapsed);
                         self.tick_toast(elapsed);
                         overlay_tick = Instant::now();
                         continue;
@@ -2158,8 +2162,8 @@ impl App {
                 });
                 self.last_error = self.watch_error.clone();
             }
-            if self.author_overlay.is_animating() && was_animating {
-                self.author_overlay.tick(overlay_tick.elapsed());
+            if self.sheet_overlay.is_animating() && was_animating {
+                self.sheet_overlay.tick(overlay_tick.elapsed());
             }
             self.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
@@ -2181,14 +2185,14 @@ impl App {
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
-        self.author_overlay.tick(elapsed);
+        self.sheet_overlay.tick(elapsed);
     }
 
     /// Let the settings sheet's slide end now. Integration-test seam for the
     /// replay, which has no clock to wait on.
     #[doc(hidden)]
     pub fn finish_animations(&mut self) {
-        self.author_overlay.tick(Duration::from_secs(1));
+        self.sheet_overlay.tick(Duration::from_secs(1));
     }
 
     /// Close the error toast now (`Esc`), unless something else owns the key:

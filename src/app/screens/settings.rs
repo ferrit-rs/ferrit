@@ -169,7 +169,7 @@ fn hint(app: &App) -> &'static str {
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
     let accent = app.theme_config.color();
     let selected_row = app.settings().selected;
-    let Some(inner) = Drawer::new(&mut app.author_overlay, " Settings ")
+    let Some(inner) = Drawer::new(&mut app.sheet_overlay, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
         .render(frame, area)

@@ -381,3 +381,22 @@ fn the_footer_says_when_the_colours_are_approximated() {
     app.set_color_depth(ferrit::components::ui::scheme::ColorDepth::Indexed);
     assert!(shown(&mut app).contains("256 colours: approximated"));
 }
+
+#[test]
+fn the_drawer_says_whether_a_sheet_is_up_from_its_first_frame_to_the_end_of_its_slide_out() {
+    let fx = Fixture::new("sheet-open-state");
+    let mut app = App::open_with(&fx.dir.join("repo"), Config::load_from(&fx.file())).unwrap();
+    assert!(!app.sheet_is_open());
+    app.set_author_click_area(Rect::new(0, 0, 6, 1));
+    click(&mut app, 1, 0);
+    assert!(
+        app.sheet_is_open(),
+        "open from the click, before the slide ends"
+    );
+    settle(&mut app);
+    assert!(app.sheet_is_open());
+    press(&mut app, KeyCode::Esc);
+    assert!(app.sheet_is_open(), "still sliding out");
+    settle(&mut app);
+    assert!(!app.sheet_is_open(), "gone once the slide is over");
+}

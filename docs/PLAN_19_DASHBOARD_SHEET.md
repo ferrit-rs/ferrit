@@ -1,6 +1,6 @@
 # Plan: phase 19, the dashboard as a sheet
 
-**Status: planned.** Written after the settings sheet (phase 17): the dashboard
+**Status: in progress (S0 done: the shared sheet state, the settings sheet moved onto it).** Written after the settings sheet (phase 17): the dashboard
 (phase 13) is a full-screen view, and the user wants to keep the panes in sight
 while it is up. lazygit has no dashboard, so this is not compared with it; it is
 checked with frame tests, the replay harness and screenshots
@@ -115,7 +115,7 @@ the layout that exists today for narrow windows. (The settings sheet stays at 75
 
 ## Milestones
 
-- **S0** the shared sheet state (`Sheet`, one overlay), the settings sheet moved onto
+- **S0** ✅ the shared sheet state (`Sheet`, one overlay), the settings sheet moved onto
   it with no change of behaviour; its tests stay green.
 - **S1** the dashboard drawn in the drawer, opened and closed by `D`, `Esc`, `q` and
   a click outside; the key bar; the worker's lifecycle.
@@ -134,13 +134,19 @@ read in Dark and in Light (looked at, not only tested). `cargo clippy --all-targ
 --all-features -- -D warnings` and `cargo test` are green, the replay passes, and the
 README says it is a sheet.
 
-## Decisions to confirm before S0
+## Decisions taken (confirmed by the user before S0)
 
-- The drawer's width: **90 %** (recommended), against 75 % like the settings sheet,
-  which would stack the page on most terminals.
-- One shared drawer state with a kind (recommended), against a second overlay state
-  for the dashboard: the second is less change today and allows two drawers at once,
-  which nobody wants.
-- No full-screen mode kept beside the sheet (recommended): two ways to show the same
-  page doubles the tests for little gain.
+- The drawer is **90 %** wide, not 75 % like the settings sheet, which would stack the
+  page on most terminals.
+- One shared drawer state with a kind (`app::sheet::Sheet`), not a second overlay state
+  for the dashboard.
+- No full-screen mode kept beside the sheet.
 - `C` (git config) and the welcome screen stay full screen.
+
+## S0, as built
+
+`src/app/sheet.rs`: `Sheet` (for now `Settings` alone; `Dashboard` comes with S1, so no
+variant sits unused), `App::open_sheet`, `close_sheet`, `sheet_is_open`. `author_overlay`
+is `sheet_overlay`, and `App::sheet` says which sheet it holds. The settings sheet
+opens through `open_sheet(Sheet::Settings)` and `screens::draw` picks the sheet to draw
+from `app.sheet`. No change of behaviour: the settings tests pass as they were.
