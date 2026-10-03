@@ -3,7 +3,7 @@
 //! clicks are in `app::settings`.
 
 use crate::app::App;
-use crate::app::settings::{Click, SaveState, SettingsHits, SettingsRow};
+use crate::app::settings::{Click, Kind, SaveState, SettingsHits, SettingsRow};
 use crate::app::theme_config::{Preset, ThemeMode};
 use crate::components::ui::color_picker::{ColorPicker, grid_metrics, rgb};
 use crate::components::ui::drawer::Drawer;
@@ -73,9 +73,12 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
     line.text(format!("{:<LABEL_WIDTH$}", row.label()), label_style);
     let idle = Style::new().fg(palette.idle);
     match row {
-        SettingsRow::Theme => {
+        SettingsRow::Theme | SettingsRow::TerminalBase => {
             let current = app.choice_index(row);
-            for (index, name) in ["Dark", "Light"].into_iter().enumerate() {
+            let Kind::Choice(names) = row.kind() else {
+                return line;
+            };
+            for (index, name) in names.iter().enumerate() {
                 let on = current == Some(index);
                 let mark = if on { "(\u{2022})" } else { "( )" };
                 let style = if on { Style::new().fg(accent) } else { idle };
@@ -159,7 +162,8 @@ fn hint(app: &App) -> &'static str {
 /// clickable when it is not on screen).
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
     let accent = app.theme_config.color();
-    let selected_row = app.settings().selected;
+    let rows = app.visible_rows();
+    let selected_row = app.settings().selected.min(rows.len().saturating_sub(1));
     let Some(inner) = Drawer::new(&mut app.author_overlay, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
@@ -185,7 +189,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
     let mut selected_line = 0;
     let mut grid_line = 0;
     let mut last_group = "";
-    for (index, row) in SettingsRow::ALL.into_iter().enumerate() {
+    for (index, row) in rows.into_iter().enumerate() {
         if row.group() != last_group {
             if !lines.is_empty() {
                 lines.push(Line::default());

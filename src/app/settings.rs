@@ -9,7 +9,7 @@ use ratatui::layout::{Position, Rect};
 use ratatui::style::Color;
 
 use super::config::{Config, Section};
-use super::theme_config::{Base, Preset, ThemeMode};
+use super::theme_config::{Base, Preset, SchemeChoice, ThemeMode};
 use super::{App, KeyModifiers};
 use crate::components::ui::color_picker::{self, PaletteDirection};
 
@@ -20,6 +20,8 @@ const WHEEL_ROWS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsRow {
     Theme,
+    /// The terminal's own brightness: only for the Terminal theme.
+    TerminalBase,
     Accent,
     Mouse,
     WheelStep,
@@ -43,8 +45,9 @@ pub enum Kind {
 }
 
 impl SettingsRow {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Theme,
+        Self::TerminalBase,
         Self::Accent,
         Self::Mouse,
         Self::WheelStep,
@@ -58,6 +61,7 @@ impl SettingsRow {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Theme => "Theme",
+            Self::TerminalBase => "Terminal is",
             Self::Accent => "Accent",
             Self::Mouse => "Mouse",
             Self::WheelStep => "Wheel step",
@@ -72,7 +76,7 @@ impl SettingsRow {
     #[must_use]
     pub const fn group(self) -> &'static str {
         match self {
-            Self::Theme | Self::Accent => "Appearance",
+            Self::Theme | Self::TerminalBase | Self::Accent => "Appearance",
             Self::Mouse | Self::WheelStep => "Interface",
             Self::DiffContext | Self::IgnoreWhitespace => "Diff",
             Self::SignOff => "Commit",
@@ -83,7 +87,8 @@ impl SettingsRow {
     #[must_use]
     pub const fn kind(self) -> Kind {
         match self {
-            Self::Theme => Kind::Choice(&["Dark", "Light"]),
+            Self::Theme => Kind::Choice(&["Terminal", "Dark", "Light"]),
+            Self::TerminalBase => Kind::Choice(&["Dark", "Light"]),
             Self::Accent => Kind::Choice(&["Green", "Blue", "Purple", "Amber"]),
             Self::WheelStep => Kind::Number { min: 1, max: 50 },
             Self::DiffContext => Kind::Number { min: 0, max: 200 },
@@ -93,7 +98,7 @@ impl SettingsRow {
 
     const fn section(self) -> Section {
         match self {
-            Self::Theme | Self::Accent => Section::Theme,
+            Self::Theme | Self::TerminalBase | Self::Accent => Section::Theme,
             Self::Mouse | Self::WheelStep => Section::Ui,
             Self::DiffContext | Self::IgnoreWhitespace => Section::Diff,
             Self::SignOff => Section::Commit,
@@ -178,7 +183,12 @@ impl App {
     #[must_use]
     pub fn choice_index(&self, row: SettingsRow) -> Option<usize> {
         match row {
-            SettingsRow::Theme => Some(usize::from(self.theme_config.base == Base::Light)),
+            SettingsRow::Theme => Some(match self.theme_config.scheme {
+                SchemeChoice::Terminal => 0,
+                SchemeChoice::Dark => 1,
+                SchemeChoice::Light => 2,
+            }),
+            SettingsRow::TerminalBase => Some(usize::from(self.theme_config.base == Base::Light)),
             SettingsRow::Accent => {
                 if self.theme_config.accent.is_some() {
                     None
@@ -221,6 +231,13 @@ impl App {
     pub fn change_setting(&mut self, row: SettingsRow, up: bool) {
         match row {
             SettingsRow::Theme => {
+                let current = self.choice_index(row).unwrap_or(0);
+                let next = if up { current + 1 } else { current + 2 } % 3;
+                // `set_choice` applies and saves it.
+                self.set_choice(row, next);
+                return;
+            },
+            SettingsRow::TerminalBase => {
                 self.theme_config.base = match self.theme_config.base {
                     Base::Dark => Base::Light,
                     Base::Light => Base::Dark,
@@ -298,6 +315,14 @@ impl App {
     pub fn set_choice(&mut self, row: SettingsRow, index: usize) {
         match row {
             SettingsRow::Theme => {
+                self.theme_config.scheme = match index {
+                    0 => SchemeChoice::Terminal,
+                    1 => SchemeChoice::Dark,
+                    _ => SchemeChoice::Light,
+                };
+                self.accent_changed();
+            },
+            SettingsRow::TerminalBase => {
                 if self.choice_index(row) != Some(index) {
                     self.change_setting(row, true);
                 }
@@ -320,9 +345,22 @@ impl App {
         self.save_settings(Section::Theme);
     }
 
-    fn selected_row(&self) -> SettingsRow {
+    /// The rows the sheet shows now: "Terminal is" only under the Terminal theme,
+    /// since a painted theme says by itself whether it is dark or light.
+    #[must_use]
+    pub fn visible_rows(&self) -> Vec<SettingsRow> {
         SettingsRow::ALL
-            .get(self.settings.selected)
+            .into_iter()
+            .filter(|row| {
+                *row != SettingsRow::TerminalBase
+                    || self.theme_config.scheme == SchemeChoice::Terminal
+            })
+            .collect()
+    }
+
+    fn selected_row(&self) -> SettingsRow {
+        let rows = self.visible_rows();
+        rows.get(self.settings.selected.min(rows.len().saturating_sub(1)))
             .copied()
             .unwrap_or(SettingsRow::Theme)
     }
@@ -342,7 +380,7 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return;
         }
-        let last = SettingsRow::ALL.len() - 1;
+        let last = self.visible_rows().len().saturating_sub(1);
         let row = self.selected_row();
         match key.code {
             KeyCode::Esc => self.author_overlay.close(),
@@ -423,8 +461,11 @@ impl App {
                     .iter()
                     .find(|(area, ..)| area.contains(point))
                 {
-                    self.settings.selected =
-                        SettingsRow::ALL.iter().position(|r| *r == row).unwrap_or(0);
+                    self.settings.selected = self
+                        .visible_rows()
+                        .iter()
+                        .position(|r| *r == row)
+                        .unwrap_or(0);
                     match click {
                         Click::Row => {},
                         Click::Choice(index) => self.set_choice(row, index),

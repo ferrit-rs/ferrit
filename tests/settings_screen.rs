@@ -125,6 +125,7 @@ fn the_sheet_holds_ferrits_settings_and_nothing_of_git_or_the_dashboard() {
         "Settings",
         "Appearance",
         "Theme",
+        "Terminal is",
         "Accent",
         "Interface",
         "Mouse",
@@ -165,20 +166,28 @@ fn the_sheet_holds_ferrits_settings_and_nothing_of_git_or_the_dashboard() {
 fn the_arrows_move_between_rows_and_change_the_value_and_the_file_follows() {
     let fx = Fixture::new("sheet-keys");
     let mut app = fx.app_with_sheet();
-    press(&mut app, KeyCode::Right); // Theme -> light
+    press(&mut app, KeyCode::Right); // Terminal -> Dark
     let text = shown(&mut app);
-    assert!(text.contains("(\u{2022}) Light"), "{text}");
+    assert!(text.contains("(\u{2022}) Dark"), "{text}");
     assert!(
         text.contains("Saved \u{b7}"),
         "the footer says it is saved: {text}"
     );
+    assert!(
+        fs::read_to_string(fx.file())
+            .unwrap()
+            .contains("scheme = \"dark\"")
+    );
+    press(&mut app, KeyCode::Right); // Dark -> Light
     assert!(app.palette().light);
     assert!(
         fs::read_to_string(fx.file())
             .unwrap()
-            .contains("base = \"light\"")
+            .contains("scheme = \"light\"")
     );
 
+    // "Terminal is" is gone under a painted theme: Accent is the next row.
+    assert!(!shown(&mut app).contains("Terminal is"));
     press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     assert!(shown(&mut app).contains("\u{25b8} Mouse"));
@@ -232,7 +241,8 @@ fn the_number_arrows_step_the_value() {
 fn enter_on_the_accent_opens_the_picker_and_a_picked_colour_is_kept() {
     let fx = Fixture::new("sheet-picker");
     let mut app = fx.app_with_sheet();
-    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Down); // Terminal is
+    press(&mut app, KeyCode::Down); // Accent
     press(&mut app, KeyCode::Enter);
     assert!(
         shown(&mut app).contains("arrows colour"),
@@ -282,6 +292,7 @@ fn an_invalid_config_file_is_left_alone_and_the_footer_says_so() {
     fs::write(fx.file(), "[oops\n").unwrap();
     let mut app = fx.app_with_sheet();
     press(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Right);
     let text = shown(&mut app);
     assert!(text.contains("Not saved:"), "{text}");
     assert_eq!(fs::read_to_string(fx.file()).unwrap(), "[oops\n");
@@ -317,12 +328,69 @@ fn turning_the_mouse_off_says_the_sheet_is_keyboard_only_from_now_on() {
     let fx = Fixture::new("sheet-mouse-off");
     let mut app = fx.app_with_sheet();
     assert!(!shown(&mut app).contains("keyboard only"));
-    press(&mut app, KeyCode::Down);
-    press(&mut app, KeyCode::Down);
+    for _ in 0..3 {
+        press(&mut app, KeyCode::Down); // Terminal is, Accent, Mouse
+    }
     press(&mut app, KeyCode::Char(' '));
     assert!(shown(&mut app).contains("Mouse is off: keyboard only"));
     // A click now does nothing: the sheet is still up.
     click(&mut app, 2, 20);
     settle(&mut app);
     assert!(shown(&mut app).contains("Wheel step"));
+}
+
+#[test]
+fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
+    let fx = Fixture::new("sheet-theme-row");
+    let mut app = fx.app_with_sheet();
+    let text = shown(&mut app);
+    assert!(
+        text.contains("(\u{2022}) Terminal")
+            && text.contains("( ) Dark")
+            && text.contains("( ) Light"),
+        "{text}"
+    );
+    assert!(text.contains("Terminal is"), "{text}");
+
+    let (x, y) = find(&mut app, "( ) Dark");
+    click(&mut app, x + 1, y);
+    let text = shown(&mut app);
+    assert!(text.contains("(\u{2022}) Dark"), "{text}");
+    assert!(
+        !text.contains("Terminal is"),
+        "gone under a painted theme: {text}"
+    );
+    assert_eq!(
+        Config::load_from(&fx.file()).config.theme.scheme,
+        ferrit::app::theme_config::SchemeChoice::Dark
+    );
+}
+
+#[test]
+fn choosing_dark_or_light_paints_the_whole_screen_live() {
+    use ratatui::style::Color;
+    let fx = Fixture::new("sheet-paint-live");
+    let mut app = fx.app_with_sheet();
+    let backgrounds = |app: &mut App| {
+        let mut terminal = Terminal::new(TestBackend::new(120, 50)).unwrap();
+        terminal.draw(|f| ui::draw(f, app)).unwrap();
+        let buf = terminal.backend().buffer().clone();
+        (0..buf.area.height)
+            .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+            .map(|(x, y)| buf[(x, y)].bg)
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        backgrounds(&mut app).contains(&Color::Reset),
+        "Terminal: not painted"
+    );
+    press(&mut app, KeyCode::Right);
+    let dark = backgrounds(&mut app);
+    assert!(!dark.contains(&Color::Reset), "Dark paints every cell");
+    assert!(dark.contains(&ferrit::components::ui::scheme::Scheme::DARK.background));
+    press(&mut app, KeyCode::Right);
+    assert!(
+        backgrounds(&mut app).contains(&ferrit::components::ui::scheme::Scheme::LIGHT.background),
+        "Light paints white"
+    );
 }

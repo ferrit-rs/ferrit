@@ -62,7 +62,7 @@ into its own crate remains deferred.
 | 15 | `PLAN_15_CREATE_REMOTE.md` | create the GitHub repository from ferrit through `gh` (optional, from the `x` menu, private by default), wire `origin`, push with the existing credential popup | ✅ done (R0-R5) |
 | 16 | `PLAN_16_START_WITHOUT_REPO.md` | start ferrit outside a repository: a welcome screen offering `git init` (with a question naming the folder), then the usual panes; `--path` keeps its error | ✅ done (W0-W4) |
 | 17 | `PLAN_17_SETTINGS.md` | the settings sheet (click the author's name): ferrit's own settings only (theme, accent with the colour picker, mouse, wheel, diff, sign-off, command log), saved at once to `config.toml`; git identities and activity leave it | ✅ done |
-| 18 | `PLAN_18_THEMES.md` | painted themes: Dark and Light that paint ferrit's whole screen (one paint pass over the frame buffer maps `Reset` and the ANSI names to the scheme's colours), "Terminal" kept as today; 256-colour fallback; contrast test; fonts are the terminal's, out of scope | 🔄 in progress (P0) |
+| 18 | `PLAN_18_THEMES.md` | painted themes: Dark and Light that paint ferrit's whole screen (one paint pass over the frame buffer maps `Reset` and the ANSI names to the scheme's colours), "Terminal" kept as today; 256-colour fallback; contrast test; fonts are the terminal's, out of scope | 🔄 in progress (P0, P1) |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).
