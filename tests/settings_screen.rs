@@ -372,3 +372,12 @@ fn choosing_light_repaints_the_whole_screen_live_and_dark_is_there_from_the_star
         "nothing of the dark one is left"
     );
 }
+
+#[test]
+fn the_footer_says_when_the_colours_are_approximated() {
+    let fx = Fixture::new("sheet-256");
+    let mut app = fx.app_with_sheet();
+    assert!(!shown(&mut app).contains("256 colours"));
+    app.set_color_depth(ferrit::components::ui::scheme::ColorDepth::Indexed);
+    assert!(shown(&mut app).contains("256 colours: approximated"));
+}

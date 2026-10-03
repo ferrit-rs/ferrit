@@ -8,6 +8,7 @@ use crate::app::theme_config::{Preset, ThemeMode};
 use crate::components::ui::color_picker::{ColorPicker, grid_metrics, rgb};
 use crate::components::ui::drawer::Drawer;
 use crate::components::ui::palette::Palette;
+use crate::components::ui::scheme::ColorDepth;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::separator::Separator;
 use ratatui::Frame;
@@ -142,6 +143,11 @@ fn footer(app: &App, palette: &Palette) -> Line<'static> {
         line
     } else {
         format!("Mouse is off: keyboard only \u{b7} {line}")
+    };
+    let line = if app.color_depth == ColorDepth::TrueColor {
+        line
+    } else {
+        format!("256 colours: approximated \u{b7} {line}")
     };
     Line::styled(line, idle)
 }

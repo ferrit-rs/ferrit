@@ -553,6 +553,10 @@ pub struct App {
     theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
     config_file: Option<PathBuf>,
+    /// What the terminal can show; the painted theme is RGB and is approximated
+    /// with 256 colours when it has no 24-bit colour. True colour until the binary
+    /// has looked (`COLORTERM`); the library never reads the environment.
+    color_depth: crate::components::ui::scheme::ColorDepth,
     /// Everything loaded from `config.toml`. Its `theme` is only the value
     /// read at startup: the theme being edited lives in `theme_config`.
     config: config::Config,
@@ -803,6 +807,7 @@ impl App {
             config,
             keymap,
             config_file: None,
+            color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
             settings_hits: settings::SettingsHits::default(),
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
@@ -1516,6 +1521,11 @@ impl App {
     /// Store the configured Git author's clickable cells for mouse routing.
     pub fn set_author_click_area(&mut self, area: Rect) {
         self.author_click_area = area;
+    }
+
+    /// Tell the app what the terminal can show (`ColorDepth::detect`).
+    pub fn set_color_depth(&mut self, depth: crate::components::ui::scheme::ColorDepth) {
+        self.color_depth = depth;
     }
 
     /// The palette every screen and line builder colours with.

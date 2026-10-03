@@ -1,6 +1,6 @@
 # Plan: phase 18, painted themes (a real dark and a real light)
 
-**Status: in progress (P0, P1 and P1b done: the paint pass and the Theme row; P2 is next).** Written after phase 17 (the settings sheet) shipped a "Theme:
+**Status: in progress (P0, P1, P1b and P2 done: the paint pass, the Theme row and the 256-colour fallback; P3, the real-terminal check, is next).** Written after phase 17 (the settings sheet) shipped a "Theme:
 Dark / Light" row that does not paint anything. lazygit has no such setting (it only
 sets foreground colours and leaves the terminal's background alone), so this phase is
 not compared with it; it is checked with buffer tests and screenshots
@@ -129,7 +129,8 @@ The scheme is RGB. A terminal that does not do 24-bit colour shows it wrong (mac
 `Terminal.app` is 256 colours only; tmux needs `Tc`). Ferrit already uses a few `Rgb`
 colours, but a painted background makes a wrong colour impossible to miss.
 
-- Ferrit reads `COLORTERM` (`truecolor` or `24bit`).
+- Ferrit reads `COLORTERM` (`truecolor` or `24bit`), in the binary (`main`) only: the
+  library never reads the environment, and `App::set_truecolor` hands it the answer.
 - With 24-bit colour, the pass writes `Rgb`.
 - Without it, the pass writes the nearest xterm-256 `Indexed` colour for every colour
   it paints, and for the `Rgb` ones it leaves (the nearest of the 256, computed once
@@ -207,7 +208,7 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 - **P1** ✅ the Theme row of the sheet, live and saved; sheet tests; the replay scripts.
 - **P1b** ✅ "Terminal" removed: `theme.base` is the theme, `scheme` and "Terminal is"
   are gone, `draw_painted` is the output stage.
-- **P2** the 24-bit fallback (`COLORTERM`, `Indexed`) with its tests and the footer
+- **P2** ✅ the 24-bit fallback (`COLORTERM`, `Indexed`) with its tests and the footer
   note; the contrast test and the table tuned to pass; the backdrop checked.
 - **P3** the screenshots in both terminals, the measured cost, anything the eye finds
   that no test saw, then README, CHANGELOG and plans.

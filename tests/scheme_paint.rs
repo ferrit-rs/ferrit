@@ -16,7 +16,7 @@ use std::time::Duration;
 use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::theme_config::Base;
 use ferrit::app::{App, screens as ui};
-use ferrit::components::ui::scheme::{Scheme, contrast};
+use ferrit::components::ui::scheme::{ColorDepth, Scheme, contrast};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -314,4 +314,118 @@ fn the_theme_survives_a_save_with_the_rest_of_the_file() {
     assert!(text.contains("base = \"light\""), "{text}");
     assert!(text.contains("answer = 42"), "{text}");
     assert_eq!(Config::load_from(&file).config.theme.base, Base::Light);
+}
+
+fn colours(buf: &Buffer) -> Vec<Color> {
+    (0..buf.area.height)
+        .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .flat_map(|(x, y)| [buf[(x, y)].fg, buf[(x, y)].bg])
+        .collect()
+}
+
+#[test]
+fn nearest_256_picks_the_cube_or_the_grey_ramp_whichever_is_closer() {
+    use ferrit::components::ui::scheme::nearest_256;
+    assert_eq!(nearest_256(0, 0, 0), 16, "black is the cube's corner");
+    assert_eq!(nearest_256(255, 255, 255), 231, "white is the other");
+    assert_eq!(nearest_256(255, 0, 0), 196);
+    assert_eq!(nearest_256(0, 255, 0), 46);
+    assert_eq!(nearest_256(0, 0, 255), 21);
+    assert_eq!(nearest_256(128, 128, 128), 244, "a mid grey is on the ramp");
+    assert_eq!(nearest_256(8, 8, 8), 232, "the first grey");
+    assert_eq!(nearest_256(238, 238, 238), 255, "the last grey");
+    assert_eq!(nearest_256(95, 135, 175), 67, "an exact cube colour");
+    // The two backgrounds stay a dark one and a light one.
+    let Color::Rgb(r, g, b) = Scheme::DARK.background else {
+        panic!("rgb")
+    };
+    assert_eq!(
+        nearest_256(r, g, b),
+        233,
+        "a near-black grey, not the cube's black"
+    );
+    let Color::Rgb(r, g, b) = Scheme::LIGHT.background else {
+        panic!("rgb")
+    };
+    assert_eq!(nearest_256(r, g, b), 231);
+}
+
+#[test]
+fn a_terminal_says_it_speaks_24_bit_colour_with_colorterm() {
+    for yes in ["truecolor", "24bit", "TrueColor"] {
+        assert_eq!(
+            ColorDepth::detect(Some(yes)),
+            ColorDepth::TrueColor,
+            "{yes}"
+        );
+    }
+    for no in [Some(""), Some("yes"), None] {
+        assert_eq!(ColorDepth::detect(no), ColorDepth::Indexed, "{no:?}");
+    }
+}
+
+#[test]
+fn without_24_bit_colour_the_frame_has_no_rgb_and_is_still_painted() {
+    let repo = Repo::new("paint-256");
+    for theme in ["dark", "light"] {
+        let mut app = repo.app(&format!("[theme]\nbase = \"{theme}\"\n"));
+        app.set_color_depth(ColorDepth::Indexed);
+        let buf = frame(&mut app);
+        assert_eq!(unpainted(&buf), None, "{theme}");
+        assert!(
+            !colours(&buf).iter().any(|c| matches!(c, Color::Rgb(..))),
+            "{theme}: an Rgb is left for a terminal that cannot show it"
+        );
+        assert!(
+            colours(&buf).iter().any(|c| matches!(c, Color::Indexed(_))),
+            "{theme}"
+        );
+    }
+    let mut app = repo.app("");
+    let buf = frame(&mut app);
+    assert!(colours(&buf).iter().any(|c| matches!(c, Color::Rgb(..))));
+    assert!(
+        !colours(&buf).iter().any(|c| matches!(c, Color::Indexed(_))),
+        "with 24-bit colour nothing is approximated"
+    );
+}
+
+#[test]
+fn what_a_popup_dims_is_the_dimming_layer_of_the_theme_not_black() {
+    let repo = Repo::new("paint-dim");
+    for (theme, scheme) in [("dark", Scheme::DARK), ("light", Scheme::LIGHT)] {
+        let mut app = repo.app(&format!("[theme]\nbase = \"{theme}\"\n"));
+        app.set_author_click_area(Rect::new(0, 0, 6, 1));
+        app.feed_mouse(ratatui::crossterm::event::MouseEvent {
+            kind: ratatui::crossterm::event::MouseEventKind::Down(
+                ratatui::crossterm::event::MouseButton::Left,
+            ),
+            column: 1,
+            row: 0,
+            modifiers: ratatui::crossterm::event::KeyModifiers::NONE,
+        });
+        for _ in 0..30 {
+            app.advance_clock(Duration::from_millis(16));
+            frame(&mut app);
+        }
+        let buf = frame(&mut app);
+        // Left of the drawer: the screen behind it, dimmed.
+        let dimmed = &buf[(2, 20)];
+        assert_eq!(dimmed.bg, scheme.fill[0], "{theme}: the dimming layer");
+        assert_ne!(dimmed.bg, Color::Rgb(0, 0, 0), "{theme}: not black");
+        assert_eq!(dimmed.fg, scheme.foreground[8], "{theme}: dim text");
+    }
+}
+
+#[test]
+fn dimmed_text_is_still_faintly_readable_in_both_themes() {
+    for (label, scheme) in [("dark", Scheme::DARK), ("light", Scheme::LIGHT)] {
+        let ratio = contrast(scheme.foreground[8], scheme.fill[0]).unwrap();
+        assert!(ratio >= 2.0, "{label}: dimmed text {ratio:.2}");
+        let back = contrast(scheme.fill[0], scheme.background).unwrap();
+        assert!(
+            back < 1.5,
+            "{label}: the dim layer is close to the screen: {back:.2}"
+        );
+    }
 }

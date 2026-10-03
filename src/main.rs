@@ -96,6 +96,11 @@ fn main() -> Result<ExitCode> {
     // Ask the terminal whether it speaks a graphics protocol, before the
     // alternate screen is up. Falls back to half-blocks on its own.
     app.detect_graphics();
+    // The painted theme is RGB: a terminal without 24-bit colour gets the nearest
+    // of its 256 (`docs/PLAN_18_THEMES.md`).
+    app.set_color_depth(ferrit::components::ui::scheme::ColorDepth::detect(
+        std::env::var("COLORTERM").ok().as_deref(),
+    ));
 
     let mut terminal = tui::init(app.mouse_enabled())?;
     let result = app.run(&mut terminal);

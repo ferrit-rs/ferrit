@@ -159,12 +159,89 @@ impl Scheme {
             .unwrap_or(color)
     }
 
-    /// Paint every cell of a drawn frame.
-    pub fn paint(&self, buffer: &mut Buffer) {
+    /// Paint every cell of a drawn frame. Without 24-bit colour in the terminal
+    /// (`ColorDepth::Indexed`) every `Rgb` the frame ends up with, the scheme's own and
+    /// the widgets' (diff tints, syntax colours, the accent), becomes the nearest
+    /// of the 256 colours, so the theme still reads as dark or light.
+    pub fn paint(&self, buffer: &mut Buffer, depth: ColorDepth) {
         for cell in &mut buffer.content {
             cell.fg = self.paint_foreground(cell.fg);
             cell.bg = self.paint_background(cell.bg);
+            if depth == ColorDepth::Indexed {
+                cell.fg = approximate(cell.fg);
+                cell.bg = approximate(cell.bg);
+            }
         }
+    }
+}
+
+/// How many colours the terminal can show.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ColorDepth {
+    /// 24-bit colour: `Rgb` is drawn as it is.
+    #[default]
+    TrueColor,
+    /// 256 colours: every `Rgb` is replaced by its nearest.
+    Indexed,
+}
+
+impl ColorDepth {
+    /// What a terminal that sets `COLORTERM` to `colorterm` can show.
+    /// `Terminal.app` sets nothing and has 256 colours; tmux needs `Tc` besides.
+    #[must_use]
+    pub fn detect(colorterm: Option<&str>) -> Self {
+        if colorterm
+            .is_some_and(|v| v.eq_ignore_ascii_case("truecolor") || v.eq_ignore_ascii_case("24bit"))
+        {
+            Self::TrueColor
+        } else {
+            Self::Indexed
+        }
+    }
+}
+
+/// The levels of the xterm 6x6x6 colour cube.
+const CUBE: [u8; 6] = [0, 95, 135, 175, 215, 255];
+
+fn distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> u32 {
+    let d = |x: u8, y: u8| u32::from(x.abs_diff(y)).pow(2);
+    d(a.0, b.0) + d(a.1, b.1) + d(a.2, b.2)
+}
+
+/// The nearest xterm-256 colour of an RGB one, among the cube (16 to 231) and the
+/// grey ramp (232 to 255). The first sixteen are left out: a terminal maps them to
+/// its own palette, so they are not a known colour.
+#[must_use]
+pub fn nearest_256(r: u8, g: u8, b: u8) -> u8 {
+    let level = |v: u8| {
+        (0..6u8)
+            .min_by_key(|&i| {
+                CUBE.get(usize::from(i))
+                    .map_or(u32::MAX, |&c| u32::from(c.abs_diff(v)))
+            })
+            .unwrap_or(0)
+    };
+    let (ri, gi, bi) = (level(r), level(g), level(b));
+    let at = |i: u8| CUBE.get(usize::from(i)).copied().unwrap_or(0);
+    let cube = (at(ri), at(gi), at(bi));
+    let cube_index = 16 + 36 * ri + 6 * gi + bi;
+    let mean = u8::try_from((u32::from(r) + u32::from(g) + u32::from(b)) / 3).unwrap_or(u8::MAX);
+    let step = u8::try_from((u32::from(mean).saturating_sub(8) + 5) / 10)
+        .unwrap_or(23)
+        .min(23);
+    let grey = 8 + 10 * step;
+    if distance((r, g, b), (grey, grey, grey)) < distance((r, g, b), cube) {
+        232 + step
+    } else {
+        cube_index
+    }
+}
+
+/// `color` with an `Rgb` replaced by its nearest of the 256; anything else as is.
+fn approximate(color: Color) -> Color {
+    match color {
+        Color::Rgb(r, g, b) => Color::Indexed(nearest_256(r, g, b)),
+        other => other,
     }
 }
 
