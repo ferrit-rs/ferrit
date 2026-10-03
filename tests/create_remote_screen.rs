@@ -94,24 +94,6 @@ fn press(app: &mut App, code: KeyCode) {
 }
 
 #[test]
-fn the_form_shows_its_four_fields_private_by_default() {
-    let project = Project::new("crs-form");
-    let mut app = project.app_with_form();
-    let shown = text(&render(&mut app, 100, 30));
-
-    assert!(shown.contains("Create on GitHub"), "{shown}");
-    for label in ["Name", "Visibility", "Description"] {
-        assert!(shown.contains(label), "{label} in {shown}");
-    }
-    assert!(shown.contains("work"), "the folder's name is the default");
-    assert!(shown.contains("(\u{2022}) private"), "{shown}");
-    assert!(shown.contains("( ) public"), "{shown}");
-    assert!(shown.contains("after creating"), "{shown}");
-    assert!(shown.contains("[x]"));
-    assert!(shown.contains("Next: Tab"), "{shown}");
-}
-
-#[test]
 fn choosing_public_moves_the_dot_and_a_bad_name_shows_its_reason() {
     let project = Project::new("crs-public");
     let mut app = project.app_with_form();
@@ -185,45 +167,107 @@ fn the_check_popup_and_tiny_terminals_do_not_panic() {
 }
 
 #[test]
-fn a_repository_with_no_commit_shows_the_first_commit_row_ticked_and_the_question_says_it() {
-    let project = Project::new("crs-first");
+fn the_form_has_three_choices_and_nothing_else() {
+    let project = Project::new("crs-form");
     let mut app = project.app_with_form();
-    let shown = text(&render(&mut app, 100, 30));
+    let shown = text(&render(&mut app, 100, 40));
+
+    assert!(shown.contains("Create on GitHub"), "{shown}");
+    for label in ["Name", "Visibility", "Description"] {
+        assert!(shown.contains(label), "{label} in {shown}");
+    }
+    assert!(shown.contains("work"), "the folder's name is the default");
+    assert!(shown.contains("(\u{2022}) private"), "{shown}");
+    assert!(shown.contains("( ) public"), "{shown}");
+    // Not choices: the first commit, the push and the SSH host happen on their own.
+    for gone in ["Initial commit", "SSH host", "after creating", "[x]", "[ ]"] {
+        assert!(!shown.contains(gone), "{gone} in {shown}");
+    }
+    assert!(shown.contains("Next: Tab"), "{shown}");
+}
+
+#[test]
+fn the_text_fields_are_framed_boxes_with_a_counter_like_the_commit_popup() {
+    let project = Project::new("crs-boxes");
+    let mut app = project.app_with_form();
+    let shown = text(&render(&mut app, 100, 40));
+    assert!(shown.contains("\u{256d} Name "), "{shown}");
+    assert!(shown.contains("\u{256d} Description "), "{shown}");
     assert!(
-        shown.contains("Initial commit with an empty README.md"),
+        shown.contains("4/100"),
+        "the folder's name is 4 characters: {shown}"
+    );
+    assert!(shown.contains("0/350"), "{shown}");
+}
+
+#[test]
+fn a_long_description_wraps_over_the_box_and_all_of_it_stays_in_view() {
+    let project = Project::new("crs-wrap");
+    let mut app = project.app_with_form();
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    let words: Vec<String> = (1..=45).map(|i| format!("word{i:02}")).collect();
+    let description = words.join(" ");
+    assert!(description.chars().count() > 250, "longer than one row");
+    for c in description.chars() {
+        app.feed_key(KeyEvent::from(KeyCode::Char(c)));
+    }
+    let shown = text(&render(&mut app, 100, 40));
+    assert!(shown.contains("word01"), "the start: {shown}");
+    assert!(shown.contains("word45"), "the end, not cut off: {shown}");
+    assert!(
+        shown.contains(&format!("{}/350", description.chars().count())),
+        "the counter: {shown}"
+    );
+    // It really wraps: the text sits on several rows of the box.
+    let rows_with_words = shown.lines().filter(|l| l.contains("word")).count();
+    assert!(rows_with_words >= 4, "{rows_with_words} rows: {shown}");
+}
+
+#[test]
+fn a_long_description_stays_in_view_on_a_smaller_terminal_too() {
+    let project = Project::new("crs-wrap-small");
+    let mut app = project.app_with_form();
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    for c in "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon last".chars() {
+        app.feed_key(KeyEvent::from(KeyCode::Char(c)));
+    }
+    let shown = text(&render(&mut app, 80, 24));
+    assert!(shown.contains("alpha") && shown.contains("last"), "{shown}");
+}
+
+#[test]
+fn a_long_name_stays_in_view_in_its_box() {
+    let project = Project::new("crs-wrap-name");
+    let mut app = project.app_with_form();
+    for _ in 0..30 {
+        press(&mut app, KeyCode::Backspace);
+    }
+    let name = format!("{}-end", "n".repeat(90));
+    for c in name.chars() {
+        app.feed_key(KeyEvent::from(KeyCode::Char(c)));
+    }
+    let shown = text(&render(&mut app, 100, 40));
+    assert!(shown.contains("-end"), "the end of the name: {shown}");
+    assert!(
+        shown.contains(&format!("{}/100", name.chars().count())),
         "{shown}"
     );
-    assert!(shown.contains("[x]"));
+}
 
+#[test]
+fn the_last_question_says_the_first_commit_is_made_by_ferrit_only_when_there_is_none() {
+    let project = Project::new("crs-first");
+    let mut app = project.app_with_form();
     press(&mut app, KeyCode::Enter);
     let shown = text(&render(&mut app, 100, 30));
     assert!(
-        shown.contains("first: commit an empty README.md"),
+        shown.contains("first: commit an empty README.md, made by Ferrit"),
         "{shown}"
     );
     assert!(shown.contains("add remote `origin`"), "{shown}");
-}
 
-#[test]
-fn unticked_the_row_says_so_and_the_question_drops_the_line() {
-    let project = Project::new("crs-first-off");
-    let mut app = project.app_with_form();
-    for _ in 0..4 {
-        press(&mut app, KeyCode::Tab);
-    }
-    press(&mut app, KeyCode::Char(' '));
-    let shown = text(&render(&mut app, 100, 30));
-    let row = shown
-        .lines()
-        .find(|l| l.contains("Initial commit"))
-        .unwrap();
-    assert!(row.contains("[ ]"), "{row}");
-    press(&mut app, KeyCode::Enter);
-    assert!(!text(&render(&mut app, 100, 30)).contains("first: commit"));
-}
-
-#[test]
-fn with_a_commit_there_is_no_such_row() {
     let project = Project::new("crs-first-none");
     let work = project.dir.join("work");
     for args in [
@@ -240,36 +284,25 @@ fn with_a_commit_there_is_no_such_row() {
         assert!(status.success());
     }
     let mut app = project.app_with_form();
+    press(&mut app, KeyCode::Enter);
     let shown = text(&render(&mut app, 100, 30));
-    assert!(!shown.contains("Initial commit"), "{shown}");
-    assert!(shown.contains("after creating"));
+    assert!(!shown.contains("first: commit"), "{shown}");
 }
 
 #[test]
-fn the_form_shows_the_ssh_host_row_with_the_users_alias_and_the_question_says_it() {
+fn the_last_question_names_the_users_ssh_alias_and_is_wide_enough_for_it() {
     let project = Project::new("crs-host");
     let config = project.dir.join("ssh_config");
     fs::write(&config, "Host github.com-personal\n  HostName github.com\n").unwrap();
     let mut app = project.app_with_form_over(&config);
-    let shown = text(&render(&mut app, 100, 30));
-    assert!(shown.contains("SSH host"), "{shown}");
-    assert!(shown.contains("github.com-personal"), "{shown}");
-
     press(&mut app, KeyCode::Enter);
     let shown = text(&render(&mut app, 100, 30));
     assert!(
         shown.contains("over ssh host github.com-personal"),
         "{shown}"
     );
-}
 
-#[test]
-fn with_no_alias_the_ssh_host_row_is_there_and_empty() {
-    let project = Project::new("crs-host-empty");
     let mut app = project.app_with_form();
-    let shown = text(&render(&mut app, 100, 30));
-    let row = shown.lines().find(|l| l.contains("SSH host")).unwrap();
-    assert!(!row.contains("github.com-"), "{row}");
     press(&mut app, KeyCode::Enter);
     assert!(!text(&render(&mut app, 100, 30)).contains("over ssh host"));
 }

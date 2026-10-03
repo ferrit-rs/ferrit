@@ -73,6 +73,9 @@ impl Project {
         )
         .unwrap();
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        // Every creation pushes: a local bare repository is the default URL the
+        // fake gh gives `origin`, so no test reaches a network.
+        let _bare = project.bare_origin();
         project
     }
 
@@ -150,14 +153,18 @@ fn draft(target: &str) -> CreateDraft {
 }
 
 #[test]
-fn a_creation_is_busy_then_reports_the_url_and_refreshes() {
+fn a_creation_is_busy_then_reports_the_url_pushes_and_refreshes() {
     let project = Project::new("cr-ok");
     let mut app = project.app();
     let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx.clone());
 
     app.start_create_remote(draft("acme/tool"), tx);
     assert_eq!(app.remote_busy_label(), Some("Creating repository\u{2026}"));
     wait_for_created(&mut app, &rx);
+    // The push follows on its own: pushing is not a choice.
+    assert_eq!(app.remote_busy_label(), Some("Pushing\u{2026}"));
+    wait_for_push(&mut app, &rx);
 
     assert!(app.remote_busy_label().is_none());
     assert_eq!(
@@ -169,13 +176,6 @@ fn a_creation_is_busy_then_reports_the_url_and_refreshes() {
         "a success drops the draft"
     );
     assert_eq!(project.remotes(), "origin");
-    assert!(
-        app.status_lines().iter().any(|l| l
-            .to_string()
-            .contains("Created https://github.com/acme/tool")),
-        "{:?}",
-        app.status_lines()
-    );
     let calls = project.calls();
     assert_eq!(calls.len(), 1);
     assert!(
@@ -252,6 +252,7 @@ fn it_takes_the_slot_of_the_other_network_operations() {
     fs::write(project.dir.join("sleep"), "").unwrap();
     let mut app = project.app();
     let (tx, rx) = mpsc::channel();
+    app.set_event_sender(tx.clone());
     app.start_create_remote(draft("tool"), tx.clone());
     assert_eq!(app.remote_busy_label(), Some("Creating repository\u{2026}"));
 
@@ -263,6 +264,7 @@ fn it_takes_the_slot_of_the_other_network_operations() {
 
     // The one creation answers once, for the first target only.
     wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
     assert!(rx.try_recv().is_err(), "no second answer");
     let calls = project.calls();
     assert_eq!(calls.len(), 1, "{calls:?}");
@@ -290,9 +292,6 @@ enum Shown {
         name: String,
         description: String,
         visibility: Visibility,
-        push_after: bool,
-        initial_commit: Option<bool>,
-        ssh_host: String,
         focus: Field,
         error: Option<String>,
     },
@@ -316,9 +315,6 @@ fn shown(app: &mut App) -> Shown {
                 name: form.name.text(),
                 description: form.description.text(),
                 visibility: form.visibility,
-                push_after: form.push_after,
-                initial_commit: form.initial_commit,
-                ssh_host: form.ssh_host.text(),
                 focus: form.focus,
                 error: form.error.map(str::to_owned),
             },
@@ -366,28 +362,15 @@ fn the_check_runs_off_the_ui_thread_then_the_form_opens_on_the_folder_name() {
         name,
         description,
         visibility,
-        push_after,
-        initial_commit,
-        ssh_host,
         focus,
         error,
     } = shown(&mut app)
     else {
         panic!("a form")
     };
-    assert_eq!(
-        ssh_host, "",
-        "no alias in the (test) ssh config: nothing is preset"
-    );
-    assert_eq!(
-        initial_commit,
-        Some(true),
-        "a repository with no commit starts with the first commit ticked"
-    );
     assert_eq!(name, "work", "the folder's name");
     assert_eq!(description, "");
     assert_eq!(visibility, Visibility::Private, "private by default");
-    assert!(push_after);
     assert_eq!(focus, Field::Name);
     assert_eq!(error, None);
     assert_eq!(project.calls(), ["--version", "auth status"]);
@@ -451,7 +434,7 @@ fn a_repository_that_has_a_remote_gets_a_note_and_no_check() {
 }
 
 #[test]
-fn the_form_edits_its_fields_with_tab_arrows_and_space() {
+fn the_form_edits_its_three_fields_with_tab_arrows_and_space() {
     let project = Project::new("cr-keys");
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
@@ -462,30 +445,20 @@ fn the_form_edits_its_fields_with_tab_arrows_and_space() {
     press(&mut app, KeyCode::Char(' '));
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "A small tool");
-    // The SSH host, then the first commit (only there with no commit yet), then the push.
-    press(&mut app, KeyCode::Tab);
-    type_text(&mut app, "my-alias");
-    press(&mut app, KeyCode::Tab);
-    press(&mut app, KeyCode::Char(' '));
-    press(&mut app, KeyCode::Tab);
-    press(&mut app, KeyCode::Char(' '));
     assert_eq!(
         shown(&mut app),
         Shown::Form {
             name: "acme/tool".to_owned(),
             description: "A small tool".to_owned(),
             visibility: Visibility::Public,
-            push_after: false,
-            initial_commit: Some(false),
-            ssh_host: "my-alias".to_owned(),
-            focus: Field::Push,
+            focus: Field::Description,
             error: None,
         }
     );
-    // Shift-Tab goes back, and the arrows flip the visibility.
-    for _ in 0..4 {
-        press(&mut app, KeyCode::BackTab);
-    }
+    // Tab wraps round to the name; Shift-Tab goes back; the arrows flip the visibility.
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::BackTab);
+    press(&mut app, KeyCode::BackTab);
     press(&mut app, KeyCode::Right);
     let Shown::Form {
         visibility, focus, ..
@@ -539,7 +512,7 @@ fn the_last_question_names_what_will_happen_and_a_private_one_takes_enter() {
     assert_eq!(title, "Create tool");
     assert_eq!(visibility, Visibility::Private);
     assert_eq!(lines[0], "PRIVATE repository");
-    assert_eq!(lines[1], "first: commit an empty README.md");
+    assert_eq!(lines[1], "first: commit an empty README.md, made by Ferrit");
     assert!(
         lines[2].starts_with("then: add remote `origin`, push "),
         "{lines:?}"
@@ -851,56 +824,10 @@ fn a_ticked_form_pushes_the_branch_and_sets_its_upstream() {
 }
 
 #[test]
-fn an_unticked_form_creates_and_leaves_the_push_to_p() {
-    let project = Project::new("cr-nopush");
-    project.commit();
-    let bare = project.bare_origin();
-    let (mut app, rx) = ready_app(&project);
-    open_form(&mut app, &rx);
-    for _ in 0..4 {
-        press(&mut app, KeyCode::Tab);
-    }
-    press(&mut app, KeyCode::Char(' '));
-    press(&mut app, KeyCode::Enter);
-    press(&mut app, KeyCode::Enter);
-    wait_for_created(&mut app, &rx);
-
-    assert!(app.remote_busy_label().is_none(), "nothing is pushed");
-    assert_eq!(bare_refs(&bare), "");
-    assert_eq!(project.remotes(), "origin");
-    assert!(
-        status_text(&app).contains("origin is set; P pushes"),
-        "{}",
-        status_text(&app)
-    );
-}
-
-#[test]
-fn with_no_commit_or_a_detached_head_the_push_is_skipped_with_a_note() {
-    let project = Project::new("cr-skip-empty");
-    let bare = project.bare_origin();
-    let (mut app, rx) = ready_app(&project);
-    open_form(&mut app, &rx);
-    // The first commit is unticked here: nothing to push, and it says so.
-    for _ in 0..4 {
-        press(&mut app, KeyCode::Tab);
-    }
-    press(&mut app, KeyCode::Char(' '));
-    press(&mut app, KeyCode::Enter);
-    press(&mut app, KeyCode::Enter);
-    wait_for_created(&mut app, &rx);
-    assert!(app.remote_busy_label().is_none());
-    assert_eq!(bare_refs(&bare), "");
-    assert!(
-        status_text(&app).contains("No commits yet: commit first"),
-        "{}",
-        status_text(&app)
-    );
-
+fn with_a_detached_head_the_push_is_skipped_with_a_note() {
     let project = Project::new("cr-skip-detached");
     project.commit();
     project.git(&["checkout", "-q", "--detach"]);
-    let _bare = project.bare_origin();
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
     press(&mut app, KeyCode::Enter);
@@ -1043,7 +970,7 @@ fn the_first_commit_the_remote_and_the_push_happen_in_one_go() {
     let Shown::Confirm { lines, .. } = shown(&mut app) else {
         panic!("the question")
     };
-    assert_eq!(lines[1], "first: commit an empty README.md");
+    assert_eq!(lines[1], "first: commit an empty README.md, made by Ferrit");
     press(&mut app, KeyCode::Enter);
     wait_for_created(&mut app, &rx);
     wait_for_push(&mut app, &rx);
@@ -1074,36 +1001,21 @@ fn the_first_commit_the_remote_and_the_push_happen_in_one_go() {
 }
 
 #[test]
-fn with_a_commit_already_there_the_first_commit_is_not_offered_or_made() {
+fn with_a_commit_already_there_no_first_commit_is_announced_or_made() {
     let project = Project::new("cr-first-na");
     project.commit();
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
-    let Shown::Form { initial_commit, .. } = shown(&mut app) else {
-        panic!("a form")
-    };
-    assert_eq!(initial_commit, None, "no such row");
-
-    // Tab skips the missing row: name, visibility, description, host, push, back.
-    for expected in [
-        Field::Visibility,
-        Field::Description,
-        Field::Host,
-        Field::Push,
-        Field::Name,
-    ] {
-        press(&mut app, KeyCode::Tab);
-        let Shown::Form { focus, .. } = shown(&mut app) else {
-            panic!("a form")
-        };
-        assert_eq!(focus, expected);
-    }
     press(&mut app, KeyCode::Enter);
     let Shown::Confirm { lines, .. } = shown(&mut app) else {
         panic!("the question")
     };
     assert!(lines.iter().all(|l| !l.starts_with("first:")), "{lines:?}");
+    press(&mut app, KeyCode::Enter);
+    wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
     assert_eq!(project.commit_count(), "1");
+    assert!(!project.work.join("README.md").exists(), "no file is added");
 }
 
 #[test]
@@ -1118,12 +1030,7 @@ fn a_failing_first_commit_stops_everything_before_anything_is_created() {
     press(&mut app, KeyCode::Enter);
     wait_for_created(&mut app, &rx);
 
-    let Shown::Form {
-        error,
-        initial_commit,
-        ..
-    } = shown(&mut app)
-    else {
+    let Shown::Form { error, .. } = shown(&mut app) else {
         panic!("the form is back")
     };
     let error = error.unwrap();
@@ -1132,7 +1039,6 @@ fn a_failing_first_commit_stops_everything_before_anything_is_created() {
         "{error}"
     );
     assert!(error.contains("refused by the hook"), "{error}");
-    assert_eq!(initial_commit, Some(true), "still the first commit to make");
     assert_eq!(project.remotes(), "");
     assert_eq!(project.commit_count(), "0");
     assert!(
@@ -1153,24 +1059,16 @@ fn a_refused_creation_keeps_the_commit_and_a_retry_does_not_make_a_second() {
 
     assert_eq!(project.commit_count(), "1", "the local commit stays");
     assert_eq!(project.remotes(), "");
-    let Shown::Form {
-        initial_commit,
-        error,
-        ..
-    } = shown(&mut app)
-    else {
+    let Shown::Form { error, .. } = shown(&mut app) else {
         panic!("the form is back")
     };
-    assert_eq!(
-        initial_commit, None,
-        "the repository has a commit now: no such row"
-    );
     assert!(error.unwrap().contains("Name already exists"));
 
     fs::remove_file(project.dir.join("name-taken")).unwrap();
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Enter);
     wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
     assert_eq!(project.remotes(), "origin");
     assert_eq!(project.commit_count(), "1", "still one commit");
 }
@@ -1191,16 +1089,11 @@ impl Project {
 }
 
 #[test]
-fn the_form_starts_with_the_users_github_alias_from_their_ssh_config() {
+fn the_last_question_names_the_users_github_alias_from_their_ssh_config() {
     let project = Project::new("cr-host-default");
     let mut app = project.app();
     app.set_ssh_config_path(project.ssh_config(&["github.com-personal", "github.com-work"]));
     app.open_create_remote();
-    let Shown::Form { ssh_host, .. } = shown(&mut app) else {
-        panic!("a form")
-    };
-    assert_eq!(ssh_host, "github.com-personal", "the first alias");
-
     press(&mut app, KeyCode::Enter);
     let Shown::Confirm { lines, .. } = shown(&mut app) else {
         panic!("the question")
@@ -1209,24 +1102,8 @@ fn the_form_starts_with_the_users_github_alias_from_their_ssh_config() {
         lines
             .iter()
             .any(|l| l.contains("add remote `origin` over ssh host github.com-personal")),
-        "{lines:?}"
+        "the first alias: {lines:?}"
     );
-}
-
-#[test]
-fn a_bad_ssh_host_is_refused_on_the_form_with_the_reason() {
-    let project = Project::new("cr-host-bad");
-    let mut app = project.app();
-    app.open_create_remote();
-    for _ in 0..3 {
-        press(&mut app, KeyCode::Tab);
-    }
-    type_text(&mut app, "git@evil host");
-    press(&mut app, KeyCode::Enter);
-    let Shown::Form { error, .. } = shown(&mut app) else {
-        panic!("still the form")
-    };
-    assert!(error.unwrap().contains("is not allowed in an SSH host"));
 }
 
 #[test]
@@ -1262,35 +1139,40 @@ fn origin_is_rewritten_over_the_alias_and_the_push_reaches_it() {
 }
 
 #[test]
-fn with_no_ssh_host_origin_keeps_the_url_gh_wrote() {
+fn with_no_alias_in_the_ssh_config_origin_keeps_the_url_gh_wrote() {
     let project = Project::new("cr-host-none");
+    let bare = project.bare_origin();
     let mut app = project.app();
     let (tx, rx) = mpsc::channel();
-    let mut plain = draft("acme/tool");
-    plain.push_after = false;
-    app.start_create_remote(plain, tx);
+    app.set_event_sender(tx.clone());
+    app.start_create_remote(draft("acme/tool"), tx);
     wait_for_created(&mut app, &rx);
+    wait_for_push(&mut app, &rx);
     assert_eq!(
         project.remote_url().as_deref(),
-        Some("https://github.com/acme/tool.git")
+        Some(bare.to_str().unwrap())
     );
 }
 
 #[test]
-fn the_note_names_the_new_url_of_origin() {
-    let project = Project::new("cr-host-note");
+fn the_rewrite_of_origin_is_in_the_command_log() {
+    let project = Project::new("cr-host-log");
+    project.bare_origin_for_alias("my-alias", "acme/tool");
     let mut app = project.app();
+    app.set_ssh_config_path(project.ssh_config(&["my-alias"]));
     let (tx, rx) = mpsc::channel();
-    let mut aliased = draft("acme/tool");
-    aliased.push_after = false;
-    aliased.ssh_host = "my-alias".to_owned();
-    app.start_create_remote(aliased, tx);
+    app.set_event_sender(tx.clone());
+    app.start_create_remote(draft("acme/tool"), tx);
     wait_for_created(&mut app, &rx);
-    assert!(
-        status_text(&app).contains("origin is git@my-alias:acme/tool.git."),
-        "{}",
-        status_text(&app)
-    );
+    wait_for_push(&mut app, &rx);
+    let logged = ferrit::domain::git::command_log::recent(usize::MAX, true)
+        .iter()
+        .any(|r| {
+            r.argv
+                .ends_with("remote set-url -- origin git@my-alias:acme/tool.git")
+                && r.exit == Some(0)
+        });
+    assert!(logged, "git remote set-url is logged");
 }
 
 impl Project {

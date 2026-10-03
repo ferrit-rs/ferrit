@@ -21,18 +21,18 @@ key g
 expect-text "Create on GitHub"
 expect-text "(•) private"
 expect-text "( ) public"
-expect-text "after creating"
 snapshot form
 
-# The form presets the user's own ssh alias (from the ssh config the replay
-# installs), so the push reaches the key that alias names.
-expect-text "SSH host"
-expect-text "replay-alias"
+# Three choices only: the name, the visibility, the description. The first
+# commit, the push and the SSH host are not on the form.
+expect-no-text "SSH host"
+expect-no-text "after creating"
+expect-no-text "Initial commit"
 
 # The last question for a private repository: Enter creates, Esc goes back.
 key enter
 expect-text "PRIVATE repository"
-expect-text "add remote `origin`"
+expect-text "add remote `origin` over ssh host replay-alias"
 expect-text "Enter/y: create"
 key esc
 expect-text "Create on GitHub"

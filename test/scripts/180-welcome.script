@@ -57,11 +57,12 @@ exec config user.name "Ferrit Fixture"
 exec config user.email "fixture@example.com"
 key G
 expect-text "Create on GitHub"
-expect-text "Initial commit with an empty README.md"
+expect-no-text "Initial commit with"       # not a choice: it is always made
 key enter
-expect-text "first: commit an empty README.md"
+expect-text "first: commit an empty README.md, made by Ferrit"
 async-key y
 git log --format=%s => "Initial commit"
+git log -1 --format=%b -> "created by Ferrit"
 git ls-tree -r --name-only HEAD => "README.md"
 git cat-file -s HEAD:README.md => "0"
 git remote => "origin"

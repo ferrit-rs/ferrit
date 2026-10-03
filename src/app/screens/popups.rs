@@ -20,6 +20,7 @@ use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
+use crate::components::ui::text_input::TextInput;
 use crate::domain::git::host::Visibility;
 
 const CONFIRM_DIALOG_WIDTH_PERCENT: u16 = 70;
@@ -472,8 +473,37 @@ pub(super) fn draw_create_remote(
     }
 }
 
-/// Cells the field labels take.
-const LABEL_WIDTH: u16 = 13;
+/// A framed text field like the commit popup's: the title on the border, a
+/// character counter on the bottom border, and the text wrapped over the rows
+/// of the box, so what was typed is always in view.
+fn draw_text_box(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &str,
+    input: &TextInput,
+    focused: bool,
+    max: usize,
+    palette_style: (Style, Style),
+) {
+    let style = if focused {
+        palette_style.0
+    } else {
+        palette_style.1
+    };
+    let counter = Line::styled(format!(" {}/{max} ", input.text().chars().count()), style);
+    let block = Panel::new()
+        .title(Line::styled(format!(" {title} "), style))
+        .bottom_title(counter.right_aligned())
+        .border_style(style)
+        .block();
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    if focused {
+        input.render(frame, inner);
+    } else {
+        input.render_inactive(frame, inner);
+    }
+}
 
 fn draw_create_form(
     frame: &mut Frame<'_>,
@@ -484,93 +514,58 @@ fn draw_create_form(
 ) {
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(palette.idle);
-    // Name, visibility, description, SSH host, [first commit,] push, and a line
-    // for an error.
-    let row_count: u16 = if form.initial_commit.is_some() { 7 } else { 6 };
+    // The name (two rows: up to 100 characters), the visibility, the
+    // description (up to 350 characters wrap over its rows), an error line.
     let dialog = Dialog::new(Line::styled(" Create on GitHub ", focused))
-        .fit_content(64.min(area.width), row_count, 1)
+        .fit_content(70.min(area.width), 14, 1)
         .border_style(focused)
         .render(frame, area);
-    let rows =
-        Layout::vertical(vec![Constraint::Length(1); usize::from(row_count)]).split(dialog.body);
-    let label = |text: &str, field: Field| {
-        let style = if form.focus == field { focused } else { idle };
-        Paragraph::new(Line::styled(format!(" {text}"), style))
-    };
-    let split = |row: Rect| {
-        Layout::horizontal([Constraint::Length(LABEL_WIDTH), Constraint::Min(1)]).split(row)
-    };
+    let rows = Layout::vertical([
+        Constraint::Length(4),
+        Constraint::Length(1),
+        Constraint::Min(3),
+        Constraint::Length(1),
+    ])
+    .split(dialog.body);
     let at = |i: usize| rows.get(i).copied().unwrap_or_default();
 
-    let [name_label, name_input] = split_pair(&split(at(0)));
-    frame.render_widget(label("Name", Field::Name), name_label);
-    if form.focus == Field::Name {
-        form.name.render(frame, name_input);
-    } else {
-        form.name.render_inactive(frame, name_input);
-    }
-
-    let [vis_label, vis_value] = split_pair(&split(at(1)));
-    frame.render_widget(label("Visibility", Field::Visibility), vis_label);
-    let radio = |on: bool| if on { "(\u{2022})" } else { "( )" };
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![Span::raw(format!(
-            "{} private   {} public",
-            radio(form.visibility == Visibility::Private),
-            radio(form.visibility == Visibility::Public)
-        ))])),
-        vis_value,
+    draw_text_box(
+        frame,
+        at(0),
+        "Name",
+        form.name,
+        form.focus == Field::Name,
+        100,
+        (focused, idle),
     );
 
-    let [desc_label, desc_input] = split_pair(&split(at(2)));
-    frame.render_widget(label("Description", Field::Description), desc_label);
-    if form.focus == Field::Description {
-        form.description.render(frame, desc_input);
-    } else {
-        form.description.render_inactive(frame, desc_input);
-    }
-
-    let [host_label, host_input] = split_pair(&split(at(3)));
-    frame.render_widget(label("SSH host", Field::Host), host_label);
-    if form.focus == Field::Host {
-        form.ssh_host.render(frame, host_input);
-    } else {
-        form.ssh_host.render_inactive(frame, host_input);
-    }
-
-    let mut next = 4;
-    if let Some(ticked) = form.initial_commit {
-        let style = if form.focus == Field::Initial {
-            focused
-        } else {
-            idle
-        };
-        frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(" Initial commit with an empty README.md   ", style),
-                Span::raw(if ticked { "[x]" } else { "[ ]" }),
-            ])),
-            at(next),
-        );
-        next += 1;
-    }
-
-    let push_style = if form.focus == Field::Push {
+    let radio = |on: bool| if on { "(\u{2022})" } else { "( )" };
+    let label_style = if form.focus == Field::Visibility {
         focused
     } else {
         idle
     };
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!(" Push {} after creating   ", form.branch),
-                push_style,
-            ),
-            Span::raw(if form.push_after { "[x]" } else { "[ ]" }),
+            Span::styled(" Visibility   ", label_style),
+            Span::raw(format!(
+                "{} private   {} public",
+                radio(form.visibility == Visibility::Private),
+                radio(form.visibility == Visibility::Public)
+            )),
         ])),
-        at(next),
+        at(1),
     );
-    next += 1;
+
+    draw_text_box(
+        frame,
+        at(2),
+        "Description",
+        form.description,
+        form.focus == Field::Description,
+        350,
+        (focused, idle),
+    );
 
     if let Some(error) = form.error {
         frame.render_widget(
@@ -578,20 +573,13 @@ fn draw_create_form(
                 format!(" {error}"),
                 Style::new().fg(palette.del),
             )),
-            at(next),
+            at(3),
         );
     }
     frame.render_widget(
         Paragraph::new(KeyBar::hints("Next: Tab   Continue: Enter   Cancel: Esc", palette).line()),
         dialog.footer,
     );
-}
-
-fn split_pair(cells: &[Rect]) -> [Rect; 2] {
-    [
-        cells.first().copied().unwrap_or_default(),
-        cells.get(1).copied().unwrap_or_default(),
-    ]
 }
 
 fn draw_create_confirm(
