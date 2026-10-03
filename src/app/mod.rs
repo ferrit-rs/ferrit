@@ -476,6 +476,9 @@ pub(super) enum SelectionKey {
     Stash(String),
 }
 
+/// How often the run loop wakes while an error toast is up, to count its timeout.
+const TOAST_TICK_MS: u64 = 250;
+
 /// Panes in order. Index into this is also the index into `App::selection`.
 pub const PANES: [Pane; 5] = [
     Pane::Status,
@@ -704,6 +707,8 @@ pub struct App {
     /// Remote failure must outlive snapshot completion that was requested
     /// immediately after the remote command.
     remote_refresh_error: Option<String>,
+    /// The snapshot error the last toast was about, so a repeat is not toasted again.
+    refresh_failure: Option<String>,
     /// One selected-diff worker; only latest requested key waits behind it.
     diff_query: DiffQueryState,
     image_query: ImageQueryState,
@@ -860,6 +865,7 @@ impl App {
             event_sender: None,
             refresh_query: RefreshQueryState::default(),
             remote_refresh_error: None,
+            refresh_failure: None,
             diff_query: DiffQueryState::default(),
             image_query: ImageQueryState::default(),
         }
@@ -1142,8 +1148,17 @@ impl App {
                 self.stashes = snap.stashes;
                 self.operation = snap.operation;
                 self.last_error = None;
+                self.refresh_failure = None;
             },
-            Err(error) => self.report_error(AppError::Refresh(error)),
+            // A failure that keeps repeating (every poll, every file change)
+            // opens one toast, not a new one each time it is seen again.
+            Err(error) if self.refresh_failure.as_deref() == Some(error.as_str()) => {
+                self.last_error = Some(AppError::Refresh(error).to_string());
+            },
+            Err(error) => {
+                self.refresh_failure = Some(error.clone());
+                self.report_error(AppError::Refresh(error));
+            },
         }
 
         // A drilled branch log (Enter on Branches) stays live across a
@@ -1222,7 +1237,10 @@ impl App {
         if rerun {
             self.request_refresh();
         } else if let Some(error) = self.remote_refresh_error.take() {
-            self.report_error(AppError::Refresh(error));
+            // The refresh just replaced the Status line: put the failed
+            // operation's own message back. Its toast was shown when it failed;
+            // it is not shown again, and it is not a refresh failure.
+            self.last_error = Some(AppError::Background(error).to_string());
         }
         if self.last_error.is_none() {
             self.last_error = self.watch_error.clone();
@@ -2081,8 +2099,15 @@ impl App {
             let was_animating = self.author_overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
             let remote_animating = self.remote_busy.is_some();
+            // Frames while something animates; a slower tick while a toast is up,
+            // so it can time out without waiting for a key.
             let timeout = (was_animating || toast_animating || remote_animating)
-                .then_some(Duration::from_millis(16));
+                .then_some(Duration::from_millis(16))
+                .or_else(|| {
+                    self.toast
+                        .is_some()
+                        .then_some(Duration::from_millis(TOAST_TICK_MS))
+                });
             let batch = if let Some(timeout) = timeout {
                 match events.next_batch_timeout(timeout) {
                     Err(error) => return Err(error),
@@ -2145,6 +2170,28 @@ impl App {
         }
         self.dashboard.stop_and_join();
         Ok(())
+    }
+
+    /// Advance the toast's animation and its timeout by `elapsed`, as the run
+    /// loop does. Integration-test seam: a test has no loop to wait on.
+    #[doc(hidden)]
+    pub fn advance_clock(&mut self, elapsed: Duration) {
+        self.tick_toast(elapsed);
+    }
+
+    /// Close the error toast now (`Esc`), unless something else owns the key:
+    /// a popup, a question or the help. `true` when there was one to close.
+    pub(super) fn dismiss_toast(&mut self) -> bool {
+        if self.popup.is_some() || self.pending_confirm.is_some() || self.show_help {
+            return false;
+        }
+        match &mut self.toast {
+            Some(toast) if !toast.is_closing() => {
+                toast.dismiss();
+                true
+            },
+            _ => false,
+        }
     }
 
     fn tick_toast(&mut self, elapsed: Duration) {

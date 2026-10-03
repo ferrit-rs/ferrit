@@ -38,6 +38,11 @@ impl App {
             return;
         }
 
+        // `Esc` closes the error toast, when no popup or question needs the key.
+        if key.code == KeyCode::Esc && self.dismiss_toast() {
+            return;
+        }
+
         // A popup (commit message box, or a dismissible note) owns all
         // input while it is up, same idea as the help overlay below but
         // richer (`docs/PLAN_7_COMMIT.md`).
