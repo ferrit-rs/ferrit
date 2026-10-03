@@ -42,6 +42,29 @@ pub struct Config {
     pub keys: KeyOverrides,
 }
 
+/// A section of `config.toml` that can be saved on its own
+/// (`Config::save_sections`). `[keys]` is not one: remapping stays in the file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Section {
+    Theme,
+    Ui,
+    Diff,
+    Commit,
+    Log,
+}
+
+impl Section {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Theme => "theme",
+            Self::Ui => "ui",
+            Self::Diff => "diff",
+            Self::Commit => "commit",
+            Self::Log => "log",
+        }
+    }
+}
+
 /// `context name -> action name -> keys`, as written in the file. Names and
 /// key text are checked when the keymap is built, not here, so one typo is one
 /// reported entry and not a dropped section.
@@ -245,10 +268,29 @@ impl Config {
         issues
     }
 
-    /// Write `theme` into `path`'s `[theme]` section, leaving every other
-    /// section exactly as the file has it. Refuses to touch a file that is not
-    /// valid TOML: saving would destroy what the user wrote.
+    /// Save the `[theme]` section only.
+    ///
+    /// # Errors
+    /// The file is not valid TOML (it is not overwritten), or cannot be
+    /// read or written.
     pub fn save_theme(path: &Path, theme: &ThemeConfig) -> Result<(), String> {
+        let config = Self {
+            theme: theme.clone(),
+            ..Self::default()
+        };
+        Self::save_sections(path, &config, &[Section::Theme])
+    }
+
+    /// Save these sections of `config` into the file at `path`, and nothing else:
+    /// the file is read, only those sections are replaced, every other section
+    /// (known or not, `[keys]` included) is kept as it is, and the result is
+    /// written beside the target and renamed over it, so a crash cannot leave a
+    /// truncated file. Comments are not kept.
+    ///
+    /// # Errors
+    /// The file is not valid TOML (it is not overwritten), or cannot be read or
+    /// written.
+    pub fn save_sections(path: &Path, config: &Self, sections: &[Section]) -> Result<(), String> {
         let mut table = match fs::read_to_string(path) {
             Ok(text) => toml::from_str::<toml::Table>(&text).map_err(|e| {
                 format!(
@@ -259,8 +301,9 @@ impl Config {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => toml::Table::new(),
             Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
         };
-        let value = toml::Value::try_from(theme).map_err(|e| e.to_string())?;
-        table.insert("theme".to_owned(), value);
+        for section in sections {
+            table.insert(section.name().to_owned(), config.section_value(*section)?);
+        }
         let body = toml::to_string_pretty(&table).map_err(|e| e.to_string())?;
 
         if let Some(parent) = path.parent() {
@@ -271,6 +314,17 @@ impl Config {
         let staging = path.with_extension("toml.tmp");
         fs::write(&staging, format!("{FILE_HEADER}{body}")).map_err(|e| e.to_string())?;
         fs::rename(&staging, path).map_err(|e| e.to_string())
+    }
+
+    fn section_value(&self, section: Section) -> Result<toml::Value, String> {
+        let value = match section {
+            Section::Theme => toml::Value::try_from(&self.theme),
+            Section::Ui => toml::Value::try_from(&self.ui),
+            Section::Diff => toml::Value::try_from(&self.diff),
+            Section::Commit => toml::Value::try_from(&self.commit),
+            Section::Log => toml::Value::try_from(&self.log),
+        };
+        value.map_err(|e| e.to_string())
     }
 }
 

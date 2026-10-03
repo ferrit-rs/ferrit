@@ -715,3 +715,111 @@ fn the_readme_example_is_a_valid_configuration() {
     assert_eq!(config.theme.colors.len(), 1);
     assert!(config.keys.contains_key("global"));
 }
+
+// ------------------------------------------------ save_sections (phase 17)
+
+use ferrit::app::config::Section;
+
+#[test]
+fn several_sections_are_written_in_one_save_and_read_back() {
+    let dir = TempDir::new("config-sections");
+    let path = dir.path().join("config.toml");
+    let mut config = Config::default();
+    config.ui.mouse = false;
+    config.ui.wheel_step = 7;
+    config.ui.poll_secs = 30;
+    config.diff.context = 5;
+    config.diff.ignore_whitespace = true;
+    config.commit.sign_off = true;
+    config.log.show_reads = true;
+    config.theme.base = ferrit::app::theme_config::Base::Light;
+
+    Config::save_sections(
+        &path,
+        &config,
+        &[
+            Section::Theme,
+            Section::Ui,
+            Section::Diff,
+            Section::Commit,
+            Section::Log,
+        ],
+    )
+    .unwrap();
+
+    let load = Config::load_from(&path);
+    assert!(load.issues.is_empty(), "{:?}", load.issues);
+    assert_eq!(load.config, config);
+    assert!(
+        !path.with_extension("toml.tmp").exists(),
+        "no staging file left"
+    );
+}
+
+#[test]
+fn saving_one_section_leaves_the_other_known_sections_as_the_file_has_them() {
+    let dir = TempDir::new("config-sections-only");
+    let path = dir.path().join("config.toml");
+    fs::write(
+        &path,
+        "[ui]\nmouse = false\nwheel_step = 9\n\n[diff]\ncontext = 12\n",
+    )
+    .unwrap();
+
+    let mut config = Config::load_from(&path).config;
+    config.log.show_reads = true;
+    // The live config changed `diff` and `ui` too, but only the log is saved.
+    config.diff.context = 99;
+    config.ui.wheel_step = 1;
+    Config::save_sections(&path, &config, &[Section::Log]).unwrap();
+
+    let reread = Config::load_from(&path).config;
+    assert!(reread.log.show_reads);
+    assert_eq!(reread.diff.context, 12, "diff was not in the save");
+    assert_eq!(reread.ui.wheel_step, 9, "ui was not in the save");
+    assert!(!reread.ui.mouse);
+}
+
+#[test]
+fn saving_sections_keeps_keys_and_unknown_sections() {
+    let dir = TempDir::new("config-sections-keep");
+    let path = dir.path().join("config.toml");
+    fs::write(
+        &path,
+        "[keys.global]\nquit = \"x\"\n\n[from_the_future]\nanswer = 42\n",
+    )
+    .unwrap();
+
+    let mut config = Config::default();
+    config.ui.wheel_step = 4;
+    Config::save_sections(&path, &config, &[Section::Ui]).unwrap();
+
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("quit = \"x\""), "{text}");
+    assert!(text.contains("answer = 42"), "{text}");
+    assert!(text.contains("wheel_step = 4"), "{text}");
+}
+
+#[test]
+fn saving_sections_refuses_a_file_that_is_not_toml_and_leaves_it_alone() {
+    let dir = TempDir::new("config-sections-broken");
+    let path = dir.path().join("config.toml");
+    let original = "this is [not toml\n";
+    fs::write(&path, original).unwrap();
+
+    let error = Config::save_sections(&path, &Config::default(), &[Section::Ui]).unwrap_err();
+    assert!(error.contains("not overwritten"), "{error}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
+fn saving_sections_with_none_writes_the_header_and_nothing_to_lose() {
+    let dir = TempDir::new("config-sections-none");
+    let path = dir.path().join("config.toml");
+    fs::write(&path, "[ui]\nmouse = false\n").unwrap();
+    Config::save_sections(&path, &Config::default(), &[]).unwrap();
+    assert!(
+        !Config::load_from(&path).config.ui.mouse,
+        "nothing replaced"
+    );
+}

@@ -1,6 +1,6 @@
 # Plan: phase 17, the settings sheet
 
-**Status: planned.** Nothing here exists yet. lazygit has no settings screen
+**Status: in progress (U0 done: `Config::save_sections`; the sheet itself is not changed yet).** lazygit has no settings screen
 (its config is a YAML file), so this phase is not compared with it; it is checked
 with the replay harness and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -181,7 +181,7 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
 
 ## Milestones
 
-- **U0** `Config::save_sections`, tests.
+- **U0** ✅ `Config::save_sections` and `Section`, tests (`tests/config.rs`).
 - **U1** `settings.rs` state, rows, keys, autosave and the live effects that need no
   loop (diff, wheel, sign-off, log), tests through the `App`.
 - **U2** `screens/settings.rs` and the routing: the click on the author's name opens
