@@ -302,7 +302,7 @@ fn app_open_with_reports_config_problems_once_in_the_status_pane() {
 }
 
 #[test]
-fn saving_from_the_drawer_writes_the_theme_and_only_the_theme() {
+fn changing_the_accent_in_the_sheet_writes_the_theme_and_keeps_the_rest() {
     let dir = TempDir::new("config-app-save");
     let repo = Repository::init(dir.path()).unwrap();
     configure_identity(dir.path());
@@ -312,7 +312,8 @@ fn saving_from_the_drawer_writes_the_theme_and_only_the_theme() {
     fs::write(&file, "[from_the_future]\nanswer = 42\n").unwrap();
 
     let mut app = App::open_with(dir.path(), Config::load_from(&file)).unwrap();
-    // Open the profile drawer by clicking its label, then next preset, save.
+    // Open the settings sheet by clicking the author's name, then the next
+    // accent preset: it is saved at once, with no save key.
     app.set_author_click_area(Rect::new(0, 0, 10, 1));
     app.feed_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
@@ -320,8 +321,8 @@ fn saving_from_the_drawer_writes_the_theme_and_only_the_theme() {
         row: 0,
         modifiers: KeyModifiers::NONE,
     });
-    app.feed_key(KeyEvent::from(KeyCode::Char('t')));
-    app.feed_key(KeyEvent::from(KeyCode::Char('s')));
+    app.feed_key(KeyEvent::from(KeyCode::Down));
+    app.feed_key(KeyEvent::from(KeyCode::Right));
 
     let text = fs::read_to_string(&file).unwrap();
     assert!(text.contains("preset = \"blue\""), "{text}");
