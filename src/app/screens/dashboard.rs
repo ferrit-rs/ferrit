@@ -38,6 +38,25 @@ const GUTTER: u16 = 4;
 /// Columns between the border and the content.
 const PAD: u16 = 2;
 
+/// Whether the page draws its own rounded border and its "Dashboard" title.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Chrome {
+    /// A page of its own: the border and the title.
+    Framed,
+    /// Inside a frame that already has them (the dashboard sheet).
+    Bare,
+}
+
+impl Chrome {
+    /// The rows a border takes at the top, and again at the bottom.
+    const fn rim(self) -> u16 {
+        match self {
+            Self::Framed => 1,
+            Self::Bare => 0,
+        }
+    }
+}
+
 /// What the screen draws, all of it given: nothing here reads the clock or the app.
 #[derive(Debug)]
 pub struct View<'a> {
@@ -56,6 +75,9 @@ pub struct View<'a> {
     pub churn_pending: bool,
     pub error: Option<&'a str>,
     pub scroll: usize,
+    /// Draw the page's own rounded border and its "Dashboard" title. A sheet has
+    /// its own frame and title, so it asks for none (`screens/dashboard_sheet.rs`).
+    pub chrome: Chrome,
     /// Unix seconds: the end of the series and the base of relative times.
     pub now: i64,
 }
@@ -252,7 +274,14 @@ fn header(view: &View<'_>, area: Rect, buf: &mut Buffer) {
         ),
         Span::styled(" · ", dim),
         Span::raw(view.branch.to_owned()),
-        Span::styled("   Dashboard", dim),
+        Span::styled(
+            if view.chrome == Chrome::Framed {
+                "   Dashboard"
+            } else {
+                ""
+            },
+            dim,
+        ),
     ]))
     .render(area, buf);
     if let Some(stats) = view.stats {
@@ -275,13 +304,21 @@ fn compact(view: &View<'_>, width: u16, height: u16) -> Buffer {
             None => "computing…".to_owned(),
         })],
     };
-    let page = 3 + u16::try_from(lines.len()).unwrap_or(u16::MAX);
+    // The rows the border takes, top and bottom; the header is one more.
+    let rim = view.chrome.rim();
+    let chrome = 1 + 2 * rim;
+    let page = chrome + u16::try_from(lines.len()).unwrap_or(u16::MAX);
     let area = Rect::new(0, 0, width, page.max(u16::from(height > 0)));
     let mut buf = Buffer::empty(area);
-    frame_block(view).render(area, &mut buf);
+    if view.chrome == Chrome::Framed {
+        frame_block(view).render(area, &mut buf);
+    }
     let inner_w = width.saturating_sub(2 * PAD);
-    header(view, Rect::new(PAD, 1, inner_w, 1), &mut buf);
-    Paragraph::new(lines).render(Rect::new(PAD, 2, inner_w, page.saturating_sub(3)), &mut buf);
+    header(view, Rect::new(PAD, rim, inner_w, 1), &mut buf);
+    Paragraph::new(lines).render(
+        Rect::new(PAD, rim + 1, inner_w, page.saturating_sub(chrome)),
+        &mut buf,
+    );
     buf
 }
 
@@ -320,6 +357,8 @@ fn compose(view: &View<'_>, width: u16, height: u16) -> Buffer {
         return compact(view, width, height);
     }
     let ctx = view.stats.map(|stats| Ctx { stats, view });
+    // The rows the border takes, top and bottom (none when the page is not framed).
+    let rim = view.chrome.rim();
     let inner_w = width.saturating_sub(2 * PAD);
     let wide = width >= WIDE;
     let col_w = if wide {
@@ -341,18 +380,20 @@ fn compose(view: &View<'_>, width: u16, height: u16) -> Buffer {
             // Borders, header, body, a title, a rule and a blank per band, and
             // the progress line come off the height; the bands share the rest.
             let n = if wide { 3 } else { 6 };
-            let chrome = 3 + body_rows + 3 * n + progress_rows;
+            let chrome = 1 + 2 * rim + body_rows + 3 * n + progress_rows;
             bands(ctx, wide, col_w, height.saturating_sub(chrome))
         },
         _ => Vec::new(),
     };
     let band_rows: u16 = bands.iter().map(|b| b.rows + 3).sum();
-    let page = 3 + body_rows + band_rows + progress_rows;
+    let page = 1 + 2 * rim + body_rows + band_rows + progress_rows;
     let area = Rect::new(0, 0, width, page.max(u16::from(height > 0)));
     let mut buf = Buffer::empty(area);
-    frame_block(view).render(area, &mut buf);
-    header(view, Rect::new(PAD, 1, inner_w, 1), &mut buf);
-    let mut y = 2;
+    if view.chrome == Chrome::Framed {
+        frame_block(view).render(area, &mut buf);
+    }
+    header(view, Rect::new(PAD, rim, inner_w, 1), &mut buf);
+    let mut y = rim + 1;
     for line in body {
         Paragraph::new(line).render(Rect::new(PAD, y, inner_w, 1), &mut buf);
         y += 1;

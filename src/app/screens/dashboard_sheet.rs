@@ -7,6 +7,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;
 
+use super::dashboard::Chrome;
 use super::{charts_mode_from_env, dashboard, unix_now};
 use crate::app::App;
 use crate::components::ui::chart_palette::ChartPalette;
@@ -42,6 +43,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         churn_pending: app.dashboard().churn_pending(),
         error: app.dashboard().error(),
         scroll: app.dashboard().scroll(),
+        chrome: Chrome::Bare,
         now: unix_now(),
     };
     let max_scroll = dashboard::draw(frame, inner, &view);

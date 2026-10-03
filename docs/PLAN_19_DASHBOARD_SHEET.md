@@ -163,11 +163,14 @@ Dark and Light at 200 columns, and Dark at 120, read by eye.
 - Both themes read well on the page: the line chart, the ring, the heat map (the dark
   and the light greens), the contributor bars, the hot files and the branch table. The
   panes behind are visibly dimmed in both.
-- **Left as it is** (cosmetic, not changed): the page still draws its own rounded border
-  inside the drawer's, and its header repeats the drawer's title ("Dashboard"), so there
-  are two nested frames. Removing the page's frame in the sheet means changing the
-  page's layout constants (the `PAD`, the chrome row count), which is a change of the
-  page and not of the sheet.
+- **The double frame, then fixed** (asked for by the user after S3): the page drew its
+  own rounded border inside the drawer's, and its header repeated the drawer's title.
+  `View` gets `framed`: the sheet passes `false`, and the page then draws no border, no
+  "Dashboard" in its header, and starts on its header row (the border's two rows come
+  off its height, `rim`). The full-screen `draw` of the page keeps `framed: true` for
+  the frame tests that build a `View` themselves. Screenshot after: one frame, the
+  drawer's, with its title, and the page's header (`ferrit · main`, `window: 90 days
+  (t)`) right under it.
 - A screenshot taken after the window had been idle for a few seconds came out blank
   twice (the app was fine: `tmux capture-pane` showed the dashboard); taking it again
   gave the right frame. A property of the capture, noted in `__SOP/visual-verify.md`.

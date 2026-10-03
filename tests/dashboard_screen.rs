@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
-use ferrit::app::screens::dashboard::{self, View};
+use ferrit::app::screens::dashboard::{self, Chrome, View};
 use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::chart_palette::{ChartMode, ChartPalette};
 use ferrit::components::ui::palette::Palette;
@@ -195,6 +195,7 @@ fn view(stats: Option<&RepoStats>) -> View<'_> {
         churn_pending: false,
         error: None,
         scroll: 0,
+        chrome: Chrome::Framed,
         now: NOW,
     }
 }
@@ -1419,4 +1420,37 @@ fn show_app_frames() {
     for (w, h) in [(100, 50), (200, 50)] {
         println!("--- through App {w}x{h}\n{}", app_frame(&mut app, w, h));
     }
+}
+
+#[test]
+fn an_unframed_page_has_no_border_and_no_dashboard_title_and_starts_on_the_header() {
+    let stats = stats();
+    let framed = view(Some(&stats));
+    let mut unframed = view(Some(&stats));
+    unframed.chrome = Chrome::Bare;
+
+    let with = buffer(&framed, 120, 60);
+    let without = buffer(&unframed, 120, 60);
+    let (with, without) = (text(&with), text(&without));
+    assert!(with.contains('╭') && with.contains("Dashboard"), "{with}");
+    assert!(
+        !without.contains('╭') && !without.contains('╰'),
+        "{without}"
+    );
+    assert!(
+        !without.contains("Dashboard"),
+        "the sheet's own title says it\n{without}"
+    );
+    assert!(without.contains("· main"), "the header is still there");
+    // The first line is the header, not a blank row.
+    assert!(without.lines().next().unwrap().contains("· main"));
+}
+
+#[test]
+fn an_unframed_compact_page_is_unframed_too() {
+    let stats = stats();
+    let mut v = view(Some(&stats));
+    v.chrome = Chrome::Bare;
+    let out = render(&v, 40, 12);
+    assert!(!out.contains('╭') && out.contains("· main"), "{out}");
 }

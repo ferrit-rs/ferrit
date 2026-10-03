@@ -268,3 +268,32 @@ fn small_terminals_do_not_panic_with_the_dashboard_up() {
         settle(&mut app, w, h);
     }
 }
+
+#[test]
+fn the_sheet_has_one_frame_and_one_title_not_a_frame_inside_a_frame() {
+    let repo = Repo::new("dsheet-oneframe");
+    let mut app = repo.app("");
+    app.open_dashboard();
+    let text = settle(&mut app, 140, 40);
+    // The drawer is 112 cells wide at the right: columns 28 and on.
+    let drawer: Vec<String> = text.lines().map(|l| l.chars().skip(28).collect()).collect();
+    let corners = drawer.iter().map(|l| l.matches('╭').count()).sum::<usize>();
+    assert_eq!(
+        corners, 1,
+        "the drawer's own top-left corner and no other\n{text}"
+    );
+    let titles = drawer
+        .iter()
+        .map(|l| l.matches("Dashboard").count())
+        .sum::<usize>();
+    assert_eq!(
+        titles, 1,
+        "the drawer's title, not repeated by the page\n{text}"
+    );
+    assert!(
+        drawer
+            .iter()
+            .any(|l| l.contains("· main") || l.contains("· ")),
+        "the page's header is there"
+    );
+}
