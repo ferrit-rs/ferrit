@@ -429,3 +429,39 @@ fn dimmed_text_is_still_faintly_readable_in_both_themes() {
         );
     }
 }
+
+#[test]
+fn text_on_a_named_fill_stays_readable_whatever_colour_it_was_given() {
+    use ratatui::style::Style;
+    for (label, scheme) in [("dark", Scheme::DARK), ("light", Scheme::LIGHT)] {
+        for fg in [
+            Color::Reset,
+            Color::Yellow,
+            Color::Green,
+            Color::Red,
+            Color::Gray,
+            Color::Rgb(0, 0, 0),
+        ] {
+            let mut buf = Buffer::empty(Rect::new(0, 0, 1, 1));
+            buf.set_string(0, 0, "x", Style::new().fg(fg).bg(Color::Blue));
+            scheme.paint(&mut buf, ColorDepth::TrueColor);
+            let cell = &buf[(0, 0)];
+            let ratio = contrast(cell.fg, cell.bg).unwrap();
+            assert!(
+                ratio >= 3.0,
+                "{label}: {fg:?} on the selection bar reads {ratio:.2}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_dim_layer_keeps_its_own_dim_text_it_is_not_made_readable() {
+    use ratatui::style::Style;
+    let scheme = Scheme::LIGHT;
+    let mut buf = Buffer::empty(Rect::new(0, 0, 1, 1));
+    buf.set_string(0, 0, "x", Style::new().fg(Color::DarkGray).bg(Color::Black));
+    scheme.paint(&mut buf, ColorDepth::TrueColor);
+    assert_eq!(buf[(0, 0)].fg, scheme.foreground[8]);
+    assert_eq!(buf[(0, 0)].bg, scheme.fill[0]);
+}

@@ -94,9 +94,9 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
                 let mark = if on { "\u{25cf}" } else { "\u{25cb}" };
                 let style = Style::new().fg(preset.color());
                 let style = if on {
-                    style
+                    style.add_modifier(Modifier::BOLD)
                 } else {
-                    style.add_modifier(Modifier::DIM)
+                    style
                 };
                 line.clickable(
                     format!("{mark} {}", preset.name()),

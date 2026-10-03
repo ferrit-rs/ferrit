@@ -1,6 +1,6 @@
 # Plan: phase 18, painted themes (a real dark and a real light)
 
-**Status: in progress (P0, P1, P1b and P2 done: the paint pass, the Theme row and the 256-colour fallback; P3, the real-terminal check, is next).** Written after phase 17 (the settings sheet) shipped a "Theme:
+**Status: in progress (P0 to P3 done: the paint pass, the Theme row, the 256-colour fallback, and the check in a real terminal).** Written after phase 17 (the settings sheet) shipped a "Theme:
 Dark / Light" row that does not paint anything. lazygit has no such setting (it only
 sets foreground colours and leaves the terminal's background alone), so this phase is
 not compared with it; it is checked with buffer tests and screenshots
@@ -210,8 +210,33 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
   are gone, `draw_painted` is the output stage.
 - **P2** ✅ the 24-bit fallback (`COLORTERM`, `Indexed`) with its tests and the footer
   note; the contrast test and the table tuned to pass; the backdrop checked.
-- **P3** the screenshots in both terminals, the measured cost, anything the eye finds
+- **P3** ✅ the screenshots in both terminals, the measured cost, anything the eye finds
   that no test saw, then README, CHANGELOG and plans.
+
+## What P3 found (Terminal.app through tmux, 200x50, the `canonical` fixture)
+
+Checked by eye on screenshots of the panes, the commit popup and the settings sheet,
+in Dark and in Light, in a 256-colour terminal (Terminal.app sets no `COLORTERM`, so
+this is the fallback path). Not checked: a 24-bit terminal (iTerm2 is installed, but
+the screenshot harness drives Terminal.app only), so the `Rgb` path is proven by the
+buffer tests and not by eye.
+
+- Light on a dark Terminal.app is white everywhere ferrit draws: panes, diff with its
+  pastel tints, popups, the drawer, and the dimmed screen behind a popup (a pale grey,
+  not black). Dark is dark everywhere. Both read well after the 256-colour
+  approximation.
+- Found and fixed: text on a named fill (the selected row's blue bar) was dark on blue
+  in Light, unreadable. The pass now keeps any text on a named fill at a contrast of 3
+  or more, switching to white or the scheme's text colour when it would not be.
+- Found and fixed: the accent presets that are not chosen were drawn dim, which on a
+  white screen is nearly invisible; the chosen one is bold instead.
+- Not changed: the settings footer shows the whole config path, which a long path cuts
+  at the right edge; it is cosmetic and was already so.
+- Cost of the pass on a 200x60 frame (the clone of the buffer taken off): 24-bit
+  about 0.36 ms in a release build (2.5 ms debug); 256-colour about 0.46 ms release
+  (9.8 ms debug, where the nearest-colour search is slow). A frame is not drawn more
+  than a few times a second, so it does not matter in release; the debug figure is
+  what a `cargo run` build pays.
 
 ## Definition of done (phase 18)
 

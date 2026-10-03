@@ -159,17 +159,45 @@ impl Scheme {
             .unwrap_or(color)
     }
 
+    /// `fg` when it reads on `bg` (contrast 3 or more), else the better of white
+    /// and the scheme's text colour.
+    fn readable_on(&self, fg: Color, bg: Color) -> Color {
+        if contrast(fg, bg).is_some_and(|ratio| ratio >= 3.0) {
+            return fg;
+        }
+        let white = Color::Rgb(255, 255, 255);
+        let best = |c: Color| contrast(c, bg).unwrap_or(0.0);
+        if best(white) >= best(self.text) {
+            white
+        } else {
+            self.text
+        }
+    }
+
     /// Paint every cell of a drawn frame. Without 24-bit colour in the terminal
     /// (`ColorDepth::Indexed`) every `Rgb` the frame ends up with, the scheme's own and
     /// the widgets' (diff tints, syntax colours, the accent), becomes the nearest
     /// of the 256 colours, so the theme still reads as dark or light.
     pub fn paint(&self, buffer: &mut Buffer, depth: ColorDepth) {
+        // Neighbouring cells mostly share their colours: remember the last answer
+        // for the foreground and for the background instead of recomputing it.
+        let mut last_fg = Memo::default();
+        let mut last_bg = Memo::default();
         for cell in &mut buffer.content {
+            // A cell on a named fill (a selection bar) must stay readable whatever
+            // colour its text was given: yellow on the light theme's blue is not.
+            let on_fill = !matches!(
+                cell.bg,
+                Color::Reset | Color::Black | Color::Rgb(..) | Color::Indexed(_)
+            );
             cell.fg = self.paint_foreground(cell.fg);
             cell.bg = self.paint_background(cell.bg);
+            if on_fill {
+                cell.fg = self.readable_on(cell.fg, cell.bg);
+            }
             if depth == ColorDepth::Indexed {
-                cell.fg = approximate(cell.fg);
-                cell.bg = approximate(cell.bg);
+                cell.fg = last_fg.approximate(cell.fg);
+                cell.bg = last_bg.approximate(cell.bg);
             }
         }
     }
@@ -237,11 +265,24 @@ pub fn nearest_256(r: u8, g: u8, b: u8) -> u8 {
     }
 }
 
-/// `color` with an `Rgb` replaced by its nearest of the 256; anything else as is.
-fn approximate(color: Color) -> Color {
-    match color {
-        Color::Rgb(r, g, b) => Color::Indexed(nearest_256(r, g, b)),
-        other => other,
+/// The last `Rgb` turned into its nearest of the 256, and what it became.
+#[derive(Default)]
+struct Memo(Option<((u8, u8, u8), u8)>);
+
+impl Memo {
+    /// `color` with an `Rgb` replaced by its nearest of the 256; anything else as is.
+    fn approximate(&mut self, color: Color) -> Color {
+        let Color::Rgb(r, g, b) = color else {
+            return color;
+        };
+        match self.0 {
+            Some((rgb, index)) if rgb == (r, g, b) => Color::Indexed(index),
+            _ => {
+                let index = nearest_256(r, g, b);
+                self.0 = Some(((r, g, b), index));
+                Color::Indexed(index)
+            },
+        }
     }
 }
 
