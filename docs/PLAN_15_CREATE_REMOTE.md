@@ -29,7 +29,8 @@ there whenever the repository has no remote.
 │ Name        ferrit                    │      organisation; no separate owner.
 │ Visibility  ( ) public   (•) private  │
 │ Description                           │      `gh` missing or signed out: the
-│ Initial commit, empty README.md  [x]  │      popup says what to run instead
+│ SSH host    github.com-personal       │      popup says what to run instead
+│ Initial commit, empty README.md  [x]  │      (the SSH host is preset from ~/.ssh/config)
 │ Push main after creating   [x]        │      and the form never shows. The
 └ Tab: next   Enter: continue   Esc ────┘      commit row exists only with no commit.
         │ Enter
@@ -79,11 +80,23 @@ through `gh`'s own git call, bypassing ferrit's credential popup
 (`push_with_upstream`, `git push -u origin <branch>`), which already handles
 passphrases and SSH host aliases.
 
-**The URL is `gh`'s.** `gh` writes an `https://` or a `git@github.com:` URL
-according to its own setting. A user whose SSH setup needs another host in that
-URL (an alias such as `git@github.com-personal:`) unticks "Push after creating",
-runs `git remote set-url origin <url>` in a shell, and pushes with `P`. Editing
-the URL from ferrit is a later phase, not this one.
+**The URL carries the user's SSH host.** `gh` writes an `https://` or a
+`git@github.com:` URL according to its own setting. With several accounts on one
+machine, the key of the right one is declared for a host alias in
+`~/.ssh/config` (`Host github.com-personal`, `HostName github.com`,
+`IdentityFile ~/.ssh/github-personal`). A remote written with the plain
+`github.com` offers none of those keys: `ssh` finds no key to unlock and the push
+fails before any passphrase is asked, so ferrit's passphrase popup never shows,
+unlike for the user's other repositories whose `origin` uses the alias. The form
+therefore has an **SSH host** field, preset from the first GitHub alias of
+`~/.ssh/config` (read, never written; empty when there is none). After `gh`
+creates the repository, ferrit rewrites `origin` to
+`git@<host>:<owner>/<name>.git` (owner and name from the web URL `gh` printed)
+with `git remote set-url`, and only then pushes, through the same path as `P`, so
+the key is the one the alias names and the popup answers for it. An empty host
+keeps the URL `gh` wrote. If the rewrite fails, `origin` keeps `gh`'s URL, the
+note says so and how to fix it, and nothing is pushed. Editing the URL of an
+existing remote later is not part of this phase.
 
 ## Backend: `src/domain/git/host.rs`
 
@@ -227,7 +240,9 @@ conventions as the other popups and key-bar questions, but for the public case).
 | network drops during create | timeout or `gh` error; nothing configured locally (`gh` adds the remote only once it succeeds) |
 | created, push rejected or cancelled | the repository and the remote stay; a note gives the web URL and says `P` retries |
 | user cancels the credential popup | the push fails with git's message; same as any push |
-| the URL `gh` wrote is wrong for the user's SSH setup | untick "Push after creating", fix it with `git remote set-url` in a shell, then `P` |
+| the URL `gh` wrote does not reach the user's key (several accounts, a host alias) | the SSH host field, preset from the ssh config alias, rewrites `origin` before the push; empty keeps `gh`'s URL |
+| the SSH host has a character `ssh_config` would not hold | refused on the form with the reason, before anything runs |
+| `gh`'s web URL has no owner and name | `origin` keeps `gh`'s URL, a note says so, nothing is pushed |
 | folder name is not a valid repo name (spaces, unicode) | the default is a sanitised version, editable, validated before running |
 | running under the replay harness | the runner installs a fake `gh` for every session (`src/replay/fake_gh.rs`): the replay never runs a real one; tests of other features never reach the entry |
 
@@ -292,6 +307,6 @@ passes, and the README table marks the row ✅.
   initialisation, topics, homepage
 - listing the user's organisations (typed as `org/name`)
 - signing in to `gh` from ferrit
-- editing the remote URL from ferrit
+- editing the URL of an existing remote from ferrit (the creation sets it once, over the chosen SSH host)
 - starting ferrit in a folder that is not a repository (phase 16: a welcome
   screen offering `git init`, `PLAN_16_START_WITHOUT_REPO.md`)
