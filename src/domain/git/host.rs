@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use git2::Repository;
 
-use crate::domain::git::diff::workdir;
+use crate::domain::git::diff::{stderr, workdir};
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
 use crate::domain::git::remote::{REMOTE_TIMEOUT, combined_output, run_child};
@@ -109,6 +109,8 @@ pub enum HostError {
     OwnerChar(char),
     #[error("write `owner/name` or just the name, with one slash at most")]
     TooManySlashes,
+    #[error("'{0}' is not allowed in an SSH host: letters, digits, '.', '-' and '_'")]
+    SshHostChar(char),
     #[error("the description takes one line")]
     DescriptionLines,
     #[error("the description is longer than {DESCRIPTION_MAX} characters")]
@@ -168,6 +170,33 @@ pub fn parse_target(text: &str) -> Result<(Option<String>, String), HostError> {
     };
     check_name(name)?;
     Ok((owner, name.to_owned()))
+}
+
+/// An SSH host as `~/.ssh/config` names it (`github.com-personal`): letters,
+/// digits, `.`, `-` and `_`. Empty is accepted: it means "keep the URL `gh`
+/// wrote".
+pub fn validate_ssh_host(host: &str) -> Result<(), HostError> {
+    match host
+        .chars()
+        .find(|c| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')))
+    {
+        Some(bad) => Err(HostError::SshHostChar(bad)),
+        None => Ok(()),
+    }
+}
+
+/// `git@<host>:<owner>/<name>.git` for the repository `gh` printed the web URL
+/// of (`https://github.com/owner/name`), over the SSH host `host`. A remote
+/// written with a host alias reaches the key that alias names, which the plain
+/// `github.com` does not. `None` when the web URL has no owner and name.
+#[must_use]
+pub fn ssh_remote_url(host: &str, web_url: &str) -> Option<String> {
+    let after_scheme = web_url.split_once("://").map_or(web_url, |(_, rest)| rest);
+    let path = after_scheme.split_once('/')?.1;
+    let mut parts = path.split('/').filter(|part| !part.is_empty());
+    let owner = parts.next()?;
+    let name = parts.next()?.trim_end_matches(".git");
+    (!name.is_empty()).then(|| format!("git@{host}:{owner}/{name}.git"))
 }
 
 /// One line, at most 350 characters.
@@ -307,5 +336,22 @@ pub(super) fn create_repo(
         })
     } else {
         Err(GitError::HostFailed(combined_output(&out)))
+    }
+}
+
+/// `git remote set-url <name> <url>`. Git refuses a remote that does not exist
+/// and says so.
+pub(super) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitResult<()> {
+    let mut cmd = exec::git(workdir(repo)?);
+    cmd.args(["remote", "set-url", "--", name, url]);
+    let out =
+        exec::output(&mut cmd).map_err(|e| GitError::HostFailed(format!("cannot run git: {e}")))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(GitError::HostFailed(format!(
+            "cannot set the URL of {name}: {}",
+            stderr(&out)
+        )))
     }
 }

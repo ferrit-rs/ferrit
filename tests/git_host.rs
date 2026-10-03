@@ -21,7 +21,7 @@ use ferrit::domain::git::command_log::{CommandKind, recent};
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::host::{
     CreateRequest, GhProgram, GhStatus, HostError, Visibility, build_create_args, gh_status,
-    parse_target, sanitize_name, validate_description,
+    parse_target, sanitize_name, ssh_remote_url, validate_description, validate_ssh_host,
 };
 
 fn request(
@@ -532,4 +532,75 @@ fn the_create_call_is_logged_as_a_write_under_gh_s_name() {
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found.first().map(|r| r.kind), Some(CommandKind::Write));
     assert_eq!(found.first().and_then(|r| r.exit), Some(0));
+}
+
+#[test]
+fn an_ssh_host_is_a_name_ssh_config_could_hold() {
+    for ok in ["github.com-personal", "gh_work", "a.b-c_1", ""] {
+        assert!(validate_ssh_host(ok).is_ok(), "{ok:?}");
+    }
+    assert_eq!(
+        validate_ssh_host("my host"),
+        Err(HostError::SshHostChar(' '))
+    );
+    assert_eq!(validate_ssh_host("a@b"), Err(HostError::SshHostChar('@')));
+    assert_eq!(validate_ssh_host("a:b"), Err(HostError::SshHostChar(':')));
+    assert_eq!(validate_ssh_host("a/b"), Err(HostError::SshHostChar('/')));
+}
+
+#[test]
+fn the_ssh_url_comes_from_the_web_url_gh_printed_and_the_chosen_host() {
+    assert_eq!(
+        ssh_remote_url(
+            "github.com-personal",
+            "https://github.com/richardlavoura/new-project"
+        ),
+        Some("git@github.com-personal:richardlavoura/new-project.git".to_owned())
+    );
+    assert_eq!(
+        ssh_remote_url("alias", "https://github.com/acme/tool.git"),
+        Some("git@alias:acme/tool.git".to_owned()),
+        "a .git suffix is not doubled"
+    );
+    assert_eq!(
+        ssh_remote_url("alias", "https://github.com/acme/tool/"),
+        Some("git@alias:acme/tool.git".to_owned()),
+        "a trailing slash is ignored"
+    );
+    assert_eq!(
+        ssh_remote_url("alias", "https://github.com/onlyowner"),
+        None
+    );
+    assert_eq!(ssh_remote_url("alias", "not a url"), None);
+    assert_eq!(ssh_remote_url("alias", ""), None);
+}
+
+#[test]
+fn set_remote_url_rewrites_a_remote_and_a_missing_one_says_so() {
+    let project = Project::new("host-seturl");
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(&project.work)
+        .args(["remote", "add", "origin", "https://example.com/a.git"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let repo = project.repo();
+    repo.set_remote_url("origin", "git@alias:acme/tool.git")
+        .unwrap();
+    assert_eq!(
+        project.remote_url().as_deref(),
+        Some("git@alias:acme/tool.git")
+    );
+
+    let err = repo
+        .set_remote_url("nope", "git@alias:x/y.git")
+        .unwrap_err();
+    assert!(
+        matches!(&err, GitError::HostFailed(m) if m.contains("cannot set the URL of nope")),
+        "{err:?}"
+    );
+    // A URL that starts with a dash is a URL, not an option.
+    repo.set_remote_url("origin", "-oProxyCommand=x").unwrap();
+    assert_eq!(project.remote_url().as_deref(), Some("-oProxyCommand=x"));
 }

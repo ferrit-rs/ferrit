@@ -382,6 +382,11 @@ impl Repo {
         commit::commit(&self.inner, kind, message, opts)
     }
 
+    /// `git remote set-url <name> <url>`: where a remote points, rewritten.
+    pub fn set_remote_url(&self, name: &str, url: &str) -> GitResult<()> {
+        host::set_remote_url(&self.inner, name, url)
+    }
+
     /// Whether the current branch has a commit; a new repository has none.
     pub fn has_commits(&self) -> bool {
         commit::has_commits(&self.inner)
