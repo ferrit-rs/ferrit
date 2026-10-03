@@ -92,8 +92,8 @@ pub enum Base {
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum SchemeChoice {
-    /// No background of its own: the terminal's colours, `base` saying whether
-    /// the terminal is dark or light.
+    /// No background of its own: the terminal's colours. The palette (the diff
+    /// tints, the syntax theme) is the dark one; a light terminal picks Light.
     Terminal,
     /// A dark screen, painted, whatever the terminal is.
     Dark,
@@ -105,12 +105,11 @@ pub enum SchemeChoice {
 #[serde(default)]
 pub struct ThemeConfig {
     /// `"terminal"`, `"dark"` or `"light"`. Absent, it is taken from `base`
-    /// (`"dark"` or `"light"`, painted), so a file written before `terminal` came
-    /// back keeps its look. Dark and Light make `base` irrelevant.
+    /// (`"dark"` or `"light"`, painted), so a file written before `scheme` existed
+    /// keeps its look.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheme: Option<SchemeChoice>,
-    /// `"dark"` (default) or `"light"`: the terminal's own brightness for
-    /// `scheme = "terminal"`, and the theme when there is no `scheme`.
+    /// `"dark"` (default) or `"light"`: the theme when there is no `scheme`.
     pub base: Base,
     pub preset: Preset,
     /// Optional RGB override; TOML uses Ratatui's `#RRGGBB` serde format.
@@ -136,9 +135,9 @@ impl Default for ThemeConfig {
 impl ThemeConfig {
     /// The colours ferrit draws with under this theme.
     pub fn palette(&self) -> Palette {
-        let mut palette = match (self.effective_scheme(), self.base) {
-            (SchemeChoice::Dark, _) | (SchemeChoice::Terminal, Base::Dark) => Palette::DARK,
-            (SchemeChoice::Light, _) | (SchemeChoice::Terminal, Base::Light) => Palette::LIGHT,
+        let mut palette = match self.effective_scheme() {
+            SchemeChoice::Dark | SchemeChoice::Terminal => Palette::DARK,
+            SchemeChoice::Light => Palette::LIGHT,
         };
         for (name, &color) in &self.colors {
             if let Some(slot) = palette.color_mut(name) {

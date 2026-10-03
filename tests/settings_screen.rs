@@ -339,16 +339,16 @@ fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
             && text.contains("( ) Light"),
         "{text}"
     );
-    assert!(
-        !text.contains("Terminal is"),
-        "not under a painted theme: {text}"
-    );
+    assert!(!text.contains("Terminal is"), "no brightness row: {text}");
 
     let (x, y) = find(&mut app, "( ) Terminal");
     click(&mut app, x + 1, y);
     let text = shown(&mut app);
     assert!(text.contains("(\u{2022}) Terminal"), "{text}");
-    assert!(text.contains("Terminal is"), "now it shows: {text}");
+    assert!(
+        !text.contains("Terminal is"),
+        "still no brightness row: {text}"
+    );
     assert_eq!(
         Config::load_from(&fx.file()).config.theme.scheme,
         Some(ferrit::app::theme_config::SchemeChoice::Terminal)
@@ -358,7 +358,6 @@ fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
     click(&mut app, x + 1, y);
     let text = shown(&mut app);
     assert!(text.contains("(\u{2022}) Light"), "{text}");
-    assert!(!text.contains("Terminal is"), "gone again: {text}");
 }
 
 #[test]

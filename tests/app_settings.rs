@@ -15,7 +15,7 @@ use std::process::Command;
 use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
-use ferrit::app::theme_config::{Base, Preset, SchemeChoice};
+use ferrit::app::theme_config::{Preset, SchemeChoice};
 
 struct Fixture {
     dir: PathBuf,
@@ -81,7 +81,6 @@ fn every_row_has_a_label_a_group_and_a_kind() {
         [
             "Appearance",
             "Appearance",
-            "Appearance",
             "Interface",
             "Interface",
             "Diff",
@@ -129,34 +128,6 @@ fn the_theme_walks_dark_light_terminal_and_the_palette_follows() {
     press(&mut app, SettingsRow::Theme, false);
     assert!(!app.palette().light);
     assert_eq!(fx.saved().theme.scheme, Some(SchemeChoice::Dark));
-}
-
-#[test]
-fn terminal_is_shows_only_under_the_terminal_theme_and_sets_its_brightness() {
-    let fx = Fixture::new("set-terminal-base");
-    let mut app = fx.app();
-    assert!(
-        !app.visible_rows().contains(&SettingsRow::TerminalBase),
-        "not under a painted theme"
-    );
-    press(&mut app, SettingsRow::Theme, true);
-    press(&mut app, SettingsRow::Theme, true); // Light, then Terminal
-    assert!(app.visible_rows().contains(&SettingsRow::TerminalBase));
-    assert_eq!(app.choice_index(SettingsRow::TerminalBase), Some(0));
-    press(&mut app, SettingsRow::TerminalBase, true);
-    assert_eq!(app.choice_index(SettingsRow::TerminalBase), Some(1));
-    assert!(app.palette().light, "a light terminal's colours");
-    assert_eq!(fx.saved().theme.base, Base::Light);
-
-    press(&mut app, SettingsRow::Theme, true); // Terminal -> Dark
-    assert!(!app.visible_rows().contains(&SettingsRow::TerminalBase));
-    assert!(!app.palette().light, "Dark wins over the terminal's base");
-    press(&mut app, SettingsRow::Theme, false); // Dark -> Terminal
-    assert_eq!(
-        app.choice_index(SettingsRow::TerminalBase),
-        Some(1),
-        "the terminal's brightness was kept"
-    );
 }
 
 #[test]

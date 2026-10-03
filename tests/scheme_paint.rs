@@ -480,11 +480,14 @@ fn the_terminal_theme_paints_nothing_and_keeps_the_terminals_own_colours() {
 }
 
 #[test]
-fn terminal_follows_base_for_the_palette_and_a_painted_scheme_ignores_it() {
+fn terminal_uses_the_dark_palette_whatever_base_says_and_a_painted_scheme_ignores_base() {
     let (config, issues) = Config::parse("[theme]\nscheme = \"terminal\"\nbase = \"light\"\n");
     assert!(issues.is_empty(), "{issues:?}");
     assert_eq!(config.theme.effective_scheme(), SchemeChoice::Terminal);
-    assert!(config.theme.palette().light, "a light terminal's colours");
+    assert!(
+        !config.theme.palette().light,
+        "no brightness setting under Terminal: the dark palette"
+    );
     assert!(config.theme.scheme().is_none());
 
     let (config, _) = Config::parse("[theme]\nscheme = \"dark\"\nbase = \"light\"\n");

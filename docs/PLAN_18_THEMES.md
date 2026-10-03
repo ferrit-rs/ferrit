@@ -52,13 +52,14 @@ P1b, kept for what it explains. What changes against the first version of this p
   is taken from `base`**, painted (`base = "light"` is Light, nothing is Dark), because
   the files written between P1b and now have only `base`. A default config writes no
   `scheme`; the sheet writes one as soon as a theme is chosen.
-- `base` keeps its first meaning under `terminal` (the terminal's brightness: it picks
-  the diff tints and the syntax theme) and is the painted theme when there is no
-  `scheme`. A painted scheme makes it irrelevant.
+- `base` is the painted theme when there is no `scheme`, and nothing else: **there is
+  no "Terminal is" row** (the user: "we do not need a terminal dark or light, only
+  terminal, dark or light"). Under Terminal the palette is the dark one (the diff
+  tints and the syntax theme); a light terminal picks Light. A painted scheme makes
+  `base` irrelevant.
 - **The default is still Dark, painted**, not Terminal: Terminal is a choice, not the
   fallback.
-- The sheet: the Theme row is `Terminal / Dark / Light`; the `Terminal is` row (Dark or
-  Light) shows only under Terminal.
+- The sheet: the Theme row is `Terminal / Dark / Light`, and that is all.
 - `screens::draw_painted` paints only when the effective scheme is not Terminal.
 
 ## The two themes (as decided at P1b; Terminal came back after P3)
