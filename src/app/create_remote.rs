@@ -394,7 +394,9 @@ impl App {
                     .create_remote
                     .ssh_aliases()
                     .first()
-                    .map_or_else(String::new, |host| format!(" over ssh host {host}"));
+                    .map_or_else(String::new, |host| {
+                        format!(" using your SSH key for {host}")
+                    });
                 lines.push(format!(
                     "then: add remote `origin`{over}, push {}",
                     self.header.branch

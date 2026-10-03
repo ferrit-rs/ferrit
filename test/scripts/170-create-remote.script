@@ -32,7 +32,7 @@ expect-no-text "Initial commit"
 # The last question for a private repository: Enter creates, Esc goes back.
 key enter
 expect-text "PRIVATE repository"
-expect-text "add remote `origin` over ssh host replay-alias"
+expect-text "add remote `origin` using your SSH key for replay-alias"
 expect-text "Enter/y: create"
 key esc
 expect-text "Create on GitHub"

@@ -93,7 +93,7 @@ fails before any passphrase is asked, so ferrit's passphrase popup never shows,
 unlike for the user's other repositories whose `origin` uses the alias. So the
 user's alias is used **automatically**, with no field for it: the first GitHub
 alias of `~/.ssh/config` (read, never written; none when there is none), named on
-the last question (`over ssh host github.com-personal`). After `gh` creates the
+the last question (`using your SSH key for github.com-personal`). After `gh` creates the
 repository, ferrit rewrites `origin` to
 `git@<host>:<owner>/<name>.git` (owner and name from the web URL `gh` printed)
 with `git remote set-url`, and only then pushes, through the same path as `P`, so

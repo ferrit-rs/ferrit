@@ -298,11 +298,11 @@ fn the_last_question_names_the_users_ssh_alias_and_is_wide_enough_for_it() {
     press(&mut app, KeyCode::Enter);
     let shown = text(&render(&mut app, 100, 30));
     assert!(
-        shown.contains("over ssh host github.com-personal"),
+        shown.contains("using your SSH key for github.com-personal"),
         "{shown}"
     );
 
     let mut app = project.app_with_form();
     press(&mut app, KeyCode::Enter);
-    assert!(!text(&render(&mut app, 100, 30)).contains("over ssh host"));
+    assert!(!text(&render(&mut app, 100, 30)).contains("using your SSH key"));
 }

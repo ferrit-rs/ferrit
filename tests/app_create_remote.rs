@@ -1101,7 +1101,7 @@ fn the_last_question_names_the_users_github_alias_from_their_ssh_config() {
     assert!(
         lines
             .iter()
-            .any(|l| l.contains("add remote `origin` over ssh host github.com-personal")),
+            .any(|l| l.contains("add remote `origin` using your SSH key for github.com-personal")),
         "the first alias: {lines:?}"
     );
 }
