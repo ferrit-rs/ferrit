@@ -25,20 +25,23 @@ there whenever the repository has no remote.
 └───────────────────────────────────────┘      form opens on its answer)
         │ Enter
         ▼
-┌ Create on GitHub ─────────────────────┐      Name takes `org/name` for an
-│ Name        ferrit                    │      organisation; no separate owner.
-│ Visibility  ( ) public   (•) private  │
-│ Description                           │      `gh` missing or signed out: the
-│ SSH host    github.com-personal       │      popup says what to run instead
-│ Initial commit, empty README.md  [x]  │      (the SSH host is preset from ~/.ssh/config)
-│ Push main after creating   [x]        │      and the form never shows. The
-└ Tab: next   Enter: continue   Esc ────┘      commit row exists only with no commit.
+┌ Create on GitHub ─────────────────────┐      Three choices, nothing else: the
+│╭ Name ──────────────────────── 6/100 ╮│      name (`org/name` for an
+││ferrit                               ││      organisation), the visibility and
+│╰─────────────────────────────────────╯│      the description. The text boxes
+│ Visibility  ( ) public   (•) private  │      wrap over their rows like a commit
+│╭ Description ───────────────── 9/350 ╮│      body, with a counter, so what was
+││a Rust git UI                        ││      typed stays in view.
+││                                     ││
+│╰─────────────────────────────────────╯│      `gh` missing or signed out: the
+└ Tab: next   Enter: continue   Esc ────┘      popup says what to run instead.
         │ Enter
         ▼
 ┌ Create richard-lavoura/ferrit ────────┐      public: the word PUBLIC in the
 │ PRIVATE repository                    │      discard prompt's warning colour,
-│ first: commit an empty README.md      │      and only `y` confirms; Enter
-│ then: add remote `origin`, push main  │      cancels.
+│ first: commit README.md, by Ferrit    │      and only `y` confirms; Enter
+│ then: add remote `origin` over ssh    │      cancels. The last two lines are
+│   host github.com-personal, push main │      not choices.
 │ Enter/y: create        n/Esc: cancel  │
 └───────────────────────────────────────┘
         │ Enter/y        ← last way back: nothing exists yet
@@ -46,7 +49,7 @@ there whenever the repository has no remote.
  gh repo create <owner/name> --private --source <dir> --remote origin
    → the repository exists, `origin` is added
         ▼
- git push -u origin <branch>     (by ferrit, if the box is ticked)
+ git push -u origin <branch>     (by ferrit, always)
    → the passphrase popup shows if the SSH key needs one
 ```
 
@@ -87,14 +90,15 @@ machine, the key of the right one is declared for a host alias in
 `IdentityFile ~/.ssh/github-personal`). A remote written with the plain
 `github.com` offers none of those keys: `ssh` finds no key to unlock and the push
 fails before any passphrase is asked, so ferrit's passphrase popup never shows,
-unlike for the user's other repositories whose `origin` uses the alias. The form
-therefore has an **SSH host** field, preset from the first GitHub alias of
-`~/.ssh/config` (read, never written; empty when there is none). After `gh`
-creates the repository, ferrit rewrites `origin` to
+unlike for the user's other repositories whose `origin` uses the alias. So the
+user's alias is used **automatically**, with no field for it: the first GitHub
+alias of `~/.ssh/config` (read, never written; none when there is none), named on
+the last question (`over ssh host github.com-personal`). After `gh` creates the
+repository, ferrit rewrites `origin` to
 `git@<host>:<owner>/<name>.git` (owner and name from the web URL `gh` printed)
 with `git remote set-url`, and only then pushes, through the same path as `P`, so
-the key is the one the alias names and the popup answers for it. An empty host
-keeps the URL `gh` wrote. If the rewrite fails, `origin` keeps `gh`'s URL, the
+the key is the one the alias names and the popup answers for it. With no alias,
+`origin` keeps the URL `gh` wrote. If the rewrite fails, `origin` keeps `gh`'s URL, the
 note says so and how to fix it, and nothing is pushed. Editing the URL of an
 existing remote later is not part of this phase.
 
@@ -171,11 +175,11 @@ any process starts.
 - **Worker**: same thread-plus-event shape as `start_remote_op_with_options`,
   `run_worker(WorkerKind::RemoteOperation, …)`, so a panic still releases the
   slot.
-- On success, with the box ticked, the flow continues without a keypress:
+- On success the flow continues without a keypress, always:
   `push_with_upstream("origin", branch)`; the credential popup appears if the SSH
   key needs a passphrase (`PLAN_9_REMOTE.md`, "Credentials"). `RemoteDone` from the
-  push refreshes the panes as today. With the box unticked, a note says the
-  remote is `origin` and `P` pushes.
+  push refreshes the panes as today. A detached `HEAD` has nothing to push: a note
+  says so and `origin` stays set.
 
 ## Rendering
 
@@ -199,20 +203,22 @@ replaced by the status-pane indicator; nothing modal blocks the UI.
   rejected key), the repository exists and the remote is configured; ferrit says
   so, shows the web URL, and leaves `P` to retry. It never deletes a remote
   repository: that is irreversible, so it is not offered here at all.
-- No file is added to the repository, with one exception the user asks for: the
+- No file is added to the repository, with one exception that is not a choice: the
   **initial commit**. `gh`'s `--add-readme`, `--gitignore` and `--license` are never
   passed, and no `.gitignore` or licence is made. When the repository has **no
-  commit at all**, the form offers (ticked) a first commit holding an empty
+  commit at all**, ferrit always makes a first commit holding an empty
   `README.md` (an existing one is committed as it is, never overwritten), so a
-  new project can be published and pushed with nothing else to set up. Only that
-  file goes in: other files of the folder stay untracked, and anything the user
-  staged stays staged. A repository that already has a commit never gets the
-  row, and asking twice commits once. The commit is local and made **before**
-  anything is created: if it fails (a hook, no identity), nothing exists
-  anywhere and the form reopens with git's message. If the creation is then
-  refused, the commit stays and a retry does not make a second one. It is
-  `git commit`, so hooks, signing and the identity are the user's own, and the
-  author chosen in the profile drawer applies.
+  new project is published and pushed with nothing else to set up; the last
+  question announces it. The message is always the same, and says who made what:
+  `Initial commit`, then `This initial commit and the remote repository were
+  created by Ferrit.` Only that file goes in: other files of the folder stay
+  untracked, and anything the user staged stays staged. A repository that already
+  has a commit gets none, and asking twice commits once. The commit is local and
+  made **before** anything is created: if it fails (a hook, no identity), nothing
+  exists anywhere and the form reopens with git's message. If the creation is then
+  refused, the commit stays and a retry does not make a second one. It is `git
+  commit`, so hooks, signing and the identity are the user's own, and the author
+  chosen in the profile drawer applies.
 - Nothing about the user's account is stored: not the login, not the URL beyond
   the remote git already keeps.
 
@@ -235,13 +241,12 @@ conventions as the other popups and key-bar questions, but for the public case).
 | owner is an organisation the user cannot create in | `gh`'s permission message; nothing created; the form reopens |
 | the repository has a remote (any name) | the menu entry is hidden; if the action is reached anyway it says so and does not create |
 | detached HEAD | nothing to push: creation is offered, the push step is skipped with a note |
-| no commits yet | the form offers the first commit (ticked), which makes the push possible; unticked, creation still works and the push is skipped ("commit first") |
+| no commits yet | the first commit is made first, always (an empty `README.md`, the same message), so there is something to push |
 | the first commit fails (a `pre-commit` hook, no identity) | nothing is created; the form reopens on the name with git's message |
 | network drops during create | timeout or `gh` error; nothing configured locally (`gh` adds the remote only once it succeeds) |
 | created, push rejected or cancelled | the repository and the remote stay; a note gives the web URL and says `P` retries |
 | user cancels the credential popup | the push fails with git's message; same as any push |
-| the URL `gh` wrote does not reach the user's key (several accounts, a host alias) | the SSH host field, preset from the ssh config alias, rewrites `origin` before the push; empty keeps `gh`'s URL |
-| the SSH host has a character `ssh_config` would not hold | refused on the form with the reason, before anything runs |
+| the URL `gh` wrote does not reach the user's key (several accounts, a host alias) | `origin` is rewritten over the first GitHub alias of `~/.ssh/config` before the push; with no alias it keeps `gh`'s URL |
 | `gh`'s web URL has no owner and name | `origin` keeps `gh`'s URL, a note says so, nothing is pushed |
 | folder name is not a valid repo name (spaces, unicode) | the default is a sanitised version, editable, validated before running |
 | running under the replay harness | the runner installs a fake `gh` for every session (`src/replay/fake_gh.rs`): the replay never runs a real one; tests of other features never reach the entry |
@@ -307,6 +312,6 @@ passes, and the README table marks the row ✅.
   initialisation, topics, homepage
 - listing the user's organisations (typed as `org/name`)
 - signing in to `gh` from ferrit
-- editing the URL of an existing remote from ferrit (the creation sets it once, over the chosen SSH host)
+- editing the URL of an existing remote from ferrit (the creation sets it once, over the user's SSH alias)
 - starting ferrit in a folder that is not a repository (phase 16: a welcome
   screen offering `git init`, `PLAN_16_START_WITHOUT_REPO.md`)
