@@ -524,3 +524,26 @@ fn app_mock_ignores_fetch_pull_push_with_no_thread_spawned() {
     );
     assert!(app.upstream_value().is_none());
 }
+
+#[test]
+fn a_push_leaves_git_s_own_words_out_of_the_status_pane_but_a_fetch_keeps_its_line() {
+    let git_words = "la branche 'main' est paramétrée pour suivre 'origin/main'.\n\
+                     To github.com:me/new_test.git\n * [new branch]      main -> main";
+    let status = |app: &App| {
+        app.status_lines()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let mut app = App::mock();
+    app.on_remote_done(RemoteOp::Push, Ok(git_words.to_owned()));
+    let shown = status(&app);
+    assert!(!shown.contains("To github.com"), "{shown}");
+    assert!(!shown.contains("paramétrée"), "{shown}");
+    assert!(!shown.contains("[new branch]"), "{shown}");
+
+    app.on_remote_done(RemoteOp::Fetch, Ok("Fetched origin".to_owned()));
+    assert!(status(&app).contains("Fetched origin"), "{}", status(&app));
+}

@@ -205,7 +205,7 @@ impl App {
     /// changes). `pub`: `App::run`'s own match arm calls this, and so does
     /// a test that drove `start_remote_op` with its own channel and has no
     /// `run()` loop to receive the result for it.
-    pub fn on_remote_done(&mut self, _op: events::RemoteOp, message: Result<String, String>) {
+    pub fn on_remote_done(&mut self, op: events::RemoteOp, message: Result<String, String>) {
         self.remote_busy = None;
         self.remote_busy_started = None;
         if let Some(worker) = self.remote_worker.take() {
@@ -226,7 +226,11 @@ impl App {
             Ok(line) => {
                 self.remote_refresh_error = None;
                 self.last_error = None;
-                self.status_note = Some(line);
+                // git's own words after a push (`To github.com:…`, `branch 'main'
+                // set up to track …`) are noise in the Status pane: the line
+                // above already shows the branch in step, and the command log
+                // has the command. A fetch or a pull keeps its line.
+                self.status_note = (op != events::RemoteOp::Push).then_some(line);
             },
             Err(line) => {
                 self.remote_refresh_error = self.event_sender.as_ref().map(|_| line.clone());

@@ -15,6 +15,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Fixed
 
+- After a push, the Status pane no longer repeats git's own words under the branch line (`To github.com:…`, `branch 'main' set up to track 'origin/main'`, the `[new branch]` line). The branch line already shows it in step and the command log has the command. A fetch and a pull keep their line.
 - The red error toast in the bottom-right corner no longer stays up until you quit. It closes by itself after about 8 seconds, on `Esc` (when no popup, question or help owns the key), or on its `x`; the message stays in the Status pane. A long message is shown whole instead of being cut at two lines.
 - A failed fetch, pull or push is shown once. It used to raise a second toast, worded "repository refresh failed: ...", when the refresh that followed ended, so closing the first one brought another. A refresh that keeps failing (for instance a repository that disappeared) opens one toast, not a new one at every poll, and a new one only after a refresh has worked again.
 
