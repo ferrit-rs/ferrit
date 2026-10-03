@@ -13,6 +13,8 @@ pub enum Sheet {
     /// Ferrit's own settings, opened by a click on the author's name.
     #[default]
     Settings,
+    /// The repository dashboard, opened by `D` (`docs/PLAN_13_DASHBOARD.md`).
+    Dashboard,
 }
 
 impl App {
@@ -21,6 +23,7 @@ impl App {
         self.sheet = sheet;
         match sheet {
             Sheet::Settings => self.prepare_settings_sheet(),
+            Sheet::Dashboard => self.prepare_dashboard_sheet(),
         }
         self.sheet_overlay.open();
     }
@@ -28,6 +31,14 @@ impl App {
     /// Slide the drawer out.
     pub(super) fn close_sheet(&mut self) {
         self.sheet_overlay.close();
+    }
+
+    /// Whether the dashboard is up: sliding in or in, not on its way out.
+    #[must_use]
+    pub fn dashboard_is_open(&self) -> bool {
+        self.sheet == Sheet::Dashboard
+            && !self.sheet_overlay.is_closed()
+            && !self.sheet_overlay.is_closing()
     }
 
     /// Whether a sheet is on screen or sliding.

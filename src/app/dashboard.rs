@@ -14,9 +14,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 use super::keymap::{Action, Context, KeyBinding};
+use super::sheet::Sheet;
 use super::{
-    App, AppEvent, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, git,
-    run_worker,
+    App, AppEvent, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, git, run_worker,
 };
 use crate::domain::git::stats::{RepoStats, StatsOptions, Window};
 
@@ -170,9 +170,13 @@ impl App {
 
     /// `D`: show the dashboard over the panes, computing what is not cached.
     pub fn open_dashboard(&mut self) {
+        self.open_sheet(Sheet::Dashboard);
+    }
+
+    /// The sheet is about to open: at the top, no old error, statistics asked for.
+    pub(super) fn prepare_dashboard_sheet(&mut self) {
         self.dashboard.error = None;
         self.dashboard.scroll = 0;
-        self.full_screen = FullScreen::Dashboard;
         self.ensure_stats(false);
     }
 
@@ -184,7 +188,7 @@ impl App {
     /// Back to the panes. A running computation is told to stop; its result, if
     /// it still arrives, is kept only when it is good.
     pub fn close_dashboard(&mut self) {
-        self.full_screen = FullScreen::None;
+        self.close_sheet();
         self.dashboard.cancel_running();
     }
 
@@ -275,7 +279,7 @@ impl App {
                 self.dashboard.error = None;
             },
             Err(message) => {
-                if self.full_screen == FullScreen::Dashboard {
+                if self.dashboard_is_open() {
                     self.dashboard.error = Some(message);
                 }
             },
@@ -325,9 +329,19 @@ impl App {
         }
     }
 
-    /// Only the wheel does anything on the dashboard: three rows a notch.
+    /// The wheel scrolls three rows a notch; a left click outside the drawer closes
+    /// it (the panes behind are dimmed and not clickable).
     pub(super) fn dashboard_mouse(&mut self, ev: MouseEvent) {
+        let point = ratatui::layout::Position::new(ev.column, ev.row);
         match ev.kind {
+            MouseEventKind::Down(ratatui::crossterm::event::MouseButton::Left)
+                if !self
+                    .sheet_overlay
+                    .overlay_rect()
+                    .is_some_and(|rect| rect.contains(point)) =>
+            {
+                self.close_dashboard();
+            },
             MouseEventKind::ScrollUp => {
                 self.dashboard.scroll = self.dashboard.scroll.saturating_sub(WHEEL_ROWS);
             },

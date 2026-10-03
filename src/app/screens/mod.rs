@@ -16,7 +16,7 @@ use crate::app::hints::{self, Bar};
 use crate::app::sheet::Sheet;
 use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
 use crate::app::{mock, theme};
-use crate::components::ui::chart_palette::{ChartPalette, charts_mode_from_env};
+use crate::components::ui::chart_palette::charts_mode_from_env;
 use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::palette::Palette;
 use crate::components::ui::pane_list::PaneList;
@@ -26,6 +26,7 @@ use crate::domain::git::command_log;
 use crate::domain::image::preview::Preview;
 
 pub mod dashboard;
+mod dashboard_sheet;
 mod diff;
 pub mod git_config;
 mod popups;
@@ -50,7 +51,6 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     let show_help = app.show_help;
     let keybar = match app.full_screen() {
-        FullScreen::Dashboard => draw_dashboard(frame, app, area),
         FullScreen::GitConfig => draw_git_config(frame, app, area),
         FullScreen::Welcome => draw_welcome(frame, app, area),
         FullScreen::None => draw_panes(frame, app, area),
@@ -148,34 +148,16 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     } else {
         match app.sheet {
             Sheet::Settings => settings::draw(frame, area, app, &palette),
+            Sheet::Dashboard => {
+                // Above the key bar, which stays the dashboard's own.
+                let above = Rect {
+                    height: area.height.saturating_sub(keybar.height),
+                    ..area
+                };
+                dashboard_sheet::draw(frame, above, app);
+            },
         }
     }
-    keybar
-}
-
-/// The full-screen dashboard above its key bar; returns the key bar's area.
-/// The app's scroll is clamped to what the page can scroll.
-fn draw_dashboard(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
-    let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
-    let view = dashboard::View {
-        stats: app.dashboard().stats(),
-        repo: &app.repo_name,
-        branch: &app.header.branch,
-        colors: ChartPalette {
-            density: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
-            ..ChartPalette::for_palette(&app.palette())
-        },
-        mode: charts_mode_from_env(),
-        show_counts: app.dashboard().show_counts(),
-        computing: app.dashboard().computing(),
-        churn_pending: app.dashboard().churn_pending(),
-        error: app.dashboard().error(),
-        scroll: app.dashboard().scroll(),
-        now: unix_now(),
-    };
-    let max_scroll = dashboard::draw(frame, page, &view);
-    app.clamp_dashboard_scroll(max_scroll);
-    draw_keybar(frame, keybar, app);
     keybar
 }
 
@@ -803,7 +785,7 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
     let bar = if app.show_help {
         Bar::Help
-    } else if app.full_screen() == FullScreen::Dashboard {
+    } else if app.dashboard_is_open() {
         Bar::Dashboard
     } else if app.full_screen() == FullScreen::GitConfig {
         Bar::GitConfig

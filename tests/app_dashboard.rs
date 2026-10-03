@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::events::AppEvent;
-use ferrit::app::{App, FullScreen, Pane};
+use ferrit::app::{App, Pane};
 use ferrit::domain::git::stats::Window;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -111,11 +111,11 @@ fn drain(app: &mut App, rx: &mpsc::Receiver<AppEvent>) {
 fn without_an_event_loop_the_statistics_are_read_at_once() {
     let tmp = history("dash-sync");
     let mut app = App::open(tmp.path()).unwrap();
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
 
     app.open_dashboard();
 
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert!(app.dashboard_is_open());
     let dashboard = app.dashboard();
     let stats = dashboard.stats().expect("computed in the call");
     assert_eq!(stats.totals.commits, 3);
@@ -184,7 +184,7 @@ fn keys_stay_in_the_dashboard_and_q_or_esc_leave_it() {
         "j did not reach the panes"
     );
     app.feed_key(key('q'));
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
     assert!(
         !app.is_quitting(),
         "q closes the dashboard, it does not quit"
@@ -192,11 +192,11 @@ fn keys_stay_in_the_dashboard_and_q_or_esc_leave_it() {
 
     app.open_dashboard();
     app.feed_key(KeyEvent::from(KeyCode::Esc));
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
 
     app.open_dashboard();
     app.feed_key(key('D'));
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
 
     app.open_dashboard();
     app.feed_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
@@ -302,12 +302,12 @@ fn r_recomputes_even_when_the_cache_is_fresh() {
 fn the_mock_app_has_no_repository_and_no_statistics() {
     let mut app = App::mock();
     app.open_dashboard();
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert!(app.dashboard_is_open());
     assert!(app.dashboard().stats().is_none());
     assert!(!app.dashboard().computing());
     assert!(app.dashboard().error().is_none());
     app.close_dashboard();
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
 }
 
 #[test]
@@ -315,10 +315,10 @@ fn d_opens_the_dashboard_and_closes_it_again() {
     let tmp = history("dash-d");
     let mut app = App::open(tmp.path()).unwrap();
     app.feed_key(key('D'));
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert!(app.dashboard_is_open());
     assert_eq!(app.dashboard().stats().unwrap().totals.commits, 3);
     app.feed_key(key('D'));
-    assert_eq!(app.full_screen(), FullScreen::None);
+    assert!(!app.dashboard_is_open());
 }
 
 #[test]
@@ -334,15 +334,11 @@ fn the_key_that_opens_the_dashboard_can_be_rebound_and_still_closes_it() {
     let mut app = App::open_with(tmp.path(), load).unwrap();
 
     app.feed_key(key('D'));
-    assert_eq!(app.full_screen(), FullScreen::None, "D is no longer bound");
+    assert!(!app.dashboard_is_open(), "D is no longer bound");
     app.feed_key(key('B'));
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert!(app.dashboard_is_open());
     app.feed_key(key('B'));
-    assert_eq!(
-        app.full_screen(),
-        FullScreen::None,
-        "the rebound key closes it"
-    );
+    assert!(!app.dashboard_is_open(), "the rebound key closes it");
 }
 
 fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
@@ -364,12 +360,20 @@ fn a_click_reaches_no_pane_behind_the_dashboard_and_the_wheel_scrolls_it() {
         .draw(|f| ferrit::app::screens::draw(f, &mut app))
         .unwrap();
     app.open_dashboard();
+    // Let the drawer slide in, so it has an area a click can be inside of.
+    for _ in 0..30 {
+        app.advance_clock(Duration::from_millis(16));
+        terminal
+            .draw(|f| ferrit::app::screens::draw(f, &mut app))
+            .unwrap();
+    }
     let selected = app.selected(Pane::Commits);
 
+    // Inside the drawer (it spans the right nine tenths of 120 columns).
     for row in [3, 12, 20, 30] {
-        app.feed_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 4, row));
+        app.feed_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 60, row));
     }
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
+    assert!(app.dashboard_is_open());
     assert_eq!(
         app.selected(Pane::Commits),
         selected,

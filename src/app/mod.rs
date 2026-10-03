@@ -391,14 +391,13 @@ fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
     hasher.finish()
 }
 
-/// A view that takes the whole terminal in place of the five panes: the
-/// dashboard (`docs/PLAN_13_DASHBOARD.md`) and the git config editor
-/// (`docs/PLAN_14_GIT_CONFIG.md`).
+/// A view that takes the whole terminal in place of the five panes: the git
+/// config editor (`docs/PLAN_14_GIT_CONFIG.md`) and the welcome screen. (The
+/// dashboard was one until phase 19: it is a sheet now, `app::sheet`.)
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FullScreen {
     #[default]
     None,
-    Dashboard,
     GitConfig,
     /// No repository: ferrit started in a folder that is not one
     /// (`docs/PLAN_16_START_WITHOUT_REPO.md`).

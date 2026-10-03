@@ -146,6 +146,11 @@ impl OverlayState {
         self.phase == Phase::Open
     }
 
+    /// Sliding out: it was open and is on its way to closed.
+    pub fn is_closing(&self) -> bool {
+        self.phase == Phase::Closing
+    }
+
     pub fn is_closed(&self) -> bool {
         self.phase == Phase::Closed
     }

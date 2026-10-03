@@ -20,7 +20,7 @@ use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
 use ferrit::app::screens::dashboard::{self, View};
-use ferrit::app::{App, FullScreen, screens as ui};
+use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::chart_palette::{ChartMode, ChartPalette};
 use ferrit::components::ui::palette::Palette;
 use ferrit::domain::git::Repo;
@@ -1168,9 +1168,13 @@ fn busy() -> TempDir {
     tmp
 }
 
+/// The frame after the drawer has finished sliding in (or out).
 fn app_frame(app: &mut App, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-    terminal.draw(|f| ui::draw(f, app)).unwrap();
+    for _ in 0..30 {
+        app.advance_clock(std::time::Duration::from_millis(16));
+        terminal.draw(|f| ui::draw(f, app)).unwrap();
+    }
     terminal.backend().to_string()
 }
 
@@ -1179,14 +1183,14 @@ fn key(app: &mut App, c: char) {
 }
 
 #[test]
-fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
+fn the_dashboard_is_a_sheet_over_the_dimmed_panes_and_has_its_own_key_bar() {
     let tmp = busy();
     let mut app = App::open(tmp.path()).unwrap();
-    let panes = app_frame(&mut app, 120, 40);
+    let panes = app_frame(&mut app, 130, 50);
     assert!(panes.contains("Stash") && !panes.contains("Dashboard"));
     app.open_dashboard();
-    assert_eq!(app.full_screen(), FullScreen::Dashboard);
-    let out = app_frame(&mut app, 120, 40);
+    assert!(app.dashboard_is_open());
+    let out = app_frame(&mut app, 130, 50);
     println!("{out}");
     for want in [
         "Dashboard",
@@ -1199,7 +1203,10 @@ fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
     ] {
         assert!(out.contains(want), "{want:?} missing in\n{out}");
     }
-    assert!(!out.contains("Stash"), "no pane behind the screen");
+    assert!(
+        out.contains("Stash") && out.contains("[1] Status"),
+        "the panes stay in sight behind the sheet"
+    );
     let last = out.lines().last().unwrap();
     assert!(
         last.contains("Back: esc | Window: t | Counts: n | Refresh: r | Help: ?"),
@@ -1218,7 +1225,7 @@ fn the_dashboard_replaces_the_panes_and_has_its_own_key_bar() {
     assert!(out.contains("main ●") && out.contains("feature") && out.contains("done"));
     // Back to the panes.
     key(&mut app, 'q');
-    let out = app_frame(&mut app, 120, 40);
+    let out = app_frame(&mut app, 130, 50);
     assert!(out.contains("Stash") && !out.contains("Dashboard"));
 }
 
@@ -1260,11 +1267,11 @@ fn the_help_overlay_still_draws_over_the_dashboard() {
     let mut app = App::open(tmp.path()).unwrap();
     app.open_dashboard();
     key(&mut app, '?');
-    let out = app_frame(&mut app, 120, 40);
+    let out = app_frame(&mut app, 130, 50);
     assert!(out.contains("Close: esc/? | Scroll: j/k"), "{out}");
     assert!(
-        out.contains("Activity") && out.contains("Hot files"),
-        "the screen stays under the overlay\n{out}"
+        out.contains("Dashboard") && out.contains("[1] Status"),
+        "the sheet and the panes stay under the overlay\n{out}"
     );
 }
 

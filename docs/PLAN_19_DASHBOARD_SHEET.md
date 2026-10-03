@@ -1,6 +1,6 @@
 # Plan: phase 19, the dashboard as a sheet
 
-**Status: in progress (S0 done: the shared sheet state, the settings sheet moved onto it).** Written after the settings sheet (phase 17): the dashboard
+**Status: in progress (S0 and S1 done: the shared sheet state, and the dashboard in the drawer).** Written after the settings sheet (phase 17): the dashboard
 (phase 13) is a full-screen view, and the user wants to keep the panes in sight
 while it is up. lazygit has no dashboard, so this is not compared with it; it is
 checked with frame tests, the replay harness and screenshots
@@ -117,7 +117,7 @@ the layout that exists today for narrow windows. (The settings sheet stays at 75
 
 - **S0** ✅ the shared sheet state (`Sheet`, one overlay), the settings sheet moved onto
   it with no change of behaviour; its tests stay green.
-- **S1** the dashboard drawn in the drawer, opened and closed by `D`, `Esc`, `q` and
+- **S1** ✅ the dashboard drawn in the drawer, opened and closed by `D`, `Esc`, `q` and
   a click outside; the key bar; the worker's lifecycle.
 - **S2** the tests and the replay script adapted and extended.
 - **S3** the screenshots in both themes and both widths, anything the eye finds, then
@@ -142,6 +142,23 @@ README says it is a sheet.
   for the dashboard.
 - No full-screen mode kept beside the sheet.
 - `C` (git config) and the welcome screen stay full screen.
+
+## S1, as built
+
+`Sheet::Dashboard`; `FullScreen::Dashboard` is gone. `open_dashboard` is `open_sheet`,
+`close_dashboard` closes the drawer and cancels the worker. `input.rs` routes keys and
+the mouse by the sheet kind (`dashboard_key`, `dashboard_mouse`: the wheel scrolls, a
+click outside the drawer closes). `screens/dashboard_sheet.rs` draws the `View` into
+the drawer's inner area, 90 % wide and above the key bar row, so the key bar is
+`Bar::Dashboard`; `OverlayState::is_closing` tells a drawer that is leaving from one
+that is up (`App::dashboard_is_open`). The page stops composing at 110 cells
+(`MAX_WIDTH`), so the 90 % drawer is as wide as the page ever gets from a terminal of
+about 124 columns.
+
+Existing tests adapted, not deleted: they let the slide finish before reading a frame,
+read `dashboard_is_open` instead of `full_screen`, and ask for 130 columns where they
+assert the two-column layout; "replaces the panes" became "a sheet over the dimmed
+panes", and the replay script 150 expects the panes in sight.
 
 ## S0, as built
 

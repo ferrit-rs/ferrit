@@ -1,5 +1,6 @@
 //! Keyboard and mouse input dispatch.
 
+use super::sheet::Sheet;
 use super::{
     App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
     MouseEventKind, PANES, Pane, Position,
@@ -52,10 +53,6 @@ impl App {
         }
 
         // A full-screen view owns the keys after the overlays above.
-        if self.full_screen == FullScreen::Dashboard {
-            self.dashboard_key(key);
-            return;
-        }
         if self.full_screen == FullScreen::GitConfig {
             self.git_config_key(key);
             return;
@@ -66,7 +63,10 @@ impl App {
         }
 
         if !self.sheet_overlay.is_closed() {
-            self.settings_key(key);
+            match self.sheet {
+                Sheet::Settings => self.settings_key(key),
+                Sheet::Dashboard => self.dashboard_key(key),
+            }
             return;
         }
 
@@ -125,10 +125,6 @@ impl App {
 
         // The panes are not on screen: their areas from the last frame must not
         // answer clicks. The wheel scrolls the dashboard.
-        if self.full_screen == FullScreen::Dashboard {
-            self.dashboard_mouse(ev);
-            return;
-        }
         if self.full_screen == FullScreen::GitConfig {
             self.git_config_mouse(ev);
             return;
@@ -139,7 +135,10 @@ impl App {
         }
 
         if !self.sheet_overlay.is_closed() {
-            self.settings_mouse(ev);
+            match self.sheet {
+                Sheet::Settings => self.settings_mouse(ev),
+                Sheet::Dashboard => self.dashboard_mouse(ev),
+            }
             return;
         }
 
@@ -179,7 +178,7 @@ impl App {
             .contains(Position::new(ev.column, ev.row))
         {
             self.mouse_pointer.request(false);
-            self.open_sheet(super::sheet::Sheet::Settings);
+            self.open_sheet(Sheet::Settings);
             return;
         }
 
