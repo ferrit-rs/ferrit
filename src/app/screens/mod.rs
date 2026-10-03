@@ -39,9 +39,9 @@ pub mod welcome;
 /// (the palette's `Red`, `Blue`...), which is what most tests look at.
 pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
     draw(frame, app);
-    app.theme_config
-        .scheme()
-        .paint(frame.buffer_mut(), app.color_depth);
+    if let Some(scheme) = app.theme_config.scheme() {
+        scheme.paint(frame.buffer_mut(), app.color_depth);
+    }
 }
 
 /// Render the full screen for the current `App` state.

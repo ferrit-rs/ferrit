@@ -87,11 +87,30 @@ pub enum Base {
     Light,
 }
 
+/// `[theme] scheme`: whether ferrit paints the screen itself
+/// (`docs/PLAN_18_THEMES.md`).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SchemeChoice {
+    /// No background of its own: the terminal's colours, `base` saying whether
+    /// the terminal is dark or light.
+    Terminal,
+    /// A dark screen, painted, whatever the terminal is.
+    Dark,
+    /// A light screen, painted, whatever the terminal is.
+    Light,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ThemeConfig {
-    /// `"dark"` (default) or `"light"`: the theme ferrit paints the whole screen
-    /// with (`docs/PLAN_18_THEMES.md`).
+    /// `"terminal"`, `"dark"` or `"light"`. Absent, it is taken from `base`
+    /// (`"dark"` or `"light"`, painted), so a file written before `terminal` came
+    /// back keeps its look. Dark and Light make `base` irrelevant.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<SchemeChoice>,
+    /// `"dark"` (default) or `"light"`: the terminal's own brightness for
+    /// `scheme = "terminal"`, and the theme when there is no `scheme`.
     pub base: Base,
     pub preset: Preset,
     /// Optional RGB override; TOML uses Ratatui's `#RRGGBB` serde format.
@@ -105,6 +124,7 @@ pub struct ThemeConfig {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
+            scheme: None,
             base: Base::Dark,
             preset: Preset::Green,
             colors: BTreeMap::new(),
@@ -116,9 +136,9 @@ impl Default for ThemeConfig {
 impl ThemeConfig {
     /// The colours ferrit draws with under this theme.
     pub fn palette(&self) -> Palette {
-        let mut palette = match self.base {
-            Base::Dark => Palette::DARK,
-            Base::Light => Palette::LIGHT,
+        let mut palette = match (self.effective_scheme(), self.base) {
+            (SchemeChoice::Dark, _) | (SchemeChoice::Terminal, Base::Dark) => Palette::DARK,
+            (SchemeChoice::Light, _) | (SchemeChoice::Terminal, Base::Light) => Palette::LIGHT,
         };
         for (name, &color) in &self.colors {
             if let Some(slot) = palette.color_mut(name) {
@@ -150,11 +170,22 @@ impl ThemeConfig {
             .collect()
     }
 
-    /// The colours the whole screen is painted with.
-    pub const fn scheme(&self) -> Scheme {
-        match self.base {
-            Base::Dark => Scheme::DARK,
-            Base::Light => Scheme::LIGHT,
+    /// The scheme in force: the one written, or the one `base` says when none is.
+    pub const fn effective_scheme(&self) -> SchemeChoice {
+        match (self.scheme, self.base) {
+            (Some(scheme), _) => scheme,
+            (None, Base::Dark) => SchemeChoice::Dark,
+            (None, Base::Light) => SchemeChoice::Light,
+        }
+    }
+
+    /// The colours to paint the screen with, `None` when the terminal's own are
+    /// kept.
+    pub const fn scheme(&self) -> Option<Scheme> {
+        match self.effective_scheme() {
+            SchemeChoice::Terminal => None,
+            SchemeChoice::Dark => Some(Scheme::DARK),
+            SchemeChoice::Light => Some(Scheme::LIGHT),
         }
     }
 

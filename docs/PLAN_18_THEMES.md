@@ -41,7 +41,27 @@ accent colour stays the user's own pick on top of any of them.
 - **The terminal's window padding.** The margin some terminals keep around the cell
   grid is the terminal's and keeps its colour; ferrit has no cell there.
 
-## The two themes
+## Terminal is back (after P3)
+
+The user asked for the Terminal theme back once it was clear what it is (the
+terminal's own colours, as ferrit always did). The three choices below are the ones
+that ship; everything that follows this section about "no Terminal" is the history of
+P1b, kept for what it explains. What changes against the first version of this plan:
+
+- `theme.scheme` is `Option<SchemeChoice>` (`terminal`, `dark`, `light`). **Absent, it
+  is taken from `base`**, painted (`base = "light"` is Light, nothing is Dark), because
+  the files written between P1b and now have only `base`. A default config writes no
+  `scheme`; the sheet writes one as soon as a theme is chosen.
+- `base` keeps its first meaning under `terminal` (the terminal's brightness: it picks
+  the diff tints and the syntax theme) and is the painted theme when there is no
+  `scheme`. A painted scheme makes it irrelevant.
+- **The default is still Dark, painted**, not Terminal: Terminal is a choice, not the
+  fallback.
+- The sheet: the Theme row is `Terminal / Dark / Light`; the `Terminal is` row (Dark or
+  Light) shows only under Terminal.
+- `screens::draw_painted` paints only when the effective scheme is not Terminal.
+
+## The two themes (as decided at P1b; Terminal came back after P3)
 
 There are two themes and no "follow the terminal" option (dropped on the user's
 decision after P1: a theme that paints nothing is not a theme). Every start is

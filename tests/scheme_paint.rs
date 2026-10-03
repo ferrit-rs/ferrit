@@ -14,7 +14,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use ferrit::app::config::{Config, ConfigLoad};
-use ferrit::app::theme_config::Base;
+use ferrit::app::theme_config::{Base, SchemeChoice};
 use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::scheme::{ColorDepth, Scheme, contrast};
 use ratatui::Terminal;
@@ -296,10 +296,10 @@ fn the_theme_is_a_config_key_with_a_default_and_a_reported_bad_value() {
 fn the_palette_and_the_painted_scheme_both_follow_base() {
     let (dark, _) = Config::parse("[theme]\nbase = \"dark\"\n");
     assert!(!dark.theme.palette().light);
-    assert_eq!(dark.theme.scheme(), Scheme::DARK);
+    assert_eq!(dark.theme.scheme(), Some(Scheme::DARK));
     let (light, _) = Config::parse("[theme]\nbase = \"light\"\n");
     assert!(light.theme.palette().light);
-    assert_eq!(light.theme.scheme(), Scheme::LIGHT);
+    assert_eq!(light.theme.scheme(), Some(Scheme::LIGHT));
 }
 
 #[test]
@@ -464,4 +464,71 @@ fn the_dim_layer_keeps_its_own_dim_text_it_is_not_made_readable() {
     scheme.paint(&mut buf, ColorDepth::TrueColor);
     assert_eq!(buf[(0, 0)].fg, scheme.foreground[8]);
     assert_eq!(buf[(0, 0)].bg, scheme.fill[0]);
+}
+
+#[test]
+fn the_terminal_theme_paints_nothing_and_keeps_the_terminals_own_colours() {
+    let repo = Repo::new("paint-terminal");
+    let mut app = repo.app("[theme]\nscheme = \"terminal\"\n");
+    let buf = frame(&mut app);
+    assert!(
+        colours(&buf).contains(&Color::Reset),
+        "the terminal's own background and text are still there"
+    );
+    // Named colours are the terminal's: not turned into the scheme's RGB.
+    assert!(colours(&buf).iter().any(|c| is_named(*c)));
+}
+
+#[test]
+fn terminal_follows_base_for_the_palette_and_a_painted_scheme_ignores_it() {
+    let (config, issues) = Config::parse("[theme]\nscheme = \"terminal\"\nbase = \"light\"\n");
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(config.theme.effective_scheme(), SchemeChoice::Terminal);
+    assert!(config.theme.palette().light, "a light terminal's colours");
+    assert!(config.theme.scheme().is_none());
+
+    let (config, _) = Config::parse("[theme]\nscheme = \"dark\"\nbase = \"light\"\n");
+    assert!(!config.theme.palette().light, "Dark wins over base");
+    let (config, _) = Config::parse("[theme]\nscheme = \"light\"\nbase = \"dark\"\n");
+    assert!(config.theme.palette().light, "Light wins over base");
+}
+
+#[test]
+fn without_a_scheme_base_decides_so_an_older_file_keeps_its_look() {
+    let (config, _) = Config::parse("[theme]\nbase = \"light\"\n");
+    assert_eq!(config.theme.scheme, None);
+    assert_eq!(config.theme.effective_scheme(), SchemeChoice::Light);
+    let (config, _) = Config::parse("");
+    assert_eq!(config.theme.effective_scheme(), SchemeChoice::Dark);
+}
+
+#[test]
+fn a_bad_scheme_is_reported_and_the_default_is_used() {
+    let (config, issues) = Config::parse("[theme]\nscheme = \"sepia\"\n");
+    assert_eq!(config.theme.effective_scheme(), SchemeChoice::Dark);
+    assert!(
+        issues.iter().any(|i| i.contains("[theme] ignored")),
+        "{issues:?}"
+    );
+}
+
+#[test]
+fn a_saved_scheme_is_written_and_a_file_without_one_does_not_gain_one() {
+    let repo = Repo::new("paint-save-scheme");
+    let file = repo.0.join("config.toml");
+    let mut load = Config::load_from(&file);
+    load.config.theme.scheme = Some(SchemeChoice::Terminal);
+    Config::save_sections(&file, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
+    assert!(
+        fs::read_to_string(&file)
+            .unwrap()
+            .contains("scheme = \"terminal\"")
+    );
+    let other = repo.0.join("other.toml");
+    let load = Config::load_from(&other);
+    Config::save_sections(&other, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
+    assert!(
+        !fs::read_to_string(&other).unwrap().contains("scheme"),
+        "a default config writes no scheme"
+    );
 }

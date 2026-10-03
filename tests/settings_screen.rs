@@ -176,7 +176,7 @@ fn the_arrows_move_between_rows_and_change_the_value_and_the_file_follows() {
     assert!(
         fs::read_to_string(fx.file())
             .unwrap()
-            .contains("base = \"light\"")
+            .contains("scheme = \"light\"")
     );
 
     press(&mut app, KeyCode::Down);
@@ -329,24 +329,52 @@ fn turning_the_mouse_off_says_the_sheet_is_keyboard_only_from_now_on() {
 }
 
 #[test]
-fn the_theme_row_offers_dark_and_light_and_a_click_picks_one() {
+fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
     let fx = Fixture::new("sheet-theme-row");
     let mut app = fx.app_with_sheet();
     let text = shown(&mut app);
     assert!(
-        text.contains("(\u{2022}) Dark") && text.contains("( ) Light"),
+        text.contains("( ) Terminal")
+            && text.contains("(\u{2022}) Dark")
+            && text.contains("( ) Light"),
         "{text}"
     );
-    assert!(!text.contains("Terminal"), "no third theme: {text}");
+    assert!(
+        !text.contains("Terminal is"),
+        "not under a painted theme: {text}"
+    );
+
+    let (x, y) = find(&mut app, "( ) Terminal");
+    click(&mut app, x + 1, y);
+    let text = shown(&mut app);
+    assert!(text.contains("(\u{2022}) Terminal"), "{text}");
+    assert!(text.contains("Terminal is"), "now it shows: {text}");
+    assert_eq!(
+        Config::load_from(&fx.file()).config.theme.scheme,
+        Some(ferrit::app::theme_config::SchemeChoice::Terminal)
+    );
 
     let (x, y) = find(&mut app, "( ) Light");
     click(&mut app, x + 1, y);
     let text = shown(&mut app);
     assert!(text.contains("(\u{2022}) Light"), "{text}");
-    assert_eq!(
-        Config::load_from(&fx.file()).config.theme.base,
-        ferrit::app::theme_config::Base::Light
-    );
+    assert!(!text.contains("Terminal is"), "gone again: {text}");
+}
+
+#[test]
+fn the_terminal_theme_leaves_the_terminals_own_colours() {
+    use ratatui::style::Color;
+    let fx = Fixture::new("sheet-terminal-colours");
+    let mut app = fx.app_with_sheet();
+    press(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Right); // Dark, Light, then Terminal
+    let mut terminal = Terminal::new(TestBackend::new(120, 50)).unwrap();
+    terminal.draw(|f| ui::draw_painted(f, &mut app)).unwrap();
+    let buf = terminal.backend().buffer().clone();
+    let reset = (0..buf.area.height)
+        .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .any(|(x, y)| buf[(x, y)].bg == Color::Reset);
+    assert!(reset, "the terminal's own background shows through");
 }
 
 #[test]

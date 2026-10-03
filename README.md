@@ -22,7 +22,7 @@ the commit flow.
 | Interactive rebase | ✅ | ✅ | Shared core workflow |
 | Stash, branches, conflicts and remotes | ✅ | ✅ | Shared core workflow |
 | Choose Git author from configured identities | ✅ | ❌ | In the commit popup, `Ctrl-A` cycles the identities git knows and git's own; for this run only, git config is not touched |
-| Settings sheet | ✅ | ❌ | Click the author's name: a Dark or Light theme that paints the whole screen, accent colour with a colour picker, mouse, wheel step, diff context, sign-off and command log, each saved to `config.toml` as you change it |
+| Settings sheet | ✅ | ❌ | Click the author's name: a Terminal, Dark or Light theme (Dark and Light paint the whole screen), accent colour with a colour picker, mouse, wheel step, diff context, sign-off and command log, each saved to `config.toml` as you change it |
 | Repository statistics dashboard | ✅ | ❌ | `D`, a sheet over the dimmed panes: activity over time, contributors, kinds of change, hot files, branch health, with charts |
 | Edit Git config from the interface | ✅ | ❌ | `C`: every key with its scope and origin, edited through `git config`, secrets hidden |
 | Start in a folder that is not a repository | ✅ | ❌ | A welcome screen offers `git init` after a question that names the folder; `--path` keeps the error |
