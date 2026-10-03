@@ -277,7 +277,7 @@ impl App {
         self.sync_theme_picker_selection();
     }
 
-    fn sync_theme_picker_selection(&mut self) {
+    pub(super) fn sync_theme_picker_selection(&mut self) {
         self.theme_palette_selected = crate::components::ui::color_picker::nearest_index(
             self.theme_config.color(),
             self.theme_picker_display,

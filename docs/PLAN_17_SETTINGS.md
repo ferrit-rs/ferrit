@@ -1,6 +1,6 @@
 # Plan: phase 17, the settings sheet
 
-**Status: in progress (U0 done: `Config::save_sections`; the sheet itself is not changed yet).** lazygit has no settings screen
+**Status: in progress (U0 and U1 done: `Config::save_sections`, the rows, live changes and autosave in `src/app/settings.rs`; the sheet itself is not drawn yet).** lazygit has no settings screen
 (its config is a YAML file), so this phase is not compared with it; it is checked
 with the replay harness and screenshots (`PLAN_SELF_TESTING.md`).
 
@@ -182,11 +182,13 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
 ## Milestones
 
 - **U0** ✅ `Config::save_sections` and `Section`, tests (`tests/config.rs`).
-- **U1** `settings.rs` state, rows, keys, autosave and the live effects that need no
-  loop (diff, wheel, sign-off, log), tests through the `App`.
+- **U1** ✅ `settings.rs` state, rows, autosave and every live effect, mouse switch and
+  refresh interval included (they go through `terminal_request` and `poll_request`,
+  which the run loop applies), tests through the `App` (`tests/app_settings.rs`). The
+  keys are routed in U2.
 - **U2** `screens/settings.rs` and the routing: the click on the author's name opens
   it, the old drawer's identity and activity blocks and keys go.
-- **U3** the live mouse switch and refresh interval.
+- **U3** folded into U1 (the live mouse switch and refresh interval).
 - **U4** the author line and `Ctrl-A` in the commit popup.
 - **U5** remove `domain/profile/activity.rs` and `Repo::activity`, the README row, the
   replay script, CHANGELOG, plans.

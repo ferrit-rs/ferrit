@@ -48,6 +48,16 @@ pub fn init(mouse: bool) -> io::Result<Tui> {
     }
 }
 
+/// Switch the terminal's mouse capture on or off while ferrit runs (the settings
+/// sheet's Mouse row). Off leaves the terminal's own text selection working.
+pub fn set_mouse(on: bool) -> io::Result<()> {
+    if on {
+        execute!(io::stdout(), EnableMouseCapture)
+    } else {
+        execute!(io::stdout(), DisableMouseCapture)
+    }
+}
+
 /// Exact reverse of `init`. Safe to call more than once.
 pub fn restore() -> io::Result<()> {
     let pointer = MousePointer::reset_terminal();

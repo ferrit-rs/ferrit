@@ -53,6 +53,19 @@ impl Preset {
         }
     }
 
+    /// Every preset, in the order `next` walks them.
+    pub const ALL: [Self; 4] = [Self::Green, Self::Blue, Self::Purple, Self::Amber];
+
+    #[must_use]
+    pub const fn prev(self) -> Self {
+        match self {
+            Self::Green => Self::Amber,
+            Self::Blue => Self::Green,
+            Self::Purple => Self::Blue,
+            Self::Amber => Self::Purple,
+        }
+    }
+
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
