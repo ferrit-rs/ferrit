@@ -254,11 +254,6 @@ impl Repo {
         )
     }
 
-    /// Recent commit activity across local and fetched remote branches.
-    pub fn activity(&self) -> GitResult<Vec<CommitEntry>> {
-        activity::commits(&self.inner)
-    }
-
     /// Dashboard statistics over `window`, polling `cancel` while it walks
     /// (`GitError::Cancelled` when set). `docs/PLAN_13_DASHBOARD.md`.
     pub fn stats(&self, window: stats::Window, cancel: &AtomicBool) -> GitResult<stats::RepoStats> {

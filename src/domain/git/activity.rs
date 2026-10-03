@@ -1,45 +1,11 @@
-//! Commit activity across local and fetched remote branches.
+//! The walk over every local and fetched remote branch, for the dashboard's statistics.
 
-use git2::{Repository, Revwalk, Sort};
+use git2::{Repository, Revwalk};
 
 use crate::domain::git::error::{GitError, GitResult};
-use crate::domain::git::model::CommitEntry;
-
-/// Read recent commits across local and fetched remote branches, newest first.
-/// This captures activity from every contributor, including unmerged branches.
-pub(super) fn commits(repo: &Repository) -> GitResult<Vec<CommitEntry>> {
-    let mut walk = branch_walk(repo)?;
-    walk.set_sorting(Sort::TIME | Sort::TOPOLOGICAL)
-        .map_err(GitError::Read)?;
-    let cutoff = now_days().saturating_sub(730).saturating_mul(86_400);
-    let mut result = Vec::new();
-    for oid in walk {
-        let commit = repo
-            .find_commit(oid.map_err(GitError::Read)?)
-            .map_err(GitError::Read)?;
-        let time = commit.time().seconds();
-        if time < cutoff {
-            break;
-        }
-        let full_hash = commit.id().to_string();
-        result.push(CommitEntry {
-            short_hash: full_hash.chars().take(7).collect(),
-            full_hash,
-            author: commit.author().name().unwrap_or("unknown").to_owned(),
-            author_email: commit.author().email().unwrap_or("").to_owned(),
-            summary: commit.summary().ok().flatten().unwrap_or("").to_owned(),
-            body: commit.body().ok().flatten().unwrap_or("").trim().to_owned(),
-            time,
-            refs: Vec::new(),
-            push_state: crate::domain::git::model::PushState::default(),
-        });
-    }
-    Ok(result)
-}
 
 /// A revwalk primed with the tip of every local and fetched remote branch
-/// (`refs/heads`, `refs/remotes`, remote `HEAD` aliases left out). Shared by
-/// `commits` and `stats`; the caller sets the sorting.
+/// (`refs/heads`, `refs/remotes`, remote `HEAD` aliases left out). The caller sets the sorting.
 pub(super) fn branch_walk(repo: &Repository) -> GitResult<Revwalk<'_>> {
     let mut walk = repo.revwalk().map_err(GitError::Read)?;
     let references = repo.references().map_err(GitError::Read)?;
@@ -58,12 +24,4 @@ pub(super) fn branch_walk(repo: &Repository) -> GitResult<Revwalk<'_>> {
         }
     }
     Ok(walk)
-}
-
-fn now_days() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |duration| {
-            i64::try_from(duration.as_secs() / 86_400).unwrap_or(i64::MAX)
-        })
 }

@@ -6,9 +6,17 @@
 
 use std::time::Duration;
 
-use super::App;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::{Position, Rect};
+use ratatui::style::Color;
+
 use super::config::{Config, Section};
-use super::theme_config::{Base, Preset};
+use super::theme_config::{Base, Preset, ThemeMode};
+use super::{App, KeyModifiers};
+use crate::components::ui::color_picker::{self, PaletteDirection};
+
+const RGB_CHANNEL_STEP: i16 = 8;
+const WHEEL_ROWS: usize = 3;
 
 /// The values the refresh interval steps through: a short scale, since
 /// "10 s, 11 s, 12 s…" is not what anyone wants to press. A value written in
@@ -117,10 +125,34 @@ pub enum SaveState {
     Failed(String),
 }
 
+/// What a click on a part of a row does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Click {
+    /// Just highlight the row.
+    Row,
+    /// A radio: set the choice at this index.
+    Choice(usize),
+    /// A checkbox: flip it.
+    Flip,
+    /// The `‹` (down) or `›` (up) around a number.
+    Step(bool),
+}
+
+/// Where the sheet's clickable parts landed on the last frame.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsHits {
+    pub color_grid: Rect,
+    pub color_grid_first_row: usize,
+    /// Narrowest last: a part of a row comes before the row's whole line.
+    pub parts: Vec<(Rect, SettingsRow, Click)>,
+}
+
 /// The sheet's own state: the highlighted row and the footer.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SettingsSheet {
     pub selected: usize,
+    /// The next frame scrolls the selected row into view.
+    pub follow: bool,
     pub save: SaveState,
 }
 
@@ -287,5 +319,209 @@ impl App {
     /// The new refresh interval the run loop has to give the poll thread, once.
     pub(crate) fn take_poll_request(&mut self) -> Option<Duration> {
         self.poll_request.take()
+    }
+
+    /// Set a choice row to the name at `index` (a click on a radio).
+    pub fn set_choice(&mut self, row: SettingsRow, index: usize) {
+        match row {
+            SettingsRow::Theme => {
+                if self.choice_index(row) != Some(index) {
+                    self.change_setting(row, true);
+                }
+            },
+            SettingsRow::Accent => {
+                if let Some(preset) = Preset::ALL.get(index) {
+                    self.theme_config.preset = *preset;
+                    self.theme_config.accent = None;
+                    self.sync_theme_picker_selection();
+                    self.accent_changed();
+                }
+            },
+            _ => {},
+        }
+    }
+
+    /// The accent (preset or picked colour) changed: apply and save it.
+    fn accent_changed(&mut self) {
+        self.theme_changed();
+        self.save_settings(Section::Theme);
+    }
+
+    fn selected_row(&self) -> SettingsRow {
+        SettingsRow::ALL
+            .get(self.settings.selected)
+            .copied()
+            .unwrap_or(SettingsRow::Theme)
+    }
+
+    /// Every key while the sheet is up. It owns the keyboard: `↑` `↓` move
+    /// between rows, `←` `→` and `Space` change the value, `Enter` opens the
+    /// colour picker on the accent, `Esc` goes back (picker) or closes.
+    pub(super) fn settings_key(&mut self, key: KeyEvent) {
+        match self.theme_mode {
+            ThemeMode::Palette => self.picker_key(key),
+            ThemeMode::EditingRgb => self.rgb_key(key),
+            ThemeMode::Idle => self.row_key(key),
+        }
+    }
+
+    fn row_key(&mut self, key: KeyEvent) {
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            return;
+        }
+        let last = SettingsRow::ALL.len() - 1;
+        let row = self.selected_row();
+        match key.code {
+            KeyCode::Esc => self.author_overlay.close(),
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.settings.selected = self.settings.selected.saturating_sub(1);
+                self.settings.follow = true;
+            },
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.settings.selected = (self.settings.selected + 1).min(last);
+                self.settings.follow = true;
+            },
+            KeyCode::Left | KeyCode::Char('h') => self.change_setting(row, false),
+            KeyCode::Right | KeyCode::Char('l' | ' ') => self.change_setting(row, true),
+            KeyCode::Enter if row == SettingsRow::Accent => {
+                self.theme_mode = ThemeMode::Palette;
+                self.sync_theme_picker_selection();
+            },
+            KeyCode::PageUp => self.settings_scroll = self.settings_scroll.saturating_sub(10),
+            KeyCode::PageDown => self.settings_scroll = self.settings_scroll.saturating_add(10),
+            KeyCode::Home | KeyCode::End => {
+                self.settings.selected = if key.code == KeyCode::Home { 0 } else { last };
+                self.settings.follow = true;
+            },
+            _ => {},
+        }
+    }
+
+    fn picker_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.theme_mode = ThemeMode::Idle,
+            KeyCode::Left | KeyCode::Char('h') => self.move_theme_palette(PaletteDirection::Left),
+            KeyCode::Right | KeyCode::Char('l') => self.move_theme_palette(PaletteDirection::Right),
+            KeyCode::Up | KeyCode::Char('k') => self.move_theme_palette(PaletteDirection::Up),
+            KeyCode::Down | KeyCode::Char('j') => self.move_theme_palette(PaletteDirection::Down),
+            KeyCode::Char('v') => self.toggle_theme_picker_display(),
+            KeyCode::Char('e') => self.theme_mode = ThemeMode::EditingRgb,
+            KeyCode::Enter => self.apply_theme_picker_selection(),
+            _ => {},
+        }
+    }
+
+    fn rgb_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Tab => {
+                self.theme_rgb_channel =
+                    (self.theme_rgb_channel + 1) % super::theme_config::RGB_CHANNEL_COUNT;
+            },
+            KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(RGB_CHANNEL_STEP),
+            KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-RGB_CHANNEL_STEP),
+            KeyCode::Esc => self.theme_mode = ThemeMode::Palette,
+            _ => {},
+        }
+    }
+
+    /// The mouse while the sheet is up: a click sets the value it lands on, the
+    /// wheel scrolls, a click outside closes it.
+    pub(super) fn settings_mouse(&mut self, ev: MouseEvent) {
+        self.mouse_pointer.request(false);
+        let point = Position::new(ev.column, ev.row);
+        match ev.kind {
+            MouseEventKind::ScrollUp => {
+                self.settings_scroll = self.settings_scroll.saturating_sub(WHEEL_ROWS);
+            },
+            MouseEventKind::ScrollDown => {
+                self.settings_scroll = self.settings_scroll.saturating_add(WHEEL_ROWS);
+            },
+            MouseEventKind::Down(MouseButton::Left) => {
+                let grid = self.settings_hits.color_grid;
+                if grid.contains(point) {
+                    let metrics = color_picker::grid_metrics(self.theme_picker_display);
+                    let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
+                    let row = self.settings_hits.color_grid_first_row
+                        + usize::from(ev.row.saturating_sub(grid.y));
+                    self.select_theme_picker_cell(column, row);
+                } else if let Some(&(_, row, click)) = self
+                    .settings_hits
+                    .parts
+                    .iter()
+                    .find(|(area, ..)| area.contains(point))
+                {
+                    self.settings.selected =
+                        SettingsRow::ALL.iter().position(|r| *r == row).unwrap_or(0);
+                    match click {
+                        Click::Row => {},
+                        Click::Choice(index) => self.set_choice(row, index),
+                        Click::Flip => self.change_setting(row, true),
+                        Click::Step(up) => self.change_setting(row, up),
+                    }
+                } else if !self
+                    .author_overlay
+                    .overlay_rect()
+                    .is_some_and(|rect| rect.contains(point))
+                {
+                    self.author_overlay.close();
+                }
+            },
+            _ => {},
+        }
+    }
+
+    fn move_theme_palette(&mut self, direction: PaletteDirection) {
+        self.theme_palette_selected = color_picker::move_selection(
+            self.theme_palette_selected,
+            direction,
+            self.theme_picker_display,
+        );
+        self.apply_theme_picker_selection();
+    }
+
+    fn toggle_theme_picker_display(&mut self) {
+        use color_picker::ColorPickerDisplay;
+
+        self.theme_picker_display = match self.theme_picker_display {
+            ColorPickerDisplay::Palette => ColorPickerDisplay::Spectrum,
+            ColorPickerDisplay::Spectrum => ColorPickerDisplay::Palette,
+        };
+        self.sync_theme_picker_selection();
+    }
+
+    pub(super) fn sync_theme_picker_selection(&mut self) {
+        self.theme_palette_selected =
+            color_picker::nearest_index(self.theme_config.color(), self.theme_picker_display);
+    }
+
+    /// The highlighted swatch becomes the accent, applied and saved.
+    fn apply_theme_picker_selection(&mut self) {
+        if let Some(color) =
+            color_picker::color_at(self.theme_picker_display, self.theme_palette_selected)
+        {
+            self.theme_config.accent = Some(color);
+            self.accent_changed();
+        }
+    }
+
+    fn select_theme_picker_cell(&mut self, column: usize, row: usize) {
+        if let Some(selected) = color_picker::selection_at(self.theme_picker_display, column, row) {
+            self.theme_mode = ThemeMode::Palette;
+            self.theme_palette_selected = selected;
+            self.apply_theme_picker_selection();
+        }
+    }
+
+    fn adjust_theme_rgb(&mut self, delta: i16) {
+        let (mut r, mut g, mut b) = color_picker::rgb(self.theme_config.color());
+        let channel = match self.theme_rgb_channel {
+            super::theme_config::RGB_RED_CHANNEL => &mut r,
+            super::theme_config::RGB_GREEN_CHANNEL => &mut g,
+            _ => &mut b,
+        };
+        *channel = u8::try_from((i16::from(*channel) + delta).clamp(0, 255)).unwrap_or_default();
+        self.theme_config.accent = Some(Color::Rgb(r, g, b));
+        self.sync_theme_picker_selection();
+        self.accent_changed();
     }
 }

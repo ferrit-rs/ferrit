@@ -1,32 +1,12 @@
 //! Keyboard and mouse input dispatch.
 
-use super::theme_config::ThemeMode;
 use super::{
     App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
     MouseEventKind, PANES, Pane, Position,
 };
 
-const KEY_THEME_PALETTE: char = 'p';
-const KEY_THEME_PRESET: char = 't';
-const KEY_THEME_RGB: char = 'e';
-const KEY_THEME_VIEW: char = 'v';
-const KEY_THEME_SAVE: char = 's';
-const KEY_GIT_AUTHOR: char = '0';
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
-const AUTHOR_KEY_START: char = '1';
-const AUTHOR_KEY_END: char = '9';
-const KEY_NAV_LEFT: char = 'h';
-const KEY_NAV_DOWN: char = 'j';
-const KEY_NAV_UP: char = 'k';
-const KEY_NAV_RIGHT: char = 'l';
-const RGB_CHANNEL_STEP: i16 = 8;
-const RGB_CHANNEL_INDEX_STEP: usize = 1;
-const RGB_MIN_VALUE: i16 = 0;
-const RGB_MAX_VALUE: i16 = 255;
-const AUTHOR_CHANGE_CONFIRM_MESSAGE: &str =
-    "Use this global Git user for future Ferrit commits? Git config stays unchanged.";
-const AUTHOR_RESET_CONFIRM_MESSAGE: &str = "Return to the identity resolved from Git config?";
 
 /// Rows a wheel tick scrolls a left pane's list: lazygit's `scrollHeight`.
 const LIST_WHEEL_ROWS: isize = 2;
@@ -86,99 +66,7 @@ impl App {
         }
 
         if !self.author_overlay.is_closed() {
-            if let KeyCode::Char(key @ AUTHOR_KEY_START..=AUTHOR_KEY_END) = key.code {
-                let index =
-                    usize::try_from(key as u32 - AUTHOR_KEY_START as u32).unwrap_or(usize::MAX);
-                if let Some(identity) = self.profile.settings.available_identities().get(index) {
-                    self.request_author_selection(Some(identity.clone()));
-                }
-                return;
-            }
-            if key.code == KeyCode::Char(KEY_GIT_AUTHOR) {
-                if self.selected_author.is_some() {
-                    self.request_author_selection(None);
-                }
-                return;
-            }
-            if key.code == KeyCode::Char(KEY_THEME_SAVE) {
-                self.save_theme();
-                return;
-            }
-            if self.theme_mode == ThemeMode::Palette {
-                match key.code {
-                    KeyCode::Esc | KeyCode::Char(KEY_THEME_PALETTE) => {
-                        self.theme_mode = ThemeMode::Idle;
-                    },
-                    KeyCode::Left | KeyCode::Char(KEY_NAV_LEFT) => self.move_theme_palette(
-                        crate::components::ui::color_picker::PaletteDirection::Left,
-                    ),
-                    KeyCode::Right | KeyCode::Char(KEY_NAV_RIGHT) => self.move_theme_palette(
-                        crate::components::ui::color_picker::PaletteDirection::Right,
-                    ),
-                    KeyCode::Up | KeyCode::Char(KEY_NAV_UP) => self.move_theme_palette(
-                        crate::components::ui::color_picker::PaletteDirection::Up,
-                    ),
-                    KeyCode::Down | KeyCode::Char(KEY_NAV_DOWN) => self.move_theme_palette(
-                        crate::components::ui::color_picker::PaletteDirection::Down,
-                    ),
-                    KeyCode::Char(KEY_THEME_VIEW) => self.toggle_theme_picker_display(),
-                    KeyCode::Enter => self.apply_theme_picker_selection(),
-                    _ => {},
-                }
-                return;
-            }
-            if key.code == KeyCode::Char(KEY_THEME_PALETTE) {
-                self.theme_mode = ThemeMode::Palette;
-                self.theme_palette_selected = crate::components::ui::color_picker::nearest_index(
-                    self.theme_config.color(),
-                    self.theme_picker_display,
-                );
-                return;
-            }
-            if key.code == KeyCode::Char(KEY_THEME_PRESET) {
-                self.theme_config.preset = self.theme_config.preset.next();
-                self.theme_config.accent = None;
-                self.sync_theme_picker_selection();
-                return;
-            }
-            if key.code == KeyCode::Char(KEY_THEME_RGB) {
-                self.theme_mode = if self.theme_mode == ThemeMode::EditingRgb {
-                    ThemeMode::Idle
-                } else {
-                    ThemeMode::EditingRgb
-                };
-                return;
-            }
-            if self.theme_mode == ThemeMode::EditingRgb {
-                match key.code {
-                    KeyCode::Tab => {
-                        self.theme_rgb_channel = (self.theme_rgb_channel + RGB_CHANNEL_INDEX_STEP)
-                            % super::theme_config::RGB_CHANNEL_COUNT;
-                    },
-                    KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(RGB_CHANNEL_STEP),
-                    KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-RGB_CHANNEL_STEP),
-                    KeyCode::Esc => self.theme_mode = ThemeMode::Idle,
-                    _ => {},
-                }
-                return;
-            }
-            match key.code {
-                KeyCode::Esc => {
-                    self.theme_mode = ThemeMode::Idle;
-                    self.author_overlay.close();
-                },
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.profile_scroll = self.profile_scroll.saturating_sub(1);
-                },
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.profile_scroll = self.profile_scroll.saturating_add(1);
-                },
-                KeyCode::PageUp => self.profile_scroll = self.profile_scroll.saturating_sub(10),
-                KeyCode::PageDown => self.profile_scroll = self.profile_scroll.saturating_add(10),
-                KeyCode::Home => self.profile_scroll = 0,
-                KeyCode::End => self.profile_scroll = usize::MAX,
-                _ => {},
-            }
+            self.settings_key(key);
             return;
         }
 
@@ -211,118 +99,6 @@ impl App {
             KeyCode::End | KeyCode::Char('G') => self.help_scroll = max,
             _ => {},
         }
-    }
-
-    fn request_author_selection(
-        &mut self,
-        identity: Option<crate::domain::profile::settings::Identity>,
-    ) {
-        let active =
-            self.selected_author
-                .as_ref()
-                .or(self.profile.settings.effective_identity.as_ref());
-        if active == identity.as_ref() {
-            return;
-        }
-        let message = if identity.is_some() {
-            let name = identity.as_ref().map_or("", |author| author.name.as_str());
-            format!("{AUTHOR_CHANGE_CONFIRM_MESSAGE}\nSelected: {name}")
-        } else {
-            AUTHOR_RESET_CONFIRM_MESSAGE.to_owned()
-        };
-        self.pending_confirm = Some(super::ConfirmPrompt {
-            message,
-            action: super::ConfirmAction::SelectAuthor(identity),
-        });
-    }
-
-    fn save_theme(&mut self) {
-        if self.theme_config == self.theme_saved_config {
-            return;
-        }
-        // No file (tests, no config directory): there is nowhere to write, and
-        // that is not an error. The unsaved marker clears either way.
-        let saved = match &self.config_file {
-            Some(path) => super::config::Config::save_theme(path, &self.theme_config),
-            None => Ok(()),
-        };
-        match saved {
-            Ok(()) => {
-                self.theme_saved_config = self.theme_config.clone();
-                self.report_notice("Theme saved".to_owned());
-            },
-            Err(error) => self.report_notice(format!("Could not save theme settings: {error}")),
-        }
-    }
-
-    fn move_theme_palette(
-        &mut self,
-        direction: crate::components::ui::color_picker::PaletteDirection,
-    ) {
-        self.theme_palette_selected = crate::components::ui::color_picker::move_selection(
-            self.theme_palette_selected,
-            direction,
-            self.theme_picker_display,
-        );
-        self.apply_theme_picker_selection();
-    }
-
-    fn toggle_theme_picker_display(&mut self) {
-        use crate::components::ui::color_picker::ColorPickerDisplay;
-
-        self.theme_picker_display = match self.theme_picker_display {
-            ColorPickerDisplay::Palette => ColorPickerDisplay::Spectrum,
-            ColorPickerDisplay::Spectrum => ColorPickerDisplay::Palette,
-        };
-        self.sync_theme_picker_selection();
-    }
-
-    pub(super) fn sync_theme_picker_selection(&mut self) {
-        self.theme_palette_selected = crate::components::ui::color_picker::nearest_index(
-            self.theme_config.color(),
-            self.theme_picker_display,
-        );
-    }
-
-    fn apply_theme_picker_selection(&mut self) {
-        if let Some(color) = crate::components::ui::color_picker::color_at(
-            self.theme_picker_display,
-            self.theme_palette_selected,
-        ) {
-            self.theme_config.accent = Some(color);
-        }
-    }
-
-    fn select_theme_picker_cell(&mut self, column: usize, row: usize) {
-        if let Some(selected) = crate::components::ui::color_picker::selection_at(
-            self.theme_picker_display,
-            column,
-            row,
-        ) {
-            self.theme_mode = ThemeMode::Palette;
-            self.theme_palette_selected = selected;
-            self.apply_theme_picker_selection();
-        }
-    }
-
-    fn adjust_theme_rgb(&mut self, delta: i16) {
-        let (mut r, mut g, mut b) = match self.theme_config.color() {
-            ratatui::style::Color::Rgb(r, g, b) => (r, g, b),
-            ratatui::style::Color::Green => (0, 255, 0),
-            ratatui::style::Color::Cyan => (0, 255, 255),
-            ratatui::style::Color::Magenta => (255, 0, 255),
-            ratatui::style::Color::Yellow => (255, 255, 0),
-            _ => (0, 255, 0),
-        };
-        let channel = match self.theme_rgb_channel {
-            super::theme_config::RGB_RED_CHANNEL => &mut r,
-            super::theme_config::RGB_GREEN_CHANNEL => &mut g,
-            _ => &mut b,
-        };
-        *channel = u8::try_from((i16::from(*channel) + delta).clamp(RGB_MIN_VALUE, RGB_MAX_VALUE))
-            .unwrap_or_default();
-        self.theme_config.accent = Some(ratatui::style::Color::Rgb(r, g, b));
-        self.sync_theme_picker_selection();
     }
 
     /// A left click focuses the pane it lands in and, when it lands on a
@@ -363,58 +139,7 @@ impl App {
         }
 
         if !self.author_overlay.is_closed() {
-            self.mouse_pointer.request(false);
-            if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left)) {
-                let point = Position::new(ev.column, ev.row);
-                if self.profile_hit_areas.save_button.contains(point) {
-                    self.save_theme();
-                    return;
-                }
-                if let Some((identity_index, _)) = self
-                    .profile_hit_areas
-                    .author_cards
-                    .iter()
-                    .find(|(_, area)| area.contains(point))
-                {
-                    if let Some(identity) = self
-                        .profile
-                        .settings
-                        .available_identities()
-                        .get(*identity_index)
-                    {
-                        self.request_author_selection(Some(identity.clone()));
-                    }
-                    return;
-                }
-                let grid = self.profile_hit_areas.color_grid;
-                if grid.contains(point) {
-                    let metrics = crate::components::ui::color_picker::grid_metrics(
-                        self.theme_picker_display,
-                    );
-                    let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
-                    let visible_row = usize::from(ev.row.saturating_sub(grid.y));
-                    let row = self.profile_hit_areas.color_grid_first_row + visible_row;
-                    self.select_theme_picker_cell(column, row);
-                    return;
-                }
-            }
-            match ev.kind {
-                MouseEventKind::ScrollUp => {
-                    self.profile_scroll = self.profile_scroll.saturating_sub(3);
-                },
-                MouseEventKind::ScrollDown => {
-                    self.profile_scroll = self.profile_scroll.saturating_add(3);
-                },
-                MouseEventKind::Down(MouseButton::Left)
-                    if !self
-                        .author_overlay
-                        .overlay_rect()
-                        .is_some_and(|rect| rect.contains(Position::new(ev.column, ev.row))) =>
-                {
-                    self.author_overlay.close();
-                },
-                _ => {},
-            }
+            self.settings_mouse(ev);
             return;
         }
 
@@ -454,6 +179,9 @@ impl App {
             .contains(Position::new(ev.column, ev.row))
         {
             self.mouse_pointer.request(false);
+            self.theme_mode = super::theme_config::ThemeMode::Idle;
+            self.settings_scroll = 0;
+            self.settings.follow = true;
             self.author_overlay.open();
             return;
         }

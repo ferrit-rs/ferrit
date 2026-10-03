@@ -460,9 +460,6 @@ impl App {
             return;
         };
         match prompt.action {
-            ConfirmAction::SelectAuthor(identity) => {
-                self.selected_author = identity;
-            },
             ConfirmAction::DiscardFile(path) => {
                 let untracked = self
                     .files

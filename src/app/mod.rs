@@ -283,8 +283,6 @@ struct ConfirmPrompt {
 }
 
 enum ConfirmAction {
-    /// Apply an existing Git identity to future Ferrit commits for this run.
-    SelectAuthor(Option<crate::domain::profile::settings::Identity>),
     /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
     DiscardFile(PathBuf),
     /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).
@@ -539,25 +537,24 @@ pub struct App {
     repo_name: String,
     /// Git author name from the repository's effective config.
     git_user_name: Option<String>,
-    /// Git settings and activity shown in the profile drawer.
+    /// The git identities (author label, Ferrit's commit author).
     profile: Profile,
     /// Optional per-commit author chosen from identities already in Git config.
     selected_author: Option<crate::domain::profile::settings::Identity>,
-    /// First visible profile drawer line.
-    profile_scroll: usize,
+    /// First visible line of the settings sheet.
+    settings_scroll: usize,
     theme_config: theme_config::ThemeConfig,
     theme_rgb_channel: usize,
     theme_mode: theme_config::ThemeMode,
     theme_palette_selected: usize,
     theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
-    theme_saved_config: theme_config::ThemeConfig,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
     config_file: Option<PathBuf>,
     /// Everything loaded from `config.toml`. Its `theme` is only the value
     /// read at startup: the theme being edited lives in `theme_config`.
     config: config::Config,
     keymap: keymap::Keymap,
-    profile_hit_areas: screens::profile::ProfileHitAreas,
+    settings_hits: settings::SettingsHits,
     header: git::model::StatusHeader,
     files: Vec<git::model::FileEntry>,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
@@ -660,7 +657,6 @@ pub struct App {
     cursor: DiffCursor,
     /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
     pending_confirm: Option<ConfirmPrompt>,
-    confirm_overlay: OverlayState,
     /// A commit popup or dismissible note; owns all input while `Some`
     /// (`docs/PLAN_7_COMMIT.md`).
     popup: Option<Popup>,
@@ -774,24 +770,16 @@ impl App {
                 },
                 git::Repo::identity_settings,
             );
-        let activity_commits = repo
-            .as_ref()
-            .and_then(|repo| repo.activity().ok())
-            .unwrap_or_default();
-        let profile = Profile::new(
-            Settings {
-                global_identities,
-                repository_identity,
-                effective_identity,
-                identity_source,
-            },
-            &activity_commits,
-        );
+        let profile = Profile::new(Settings {
+            global_identities,
+            repository_identity,
+            effective_identity,
+            identity_source,
+        });
         let theme_palette_selected = crate::components::ui::color_picker::nearest_index(
             theme_config.color(),
             crate::components::ui::color_picker::ColorPickerDisplay::default(),
         );
-        let theme_saved_config = theme_config.clone();
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -804,18 +792,17 @@ impl App {
             git_user_name,
             profile,
             selected_author: None,
-            profile_scroll: 0,
+            settings_scroll: 0,
             theme_config,
             theme_rgb_channel: theme_config::RGB_RED_CHANNEL,
             theme_mode: theme_config::ThemeMode::Idle,
             theme_palette_selected,
             theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
             ),
-            theme_saved_config,
             config,
             keymap,
             config_file: None,
-            profile_hit_areas: screens::profile::ProfileHitAreas::default(),
+            settings_hits: settings::SettingsHits::default(),
             header: git::model::StatusHeader::default(),
             files: Vec::new(),
             collapsed_dirs: HashSet::new(),
@@ -854,7 +841,6 @@ impl App {
             mode: Mode::default(),
             cursor: DiffCursor::default(),
             pending_confirm: None,
-            confirm_overlay: OverlayState::new(),
             popup: None,
             commit_draft: None,
             remote_busy: None,
@@ -1124,18 +1110,15 @@ impl App {
         });
         RefreshCompletion {
             snapshot,
-            profile: repo.activity().ok().map(|commits| {
+            profile: Some({
                 let (global_identities, repository_identity, effective_identity, identity_source) =
                     repo.identity_settings();
-                Profile::new(
-                    Settings {
-                        global_identities,
-                        repository_identity,
-                        effective_identity,
-                        identity_source,
-                    },
-                    &commits,
-                )
+                Profile::new(Settings {
+                    global_identities,
+                    repository_identity,
+                    effective_identity,
+                    identity_source,
+                })
             }),
             branch_log,
             commit_files,
@@ -1461,11 +1444,6 @@ impl App {
 
     pub fn git_user_name(&self) -> Option<&str> {
         self.git_user_name.as_deref()
-    }
-
-    /// All author identities and activity for the open repository.
-    pub(crate) fn profile(&self) -> &Profile {
-        &self.profile
     }
 
     /// Return cached styled diff. Cache invalidates on selection, diff text,
@@ -2191,11 +2169,12 @@ impl App {
         Ok(())
     }
 
-    /// Advance the toast's animation and its timeout by `elapsed`, as the run
-    /// loop does. Integration-test seam: a test has no loop to wait on.
+    /// Advance the toast's animation and its timeout, and the settings sheet's
+    /// slide, by `elapsed`, as the run loop does. Integration-test seam: a test has no loop to wait on.
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
+        self.author_overlay.tick(elapsed);
     }
 
     /// Close the error toast now (`Esc`), unless something else owns the key:

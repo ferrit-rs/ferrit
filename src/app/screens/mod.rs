@@ -28,7 +28,7 @@ pub mod dashboard;
 mod diff;
 pub mod git_config;
 mod popups;
-pub(super) mod profile;
+mod settings;
 pub mod welcome;
 
 /// Render the full screen for the current `App` state.
@@ -86,17 +86,6 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         },
         None => {},
     }
-    if let Some(message) = app.confirm_dialog_message().map(str::to_owned) {
-        popups::draw_confirmation(
-            frame,
-            area,
-            &message,
-            &mut app.confirm_overlay,
-            app.theme_config.color(),
-            &palette,
-        );
-    }
-
     if let Some(toast) = &mut app.toast {
         toast.render(frame, area, &palette);
     }
@@ -143,29 +132,9 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     draw_keybar(frame, keybar, app);
 
     if app.author_overlay.is_closed() {
-        app.profile_hit_areas = profile::ProfileHitAreas::default();
-    }
-
-    if !app.author_overlay.is_closed() {
-        let profile_data = app.profile().clone();
-        let theme_view = profile::ThemeView {
-            config: &app.theme_config,
-            mode: app.theme_mode,
-            rgb_channel: app.theme_rgb_channel,
-            palette_selected: app.theme_palette_selected,
-            picker_display: app.theme_picker_display,
-            dirty: app.theme_config != app.theme_saved_config,
-            colors: palette,
-        };
-        app.profile_hit_areas = profile::draw_author(
-            frame,
-            area,
-            &mut app.author_overlay,
-            &profile_data,
-            &mut app.profile_scroll,
-            &theme_view,
-            app.selected_author.as_ref(),
-        );
+        app.settings_hits = crate::app::settings::SettingsHits::default();
+    } else {
+        settings::draw(frame, area, app, &palette);
     }
     keybar
 }
