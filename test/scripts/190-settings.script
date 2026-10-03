@@ -10,6 +10,7 @@ expect-text "Settings"
 expect-text "Appearance"
 expect-text "(•) Dark"
 expect-text "Wheel step"
+expect-no-text "Refresh"
 expect-text "Show read commands"
 expect-no-text "Global Git users"
 expect-no-text "Contributors"
@@ -21,8 +22,8 @@ key right
 expect-text "(•) Light"
 expect-text "Saved ·"
 
-# A number (Context lines is five rows down) and a toggle (Sign-off, two more).
-key down down down down down
+# A number (Context lines is four rows down) and a toggle (Sign-off, two more).
+key down down down down
 expect-text "▸ Context lines"
 key right right
 expect-text "‹ 5 ›"

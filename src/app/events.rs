@@ -6,8 +6,6 @@
 
 use std::any::Any;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
@@ -77,9 +75,6 @@ pub enum RemoteOp {
 /// Debounce window for filesystem bursts. `git` touches a dozen files per
 /// operation (`index.lock`, `index`, `ORIG_HEAD`, refs, ...); this folds the
 /// burst into a single `Refresh`.
-/// How often the poll thread looks at the shared interval again.
-const POLL_SLICE_MS: u64 = 250;
-
 const FS_DEBOUNCE: Duration = Duration::from_millis(150);
 
 /// Process bursts of keys without repainting after every repeated key, while
@@ -95,8 +90,6 @@ pub struct Events {
     /// just receive (`docs/PLAN_9_REMOTE.md`'s background fetch/pull/push).
     tx: Sender<AppEvent>,
     rx: Receiver<AppEvent>,
-    /// The poll interval in milliseconds, shared with the poll thread.
-    poll: Arc<AtomicU64>,
     /// Held only to keep the filesystem watch alive; never read. Boxed so the
     /// debouncer's concrete type never leaks into this signature.
     #[allow(dead_code, reason = "owning it is what keeps the watch running")]
@@ -112,8 +105,7 @@ impl Events {
     pub fn new(watch_root: Option<&Path>, poll: Duration) -> Result<Self> {
         let (tx, rx) = mpsc::channel();
         spawn_input(tx.clone());
-        let poll = Arc::new(AtomicU64::new(duration_ms(poll)));
-        spawn_poll(tx.clone(), Arc::clone(&poll));
+        spawn_poll(tx.clone(), poll);
         let (watch, watch_error) = match watch_root {
             Some(root) => match spawn_watch(tx.clone(), root) {
                 Ok(watch) => (watch, None),
@@ -124,15 +116,9 @@ impl Events {
         Ok(Self {
             tx,
             rx,
-            poll,
             watcher: watch,
             watch_error,
         })
-    }
-
-    /// Change the refresh interval, from now on (`[ui] poll_secs`).
-    pub fn set_poll(&self, interval: Duration) {
-        self.poll.store(duration_ms(interval), Ordering::Relaxed);
     }
 
     /// Point the filesystem watch at `root`, replacing the one there was (none,
@@ -211,22 +197,11 @@ fn spawn_input(tx: Sender<AppEvent>) {
 /// Slow heartbeat so the panes never sit stale even when the watcher misses
 /// an event: network filesystems, dropped inotify events, editors that swap
 /// files in place. `poll` is `[ui] poll_secs`, 10 seconds by default, matching
-/// lazygit's `refresher.refreshInterval`. The interval is shared (milliseconds)
-/// and read again every `POLL_SLICE`, so a change from the settings sheet takes
-/// effect within a fraction of a second, not after the old interval has run out.
-fn spawn_poll(tx: Sender<AppEvent>, poll: Arc<AtomicU64>) {
+/// lazygit's `refresher.refreshInterval`.
+fn spawn_poll(tx: Sender<AppEvent>, poll: Duration) {
     thread::spawn(move || {
         loop {
-            let mut waited = 0;
-            loop {
-                let target = poll.load(Ordering::Relaxed);
-                if waited >= target {
-                    break;
-                }
-                let slice = (target - waited).min(POLL_SLICE_MS);
-                thread::sleep(Duration::from_millis(slice));
-                waited += slice;
-            }
+            thread::sleep(poll);
             if tx.send(AppEvent::Refresh).is_err() {
                 break;
             }
@@ -262,23 +237,17 @@ fn is_relevant(path: &Path) -> bool {
     !path.to_string_lossy().contains("/.git/objects/")
 }
 
-/// `d` in milliseconds, at least one so a zero cannot spin.
-fn duration_ms(d: Duration) -> u64 {
-    u64::try_from(d.as_millis()).unwrap_or(u64::MAX).max(1)
-}
-
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Arc, mpsc};
-    use std::time::{Duration, Instant};
+    use std::sync::mpsc;
+    use std::time::Duration;
 
     use super::{AppEvent, spawn_poll};
 
     #[test]
     fn the_poll_fires_at_the_configured_interval_not_a_fixed_one() {
         let (tx, rx) = mpsc::channel();
-        spawn_poll(tx, Arc::new(AtomicU64::new(20)));
+        spawn_poll(tx, Duration::from_millis(20));
         // Ten seconds would be the old fixed interval; a 20 ms poll answers at
         // once, and keeps answering.
         for _ in 0..3 {
@@ -290,21 +259,5 @@ mod tests {
                 "a poll tick"
             );
         }
-    }
-
-    #[test]
-    fn a_shorter_interval_is_taken_up_without_waiting_for_the_old_one() {
-        let (tx, rx) = mpsc::channel();
-        // An hour: nothing would ever arrive if the old interval had to run out.
-        let poll = Arc::new(AtomicU64::new(3_600_000));
-        spawn_poll(tx, Arc::clone(&poll));
-        assert!(rx.recv_timeout(Duration::from_millis(400)).is_err());
-        poll.store(50, Ordering::Relaxed);
-        let started = Instant::now();
-        assert!(matches!(
-            rx.recv_timeout(Duration::from_secs(2)),
-            Ok(AppEvent::Refresh)
-        ));
-        assert!(started.elapsed() < Duration::from_secs(1));
     }
 }

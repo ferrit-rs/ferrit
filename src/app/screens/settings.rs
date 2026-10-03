@@ -55,14 +55,6 @@ impl RowLine {
     }
 }
 
-fn seconds(value: u64) -> String {
-    if value >= 60 && value % 60 == 0 {
-        format!("{} min", value / 60)
-    } else {
-        format!("{value} s")
-    }
-}
-
 /// The row's line: the marker, the label and the value with its click parts.
 fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> RowLine {
     let accent = app.theme_config.color();
@@ -121,13 +113,9 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
             let style = if on { Style::new().fg(accent) } else { idle };
             line.clickable(if on { "[x]" } else { "[ ]" }, style, Click::Flip);
         },
-        SettingsRow::WheelStep | SettingsRow::RefreshSecs | SettingsRow::DiffContext => {
+        SettingsRow::WheelStep | SettingsRow::DiffContext => {
             let value = app.number_value(row);
-            let shown = if row == SettingsRow::RefreshSecs {
-                seconds(value)
-            } else {
-                value.to_string()
-            };
+            let shown = value.to_string();
             line.clickable("\u{2039}", idle, Click::Step(false));
             line.text(format!(" {shown} "), Style::new());
             line.clickable("\u{203a}", idle, Click::Step(true));

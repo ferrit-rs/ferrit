@@ -689,8 +689,6 @@ pub struct App {
     settings: settings::SettingsSheet,
     /// A change the run loop has to carry out in the terminal, once.
     terminal_request: Option<settings::TerminalRequest>,
-    /// The refresh interval the run loop has to hand to the poll thread, once.
-    poll_request: Option<Duration>,
     /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.
     welcome_selected: usize,
     create_remote: create_remote::CreateRemote,
@@ -857,7 +855,6 @@ impl App {
             welcome_dir: None,
             settings: settings::SettingsSheet::default(),
             terminal_request: None,
-            poll_request: None,
             welcome_selected: 0,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
@@ -2138,9 +2135,6 @@ impl App {
                 }
             }
             // A setting changed that only this loop can carry out.
-            if let Some(interval) = self.take_poll_request() {
-                events.set_poll(interval);
-            }
             if let Some(settings::TerminalRequest::Mouse(on)) = self.take_terminal_request() {
                 if let Err(error) = terminal::set_mouse(on) {
                     self.report_notice(format!("cannot switch the mouse: {error}"));

@@ -4,8 +4,6 @@
 //! `config.toml` (only its own section, through `Config::save_sections`), so the
 //! next start finds the sheet as it was left.
 
-use std::time::Duration;
-
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 use ratatui::style::Color;
@@ -18,11 +16,6 @@ use crate::components::ui::color_picker::{self, PaletteDirection};
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
 
-/// The values the refresh interval steps through: a short scale, since
-/// "10 s, 11 s, 12 s…" is not what anyone wants to press. A value written in
-/// the file that is not on it steps to the next one above or below.
-pub const REFRESH_STEPS: [u64; 13] = [1, 2, 3, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600];
-
 /// One line of the sheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsRow {
@@ -30,7 +23,6 @@ pub enum SettingsRow {
     Accent,
     Mouse,
     WheelStep,
-    RefreshSecs,
     DiffContext,
     IgnoreWhitespace,
     SignOff,
@@ -51,12 +43,11 @@ pub enum Kind {
 }
 
 impl SettingsRow {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 8] = [
         Self::Theme,
         Self::Accent,
         Self::Mouse,
         Self::WheelStep,
-        Self::RefreshSecs,
         Self::DiffContext,
         Self::IgnoreWhitespace,
         Self::SignOff,
@@ -70,7 +61,6 @@ impl SettingsRow {
             Self::Accent => "Accent",
             Self::Mouse => "Mouse",
             Self::WheelStep => "Wheel step",
-            Self::RefreshSecs => "Refresh every",
             Self::DiffContext => "Context lines",
             Self::IgnoreWhitespace => "Ignore whitespace",
             Self::SignOff => "Sign-off by default",
@@ -83,7 +73,7 @@ impl SettingsRow {
     pub const fn group(self) -> &'static str {
         match self {
             Self::Theme | Self::Accent => "Appearance",
-            Self::Mouse | Self::WheelStep | Self::RefreshSecs => "Interface",
+            Self::Mouse | Self::WheelStep => "Interface",
             Self::DiffContext | Self::IgnoreWhitespace => "Diff",
             Self::SignOff => "Commit",
             Self::ShowReads => "Command log",
@@ -96,7 +86,6 @@ impl SettingsRow {
             Self::Theme => Kind::Choice(&["Dark", "Light"]),
             Self::Accent => Kind::Choice(&["Green", "Blue", "Purple", "Amber"]),
             Self::WheelStep => Kind::Number { min: 1, max: 50 },
-            Self::RefreshSecs => Kind::Number { min: 1, max: 3600 },
             Self::DiffContext => Kind::Number { min: 0, max: 200 },
             Self::Mouse | Self::IgnoreWhitespace | Self::SignOff | Self::ShowReads => Kind::Toggle,
         }
@@ -105,7 +94,7 @@ impl SettingsRow {
     const fn section(self) -> Section {
         match self {
             Self::Theme | Self::Accent => Section::Theme,
-            Self::Mouse | Self::WheelStep | Self::RefreshSecs => Section::Ui,
+            Self::Mouse | Self::WheelStep => Section::Ui,
             Self::DiffContext | Self::IgnoreWhitespace => Section::Diff,
             Self::SignOff => Section::Commit,
             Self::ShowReads => Section::Log,
@@ -161,17 +150,6 @@ pub struct SettingsSheet {
 pub enum TerminalRequest {
     /// Switch the terminal's mouse capture on or off.
     Mouse(bool),
-}
-
-/// The step after `value` on `REFRESH_STEPS`, up or down, staying on the scale.
-fn refresh_step(value: u64, up: bool) -> u64 {
-    let next = if up {
-        REFRESH_STEPS.iter().copied().find(|&s| s > value)
-    } else {
-        REFRESH_STEPS.iter().rev().copied().find(|&s| s < value)
-    };
-    // Past an end of the scale: stay on that end.
-    next.unwrap_or(if up { 3600 } else { 1 })
 }
 
 /// `value` moved by one unit in `up`'s direction, clamped to `min..=max`.
@@ -231,7 +209,6 @@ impl App {
     pub fn number_value(&self, row: SettingsRow) -> u64 {
         match row {
             SettingsRow::WheelStep => u64::from(self.config.ui.wheel_step),
-            SettingsRow::RefreshSecs => self.config.ui.poll_secs,
             SettingsRow::DiffContext => u64::from(self.config.diff.context),
             _ => 0,
         }
@@ -268,10 +245,6 @@ impl App {
                 let value = stepped(self.number_value(row), up, 1, 50);
                 self.config.ui.wheel_step = u8::try_from(value).unwrap_or(50);
             },
-            SettingsRow::RefreshSecs => {
-                self.config.ui.poll_secs = refresh_step(self.config.ui.poll_secs, up);
-                self.poll_request = Some(Duration::from_secs(self.config.ui.poll_secs));
-            },
             SettingsRow::DiffContext => {
                 let value = stepped(self.number_value(row), up, 0, 200);
                 self.config.diff.context = u32::try_from(value).unwrap_or(200);
@@ -291,8 +264,13 @@ impl App {
     /// was drawn from it, and mirror it into the live config so a clone of the
     /// config (the app rebuilt on a new repository) carries it.
     pub(super) fn theme_changed(&mut self) {
-        self.palette = self.theme_config.palette();
-        self.rendered_diff = None;
+        let palette = self.theme_config.palette();
+        // The cached diff holds syntax colours, which follow the base only: an
+        // accent change must not make every click re-highlight the diff.
+        if palette.light != self.palette.light {
+            self.rendered_diff = None;
+        }
+        self.palette = palette;
         self.config.theme = self.theme_config.clone();
     }
 
@@ -314,11 +292,6 @@ impl App {
     /// What the run loop has to do for the last change, once.
     pub(crate) fn take_terminal_request(&mut self) -> Option<TerminalRequest> {
         self.terminal_request.take()
-    }
-
-    /// The new refresh interval the run loop has to give the poll thread, once.
-    pub(crate) fn take_poll_request(&mut self) -> Option<Duration> {
-        self.poll_request.take()
     }
 
     /// Set a choice row to the name at `index` (a click on a radio).

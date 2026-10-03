@@ -29,7 +29,6 @@ nobody sets things again.
 │ Interface                                             │
 │   Mouse            [x]                                │
 │   Wheel step       3                                  │
-│   Refresh every    10 s                               │
 │ Diff                                                  │
 │   Context lines    3                                  │
 │   Ignore whitespace [ ]                               │
@@ -74,7 +73,6 @@ invented except where a row needs it.
 | Appearance | Accent | `theme.preset`, `theme.accent` | four presets, or any colour from the picker | at once |
 | Interface | Mouse | `ui.mouse` | on, off | at once: mouse capture is switched on or off in the terminal |
 | Interface | Wheel step | `ui.wheel_step` | 1 to 50 | at once |
-| Interface | Refresh every | `ui.poll_secs` | 1 to 3600 s | at once: the poll thread reads a shared interval |
 | Diff | Context lines | `diff.context` | 0 to 200 | at once: the diff in view is read again |
 | Diff | Ignore whitespace | `diff.ignore_whitespace` | on, off | at once, same |
 | Commit | Sign-off by default | `commit.sign_off` | on, off | the next commit popup |
@@ -133,11 +131,10 @@ it. The sheet needs no mouse to be used.
   `change_setting`, `save_settings`. The live `Config` is `App::config`, so every
   other part of ferrit already reads the new value (`diff_opts()`, the wheel, the
   commit popup, the log panel).
-- Live effects that need the run loop: switching mouse capture on or off, and the new
-  refresh interval. Both go through a small request the loop applies
-  (`terminal_request`), like the watch request of phase 16.
-- `Events` gets a shared poll interval (`Arc<AtomicU64>`) so `ui.poll_secs` changes
-  without a restart.
+- The one live effect that needs the run loop is switching mouse capture on or off:
+  it goes through a small request the loop applies (`terminal_request`), like the
+  watch request of phase 16. The refresh interval is not a setting (it stays in the
+  file as `ui.poll_secs`): the sheet does not offer it.
 
 ## Rendering: `src/app/screens/settings.rs`
 
@@ -183,14 +180,14 @@ A sheet taller than the screen scrolls, with the existing scroll bar.
 ## Milestones
 
 - **U0** ✅ `Config::save_sections` and `Section`, tests (`tests/config.rs`).
-- **U1** ✅ `settings.rs` state, rows, autosave and every live effect, mouse switch and
-  refresh interval included (they go through `terminal_request` and `poll_request`,
+- **U1** ✅ `settings.rs` state, rows, autosave and every live effect, mouse switch
+  included (it goes through `terminal_request`,
   which the run loop applies), tests through the `App` (`tests/app_settings.rs`). The
   keys are routed in U2.
 - **U2** ✅ `screens/settings.rs` and the routing: the click on the author's name opens
   it, the old drawer's identity and activity blocks and keys go, `domain/profile/activity.rs`
   and `Repo::activity` go with them (the refresh no longer walks two years of commits for it).
-- **U3** folded into U1 (the live mouse switch and refresh interval).
+- **U3** folded into U1 (the live mouse switch).
 - **U4** ✅ the author line and `Ctrl-A` in the commit popup (`tests/app_commit.rs`).
 - **U5** ✅ the replay script (`click-text`, `config-file`, `reopen`) and a last pass over README, CHANGELOG and plans.
 

@@ -14,7 +14,7 @@ use std::process::Command;
 
 use ferrit::app::App;
 use ferrit::app::config::Config;
-use ferrit::app::settings::{Kind, REFRESH_STEPS, SaveState, SettingsRow, TerminalRequest};
+use ferrit::app::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
 use ferrit::app::theme_config::{Base, Preset};
 
 struct Fixture {
@@ -81,7 +81,6 @@ fn every_row_has_a_label_a_group_and_a_kind() {
         [
             "Appearance",
             "Appearance",
-            "Interface",
             "Interface",
             "Interface",
             "Diff",
@@ -178,44 +177,6 @@ fn the_numbers_step_by_one_and_stop_at_their_ends() {
     press(&mut app, SettingsRow::DiffContext, true);
     assert_eq!(fx.saved().diff.context, 1);
     assert_eq!(app.live_config().diff.context, 1);
-}
-
-#[test]
-fn the_refresh_interval_walks_a_short_scale_and_a_value_off_the_scale_snaps_to_it() {
-    let fx = Fixture::new("set-refresh");
-    let mut app = fx.app();
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 10);
-    press(&mut app, SettingsRow::RefreshSecs, true);
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 15);
-    press(&mut app, SettingsRow::RefreshSecs, false);
-    press(&mut app, SettingsRow::RefreshSecs, false);
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 5);
-    assert_eq!(fx.saved().ui.poll_secs, 5);
-
-    for _ in 0..30 {
-        press(&mut app, SettingsRow::RefreshSecs, true);
-    }
-    assert_eq!(
-        app.number_value(SettingsRow::RefreshSecs),
-        3600,
-        "the top of the scale"
-    );
-    for _ in 0..30 {
-        press(&mut app, SettingsRow::RefreshSecs, false);
-    }
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 1, "the bottom");
-    assert_eq!(REFRESH_STEPS.first(), Some(&1));
-    assert_eq!(REFRESH_STEPS.last(), Some(&3600));
-
-    // 7 s, typed in the file, is not on the scale.
-    fs::write(fx.file(), "[ui]\npoll_secs = 7\n").unwrap();
-    let mut app = fx.app();
-    press(&mut app, SettingsRow::RefreshSecs, true);
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 10);
-    fs::write(fx.file(), "[ui]\npoll_secs = 7\n").unwrap();
-    let mut app = fx.app();
-    press(&mut app, SettingsRow::RefreshSecs, false);
-    assert_eq!(app.number_value(SettingsRow::RefreshSecs), 5);
 }
 
 #[test]
@@ -320,7 +281,6 @@ fn what_is_saved_is_what_the_next_start_loads() {
         press(&mut app, SettingsRow::Accent, true);
         press(&mut app, SettingsRow::Mouse, true);
         press(&mut app, SettingsRow::WheelStep, true);
-        press(&mut app, SettingsRow::RefreshSecs, true);
         press(&mut app, SettingsRow::DiffContext, true);
         press(&mut app, SettingsRow::IgnoreWhitespace, true);
         press(&mut app, SettingsRow::SignOff, true);
@@ -334,7 +294,6 @@ fn what_is_saved_is_what_the_next_start_loads() {
     assert_eq!(reopened.choice_index(SettingsRow::Accent), Some(1));
     assert!(!reopened.mouse_enabled());
     assert_eq!(reopened.number_value(SettingsRow::WheelStep), 4);
-    assert_eq!(reopened.number_value(SettingsRow::RefreshSecs), 15);
     assert_eq!(reopened.number_value(SettingsRow::DiffContext), 4);
     for row in [
         SettingsRow::IgnoreWhitespace,

@@ -129,7 +129,6 @@ fn the_sheet_holds_ferrits_settings_and_nothing_of_git_or_the_dashboard() {
         "Interface",
         "Mouse",
         "Wheel step",
-        "Refresh every",
         "Diff",
         "Context lines",
         "Ignore whitespace",
@@ -159,7 +158,7 @@ fn the_sheet_holds_ferrits_settings_and_nothing_of_git_or_the_dashboard() {
         text.contains("(\u{2022}) Dark") && text.contains("( ) Light"),
         "{text}"
     );
-    assert!(text.contains("10 s"), "the refresh interval: {text}");
+    assert!(!text.contains("Refresh"), "no refresh option: {text}");
 }
 
 #[test]
