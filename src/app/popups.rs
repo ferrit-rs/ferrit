@@ -92,6 +92,7 @@ impl App {
             lines: buf.lines(),
             cursor: buf.cursor(),
             toggles: None,
+            author: None,
             hints: "Create: Enter | Cancel: Esc",
         })
     }
@@ -110,6 +111,7 @@ impl App {
             lines: buf.lines(),
             cursor: buf.cursor(),
             toggles: None,
+            author: None,
             hints: "Stash: Enter | Cancel: Esc",
         })
     }
@@ -128,6 +130,7 @@ impl App {
             lines: input.lines(),
             cursor: input.cursor(),
             toggles: None,
+            author: None,
             hints: target.hints(),
         })
     }
@@ -196,6 +199,7 @@ impl App {
             lines: input.lines(),
             cursor: input.cursor(),
             toggles: None,
+            author: None,
             hints: "Push: Enter | Cancel: Esc",
         })
     }

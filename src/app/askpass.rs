@@ -76,6 +76,7 @@ impl App {
             lines: ask.shown.lines(),
             cursor: ask.shown.cursor(),
             toggles: None,
+            author: None,
             hints: "Send: Enter | Cancel: Esc",
         })
     }

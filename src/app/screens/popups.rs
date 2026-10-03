@@ -134,7 +134,8 @@ pub(super) fn draw_commit(
         };
         // The sign-off / no-verify line only exists when the toggles do (not
         // for a rebase reword, which runs the amend itself).
-        let footer_rows = if view.toggles.is_some() { 2 } else { 1 };
+        let footer_rows =
+            if view.toggles.is_some() { 2 } else { 1 } + u16::from(view.author.is_some());
         let [body_area, footer_area] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(footer_rows)]).areas(inner);
         let [summary_area, description_area] =
@@ -180,7 +181,14 @@ pub(super) fn draw_commit(
                     Span::styled("no-verify: ", Style::new().fg(palette.idle)),
                     Span::styled(on_off(no_verify), Style::new().fg(palette.del)),
                 ]);
-                vec![status, hints]
+                let mut rows = vec![status];
+                rows.extend(
+                    view.author
+                        .as_ref()
+                        .map(|author| Line::styled(author.clone(), Style::new().fg(palette.idle))),
+                );
+                rows.push(hints);
+                rows
             },
             None => vec![hints],
         };

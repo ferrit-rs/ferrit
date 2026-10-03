@@ -548,3 +548,123 @@ fn a_too_long_subject_can_still_be_committed() {
     assert!(app.commit_popup().is_none(), "no block, only a colour");
     assert_eq!(head_summary(&mut app), subject);
 }
+
+fn screen_text(app: &mut App) -> String {
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal
+        .draw(|f| ferrit::app::screens::draw(f, app))
+        .unwrap();
+    let buf = terminal.backend().buffer().clone();
+    (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A repository with one staged change and its own identity, an app on it that
+/// knows two global identities.
+fn app_with_identities(tag: &str) -> (TempDir, App) {
+    let dir = TempDir::new(tag);
+    let repo = Repository::init(dir.path()).unwrap();
+    configure_identity(dir.path());
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    commit_all(&repo, "init");
+    fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+    Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["add", "a.txt"])
+        .output()
+        .unwrap();
+    let mut app = App::open(dir.path()).unwrap();
+    app.set_global_identities(vec![
+        ("Ada Work".to_owned(), "ada@work.example".to_owned()),
+        ("Ada Home".to_owned(), "ada@home.example".to_owned()),
+    ]);
+    (dir, app)
+}
+
+#[test]
+fn the_commit_popup_names_the_author_and_ctrl_a_cycles_the_identities_then_git_own() {
+    let (_dir, mut app) = app_with_identities("app-commit-author");
+    app.feed_key(char_key('c'));
+    let text = screen_text(&mut app);
+    assert!(
+        text.contains("author: git's own (Max Wells <maxwells.pro@proton.me>)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Ctrl-O/N/A"),
+        "the hint names the key: {text}"
+    );
+
+    app.feed_key(ctrl_key('a'));
+    assert!(screen_text(&mut app).contains("author: Ada Work <ada@work.example>"));
+    app.feed_key(ctrl_key('a'));
+    assert!(screen_text(&mut app).contains("author: Ada Home <ada@home.example>"));
+    app.feed_key(ctrl_key('a'));
+    assert!(screen_text(&mut app).contains("author: git's own (Max Wells"));
+}
+
+#[test]
+fn a_commit_is_by_the_chosen_author_and_the_choice_lasts_for_the_next_commit_of_the_run() {
+    let (dir, mut app) = app_with_identities("app-commit-by");
+    app.feed_key(char_key('c'));
+    app.feed_key(ctrl_key('a'));
+    type_text(&mut app, "by ada");
+    app.feed_key(KeyEvent::from(KeyCode::Enter));
+
+    let log = |format: &str| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .args(["log", "-1", &format!("--format={format}")])
+            .output()
+            .unwrap();
+        String::from_utf8(out.stdout).unwrap().trim().to_owned()
+    };
+    assert_eq!(log("%an <%ae>"), "Ada Work <ada@work.example>");
+    assert_eq!(
+        log("%cn <%ce>"),
+        "Max Wells <maxwells.pro@proton.me>",
+        "the committer stays git's own"
+    );
+
+    fs::write(dir.path().join("a.txt"), "one\ntwo\nthree\n").unwrap();
+    Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["add", "a.txt"])
+        .output()
+        .unwrap();
+    app.refresh();
+    app.feed_key(char_key('c'));
+    assert!(
+        screen_text(&mut app).contains("author: Ada Work"),
+        "still chosen for this run"
+    );
+    // The choice never touches git's config.
+    let configured = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["config", "user.name"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8(configured.stdout).unwrap().trim(),
+        "Max Wells"
+    );
+}
+
+#[test]
+fn without_a_global_identity_ctrl_a_has_nothing_to_cycle() {
+    let (_dir, mut app) = app_with_identities("app-commit-noident");
+    app.set_global_identities(Vec::new());
+    app.feed_key(char_key('c'));
+    app.feed_key(ctrl_key('a'));
+    assert!(screen_text(&mut app).contains("author: git's own (Max Wells"));
+}

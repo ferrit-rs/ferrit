@@ -57,6 +57,7 @@ impl CommitDraft {
 impl App {
     /// Commit popup view for rendering.
     pub fn commit_popup(&mut self) -> Option<CommitPopupView<'_>> {
+        let author = self.author_line();
         let Self {
             popup,
             commit_overlay,
@@ -65,12 +66,13 @@ impl App {
         let Some(Popup::Commit(draft)) = popup else {
             return None;
         };
+        let author = draft.reword.is_none().then_some(author);
         let hints = match (draft.reword.is_some(), draft.focus) {
             (false, CommitField::Summary) => {
-                "Enter: commit | Tab: description | ↑/↓: history | Ctrl-O/N: options | Esc: cancel"
+                "Enter: commit | Tab: description | ↑/↓: history | Ctrl-O/N/A: options | Esc: cancel"
             },
             (false, CommitField::Description) => {
-                "Enter: newline | Tab: summary | Meta/Ctrl-Enter: commit | Ctrl-O/N: options | Esc: cancel"
+                "Enter: newline | Tab: summary | Meta/Ctrl-Enter: commit | Ctrl-O/N/A: options | Esc: cancel"
             },
             // A rebase reword has no sign-off / no-verify to toggle.
             (true, CommitField::Summary) => {
@@ -96,8 +98,53 @@ impl App {
                 .reword
                 .is_none()
                 .then_some((draft.sign_off, draft.no_verify)),
+            author,
             hints,
         })
+    }
+
+    /// Replace the identities git knows globally. Integration-test seam: the
+    /// real ones come from the machine's own git config.
+    #[doc(hidden)]
+    pub fn set_global_identities(&mut self, identities: Vec<(String, String)>) {
+        self.profile.settings.global_identities = identities
+            .into_iter()
+            .map(|(name, email)| crate::domain::profile::settings::Identity {
+                name,
+                email: Some(email),
+            })
+            .collect();
+    }
+
+    /// The popup's author line: who the next commit is by. Ferrit's pick is for
+    /// this run only and never writes git's config.
+    fn author_line(&self) -> String {
+        let identity = |i: &crate::domain::profile::settings::Identity| match &i.email {
+            Some(email) => format!("{} <{email}>", i.name),
+            None => i.name.clone(),
+        };
+        match (
+            &self.selected_author,
+            &self.profile.settings.effective_identity,
+        ) {
+            (Some(chosen), _) => format!("author: {}", identity(chosen)),
+            (None, Some(own)) => format!("author: git's own ({})", identity(own)),
+            (None, None) => "author: git's own".to_owned(),
+        }
+    }
+
+    /// `Ctrl-A`: the next identity git knows (from its global config), then
+    /// git's own, then round again. Nothing to cycle when git knows none.
+    fn cycle_author(&mut self) {
+        let identities = self.profile.settings.available_identities();
+        self.selected_author = match &self.selected_author {
+            None => identities.first().cloned(),
+            Some(current) => identities
+                .iter()
+                .position(|i| i == current)
+                .and_then(|index| identities.get(index + 1))
+                .cloned(),
+        };
     }
 
     /// `c` / `A` / `w`: open the commit editor. Amend / Reword pre-fill
@@ -264,6 +311,7 @@ impl App {
             KeyCode::Char('n') if ctrl && draft.reword.is_none() => {
                 draft.no_verify = !draft.no_verify;
             },
+            KeyCode::Char('a') if ctrl && draft.reword.is_none() => self.cycle_author(),
             KeyCode::Enter if draft.focus == CommitField::Summary => commit = true,
             KeyCode::Enter => {
                 draft

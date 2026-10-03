@@ -104,6 +104,9 @@ pub struct CommitPopupView<'a> {
     /// `Some((sign_off, no_verify))` for the commit popup's toggle line;
     /// `None` for the new-branch popup, which has nothing to toggle.
     pub toggles: Option<(bool, bool)>,
+    /// The commit popup's author line (`author: Name <email>`); `None` for the
+    /// other popups and for a reword, which keeps the commit's own author.
+    pub author: Option<String>,
     /// Footer key hints, e.g. `"Commit: Ctrl-S | ... | Cancel: Esc"`.
     pub hints: &'static str,
 }
@@ -2175,6 +2178,13 @@ impl App {
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
         self.author_overlay.tick(elapsed);
+    }
+
+    /// Let the settings sheet's slide end now. Integration-test seam for the
+    /// replay, which has no clock to wait on.
+    #[doc(hidden)]
+    pub fn finish_animations(&mut self) {
+        self.author_overlay.tick(Duration::from_secs(1));
     }
 
     /// Close the error toast now (`Esc`), unless something else owns the key:
