@@ -1,6 +1,7 @@
 //! The dashboard as a sheet (`docs/PLAN_19_DASHBOARD_SHEET.md`): the page of
-//! `screens/dashboard.rs` drawn into the drawer's inner area, 90 % wide so that
-//! its two columns fit on the usual wide terminals.
+//! `screens/dashboard.rs` drawn into the drawer's inner area. The drawer is as wide
+//! as the page ever gets (it stops at `MAX_WIDTH`, so a wider drawer would only add
+//! margins) and at most 95 % of the terminal, so the panes stay in sight.
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
@@ -11,15 +12,17 @@ use crate::app::App;
 use crate::components::ui::chart_palette::ChartPalette;
 use crate::components::ui::drawer::Drawer;
 
-/// How much of the width the drawer takes.
-const WIDTH_PERCENT: u16 = 90;
+/// The most of the terminal's width the drawer takes, in percent.
+const MAX_PERCENT: u16 = 95;
 
 /// Draw the drawer and the page in it, over `area`. The page's scroll is clamped
 /// to what it can scroll.
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let accent = app.theme_config.color();
+    // The page plus the drawer's two border columns, no more.
+    let width = (dashboard::MAX_WIDTH + 2).min(area.width.saturating_mul(MAX_PERCENT) / 100);
     let Some(inner) = Drawer::new(&mut app.sheet_overlay, " Dashboard ")
-        .width(Constraint::Percentage(WIDTH_PERCENT))
+        .width(Constraint::Length(width))
         .border_style(Style::new().fg(accent))
         .render(frame, area)
     else {

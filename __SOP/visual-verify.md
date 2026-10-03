@@ -44,6 +44,13 @@ launch ferrit with `FERRIT_NO_GRAPHICS=1` (already baked into
 with a raw ANSI diff (`tmux capture-pane -t ferrit -p -e`, diff two
 captures around a keypress) before assuming the feature itself is broken.
 
+## Gotcha: a blank screenshot
+
+A shot taken after the window has sat idle for a few seconds can come out as an empty
+dark window while the app is fine (`tmux capture-pane -t <session> -p` still shows
+the screen). Take it again (`sleep 1` first); do not conclude the program drew
+nothing from one blank image.
+
 ## Files
 
 - `.dev-tools/tui-shot.sh` — one step, one screenshot. Tracked in git.

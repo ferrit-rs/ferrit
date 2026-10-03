@@ -1,6 +1,6 @@
 # Plan: phase 19, the dashboard as a sheet
 
-**Status: in progress (S0 to S2 done: the shared sheet state, the dashboard in the drawer, and its tests).** Written after the settings sheet (phase 17): the dashboard
+**Status: done (S0 to S3).** Written after the settings sheet (phase 17): the dashboard
 (phase 13) is a full-screen view, and the user wants to keep the panes in sight
 while it is up. lazygit has no dashboard, so this is not compared with it; it is
 checked with frame tests, the replay harness and screenshots
@@ -45,6 +45,10 @@ Today (D, full screen)                  This phase (D, a sheet)
   filtered list and the welcome screen has no panes behind it: neither is converted).
 
 ## Width
+
+> **Superseded in S3** (see "S3, what the screenshots found"): the drawer is as wide as
+> the page (112 cells), at most 95 % of the terminal, not 90 %. The analysis below is
+> what the plan assumed before the screenshots.
 
 The dashboard has two layouts, chosen from the width it is given: **wide** (two
 columns, from 110 cells, `WIDE`) and **stacked** (one column, more scrolling); below
@@ -120,7 +124,7 @@ the layout that exists today for narrow windows. (The settings sheet stays at 75
 - **S1** ✅ the dashboard drawn in the drawer, opened and closed by `D`, `Esc`, `q` and
   a click outside; the key bar; the worker's lifecycle.
 - **S2** ✅ the tests and the replay script adapted and extended.
-- **S3** the screenshots in both themes and both widths, anything the eye finds, then
+- **S3** ✅ the screenshots in both themes and both widths, anything the eye finds, then
   README, CHANGELOG, `PLAN_13_DASHBOARD.md` (a line saying it is a sheet now) and
   `PLAN_0_GENERAL.md`.
 
@@ -136,12 +140,37 @@ README says it is a sheet.
 
 ## Decisions taken (confirmed by the user before S0)
 
-- The drawer is **90 %** wide, not 75 % like the settings sheet, which would stack the
-  page on most terminals.
+- The drawer is wide, not 75 % like the settings sheet, which would stack the page on
+  most terminals. (Planned as 90 % of the terminal; changed in S3, see below.)
 - One shared drawer state with a kind (`app::sheet::Sheet`), not a second overlay state
   for the dashboard.
 - No full-screen mode kept beside the sheet.
 - `C` (git config) and the welcome screen stay full screen.
+
+## S3, what the screenshots found (Terminal.app through tmux, the ferrit repository)
+
+Dark and Light at 200 columns, and Dark at 120, read by eye.
+
+- **The 90 % drawer was wrong on a wide terminal.** The page stops composing at 110
+  cells (`MAX_WIDTH`), so at 200 columns a 90 % drawer (about 170 cells) held a 110-cell
+  page floating in the middle with wide empty margins, and left only about 20
+  columns of panes in sight, which defeats the point of a sheet. The drawer is now as
+  wide as the page plus its two border columns (112 cells) and at most 95 % of the
+  terminal: at 200 columns 88 columns of panes stay visible (the Files, Branches and
+  Commits panes and the start of the diff), and at 120 columns the page keeps its two
+  columns (112 of 120) with a strip of the panes still showing. Below about 118 columns
+  it is 95 % wide and the page stacks, as it always did on a narrow terminal.
+- Both themes read well on the page: the line chart, the ring, the heat map (the dark
+  and the light greens), the contributor bars, the hot files and the branch table. The
+  panes behind are visibly dimmed in both.
+- **Left as it is** (cosmetic, not changed): the page still draws its own rounded border
+  inside the drawer's, and its header repeats the drawer's title ("Dashboard"), so there
+  are two nested frames. Removing the page's frame in the sheet means changing the
+  page's layout constants (the `PAD`, the chrome row count), which is a change of the
+  page and not of the sheet.
+- A screenshot taken after the window had been idle for a few seconds came out blank
+  twice (the app was fine: `tmux capture-pane` showed the dashboard); taking it again
+  gave the right frame. A property of the capture, noted in `__SOP/visual-verify.md`.
 
 ## S2, as built
 

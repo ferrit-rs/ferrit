@@ -18,7 +18,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Changed
 
-- The dashboard (`D`) is now a sheet, like the settings: it slides in from the right over the dimmed panes instead of replacing the whole screen, so the panes stay in sight. It is 90 % of the width (the page keeps its two columns from 110 cells inside it, so a terminal of about 124 columns or more), its own key bar stays at the bottom, and `D`, `Esc`, `q` or a click outside slide it out. The page and the way it is computed are unchanged. The settings sheet and the dashboard share one drawer, so only one is up at a time.
+- The dashboard (`D`) is now a sheet, like the settings: it slides in from the right over the dimmed panes instead of replacing the whole screen, so the panes stay in sight. The drawer is as wide as the page ever gets (112 cells, and at most 95 % of the terminal), so the two columns of the page fit from a 120-column terminal and more of the panes stay in sight on a wide one; its own key bar stays at the bottom, and `D`, `Esc`, `q` or a click outside slide it out. The page and the way it is computed are unchanged. The settings sheet and the dashboard share one drawer, so only one is up at a time.
 
 ### Removed
 

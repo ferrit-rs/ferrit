@@ -1270,7 +1270,7 @@ fn the_help_overlay_still_draws_over_the_dashboard() {
     let out = app_frame(&mut app, 130, 50);
     assert!(out.contains("Close: esc/? | Scroll: j/k"), "{out}");
     assert!(
-        out.contains("Dashboard") && out.contains("[1] Status"),
+        out.contains("Dashb") && out.contains("[1] Status"),
         "the sheet and the panes stay under the overlay\n{out}"
     );
 }

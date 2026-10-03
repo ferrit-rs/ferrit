@@ -369,7 +369,7 @@ fn a_click_reaches_no_pane_behind_the_dashboard_and_the_wheel_scrolls_it() {
     }
     let selected = app.selected(Pane::Commits);
 
-    // Inside the drawer (it spans the right nine tenths of 120 columns).
+    // Inside the drawer (112 of the 120 columns, from the right).
     for row in [3, 12, 20, 30] {
         app.feed_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 60, row));
     }
