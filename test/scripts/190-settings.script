@@ -8,7 +8,7 @@ config-file ""
 click-text "Ferrit Fixture"
 expect-text "Settings"
 expect-text "Appearance"
-expect-text "(•) Terminal"
+expect-text "(•) Dark"
 expect-text "Wheel step"
 expect-no-text "Refresh"
 expect-text "Show read commands"
@@ -17,12 +17,7 @@ expect-no-text "Contributors"
 expect-no-text "[ Save ]"
 snapshot sheet
 
-# The theme: Right walks Terminal, Dark, Light; each is on disk before anything is
-# closed. "Terminal is" belongs to the Terminal choice only.
-expect-text "Terminal is"
-key right
-expect-text "(•) Dark"
-expect-no-text "Terminal is"
+# The theme: Right goes to Light; it is on disk before anything is closed.
 key right
 expect-text "(•) Light"
 expect-text "Saved ·"

@@ -31,6 +31,15 @@ mod popups;
 mod settings;
 pub mod welcome;
 
+/// What the terminal gets: the screen, then the theme's paint pass over it, which
+/// turns the unset and the ANSI colours of the frame into the theme's own
+/// (`docs/PLAN_18_THEMES.md`). `draw` alone keeps the colours the widgets chose
+/// (the palette's `Red`, `Blue`...), which is what most tests look at.
+pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
+    draw(frame, app);
+    app.theme_config.scheme().paint(frame.buffer_mut());
+}
+
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
@@ -88,11 +97,6 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     }
     if let Some(toast) = &mut app.toast {
         toast.render(frame, area, &palette);
-    }
-    // Last, over everything drawn: a painted theme turns the unset and the ANSI
-    // colours of the frame into its own (`docs/PLAN_18_THEMES.md`).
-    if let Some(scheme) = app.theme_config.scheme() {
-        scheme.paint(frame.buffer_mut());
     }
 }
 

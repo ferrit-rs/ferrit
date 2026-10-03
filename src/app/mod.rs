@@ -2082,7 +2082,7 @@ impl App {
                 terminal.clear()?;
             }
             prev_was_image = is_image;
-            terminal.draw(|frame| ui::draw(frame, self))?;
+            terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
             let was_animating = self.author_overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);

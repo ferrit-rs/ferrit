@@ -5,8 +5,8 @@
     clippy::indexing_slicing,
     reason = "integration test scaffolding: a failed setup is the assertion"
 )]
-//! Painted themes (`docs/PLAN_18_THEMES.md`, P0): `[theme] scheme = "dark" |
-//! "light"` paints the whole frame, `terminal` (the default) paints nothing.
+//! Painted themes (`docs/PLAN_18_THEMES.md`): `[theme] base = "dark" | "light"`
+//! paints the whole frame, whichever the terminal's own background is.
 
 use std::fs;
 use std::path::PathBuf;
@@ -14,7 +14,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use ferrit::app::config::{Config, ConfigLoad};
-use ferrit::app::theme_config::SchemeChoice;
+use ferrit::app::theme_config::Base;
 use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::scheme::{Scheme, contrast};
 use ratatui::Terminal;
@@ -71,7 +71,7 @@ impl Drop for Repo {
 
 fn frame(app: &mut App) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal.draw(|f| ui::draw(f, app)).unwrap();
+    terminal.draw(|f| ui::draw_painted(f, app)).unwrap();
     terminal.backend().buffer().clone()
 }
 
@@ -114,7 +114,7 @@ fn press(app: &mut App, code: KeyCode) {
 fn a_painted_scheme_leaves_no_unset_and_no_ansi_colour_on_the_panes() {
     let repo = Repo::new("paint-panes");
     for scheme in ["dark", "light"] {
-        let mut app = repo.app(&format!("[theme]\nscheme = \"{scheme}\"\n"));
+        let mut app = repo.app(&format!("[theme]\nbase = \"{scheme}\"\n"));
         let buf = frame(&mut app);
         assert_eq!(unpainted(&buf), None, "{scheme}");
     }
@@ -124,7 +124,7 @@ fn a_painted_scheme_leaves_no_unset_and_no_ansi_colour_on_the_panes() {
 fn it_covers_what_clear_wipes_a_popup_the_help_the_toast_and_the_drawer() {
     let repo = Repo::new("paint-overlays");
     for scheme in ["dark", "light"] {
-        let mut app = repo.app(&format!("[theme]\nscheme = \"{scheme}\"\n"));
+        let mut app = repo.app(&format!("[theme]\nbase = \"{scheme}\"\n"));
         // The help screen.
         press(&mut app, KeyCode::Char('?'));
         assert_eq!(unpainted(&frame(&mut app)), None, "{scheme} help");
@@ -161,7 +161,7 @@ fn it_covers_what_clear_wipes_a_popup_the_help_the_toast_and_the_drawer() {
 #[test]
 fn the_dashboard_and_the_git_config_screen_are_painted_too() {
     let repo = Repo::new("paint-screens");
-    let mut app = repo.app("[theme]\nscheme = \"light\"\n");
+    let mut app = repo.app("[theme]\nbase = \"light\"\n");
     press(&mut app, KeyCode::Char('C'));
     assert_eq!(unpainted(&frame(&mut app)), None, "git config");
     press(&mut app, KeyCode::Esc);
@@ -170,23 +170,24 @@ fn the_dashboard_and_the_git_config_screen_are_painted_too() {
 }
 
 #[test]
-fn the_default_scheme_is_terminal_and_paints_nothing() {
-    let repo = Repo::new("paint-terminal");
+fn with_no_config_ferrit_is_dark_and_painted() {
+    let repo = Repo::new("paint-default");
     let mut app = repo.app("");
-    assert_eq!(Config::default().theme.scheme, SchemeChoice::Terminal);
+    assert_eq!(Config::default().theme.base, Base::Dark);
     let buf = frame(&mut app);
-    let reset = (0..buf.area.height)
-        .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
-        .any(|(x, y)| buf[(x, y)].bg == Color::Reset);
-    assert!(reset, "the terminal's own background is still there");
-    let same = frame(&mut repo.app("[theme]\nscheme = \"terminal\"\n"));
-    assert_eq!(buf, same, "naming it changes nothing");
+    assert_eq!(unpainted(&buf), None);
+    assert!(
+        (0..buf.area.height)
+            .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+            .any(|(x, y)| buf[(x, y)].bg == Scheme::DARK.background),
+        "the dark background is there without any setting"
+    );
 }
 
 #[test]
 fn the_painted_background_and_text_are_the_schemes() {
     let repo = Repo::new("paint-colours");
-    let mut app = repo.app("[theme]\nscheme = \"light\"\n");
+    let mut app = repo.app("[theme]\nbase = \"light\"\n");
     let buf = frame(&mut app);
     assert!(
         (0..buf.area.height)
@@ -194,7 +195,7 @@ fn the_painted_background_and_text_are_the_schemes() {
             .any(|(x, y)| buf[(x, y)].bg == Scheme::LIGHT.background),
         "white is painted"
     );
-    let dark = frame(&mut repo.app("[theme]\nscheme = \"dark\"\n"));
+    let dark = frame(&mut repo.app("[theme]\nbase = \"dark\"\n"));
     assert!(
         (0..dark.area.height)
             .flat_map(|y| (0..dark.area.width).map(move |x| (x, y)))
@@ -269,53 +270,48 @@ fn every_text_colour_reads_on_its_background_in_both_schemes() {
 }
 
 #[test]
-fn the_scheme_is_a_config_key_with_a_default_and_a_reported_bad_value() {
+fn the_theme_is_a_config_key_with_a_default_and_a_reported_bad_value() {
     let (config, issues) = Config::parse("");
     assert!(issues.is_empty());
-    assert_eq!(config.theme.scheme, SchemeChoice::Terminal);
+    assert_eq!(config.theme.base, Base::Dark);
 
-    for (text, wanted) in [
-        ("terminal", SchemeChoice::Terminal),
-        ("dark", SchemeChoice::Dark),
-        ("light", SchemeChoice::Light),
-    ] {
-        let (config, issues) = Config::parse(&format!("[theme]\nscheme = \"{text}\"\n"));
+    for (text, wanted) in [("dark", Base::Dark), ("light", Base::Light)] {
+        let (config, issues) = Config::parse(&format!("[theme]\nbase = \"{text}\"\n"));
         assert!(issues.is_empty(), "{issues:?}");
-        assert_eq!(config.theme.scheme, wanted);
+        assert_eq!(config.theme.base, wanted);
     }
 
-    let (config, issues) = Config::parse("[theme]\nscheme = \"sepia\"\n");
-    assert_eq!(config.theme.scheme, SchemeChoice::Terminal, "falls back");
-    assert!(
-        issues.iter().any(|i| i.contains("[theme] ignored")),
-        "{issues:?}"
-    );
+    // "terminal" was a value of a plan that was dropped: it is a bad value now.
+    for bad in ["sepia", "terminal"] {
+        let (config, issues) = Config::parse(&format!("[theme]\nbase = \"{bad}\"\n"));
+        assert_eq!(config.theme.base, Base::Dark, "falls back");
+        assert!(
+            issues.iter().any(|i| i.contains("[theme] ignored")),
+            "{bad}: {issues:?}"
+        );
+    }
 }
 
 #[test]
-fn a_painted_scheme_makes_base_irrelevant_and_terminal_keeps_it() {
-    let (dark_painted, _) = Config::parse("[theme]\nscheme = \"dark\"\nbase = \"light\"\n");
-    assert!(!dark_painted.theme.palette().light, "dark wins over base");
-    let (light_painted, _) = Config::parse("[theme]\nscheme = \"light\"\nbase = \"dark\"\n");
-    assert!(light_painted.theme.palette().light);
-    let (terminal_light, _) = Config::parse("[theme]\nbase = \"light\"\n");
-    assert!(terminal_light.theme.palette().light, "as before this phase");
-    assert!(terminal_light.theme.scheme().is_none());
+fn the_palette_and_the_painted_scheme_both_follow_base() {
+    let (dark, _) = Config::parse("[theme]\nbase = \"dark\"\n");
+    assert!(!dark.theme.palette().light);
+    assert_eq!(dark.theme.scheme(), Scheme::DARK);
+    let (light, _) = Config::parse("[theme]\nbase = \"light\"\n");
+    assert!(light.theme.palette().light);
+    assert_eq!(light.theme.scheme(), Scheme::LIGHT);
 }
 
 #[test]
-fn the_scheme_survives_a_save_of_the_theme_with_the_rest_of_the_file() {
+fn the_theme_survives_a_save_with_the_rest_of_the_file() {
     let repo = Repo::new("paint-save");
     let file = repo.0.join("config.toml");
     fs::write(&file, "[from_the_future]\nanswer = 42\n").unwrap();
     let mut load = Config::load_from(&file);
-    load.config.theme.scheme = SchemeChoice::Light;
+    load.config.theme.base = Base::Light;
     Config::save_sections(&file, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
     let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains("scheme = \"light\""), "{text}");
+    assert!(text.contains("base = \"light\""), "{text}");
     assert!(text.contains("answer = 42"), "{text}");
-    assert_eq!(
-        Config::load_from(&file).config.theme.scheme,
-        SchemeChoice::Light
-    );
+    assert_eq!(Config::load_from(&file).config.theme.base, Base::Light);
 }

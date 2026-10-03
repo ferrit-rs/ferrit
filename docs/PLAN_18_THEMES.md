@@ -1,6 +1,6 @@
 # Plan: phase 18, painted themes (a real dark and a real light)
 
-**Status: in progress (P0 and P1 done: `theme.scheme`, the paint pass, and the Theme row of the sheet).** Written after phase 17 (the settings sheet) shipped a "Theme:
+**Status: in progress (P0, P1 and P1b done: the paint pass and the Theme row; P2 is next).** Written after phase 17 (the settings sheet) shipped a "Theme:
 Dark / Light" row that does not paint anything. lazygit has no such setting (it only
 sets foreground colours and leaves the terminal's background alone), so this phase is
 not compared with it; it is checked with buffer tests and screenshots
@@ -37,39 +37,39 @@ accent colour stays the user's own pick on top of any of them.
   terminals honour it, and a crash would leave the terminal's background changed.
   Ferrit paints its own cells instead, which works everywhere and cleans up by itself.
 - **Themes the user writes** (a theme file format). The data is shaped so that more
-  themes can be added later; this phase ships three choices and no file format.
+  themes can be added later; this phase ships two themes and no file format.
 - **The terminal's window padding.** The margin some terminals keep around the cell
   grid is the terminal's and keeps its colour; ferrit has no cell there.
 
-## The three choices
+## The two themes
 
-| Choice | What it does | Config |
+There are two themes and no "follow the terminal" option (dropped on the user's
+decision after P1: a theme that paints nothing is not a theme). Every start is
+painted: ferrit is dark unless the config says light.
+
+| Theme | What it does | Config |
 | --- | --- | --- |
-| **Terminal** (default, today's behaviour) | ferrit paints no background and uses the terminal's own colours; `base` tells it whether the terminal is dark or light, as now | `theme.scheme = "terminal"` (or absent) |
-| **Dark** | ferrit paints a dark background and its own dark colours | `theme.scheme = "dark"` |
-| **Light** | ferrit paints a light background and its own light colours | `theme.scheme = "light"` |
+| **Dark** (default) | ferrit paints a dark background and its own dark colours | `theme.base = "dark"` (or absent) |
+| **Light** | ferrit paints a light background and its own light colours | `theme.base = "light"` |
 
-No existing config changes meaning: a file without `scheme` is `terminal`, and
-`base = "light"` keeps tuning the terminal case exactly as before. When `scheme` is
-`dark` or `light`, `base` is ignored (the scheme says it).
+The key is the existing `theme.base` (phase 12), so no config changes meaning:
+`base = "light"` was already "I want the light colours" and is now also the light
+background. Because of that, an existing user with a dark terminal and no `base`
+sees ferrit's dark background instead of the terminal's: this is the one change in
+look for existing users, and is the point of the phase. Any other value (the dropped
+`"terminal"`, a typo) is reported at startup like a bad value, and dark is used.
 
-The settings sheet:
+The settings sheet keeps its `Theme` row, now painted for real:
 
 ```
 ┌ Settings ────────────────────────────────────────────┐
 │ Appearance                                           │
-│ ▸ Theme            ( ) Terminal  (•) Dark  ( ) Light │
-│   Terminal is      (•) Dark  ( ) Light     ← only    │
-│                                              shown   │
-│   Accent           ● Green  ○ Blue  ○ Purple  ○ Amber│    when Theme
-│                    (the colour picker, as today)     │    is Terminal
+│ ▸ Theme            (•) Dark  ( ) Light               │
+│   Accent           ● Green  ○ Blue  ○ Purple  ○ Amber│
+│                    (the colour picker, as today)     │
 │ …                                                    │
 └──────────────────────────────────────────────────────┘
 ```
-
-"Terminal is" is the old `base` row, kept for the Terminal choice only (it decides the
-diff tints and the syntax theme when ferrit does not paint). It disappears when the
-theme is Dark or Light, since the scheme already says it.
 
 ## How it is painted
 
@@ -97,9 +97,11 @@ widgets draw as today ─▶ buffer ─▶ paint pass (scheme) ─▶ terminal
 
 Why a pass and not the palette: it also catches what `Clear` resets (popups, the
 drawer, the toast: `Clear` wipes a cell back to `Reset`, and a background set before
-it would be lost), and any colour a future widget uses. In the `terminal` choice the
-pass does nothing, so today's rendering is untouched. A frame is about 6,000 cells, so
-the pass is not measurable next to the draw itself (to be measured, see tests).
+it would be lost), and any colour a future widget uses. The pass is the *output*
+stage: `screens::draw_painted` is `draw` plus the pass, and only the run loop calls
+it; `screens::draw` keeps the colours the widgets chose (the palette's `Red`, `Blue`),
+which is what most tests assert. A frame is about 6,000 cells, so the pass is not
+measurable next to the draw itself (to be measured, see tests).
 
 ### The schemes
 
@@ -138,18 +140,16 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 
 ## What changes in what exists
 
-- `theme_config.rs`: `Scheme { Terminal, Dark, Light }`, `theme.scheme` (serde,
-  default `Terminal`); `ThemeConfig::palette()` for a painted scheme returns the dark
-  or light `Palette` (the `light` flag follows the scheme, so the diff and syntax
+- `theme_config.rs`: `ThemeConfig::scheme()` gives the painted scheme for `base`;
+  `palette()` is unchanged (the `light` flag follows `base`, so the diff and syntax
   choices follow it).
 - `components/ui/scheme.rs` (new): the two `const` schemes and the paint pass
-  (`paint(buffer, &Scheme, truecolor)`); no knowledge of ferrit's screens, like the
-  other components.
-- `screens/mod.rs`: one call to the pass after everything is drawn, before the frame
-  ends. The toast and the drawer draw before it, so they are covered.
-- `settings.rs` / `screens/settings.rs`: the Theme row becomes three choices; the
-  "Terminal is" row appears under it only for `Terminal`; both are saved to
-  `theme.scheme` / `theme.base` through `save_sections` as today.
+  (`Scheme::paint`, later with the truecolor choice); no knowledge of ferrit's
+  screens, like the other components.
+- `screens/mod.rs`: `draw_painted` (draw, then the pass); the run loop draws with it.
+  The toast and the drawer draw before the pass, so they are covered.
+- `settings.rs` / `screens/settings.rs`: the Theme row is the existing one, saved to
+  `theme.base` as before; nothing new in the sheet.
 - `Backdrop` (drawer and popups dim the screen with `Black` and `DarkGray`): over a
   painted scheme the dimming must go toward the scheme's background, not toward black
   (a black wash over a white screen is a blackout). The pass handles it: it maps the
@@ -159,10 +159,9 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 
 | Case | Behaviour |
 | --- | --- |
-| `scheme = "dark"` in a light terminal | the whole screen is dark; the terminal's padding stays light |
-| `scheme = "light"` and `base = "dark"` | `base` is ignored |
-| a config with no `scheme` | `terminal`: nothing changes |
-| `scheme = "sepia"` (unknown) | reported at startup like any bad value, `terminal` used |
+| Dark in a light terminal, or Light in a dark one | the whole screen is the chosen theme; the terminal's padding keeps its own colour |
+| a config with no `base` | dark, painted |
+| `base = "terminal"` or any unknown value | reported at startup like any bad value, dark used |
 | `[theme.colors]` overrides (phase 12) | still apply, and win over the scheme's table for the slot they name |
 | an image preview | drawn over the cell grid as today; transparent PNG shows the painted background |
 | the accent is a named preset | the pass maps `Green` etc. like any named colour, so the accent follows the scheme; a picked `Rgb` is kept exactly |
@@ -172,11 +171,11 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
-- `tests/scheme_paint.rs`: after the pass on a rendered frame (the panes, a popup, the
-  drawer, the toast, the dashboard, the welcome screen) in `Dark` and in `Light`, no
-  cell has a `Reset` background or foreground and none has a named ANSI colour; in
-  `Terminal` the buffer is byte-identical to before the pass (nothing changes for
-  today's users). A `Clear` in the middle does not leave a hole.
+- `tests/scheme_paint.rs`: after the pass on a rendered frame (the panes, the help, a
+  popup, the drawer, the toast, the dashboard, the git config screen) in `Dark` and in
+  `Light`, no cell has a `Reset` background or foreground and none has a named ANSI
+  colour; with no config at all the frame is already dark and painted. A `Clear` in
+  the middle does not leave a hole.
 - A **contrast test**: for each scheme, every text colour on the background it is used
   on reaches a contrast ratio of 4.5 (3.0 for the dim grey and borders), computed from
   the table. The table is tuned until it passes; a new colour cannot make a theme
@@ -185,28 +184,29 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
   the nearest-colour function is checked on known values; with it present, `Rgb`.
   (The environment is read in the binary and passed in; the library never sets it,
   `unsafe_code` is forbidden.)
-- `tests/config.rs`: `scheme` parses, defaults, an unknown value is reported, a file
-  without it loads as `terminal`, saving the theme keeps the other sections.
-- `tests/app_settings.rs` and `tests/settings_screen.rs`: the Theme row has three
-  choices and each is saved; "Terminal is" shows only for `Terminal`; the footer note
-  for 256 colours; the palette follows the choice at once.
+- `tests/config.rs`, `tests/scheme_paint.rs`: `base` parses, defaults to dark, an
+  unknown value (`"terminal"` included) is reported, saving the theme keeps the other
+  sections.
+- `tests/app_settings.rs` and `tests/settings_screen.rs`: the Theme row has two
+  choices and each is saved; the screen repaints at once; the footer note for 256
+  colours (P2).
 - A measurement, not an assertion: the cost of the pass on a 200x60 frame, in a debug
   build, written in this plan when done.
 - Screenshots through the tmux harness (`__SOP/visual-verify.md`): the panes, a diff,
   a popup and the settings sheet in each scheme, in a truecolor terminal and in
   `Terminal.app`. The TestBackend proves the cells; only a real terminal shows how the
   colours look and whether the fallback is acceptable.
-- `test/scripts/200-themes.script`: from the settings sheet, pick Dark, then Light,
-  then Terminal; `reopen`; the sheet shows the last choice (the replay's frames are
+- `test/scripts/200-themes.script`: from the settings sheet, pick Light (arrow and
+  click) and Dark; `reopen`; the sheet shows the last choice (the replay's frames are
   text, so the colours themselves are the buffer tests' job).
 
 ## Milestones
 
-- **P0** ✅ `Scheme`, `theme.scheme` config and its tests; the two scheme structs and
-  the paint pass with its buffer tests; wired into `screens::draw`. No UI yet: the
-  config key alone switches the theme.
-- **P1** ✅ the settings sheet: the three-choice Theme row, the "Terminal is" row, live
-  and saved; sheet tests; the replay script.
+- **P0** ✅ the paint pass and its schemes, with buffer tests. (It first came with a
+  `theme.scheme` key and a "Terminal" choice; both were dropped after P1.)
+- **P1** ✅ the Theme row of the sheet, live and saved; sheet tests; the replay scripts.
+- **P1b** ✅ "Terminal" removed: `theme.base` is the theme, `scheme` and "Terminal is"
+  are gone, `draw_painted` is the output stage.
 - **P2** the 24-bit fallback (`COLORTERM`, `Indexed`) with its tests and the footer
   note; the contrast test and the table tuned to pass; the backdrop checked.
 - **P3** the screenshots in both terminals, the measured cost, anything the eye finds
@@ -216,16 +216,12 @@ This is the part most likely to need a real terminal to judge; see Self-testing.
 
 In the settings sheet choose Light: the whole of ferrit turns light (panes, diff,
 popups, the sheet, the toast, the dashboard), on a dark terminal as on a light one;
-choose Dark and it is dark; choose Terminal and ferrit looks as it did before this
-phase. Close ferrit and open it again: the choice is kept. The text is readable in
-every scheme (the contrast test passes) and the 256-colour fallback still reads as
-dark or light. `cargo clippy --all-targets --all-features -- -D warnings` and
-`cargo test` are green, the replay passes, and the README table says so.
+choose Dark and it is dark. Close ferrit and open it again: the choice is kept. The
+text is readable in both (the contrast test passes) and the 256-colour fallback still
+reads as dark or light. `cargo clippy --all-targets --all-features -- -D warnings`
+and `cargo test` are green, the replay passes, and the README table says so.
 
-## Questions for the user before P0
+## Decisions taken
 
-- Is "Terminal" worth keeping as a third choice? Recommended yes: it costs nothing
-  (the pass does nothing for it) and nobody with a well-tuned terminal theme is
-  forced to change.
-- Should **Dark** or **Light** be the default for a new install, or stay `Terminal`?
-  Recommended `Terminal`: a first start must not change what an existing user sees.
+- "Terminal" (follow the terminal) is not offered. Decided by the user after P1.
+- Dark is the default for a new install, and for an existing one with no `base`.

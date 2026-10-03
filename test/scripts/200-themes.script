@@ -1,30 +1,25 @@
-# Phase 18, painted themes: the Theme row of the settings sheet picks Terminal,
-# Dark or Light. "Terminal is" belongs to Terminal only. The choice is written
-# at once and a new start finds it. (The colours themselves are checked on the
-# cells in tests/scheme_paint.rs; a replay frame is text.)
+# Phase 18, painted themes: the Theme row of the settings sheet picks Dark or
+# Light, either arrow or a click, and a new start finds the choice. (The colours
+# themselves are checked on the cells in tests/scheme_paint.rs; a replay frame is
+# text.)
 fixture canonical
 size 120x50
 config-file ""
 
 click-text "Ferrit Fixture"
-expect-text "(•) Terminal"
-expect-text "Terminal is"
-
-key right
 expect-text "(•) Dark"
-expect-no-text "Terminal is"
+expect-no-text "Terminal"
+
 key right
 expect-text "(•) Light"
-key right
-expect-text "(•) Terminal"
-expect-text "Terminal is"
-
-# Back on Dark, then close and start again: it is still Dark.
-key right
+key left
 expect-text "(•) Dark"
+click-text "( ) Light"
+expect-text "(•) Light"
+
+# Close and start again: it is still Light.
 key esc
 reopen
 click-text "Ferrit Fixture"
-expect-text "(•) Dark"
-expect-no-text "Terminal is"
-snapshot dark
+expect-text "(•) Light"
+snapshot light

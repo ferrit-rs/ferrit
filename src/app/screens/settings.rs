@@ -73,7 +73,7 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
     line.text(format!("{:<LABEL_WIDTH$}", row.label()), label_style);
     let idle = Style::new().fg(palette.idle);
     match row {
-        SettingsRow::Theme | SettingsRow::TerminalBase => {
+        SettingsRow::Theme => {
             let current = app.choice_index(row);
             let Kind::Choice(names) = row.kind() else {
                 return line;
@@ -162,8 +162,7 @@ fn hint(app: &App) -> &'static str {
 /// clickable when it is not on screen).
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
     let accent = app.theme_config.color();
-    let rows = app.visible_rows();
-    let selected_row = app.settings().selected.min(rows.len().saturating_sub(1));
+    let selected_row = app.settings().selected;
     let Some(inner) = Drawer::new(&mut app.author_overlay, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
@@ -189,7 +188,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
     let mut selected_line = 0;
     let mut grid_line = 0;
     let mut last_group = "";
-    for (index, row) in rows.into_iter().enumerate() {
+    for (index, row) in SettingsRow::ALL.into_iter().enumerate() {
         if row.group() != last_group {
             if !lines.is_empty() {
                 lines.push(Line::default());

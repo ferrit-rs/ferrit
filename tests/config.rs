@@ -321,7 +321,6 @@ fn changing_the_accent_in_the_sheet_writes_the_theme_and_keeps_the_rest() {
         row: 0,
         modifiers: KeyModifiers::NONE,
     });
-    app.feed_key(KeyEvent::from(KeyCode::Down)); // Terminal is
     app.feed_key(KeyEvent::from(KeyCode::Down)); // Accent
     app.feed_key(KeyEvent::from(KeyCode::Right));
 
