@@ -50,3 +50,10 @@ key D
 key q
 expect-no-text "Dashboard"
 expect-text "[4] Commits"
+
+# A click on the dimmed panes slides the sheet out too, and the click goes to no pane.
+key D
+expect-text "Dashboard"
+click-text "[4] Commits"
+expect-no-text "Dashboard"
+expect-text "[4] Commits"

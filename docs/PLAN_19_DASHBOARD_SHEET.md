@@ -1,6 +1,6 @@
 # Plan: phase 19, the dashboard as a sheet
 
-**Status: in progress (S0 and S1 done: the shared sheet state, and the dashboard in the drawer).** Written after the settings sheet (phase 17): the dashboard
+**Status: in progress (S0 to S2 done: the shared sheet state, the dashboard in the drawer, and its tests).** Written after the settings sheet (phase 17): the dashboard
 (phase 13) is a full-screen view, and the user wants to keep the panes in sight
 while it is up. lazygit has no dashboard, so this is not compared with it; it is
 checked with frame tests, the replay harness and screenshots
@@ -119,7 +119,7 @@ the layout that exists today for narrow windows. (The settings sheet stays at 75
   it with no change of behaviour; its tests stay green.
 - **S1** ✅ the dashboard drawn in the drawer, opened and closed by `D`, `Esc`, `q` and
   a click outside; the key bar; the worker's lifecycle.
-- **S2** the tests and the replay script adapted and extended.
+- **S2** ✅ the tests and the replay script adapted and extended.
 - **S3** the screenshots in both themes and both widths, anything the eye finds, then
   README, CHANGELOG, `PLAN_13_DASHBOARD.md` (a line saying it is a sheet now) and
   `PLAN_0_GENERAL.md`.
@@ -142,6 +142,17 @@ README says it is a sheet.
   for the dashboard.
 - No full-screen mode kept beside the sheet.
 - `C` (git config) and the welcome screen stay full screen.
+
+## S2, as built
+
+`tests/dashboard_sheet.rs` (8 tests): the panes stay on screen behind the sheet and are
+dimmed with the theme's own layer (Dark and Light); a click inside leaves it up and a
+click over the panes slides it out, reaching no pane; the settings sheet and the
+dashboard exclude each other (`D` inside the settings does nothing, a click on the
+author's name over the dashboard only closes it); closing cancels the worker and
+leaves nothing running; the key bar is the dashboard's while it is up and the panes'
+after; a key while it slides out neither reopens it nor reaches a pane; tiny terminals
+do not panic. Script 150 gains the click on the dimmed panes.
 
 ## S1, as built
 

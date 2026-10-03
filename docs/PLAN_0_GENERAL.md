@@ -63,7 +63,7 @@ into its own crate remains deferred.
 | 16 | `PLAN_16_START_WITHOUT_REPO.md` | start ferrit outside a repository: a welcome screen offering `git init` (with a question naming the folder), then the usual panes; `--path` keeps its error | ✅ done (W0-W4) |
 | 17 | `PLAN_17_SETTINGS.md` | the settings sheet (click the author's name): ferrit's own settings only (theme, accent with the colour picker, mouse, wheel, diff, sign-off, command log), saved at once to `config.toml`; git identities and activity leave it | ✅ done |
 | 18 | `PLAN_18_THEMES.md` | painted themes: Dark and Light that paint ferrit's whole screen (one paint pass over the frame buffer maps `Reset` and the ANSI names to the scheme's colours), two themes, no "follow the terminal"; 256-colour fallback; contrast test; fonts are the terminal's, out of scope | ✅ done |
-| 19 | `PLAN_19_DASHBOARD_SHEET.md` | the dashboard (`D`) as a drawer over the dimmed panes, like the settings sheet, instead of a full-screen view; same content and worker; 90 % wide so two columns fit; one shared sheet state | 🔄 in progress (S0, S1) |
+| 19 | `PLAN_19_DASHBOARD_SHEET.md` | the dashboard (`D`) as a drawer over the dimmed panes, like the settings sheet, instead of a full-screen view; same content and worker; 90 % wide so two columns fit; one shared sheet state | 🔄 in progress (S0 to S2) |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).
