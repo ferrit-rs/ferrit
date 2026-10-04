@@ -60,19 +60,20 @@ fn is_ignored(path: &str) -> bool {
         })
 }
 
-/// Read the churn of the non-merge commits of the local and remote branches
-/// (and a detached `HEAD`) since `since`, at most `cap` of them, newest first.
-pub(super) fn read(repo: &Repository, since: Option<i64>, cap: usize) -> Option<Churn> {
+/// Read the churn of the non-merge commits reachable from `rev` (the main
+/// branch's tip, or `HEAD`) since `since`, at most `cap` of them, newest first.
+pub(super) fn read(repo: &Repository, rev: &str, since: Option<i64>, cap: usize) -> Option<Churn> {
+    // An unborn HEAD has no history to read: that is an empty churn, not a failure.
+    if rev == "HEAD" && repo.head().is_err() {
+        return Some(parse("", cap));
+    }
     let workdir = repo.workdir().unwrap_or_else(|| repo.path());
     let mut cmd = exec::git(workdir);
     // Print paths as they are, not C-quoted, without changing the logged argv.
     cmd.env("GIT_CONFIG_COUNT", "1")
         .env("GIT_CONFIG_KEY_0", "core.quotepath")
         .env("GIT_CONFIG_VALUE_0", "false");
-    cmd.args(["log", "--branches", "--remotes"]);
-    if repo.head_detached().unwrap_or(false) {
-        cmd.arg("HEAD");
-    }
+    cmd.args(["log", rev]);
     cmd.args([
         "--no-merges",
         "--numstat",

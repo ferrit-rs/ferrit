@@ -46,7 +46,7 @@ pub struct TagSince {
 /// `init.defaultBranch`, else the first of `main`, `master`. Named and
 /// resolved to its tip (the local branch when it exists, else the remote
 /// one). `None` means HEAD's own branch is all there is.
-fn main_branch(repo: &Repository) -> Option<(String, Oid)> {
+pub(super) fn main_branch(repo: &Repository) -> Option<(String, Oid)> {
     let tip = |name: &str, remote: Option<&str>| {
         repo.find_branch(name, BranchType::Local)
             .ok()

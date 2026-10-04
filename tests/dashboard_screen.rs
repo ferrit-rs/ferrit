@@ -375,11 +375,11 @@ fn the_tiles_show_the_value_above_its_label() {
     let lines: Vec<&str> = out.lines().collect();
     let labels = lines
         .iter()
-        .position(|l| l.contains("commits    authors"))
+        .position(|l| l.contains("commits on main    authors"))
         .unwrap();
     let values = lines[labels - 1];
     for (value, label) in [
-        ("423", "commits"),
+        ("423", "commits on main"),
         ("7", "authors"),
         ("13 (+3 remote)", "branches"),
         ("5", "tags"),

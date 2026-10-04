@@ -9,6 +9,17 @@ Not done, left for a later slice: the `[theme.colors] chart1..chart6` and
 from the locale and `TERM`, the ignore list is built in), and the real-image donut
 (out of scope).
 
+> **Counting changed after D5: the commits on the main branch only.** The first
+> version walked every local and fetched remote branch, so a commit that lived only on
+> a feature branch counted. The dashboard now walks from the tip of the main branch
+> (`origin/HEAD`, else `init.defaultBranch`, else `main`, `master`) and nothing else;
+> with no main branch to name, from `HEAD`. It applies to the totals, the series, the
+> authors, the kinds, the heat map, the hot files and the lines (the `git log
+> --numstat` is given the same tip). The branch health table still lists every local
+> branch and how it stands against main, and the commits tile says whose commits they
+> are (`commits on main`). Where `activity::branch_walk` (every branch and remote) was
+> described below, read "the main branch's tip".
+
 ## Goal
 
 One full-screen view, `D`, that answers "what is this repository and what has

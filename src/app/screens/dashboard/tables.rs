@@ -489,8 +489,17 @@ pub(super) fn tiles(ctx: &Ctx<'_>, width: u16) -> [Line<'static>; 2] {
     } else {
         String::new()
     };
+    // The commits are those on the main branch: the label says which.
+    let on = ctx
+        .stats
+        .main_branch
+        .as_ref()
+        .map_or_else(String::new, |main| format!(" on {main}"));
     let mut items = vec![
-        (t.commits.to_string(), noun(t.commits, "commit", "commits")),
+        (
+            t.commits.to_string(),
+            format!("{}{on}", noun(t.commits, "commit", "commits")),
+        ),
         (t.authors.to_string(), noun(t.authors, "author", "authors")),
         (
             format!("{}{remote}", t.local_branches),

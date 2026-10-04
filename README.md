@@ -34,8 +34,8 @@ Run `ferrit` in any repository. There is nothing to set up first.
   author of a commit with `Ctrl-A`, without touching git's config); branches,
   stash, conflicts, interactive rebase, fetch, pull and push, with your SSH
   passphrase asked in a popup instead of hanging. Destructive actions ask first.
-- **Understand it.** `D` slides in a dashboard over your panes: commits over
-  time, who did what, the kind of work (feat, fix, docs...), the files that
+- **Understand it.** `D` slides in a dashboard over your panes: the commits on
+  `main` over time, who did what, the kind of work (feat, fix, docs...), the files that
   change most, the health of your branches.
 - **Set git up.** `C` lists every git config key with the level it was set at
   and the file it came from, and edits it through `git config`; secrets stay

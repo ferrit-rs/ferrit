@@ -235,8 +235,11 @@ fn totals_count_the_window_and_the_whole_repository() {
     let tmp = project();
     let stats = stats_at(tmp.path(), Window::Days90);
     let t = &stats.totals;
-    assert_eq!(t.commits, 9, "c1 (100 days) is outside the window");
-    assert_eq!(t.authors, 3);
+    assert_eq!(
+        t.commits, 6,
+        "the commits on main: c1 (100 days) is outside the window, o1, f1 and f2 are not on main"
+    );
+    assert_eq!(t.authors, 2);
     assert_eq!(t.local_branches, 5);
     assert_eq!((t.remote_branches, t.remotes), (0, 0));
     assert_eq!(t.tags, 1);
@@ -250,10 +253,10 @@ fn totals_count_the_window_and_the_whole_repository() {
     assert_eq!(stats.window, Window::Days90);
     assert!(!stats.sampled && !stats.shallow);
 
-    assert_eq!(stats_at(tmp.path(), Window::All).totals.commits, 10);
-    assert_eq!(stats_at(tmp.path(), Window::Year).totals.commits, 10);
-    assert_eq!(stats_at(tmp.path(), Window::Days30).totals.commits, 7);
-    assert_eq!(stats_at(tmp.path(), Window::Days7).totals.commits, 4);
+    assert_eq!(stats_at(tmp.path(), Window::All).totals.commits, 7);
+    assert_eq!(stats_at(tmp.path(), Window::Year).totals.commits, 7);
+    assert_eq!(stats_at(tmp.path(), Window::Days30).totals.commits, 5);
+    assert_eq!(stats_at(tmp.path(), Window::Days7).totals.commits, 2);
 }
 
 #[test]
@@ -261,8 +264,8 @@ fn a_seven_day_window_is_daily_and_ends_today() {
     let tmp = project();
     let stats = stats_at(tmp.path(), Window::Days7);
     assert_eq!(stats.granularity, Granularity::Day);
-    // 09-22 .. 09-29: f1 (24th), f2 (25th), c4 (26th), c5 (27th).
-    assert_eq!(buckets(&stats), [0, 0, 1, 1, 1, 1, 0, 0]);
+    // 09-22 .. 09-29: c4 (26th), c5 (27th). f1 and f2 are not on main.
+    assert_eq!(buckets(&stats), [0, 0, 0, 0, 1, 1, 0, 0]);
     assert_eq!(stats.series.first().unwrap().start, ago(7) - 12 * 3600);
     assert_eq!(stats.series.last().unwrap().start, NOW - 12 * 3600);
 }
@@ -273,7 +276,7 @@ fn thirty_days_are_daily_and_ninety_are_weekly_iso_weeks() {
     let month = stats_at(tmp.path(), Window::Days30);
     assert_eq!(month.granularity, Granularity::Day);
     assert_eq!(month.series.len(), 31);
-    assert_eq!(month.series.iter().map(|b| b.commits).sum::<usize>(), 7);
+    assert_eq!(month.series.iter().map(|b| b.commits).sum::<usize>(), 5);
 
     let quarter = stats_at(tmp.path(), Window::Days90);
     assert_eq!(quarter.granularity, Granularity::Week);
@@ -282,9 +285,9 @@ fn thirty_days_are_daily_and_ninety_are_weekly_iso_weeks() {
     assert_eq!(quarter.series.first().unwrap().start, ago(92) - 12 * 3600);
     assert_eq!(quarter.series.last().unwrap().start, ago(1) - 12 * 3600);
     let all = buckets(&quarter);
-    assert_eq!(all.iter().sum::<usize>(), 9);
-    // Week of 09-14: c3, d1. Week of 09-21: M, f1, f2, c4, c5. This week: none yet.
-    assert_eq!(&all[11..], [2, 5, 0]);
+    assert_eq!(all.iter().sum::<usize>(), 6);
+    // Week of 09-14: c3, d1. Week of 09-21: M, c4, c5. This week: none yet.
+    assert_eq!(&all[11..], [2, 3, 0]);
 }
 
 #[test]
@@ -348,13 +351,12 @@ fn authors_are_grouped_through_mailmap_and_ranked() {
     assert_eq!(
         names,
         [
-            ("Richard", "richard@example.com", 5),
-            ("Max Wells", "max@example.com", 3),
-            ("Ola", "ola@example.com", 1),
+            ("Richard", "richard@example.com", 4),
+            ("Max Wells", "max@example.com", 2),
         ]
     );
     let max = &stats.authors[1];
-    assert_eq!(max.last_commit, ago(5), "c2, c3 and f1 under one identity");
+    assert_eq!(max.last_commit, ago(10), "c2 and c3 under one identity");
 }
 
 #[test]
@@ -496,16 +498,7 @@ fn kinds_come_from_the_prefix_and_leave_merges_out() {
     let tmp = project();
     let stats = stats_at(tmp.path(), Window::Days90);
     let kinds: Vec<_> = stats.kinds.iter().map(|k| (k.kind, k.commits)).collect();
-    assert_eq!(
-        kinds,
-        [
-            (Kind::Feat, 4),
-            (Kind::Fix, 1),
-            (Kind::Docs, 1),
-            (Kind::Test, 1),
-            (Kind::Other, 1),
-        ]
-    );
+    assert_eq!(kinds, [(Kind::Feat, 3), (Kind::Fix, 1), (Kind::Docs, 1),]);
     assert_eq!(
         stats.kinds.iter().map(|k| k.commits).sum::<usize>(),
         stats.totals.commits - 1,
@@ -633,7 +626,7 @@ fn a_window_without_commits_is_empty_but_the_totals_keep_the_history() {
 }
 
 #[test]
-fn a_detached_head_counts_its_own_commits_and_no_branch_is_current() {
+fn a_detached_head_changes_nothing_about_what_is_counted_and_no_branch_is_current() {
     let tmp = TempDir::new("stats-detached");
     let dir = tmp.path();
     init(dir, "main");
@@ -642,7 +635,10 @@ fn a_detached_head_counts_its_own_commits_and_no_branch_is_current() {
     git(dir, &["checkout", "-q", "--detach", "HEAD~1"]);
     commit(dir, RICHARD, ago(1), "fix: loose", &[("b.txt", "b\n")]);
     let stats = stats_at(dir, Window::All);
-    assert_eq!(stats.totals.commits, 3);
+    assert_eq!(
+        stats.totals.commits, 2,
+        "the commits on main; the loose commit on the detached HEAD is not on it"
+    );
     assert_eq!(stats.main_branch.as_deref(), Some("main"));
     assert!(stats.branches.iter().all(|b| !b.current));
 }
@@ -760,7 +756,7 @@ fn hot_files_rank_by_commits_touching_them_and_hide_lockfiles_and_changelogs() {
     let tmp = project();
     let stats = stats_at(tmp.path(), Window::Days90);
     let hot = stats.hot_files.unwrap();
-    assert_eq!(hot.commits, 8, "the merge commit is not read");
+    assert_eq!(hot.commits, 5, "the merge commit is not read");
     let rows: Vec<_> = hot
         .files
         .iter()
@@ -777,18 +773,18 @@ fn hot_files_rank_by_commits_touching_them_and_hide_lockfiles_and_changelogs() {
     assert_eq!(
         rows,
         [
-            ("src/app.rs", 3, Some(38), 3, 0),
-            ("README.md", 1, Some(13), 1, 0),
-            ("b.txt", 1, Some(13), 1, 0),
-            ("c.txt", 1, Some(13), 1, 0),
-            ("d.txt", 1, Some(13), 1, 0),
-            ("e.txt", 1, Some(13), 1, 0),
+            ("src/app.rs", 3, Some(60), 3, 0),
+            ("README.md", 1, Some(20), 1, 0),
+            ("b.txt", 1, Some(20), 1, 0),
+            ("c.txt", 1, Some(20), 1, 0),
+            ("d.txt", 1, Some(20), 1, 0),
+            ("e.txt", 1, Some(20), 1, 0),
         ]
     );
     assert_eq!(hot.hidden, ["CHANGELOG.md", "Cargo.lock"]);
     assert_eq!(
-        hot.gone, 2,
-        "f.txt and o.txt live on branches other than HEAD"
+        hot.gone, 0,
+        "f.txt and o.txt are on branches other than main, which is not walked"
     );
 }
 
@@ -882,18 +878,15 @@ fn lines_are_summed_in_total_and_per_author() {
     let lines = stats.totals.lines.unwrap();
     assert_eq!(
         (lines.added, lines.removed),
-        (13, 0),
-        "lockfile lines count as git counts them; the stash commit is not branch history"
+        (10, 0),
+        "lockfile lines count as git counts them; the stash and the other branches are not main"
     );
     let per_author: Vec<_> = stats
         .authors
         .iter()
         .map(|a| (a.name.as_str(), a.added.unwrap(), a.removed.unwrap()))
         .collect();
-    assert_eq!(
-        per_author,
-        [("Richard", 5, 0), ("Max Wells", 7, 0), ("Ola", 1, 0)]
-    );
+    assert_eq!(per_author, [("Richard", 4, 0), ("Max Wells", 6, 0)]);
 }
 
 #[test]
@@ -901,7 +894,7 @@ fn the_churn_reads_the_window_only() {
     let tmp = project();
     let stats = stats_at(tmp.path(), Window::Days7);
     let hot = stats.hot_files.unwrap();
-    assert_eq!(hot.commits, 4);
+    assert_eq!(hot.commits, 2);
     let paths: Vec<_> = hot.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["README.md", "e.txt"], "f.txt is not in HEAD");
     let all = stats_at(tmp.path(), Window::All).totals.lines.unwrap();
@@ -924,11 +917,11 @@ fn the_numstat_cap_keeps_the_newest_commits_and_says_sampled() {
         .stats_with(Window::All, &opts, &AtomicBool::new(false))
         .unwrap();
     assert!(stats.sampled);
-    assert_eq!(stats.totals.commits, 10, "the walk has its own cap");
+    assert_eq!(stats.totals.commits, 7, "the walk has its own cap");
     let hot = stats.hot_files.unwrap();
-    assert_eq!(hot.commits, 3, "c5, c4 and f2");
+    assert_eq!(hot.commits, 3, "c5, c4 and d1");
     let lines = stats.totals.lines.unwrap();
-    assert_eq!((lines.added, lines.removed), (3, 0));
+    assert_eq!((lines.added, lines.removed), (4, 0));
 
     let exact = StatsOptions {
         now: NOW,
@@ -954,8 +947,8 @@ fn a_failing_git_log_leaves_the_churn_absent_and_the_rest_filled() {
             .iter()
             .all(|a| a.added.is_none() && a.removed.is_none())
     );
-    assert_eq!(stats.totals.commits, 9);
-    assert_eq!(stats.authors.len(), 3);
+    assert_eq!(stats.totals.commits, 6);
+    assert_eq!(stats.authors.len(), 2);
 }
 
 #[test]
@@ -996,8 +989,8 @@ fn the_daily_counts_cover_26_weeks_whatever_the_window() {
     assert_eq!(week.daily, all.daily, "the heat map ignores the window");
     let recent: usize = week.daily.iter().map(|b| b.commits).sum();
     assert_eq!(
-        recent, 10,
-        "every walked commit of the last 26 weeks, the 100-day-old one included"
+        recent, 7,
+        "every commit of main in the last 26 weeks, the 100-day-old one included"
     );
     assert!(
         week.daily
@@ -1005,4 +998,47 @@ fn the_daily_counts_cover_26_weeks_whatever_the_window() {
             .all(|w| w[1].start - w[0].start == 86_400),
         "consecutive days"
     );
+}
+
+#[test]
+fn commits_only_on_other_branches_are_not_counted_but_their_branches_still_show() {
+    let tmp = project();
+    let stats = stats_at(tmp.path(), Window::All);
+    assert_eq!(
+        stats.totals.commits, 7,
+        "c1 to c5, d1 and the merge: not o1, f1, f2"
+    );
+    assert!(
+        stats.authors.iter().all(|a| a.name != "Ola"),
+        "Ola only has a commit on `old`"
+    );
+    let names: Vec<_> = stats.branches.iter().map(|b| b.name.as_str()).collect();
+    assert!(
+        names.contains(&"old") && names.contains(&"feature"),
+        "the branch health still lists every branch: {names:?}"
+    );
+}
+
+#[test]
+fn working_on_another_branch_still_counts_main() {
+    let tmp = project();
+    git(tmp.path(), &["checkout", "-q", "feature"]);
+    let stats = stats_at(tmp.path(), Window::All);
+    assert_eq!(stats.totals.commits, 7, "main's commits, wherever HEAD is");
+    assert_eq!(stats.main_branch.as_deref(), Some("main"));
+}
+
+#[test]
+fn with_no_main_branch_the_history_of_head_is_what_is_counted() {
+    let tmp = TempDir::new("stats-no-main");
+    let dir = tmp.path();
+    init(dir, "dev");
+    commit(dir, RICHARD, ago(5), "feat: one", &[("a.txt", "a\n")]);
+    commit(dir, RICHARD, ago(4), "feat: two", &[("a.txt", "b\n")]);
+    git(dir, &["checkout", "-q", "-b", "other"]);
+    commit(dir, RICHARD, ago(1), "fix: elsewhere", &[("b.txt", "b\n")]);
+    git(dir, &["checkout", "-q", "dev"]);
+    let stats = stats_at(dir, Window::All);
+    assert_eq!(stats.main_branch, None);
+    assert_eq!(stats.totals.commits, 2, "dev's own history, not `other`'s");
 }

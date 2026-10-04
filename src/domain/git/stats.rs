@@ -1,8 +1,9 @@
 //! Repository statistics for the dashboard (`docs/PLAN_13_DASHBOARD.md`,
 //! "Backend"): one headless function, `Repo::stats`, returning owned values.
-//! Commits come from a `git2` revwalk over the local and fetched remote
-//! branches; the churn columns (D1) come from `git log --numstat` through
-//! `exec`. Nothing here imports `ratatui`.
+//! Commits come from a `git2` revwalk from the tip of the main branch only (the
+//! commits on `main`, not those only on other branches; when there is no main
+//! branch, `HEAD`'s own); the churn columns (D1) come from `git log --numstat`
+//! through `exec`, over the same commits. Nothing here imports `ratatui`.
 //!
 //! Counting rules: `totals.commits`, the series and the authors count every
 //! commit in the window, merges included; `kinds` leaves merges out. Times are
@@ -34,7 +35,7 @@ use self::series::{Bucket, Granularity};
 use self::share::Share;
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::model::Change;
-use crate::domain::git::{activity, status};
+use crate::domain::git::status;
 
 const DAY: i64 = 86_400;
 /// The heat map always shows the last 26 weeks, whatever the window.
@@ -224,9 +225,16 @@ pub(super) fn repo_stats(
     let cutoff = window.days().map(|days| opts.now - days * DAY);
     let mailmap = repo.mailmap().ok();
 
-    let mut walk = activity::branch_walk(repo)?;
-    // A detached HEAD may sit on commits no branch holds; an unborn one has none.
-    let _ = walk.push_head();
+    // Only the commits on the main branch: its tip is the one start. With no main
+    // branch to name, HEAD's own history is all there is (an unborn HEAD has none).
+    let main = branches::main_branch(repo);
+    let mut walk = repo.revwalk().map_err(GitError::Read)?;
+    match &main {
+        Some((_, tip)) => walk.push(*tip).map_err(GitError::Read)?,
+        None => {
+            let _ = walk.push_head();
+        },
+    }
     walk.set_sorting(Sort::TIME).map_err(GitError::Read)?;
 
     let mut sampled = false;
@@ -308,7 +316,10 @@ pub(super) fn repo_stats(
         return Err(GitError::Cancelled);
     }
     let churn = if opts.churn {
-        churn::read(repo, cutoff, opts.numstat_cap)
+        let rev = main
+            .as_ref()
+            .map_or_else(|| "HEAD".to_owned(), |(_, tip)| tip.to_string());
+        churn::read(repo, &rev, cutoff, opts.numstat_cap)
     } else {
         None
     };

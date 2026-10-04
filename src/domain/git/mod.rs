@@ -9,7 +9,6 @@
 //! merge); those are the three submodules that are not read-only, and all
 //! three shell out to `git` rather than writing objects directly.
 
-pub mod activity;
 pub mod apply;
 pub mod askpass;
 pub mod blob;
