@@ -54,6 +54,10 @@ nothing from one blank image.
 ## Files
 
 - `.dev-tools/tui-shot.sh` — one step, one screenshot. Tracked in git.
+- `.dev-tools/demo-gif.py` — records the README's `demo-ferrit.gif`: screenshots
+  of ferrit (an empty folder to a repository, then a day in one) joined with PIL; `gh`
+  is a stand-in, the people are invented, and the user and host names are cropped
+  out. `--assemble-only` re-joins the last screenshots. Tracked in git.
 - `.dev-tools/tui-report.sh` — bundles a feature folder's screenshots +
   notes into `report.html` and opens it. Tracked in git.
 - `.dev-tools/report-template.html` — the report's HTML/CSS (image size,

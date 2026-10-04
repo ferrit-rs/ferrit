@@ -1,5 +1,7 @@
 ![Ferrit demo](demo-ferrit.gif)
 
+*From an empty folder to a repository (with a stand-in for `gh`, so nothing was created on GitHub), then a day in a repository: a diff, stage, commit, the dashboard, the Light theme. Invented people and data.*
+
 # ferrit
 
 *The everyday git manager for your terminal.*
