@@ -422,8 +422,8 @@ const WORDMARK_LARGE: Wordmark = Wordmark {
 
 /// What ferrit is, and the promise it makes (the README opens with the same two
 /// lines). The crate description is written for crates.io, not for this pane.
-const TAGLINE_WHAT: &str = "A git manager for the terminal";
-const TAGLINE_PROMISE: &str = "Never open github.com to start a project again.";
+const TAGLINE_WHAT: &str = "The everyday git manager for your terminal";
+const TAGLINE_PROMISE: &str = "Live in your repository. Start a GitHub project from nothing.";
 
 /// Status pane's right side: lazygit's welcome screen, not a repo-status
 /// view (see `docs/PLAN_1_LAYOUT.md`, "Welcome screen"). No repo data, so

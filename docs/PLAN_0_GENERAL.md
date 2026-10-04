@@ -6,12 +6,13 @@ index. Keep it short; the phase files carry the weight.
 
 ## North star
 
-A git manager for the terminal, in Rust: start a project (an empty folder to a
-repository on GitHub, without a browser), work in it, and understand it (dashboard,
-git config). One repository at a time, the one ferrit is opened in. The panes and
-keys are in the lazygit family, which is a way in and not the pitch. Keyboard-first,
-fast on large repos, small and predictable keymap. Not a git porcelain replacement
-on the command line: the value is the TUI.
+The everyday git manager for the terminal, in Rust, for two things at once: the
+repository you already have (a full TUI view of git: stage, commit, branches, rebase,
+a dashboard, the git config) and the whole way from an empty folder to a repository on
+GitHub, without a browser (`i`, then `G`). One repository at a time, the one ferrit is
+opened in. The panes and keys are in the lazygit family, which is a way in and not the
+pitch. Keyboard-first, fast on large repos, small and predictable keymap. Not a git
+porcelain replacement on the command line: the value is the TUI.
 
 ## Principles
 

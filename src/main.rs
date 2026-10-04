@@ -9,8 +9,8 @@ use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::terminal as tui;
 
-/// A git manager for the terminal: start a project, put it on GitHub, work in it
-/// and understand it.
+/// The everyday git manager for the terminal: a full TUI for your repository, and
+/// an empty folder to GitHub without leaving it.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {

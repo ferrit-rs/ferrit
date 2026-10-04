@@ -2,47 +2,59 @@
 
 # ferrit
 
-*A git manager for the terminal.*
+*The everyday git manager for your terminal.*
 
-**Never open github.com to start a project again.**
+**Live in your repository every day. Start a GitHub project from nothing.**
 
-Make a folder. Open ferrit in it. Press `i` to make it a repository, press `G`
-to create it on GitHub and link it: first commit, `origin`, push. No browser,
-no `git remote add`, no copying URLs.
+One tool for both: a full terminal view of git for the repository you already
+have, and the whole way from an empty folder to a published repository, without
+opening a browser.
 
 ```
- an empty folder                         your repository, on GitHub
- ┌─────────────┐   ferrit   ┌─────────────────────────────────────────┐
- │ my-project/ │ ─────────▶ │ i   git init                            │
- └─────────────┘            │ G   name · private/public · description │
-                            │     first commit · origin · push        │
-                            └─────────────────────────────────────────┘
+ Every day                                From nothing
+ ─────────                                ────────────
+ stage files, hunks and single lines      mkdir my-project && cd my-project
+ commit · branches · rebase · stash       ferrit
+ conflicts · fetch · pull · push          i   git init
+ D   a dashboard of the repository        G   create it on GitHub, link it:
+ C   your git configuration                   first commit · origin · push
+ click your name   settings and theme
 ```
 
-Then it is the git manager you keep open, in a repository you just made or in one
-you already have: stage and commit, branches and rebase, a dashboard of what has
-happened in the repository, your git configuration, all in the terminal.
+## Every day, in the repository you have
 
-## In a repository you already have
+Run `ferrit` in any repository. There is nothing to set up first.
 
-Run `ferrit` in any repository. Everything below works there as well, with
-nothing to set up first:
-
+- **See git as it is.** Five panes: status, files as a tree, branches, commits
+  and the reflog, stash, with the diff next to them and the git commands ferrit
+  ran one key away (`@`). Keyboard first, mouse when you want it.
+- **Work in it.** Stage files, hunks and single lines; commit (and choose the
+  author of a commit with `Ctrl-A`, without touching git's config); branches,
+  stash, conflicts, interactive rebase, fetch, pull and push, with your SSH
+  passphrase asked in a popup instead of hanging. Destructive actions ask first.
 - **Understand it.** `D` slides in a dashboard over your panes: commits over
   time, who did what, the kind of work (feat, fix, docs...), the files that
   change most, the health of your branches.
 - **Set git up.** `C` lists every git config key with the level it was set at
   and the file it came from, and edits it through `git config`; secrets stay
   hidden.
-- **Work in it.** Stage files, hunks and single lines; commit (and choose the
-  author of the commit with `Ctrl-A`, without touching git's config); branches,
-  stash, conflicts, interactive rebase, fetch, pull and push, with your SSH
-  passphrase asked in a popup instead of hanging.
 - **Make it yours.** Click your name for the settings: a Terminal, Dark or
   Light theme, an accent colour, the mouse, the diff.
 
-No remote yet? `G` (or `x`) offers to create it on GitHub and link it, the same
-way as for a new folder.
+## From nothing to GitHub
+
+Make a folder and open ferrit in it. It says the folder is not a repository and
+offers to make it one.
+
+1. `i` runs `git init`, after a question that names the folder.
+2. `G` asks for a name, private or public, and a description, then creates the
+   repository on GitHub, makes the first commit (an empty `README.md`), writes
+   `origin` and pushes.
+
+No browser, no `git remote add`, no copying URLs. From then on it is the same
+ferrit as above.
+
+No remote on a repository you already have? `G` (or `x`) does the same for it.
 
 ## What you need
 

@@ -550,11 +550,11 @@ fn the_status_pane_says_what_ferrit_is_and_its_promise_not_the_crate_description
     app.feed_key(KeyEvent::from(KeyCode::Char('1'))); // the Status pane
     let status = frame(&mut app, 200, 50);
     assert!(
-        status.contains("A git manager for the terminal"),
+        status.contains("The everyday git manager for your terminal"),
         "{status}"
     );
     assert!(
-        status.contains("Never open github.com to start a project again."),
+        status.contains("Live in your repository. Start a GitHub project from nothing."),
         "{status}"
     );
     assert!(!status.contains("lazygit-style"), "{status}");
