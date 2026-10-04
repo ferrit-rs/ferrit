@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-04
+
 ### Added
 
 - Ferrit now paints its whole screen itself by default: the theme is `Dark` (the default) or `Light`, a dark or a light background, text and colours (the popups, the drawer, the toast and the full-screen views included), whatever the terminal's own background is. A third theme, `Terminal`, keeps what ferrit did before: no background of its own, the terminal's colours (with the dark diff tints and syntax colours, so a light terminal picks `Light`). In `config.toml`: `[theme] scheme = "dark" | "light" | "terminal"`; a file with no `scheme` keeps working, `base = "dark" | "light"` then being the painted theme. A bad value is reported and dark is used. A terminal that does not say it speaks 24-bit colour (`COLORTERM` is not `truecolor` or `24bit`, as in macOS Terminal.app) gets the nearest of its 256 colours for every colour ferrit draws, and the settings sheet footer says so (`256 colours: approximated`).
@@ -430,7 +432,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ferrit-rs/ferrit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ferrit-rs/ferrit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ferrit-rs/ferrit/compare/v0.5.0...v0.6.0
