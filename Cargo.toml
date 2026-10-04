@@ -3,13 +3,13 @@ name = "ferrit"
 version = "0.8.0"
 edition = "2024"
 rust-version = "1.86"
-description = "A lazygit-style terminal UI for git, written in Rust"
+description = "A git manager for the terminal: start a project, put it on GitHub, work in it and understand it"
 authors = ["The ferrit Authors"]
 license = "MIT"
 repository = "https://github.com/ferrit-rs/ferrit"
 homepage = "https://github.com/ferrit-rs/ferrit"
 readme = "README.md"
-keywords = ["git", "tui", "lazygit", "terminal", "cli"]
+keywords = ["git", "tui", "terminal", "github", "dashboard"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]

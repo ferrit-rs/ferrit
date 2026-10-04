@@ -2,46 +2,83 @@
 
 # ferrit
 
-A lazygit-style terminal UI for git, written in Rust.
+*A git manager for the terminal.*
 
-`ferrit` brings a fast, keyboard-driven TUI to everyday git work: staging hunks,
-crafting commits, browsing branches and the reflog, resolving conflicts, and
-running interactive rebases without leaving the terminal.
+**Never open github.com to start a project again.**
 
-> Status: early development. Not usable yet.
+Make a folder. Open ferrit in it. Press `i` to make it a repository, press `G`
+to create it on GitHub and link it: first commit, `origin`, push. No browser,
+no `git remote add`, no copying URLs.
 
-## Ferrit vs lazygit
+```
+ an empty folder                         your repository, on GitHub
+ ┌─────────────┐   ferrit   ┌─────────────────────────────────────────┐
+ │ my-project/ │ ─────────▶ │ i   git init                            │
+ └─────────────┘            │ G   name · private/public · description │
+                            │     first commit · origin · push        │
+                            └─────────────────────────────────────────┘
+```
 
-Both tools cover the core Git workflow. Ferrit's differentiator is a
-repository-aware profile and identity layer, with author selection built into
-the commit flow.
+Then it is the git manager you keep open, in a repository you just made or in one
+you already have: stage and commit, branches and rebase, a dashboard of what has
+happened in the repository, your git configuration, all in the terminal.
+
+## In a repository you already have
+
+Run `ferrit` in any repository. Everything below works there as well, with
+nothing to set up first:
+
+- **Understand it.** `D` slides in a dashboard over your panes: commits over
+  time, who did what, the kind of work (feat, fix, docs...), the files that
+  change most, the health of your branches.
+- **Set git up.** `C` lists every git config key with the level it was set at
+  and the file it came from, and edits it through `git config`; secrets stay
+  hidden.
+- **Work in it.** Stage files, hunks and single lines; commit (and choose the
+  author of the commit with `Ctrl-A`, without touching git's config); branches,
+  stash, conflicts, interactive rebase, fetch, pull and push, with your SSH
+  passphrase asked in a popup instead of hanging.
+- **Make it yours.** Click your name for the settings: a Terminal, Dark or
+  Light theme, an accent colour, the mouse, the diff.
+
+No remote yet? `G` (or `x`) offers to create it on GitHub and link it, the same
+way as for a new folder.
+
+## What you need
+
+- **`gh`**, the GitHub CLI, signed in once (`gh auth login`), to create the
+  repository. Ferrit never holds a token. Without `gh`, everything else works.
+- **A working SSH key for GitHub**, to push. Ferrit uses your own `~/.ssh/config`
+  alias, so the key you already use is the one that is used.
+- **GitHub only**, for creating the remote. Other servers work as remotes you
+  add yourself.
+- **One repository at a time**: the one in the folder you open ferrit in.
+
+## Ferrit and lazygit
+
+The panes and the keys will feel familiar if you know lazygit, and ferrit covers
+the same core workflow. What it adds is the rest of the life of a repository,
+which lazygit leaves to other tools. Where lazygit does more today, the table
+says so.
 
 | Capability | ferrit | lazygit | Difference |
 | --- | :---: | :---: | --- |
+| Start in a folder that is not a repository | ✅ | ❌ | A welcome screen offers `git init` after a question that names the folder; `--path` keeps the error |
+| Create the remote repository from the interface | ✅ | ❌ | `G` (or `x`) with no remote: GitHub through `gh`, private by default, first commit, then push |
+| Repository statistics dashboard | ✅ | ❌ | `D`, a sheet over the dimmed panes: activity over time, contributors, kinds of change, hot files, branch health, with charts |
+| Edit Git config from the interface | ✅ | ❌ | `C`: every key with its scope and origin, edited through `git config`, secrets hidden |
+| Choose Git author from configured identities | ✅ | ❌ | In the commit popup, `Ctrl-A` cycles the identities git knows and git's own; for this run only, git config is not touched |
+| Settings sheet | ✅ | ❌ | Click the author's name: a Terminal, Dark or Light theme (Dark and Light paint the whole screen), accent colour with a colour picker, mouse, wheel step, diff context, sign-off and command log, each saved to `config.toml` as you change it |
 | Stage files, hunks and lines | ✅ | ✅ | Shared core workflow |
 | Interactive rebase | ✅ | ✅ | Shared core workflow |
 | Stash, branches, conflicts and remotes | ✅ | ✅ | Shared core workflow |
-| Choose Git author from configured identities | ✅ | ❌ | In the commit popup, `Ctrl-A` cycles the identities git knows and git's own; for this run only, git config is not touched |
-| Settings sheet | ✅ | ❌ | Click the author's name: a Terminal, Dark or Light theme (Dark and Light paint the whole screen), accent colour with a colour picker, mouse, wheel step, diff context, sign-off and command log, each saved to `config.toml` as you change it |
-| Repository statistics dashboard | ✅ | ❌ | `D`, a sheet over the dimmed panes: activity over time, contributors, kinds of change, hot files, branch health, with charts |
-| Edit Git config from the interface | ✅ | ❌ | `C`: every key with its scope and origin, edited through `git config`, secrets hidden |
-| Start in a folder that is not a repository | ✅ | ❌ | A welcome screen offers `git init` after a question that names the folder; `--path` keeps the error |
-| Create the remote repository from the interface | ✅ | ❌ | `G` (or `x`) with no remote: GitHub through `gh`, private by default, then push |
 | Custom commands | ⚠️ | ✅ | Planned for Ferrit; lazygit supports user-defined commands |
 | Worktree management | ⚠️ | ✅ | Planned for Ferrit; lazygit has built-in worktree actions |
 | Gitflow integration | ⚠️ | ✅ | Planned for Ferrit; available in lazygit when Gitflow is installed |
 | Git bisect workflow | ⚠️ | ✅ | Planned for Ferrit; built into lazygit's documented commit actions |
 
-✅ available · ⚠️ planned. Comparison covers built-in features. lazygit can be
-extended with custom commands; Ferrit is focused on an identity-aware Git
-workflow.
-
-## Why
-
-- **Fast**: native Rust, no runtime, instant startup.
-- **Keyboard first**: every action reachable without the mouse.
-- **Readable diffs**: syntax-aware, hunk-level staging.
-- **Safe**: destructive actions always ask first.
+✅ available · ⚠️ planned. The comparison covers built-in features; lazygit can
+be extended with custom commands.
 
 ## Install
 
@@ -49,27 +86,27 @@ workflow.
 cargo install ferrit
 ```
 
-Requires Rust 1.85+ (edition 2024).
+Requires Rust 1.86+ (edition 2024).
 
 ## Usage
 
 ```bash
-ferrit          # open the TUI in the current repo
+ferrit          # open the TUI in the current folder
 ```
 
-Press `?` inside the app for the keybinding cheatsheet, `x` (or a right
-click) on a row for the less common actions, `@` for the git commands ferrit
-ran.
+In a folder that is not a repository it opens the welcome screen. Press `?`
+inside the app for the keybinding cheatsheet, `x` (or a right click) on a row for
+the less common actions, `@` for the git commands ferrit ran.
 
 ## Configuration
 
 `ferrit --config-path` prints where the settings file lives. Everything is
-optional; a wrong value is reported at startup and only that part falls back
-to its default.
+optional, the settings sheet writes it for you as you change things, and a wrong
+value is reported at startup and only that part falls back to its default.
 
 ```toml
 [theme]
-base = "dark"            # or "light"
+scheme = "dark"          # "terminal" (your terminal's colours), "dark" or "light"
 preset = "green"         # the accent: green, blue, purple, amber
 
 [theme.colors]           # any of the 14 palette colours, "#rrggbb" or a name

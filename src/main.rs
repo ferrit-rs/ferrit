@@ -9,7 +9,8 @@ use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::terminal as tui;
 
-/// A lazygit-style terminal UI for git, written in Rust.
+/// A git manager for the terminal: start a project, put it on GitHub, work in it
+/// and understand it.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {

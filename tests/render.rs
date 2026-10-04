@@ -543,3 +543,19 @@ fn stash_popup_renders_title_and_hints() {
     assert!(out.contains("Stash: Enter"), "hints show:\n{out}");
     assert!(out.contains("Cancel: Esc"), "hints show:\n{out}");
 }
+
+#[test]
+fn the_status_pane_says_what_ferrit_is_and_its_promise_not_the_crate_description() {
+    let mut app = App::mock();
+    app.feed_key(KeyEvent::from(KeyCode::Char('1'))); // the Status pane
+    let status = frame(&mut app, 200, 50);
+    assert!(
+        status.contains("A git manager for the terminal"),
+        "{status}"
+    );
+    assert!(
+        status.contains("Never open github.com to start a project again."),
+        "{status}"
+    );
+    assert!(!status.contains("lazygit-style"), "{status}");
+}
