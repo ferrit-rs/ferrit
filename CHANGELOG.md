@@ -11,6 +11,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   content-sized height, scrolls reliably above the keybar, and searches command
   keys and descriptions with `/` in a separate, visibly focused search panel.
   Indexed diff colours expand on truecolor frames.
+- The Infos bar now shows an explicit `📊 Dashboard` trigger on its bottom row;
+  clicking it opens the dashboard sheet while the existing user click keeps
+  opening settings.
 
 ## [0.9.0] - 2026-10-04
 

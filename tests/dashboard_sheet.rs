@@ -235,7 +235,18 @@ fn the_key_bar_is_the_dashboards_while_it_is_up_and_the_panes_after() {
     press(&mut app, 'q');
     let after = settle(&mut app, 140, 40);
     assert!(after.lines().last().unwrap().contains("Commit: c"));
-    assert!(!after.contains("Dashboard"));
+    assert!(!after.lines().any(|line| line.contains("Back: esc")));
+}
+
+#[test]
+fn clicking_the_dashboard_info_trigger_opens_the_dashboard() {
+    let repo = Repo::new("dsheet-info-trigger");
+    let mut app = repo.app("");
+    app.set_dashboard_click_area(Rect::new(10, 0, 12, 1));
+
+    click(&mut app, 12, 0);
+
+    assert!(app.dashboard_is_open());
 }
 
 #[test]

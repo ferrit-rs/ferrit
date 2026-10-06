@@ -148,7 +148,11 @@ impl App {
                 && self
                     .author_click_area
                     .contains(Position::new(ev.column, ev.row));
-            self.mouse_pointer.request(over_author);
+            let over_dashboard = self.sheet_overlay.is_closed()
+                && self
+                    .dashboard_click_area
+                    .contains(Position::new(ev.column, ev.row));
+            self.mouse_pointer.request(over_author || over_dashboard);
             return;
         }
 
@@ -211,6 +215,15 @@ impl App {
         {
             self.mouse_pointer.request(false);
             self.open_sheet(Sheet::Settings);
+            return;
+        }
+
+        if self
+            .dashboard_click_area
+            .contains(Position::new(ev.column, ev.row))
+        {
+            self.mouse_pointer.request(false);
+            self.open_dashboard();
             return;
         }
 

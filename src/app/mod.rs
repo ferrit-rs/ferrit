@@ -621,6 +621,8 @@ pub struct App {
     right_area: Rect,
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
+    /// Click target for the visible Dashboard trigger beside the author.
+    dashboard_click_area: Rect,
     /// The colours everything is drawn with (`[theme]` in `config.toml`).
     palette: Palette,
     /// Where the keybar was drawn and what each part of it runs when clicked.
@@ -840,6 +842,7 @@ impl App {
             right_viewport: 0,
             right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
+            dashboard_click_area: Rect::ZERO,
             palette,
             keybar_area: Rect::ZERO,
             keybar_hits: Vec::new(),
@@ -1532,6 +1535,11 @@ impl App {
     /// Store the configured Git author's clickable cells for mouse routing.
     pub fn set_author_click_area(&mut self, area: Rect) {
         self.author_click_area = area;
+    }
+
+    /// Store the visible Dashboard trigger cells for mouse routing.
+    pub fn set_dashboard_click_area(&mut self, area: Rect) {
+        self.dashboard_click_area = area;
     }
 
     /// Tell the app what the terminal can show (`ColorDepth::detect`).

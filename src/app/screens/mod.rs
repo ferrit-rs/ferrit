@@ -720,12 +720,18 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let inner = block.inner(panel_area);
     frame.render_widget(block, panel_area);
 
-    let [first, rest] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+    let [first, rest, dashboard_row] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .areas(inner);
     app.set_author_click_area(Rect::ZERO);
+    app.set_dashboard_click_area(Rect::ZERO);
 
     // The two newest commands ferrit ran (writes only; `@` lists everything),
     // oldest on top. A repo-free `App::mock()` keeps its fixed sample.
-    let rows = usize::from(inner.height);
+    let rows = usize::from(rest.height);
     let lines: Vec<Line<'static>> = if app.is_mock() {
         mock::COMMAND_LOG
             .iter()
@@ -739,21 +745,22 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     };
     let first_line = lines.first().cloned().unwrap_or_default();
     if let Some(name) = git_user_name {
-        let name = format!("👤 {name}");
-        let name_width = u16::try_from(UnicodeWidthStr::width(name.as_str())).unwrap_or(u16::MAX);
-        let [command_area, name_area] = Layout::horizontal([
+        let author = format!("👤 {name}");
+        let author_width =
+            u16::try_from(UnicodeWidthStr::width(author.as_str())).unwrap_or(u16::MAX);
+        let [command_area, author_area] = Layout::horizontal([
             Constraint::Min(0),
-            Constraint::Length(name_width.min(first.width)),
+            Constraint::Length(author_width.min(first.width)),
         ])
         .areas(first);
         frame.render_widget(Paragraph::new(first_line), command_area);
         frame.render_widget(
-            Paragraph::new(name)
+            Paragraph::new(author)
                 .alignment(Alignment::Right)
                 .style(Style::new().fg(palette.idle)),
-            name_area,
+            author_area,
         );
-        app.set_author_click_area(name_area);
+        app.set_author_click_area(author_area);
     } else {
         frame.render_widget(Paragraph::new(first_line), first);
     }
@@ -763,6 +770,20 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             rest,
         );
     }
+    let trigger = "📊 Dashboard";
+    let trigger_width = u16::try_from(UnicodeWidthStr::width(trigger)).unwrap_or(u16::MAX);
+    let [_, dashboard_area] = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(trigger_width.min(dashboard_row.width)),
+    ])
+    .areas(dashboard_row);
+    frame.render_widget(
+        Paragraph::new(trigger)
+            .alignment(Alignment::Right)
+            .style(Style::new().fg(palette.idle)),
+        dashboard_area,
+    );
+    app.set_dashboard_click_area(dashboard_area);
 }
 
 /// Inner rows of the Infos box: the two it always has, grown to hold the newest

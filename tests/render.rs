@@ -85,6 +85,7 @@ fn renders_every_region() {
         "[4] Commits",
         "[5] Stash",
         "Infos",
+        "📊 Dashboard",
         "Stage:", // keybar label
         "Quit:",  // keybar label
     ] {
