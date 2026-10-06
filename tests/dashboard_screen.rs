@@ -1188,7 +1188,7 @@ fn the_dashboard_is_a_sheet_over_the_dimmed_panes_and_has_its_own_key_bar() {
     let tmp = busy();
     let mut app = App::open(tmp.path()).unwrap();
     let panes = app_frame(&mut app, 130, 50);
-    assert!(panes.contains("Stash") && !panes.contains("Dashboard"));
+    assert!(panes.contains("Stash") && !panes.contains("Activity"));
     app.open_dashboard();
     assert!(app.dashboard_is_open());
     let out = app_frame(&mut app, 130, 50);
@@ -1227,7 +1227,7 @@ fn the_dashboard_is_a_sheet_over_the_dimmed_panes_and_has_its_own_key_bar() {
     // Back to the panes.
     key(&mut app, 'q');
     let out = app_frame(&mut app, 130, 50);
-    assert!(out.contains("Stash") && !out.contains("Dashboard"));
+    assert!(out.contains("Stash") && !out.contains("Activity"));
 }
 
 #[test]
