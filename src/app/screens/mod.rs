@@ -114,7 +114,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     let log_rows = command_log_rows(app, area.height);
     let [content, log, keybar] = Layout::vertical([
         Constraint::Min(0),
-        Constraint::Length(log_rows + 3),
+        Constraint::Length(log_rows + 4),
         Constraint::Length(1),
     ])
     .areas(area);

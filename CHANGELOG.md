@@ -16,6 +16,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - The Infos bar now shows an explicit `📊 Dashboard` trigger on its bottom row;
   clicking it opens the dashboard sheet while the existing user click keeps
   opening settings.
+- The Infos panel keeps command-log rows visible above the bottom Dashboard
+  trigger.
 
 ## [0.9.0] - 2026-10-04
 
