@@ -9,6 +9,7 @@ license = "MIT"
 repository = "https://github.com/ferrit-rs/ferrit"
 homepage = "https://github.com/ferrit-rs/ferrit"
 readme = "README.md"
+exclude = ["demo-ferrit.gif", "assets/ferrit/motion-design/ferrit-film.mp4"]
 keywords = ["git", "tui", "terminal", "github", "dashboard"]
 categories = ["command-line-utilities", "development-tools"]
 
