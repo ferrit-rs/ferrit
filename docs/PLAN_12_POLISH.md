@@ -364,12 +364,15 @@ bindings or with a user's remaps.
 - The Stash pane with no entries has `Bar::StashEmpty`, an empty body: only
   `Help: ?` and `Quit: q`, since Apply, Pop and Drop have nothing to act on
   (lazygit: `Keybindings: ?`). Those keys are already no-ops there.
-- While the help is open the bar is `Bar::Help`: `Close: esc/? | Scroll: j/k`,
-  fixed text (the help's keys are not remappable, `help_key`), no Help / Quit
-  and no click targets; the help dialog stops above the bar row so it stays
-  visible (lazygit swaps in the popup's own keys). The scroll test compares
-  frames without the bottom command-log rows: that log is one process-wide ring
-  other parallel tests write to, which made whole-frame equality flaky.
+- While the help is open the bar is `Bar::Help`: `Search: / | Close: esc/? |
+  Scroll: j/k`, fixed text (the help's keys are not remappable, `help_key`), no
+  Help / Quit and no click targets. `/` filters keys and descriptions live;
+  `Enter` keeps the filter, `Esc` leaves search, and the result list keeps its
+  scroll behavior. The help is a centered `tui_overlay` with a dimmed backdrop,
+  a theme-painted background, a content-sized height capped above the keybar,
+  and a search row. The scroll test compares frames without the bottom
+  command-log rows: that log is one process-wide ring other parallel tests
+  write to, which made whole-frame equality flaky.
 - The Files pane with nothing changed has `Bar::FilesEmpty`: `Commit`, `Stash`,
   `Reword`, `Fetch/Pull/Push`, then `Help` and `Quit`. Stage, All, Discard and
   Amend have nothing to act on (lazygit: `Commit, Stash, Reset, Keybindings`).
@@ -488,8 +491,8 @@ terminal-lifecycle work with its own failure modes, not a config line.
   refactor); a remap moves one action; a duplicate key falls back with a
   report; reserved keys reject a remap; context precedence.
 - `tests/render.rs` (P3, P4): the keybar at 120, 80 and 60 columns drops
-  segments instead of wrapping; help scrolls and shows its last line at 24
-  rows; a remapped key appears in help and keybar; the `x` menu and the
+  segments instead of wrapping; help scrolls, searches and shows its last line
+  at 24 rows; a remapped key appears in help and keybar; the `x` menu and the
   command-log popup render.
 - `tests/app_context_menu.rs` (P4): each seeded entry runs its command and refreshes;
   right-click opens the menu for the clicked row; a keybar click dispatches.

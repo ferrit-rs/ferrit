@@ -148,9 +148,9 @@ impl Scheme {
         }
     }
 
-    /// `color` from `table` when it is an ANSI name; an `Rgb` or `Indexed`
-    /// colour is a deliberate choice (a diff tint, a syntax colour, the accent)
-    /// and stays as it is.
+    /// `color` from `table` when it is an ANSI name; an `Rgb` colour is a
+    /// deliberate choice (a diff tint, a syntax colour, the accent) and stays
+    /// as it is. Indexed colours are normalized in `paint` for truecolor.
     fn pick(table: &[Color; 16], color: Color) -> Color {
         NAMES
             .iter()
@@ -192,6 +192,10 @@ impl Scheme {
             );
             cell.fg = self.paint_foreground(cell.fg);
             cell.bg = self.paint_background(cell.bg);
+            if depth == ColorDepth::TrueColor {
+                cell.fg = expand_indexed(cell.fg);
+                cell.bg = expand_indexed(cell.bg);
+            }
             if on_fill {
                 cell.fg = self.readable_on(cell.fg, cell.bg);
             }
@@ -201,6 +205,44 @@ impl Scheme {
             }
         }
     }
+}
+
+fn expand_indexed(color: Color) -> Color {
+    let Color::Indexed(index) = color else {
+        return color;
+    };
+    let rgb = match index {
+        0 => (0, 0, 0),
+        1 => (128, 0, 0),
+        2 => (0, 128, 0),
+        3 => (128, 128, 0),
+        4 => (0, 0, 128),
+        5 => (128, 0, 128),
+        6 => (0, 128, 128),
+        7 => (192, 192, 192),
+        8 => (128, 128, 128),
+        9 => (255, 0, 0),
+        10 => (0, 255, 0),
+        11 => (255, 255, 0),
+        12 => (0, 0, 255),
+        13 => (255, 0, 255),
+        14 => (0, 255, 255),
+        15 => (255, 255, 255),
+        16..=231 => {
+            let cube = index - 16;
+            let channel = |value| if value == 0 { 0 } else { 55 + 40 * value };
+            (
+                channel(cube / 36),
+                channel((cube % 36) / 6),
+                channel(cube % 6),
+            )
+        },
+        232..=255 => {
+            let gray = 8 + 10 * (index - 232);
+            (gray, gray, gray)
+        },
+    };
+    Color::Rgb(rgb.0, rgb.1, rgb.2)
 }
 
 /// How many colours the terminal can show.

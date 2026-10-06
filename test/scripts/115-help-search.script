@@ -1,0 +1,14 @@
+# Help search: small result sets make the popup compact and filter command
+# descriptions without letting keys leak into the underlying dashboard.
+fixture canonical
+size 120x40
+
+key ?
+expect-text "toggle this help"
+key /
+type "stash"
+expect-text "stash every change"
+expect-no-text "toggle this help"
+key enter
+key esc
+expect-no-text "stash every change"

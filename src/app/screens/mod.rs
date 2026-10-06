@@ -49,7 +49,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
     let palette = app.palette();
 
-    let show_help = app.show_help;
+    let show_help = app.help_is_open();
     let keybar = match app.full_screen() {
         FullScreen::GitConfig => draw_git_config(frame, app, area),
         FullScreen::Welcome => draw_welcome(frame, app, area),
@@ -69,6 +69,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             app.theme_config.color(),
             &lines,
             app.help_scroll(),
+            &mut app.help_overlay,
+            &app.help_query,
+            app.help_searching,
             &palette,
         );
         app.set_help_rows(rows);
@@ -795,7 +798,7 @@ fn command_log_lines(app: &App) -> Vec<Line<'static>> {
 /// screen wins over all of it: only its own keys work while it is up.
 fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let palette = app.palette();
-    let bar = if app.show_help {
+    let bar = if app.help_is_open() {
         Bar::Help
     } else if app.dashboard_is_open() {
         Bar::Dashboard

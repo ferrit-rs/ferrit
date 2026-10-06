@@ -159,7 +159,7 @@ const GIT_CONFIG_BAR: &str = "Edit: e | Add: a | Unset: d | Scope: s | Filter: /
 const DASHBOARD_BAR: &str = "Back: esc | Window: t | Counts: n | Refresh: r | Help: ?";
 
 /// The help screen's bar. Not remappable and not clickable, like the keys.
-const HELP_BAR: &str = "Close: esc/? | Scroll: j/k";
+const HELP_BAR: &str = "Search: / | Close: esc/? | Scroll: j/k";
 
 /// One hint segment: the actions whose keys it shows, each in its home context.
 type Segment = &'static [(Context, Action)];
@@ -380,6 +380,39 @@ pub enum HelpLine {
         text: String,
     },
     Blank,
+}
+
+/// Keep headings that contain at least one matching command, so search keeps
+/// the context of every result without showing unrelated commands.
+pub fn filter_help_lines(lines: &[HelpLine], query: &str) -> Vec<HelpLine> {
+    let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        return lines.to_vec();
+    }
+
+    let mut filtered = Vec::new();
+    let mut heading = None;
+    let mut blank = false;
+    for line in lines {
+        match line {
+            HelpLine::Heading(text) => heading = Some(text.clone()),
+            HelpLine::Blank => blank = true,
+            HelpLine::Entry { keys, text }
+                if keys.to_lowercase().contains(&query) || text.to_lowercase().contains(&query) =>
+            {
+                if let Some(heading) = heading.take() {
+                    if !filtered.is_empty() && blank {
+                        filtered.push(HelpLine::Blank);
+                    }
+                    filtered.push(HelpLine::Heading(heading));
+                }
+                filtered.push(line.clone());
+                blank = false;
+            },
+            HelpLine::Entry { .. } => {},
+        }
+    }
+    filtered
 }
 
 /// The help screen for a focused pane: its own context (and the diff cursor's

@@ -306,7 +306,7 @@ impl App {
         }
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.close_dashboard(),
-            KeyCode::Char('?') => self.show_help = true,
+            KeyCode::Char('?') => self.open_help(),
             KeyCode::Char('t') => self.cycle_window(true),
             KeyCode::Char('T') => self.cycle_window(false),
             KeyCode::Char('r') => self.ensure_stats(true),

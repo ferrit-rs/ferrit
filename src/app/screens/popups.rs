@@ -7,12 +7,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
-use crate::app::hints::HelpLine;
+use crate::app::hints::{self, HelpLine};
 use crate::app::theme;
 use crate::app::{CommandLogView, CommitPopupView, MenuView};
 use crate::components::tui_overlay::anchor::Anchor;
 use crate::components::tui_overlay::backdrop::Backdrop;
 use crate::components::tui_overlay::overlay::Overlay;
+use crate::components::tui_overlay::slide::Slide;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
@@ -32,22 +33,75 @@ pub(super) fn draw_help(
     accent: ratatui::style::Color,
     lines: &[HelpLine],
     scroll: usize,
+    overlay_state: &mut OverlayState,
+    query: &TextInput,
+    searching: bool,
     palette: &Palette,
 ) -> usize {
+    let filtered = hints::filter_help_lines(lines, &query.text());
     let width = 80.min(area.width);
-    let height = area
-        .height
-        .min(u16::try_from(lines.len() + 3).unwrap_or(u16::MAX));
+    let desired_height = u16::try_from(filtered.len().saturating_add(6)).unwrap_or(u16::MAX);
+    let max_height = (area.height.saturating_mul(4) / 5).max(1);
+    let height = desired_height.min(max_height).min(area.height);
     let focused = Style::new().fg(accent).add_modifier(Modifier::BOLD);
-    let dialog = Dialog::new(Line::styled(" keybindings ", focused))
-        .size(width, height)
-        .footer_rows(1)
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
         .border_style(focused)
-        .render(frame, area);
-    let rows = usize::from(dialog.body.height);
-    let max = lines.len().saturating_sub(rows);
+        .title(Line::styled(" keybindings ", focused));
+    if overlay_state.is_closed() {
+        // Keep direct render-test assignment of `show_help = true` useful;
+        // real input opens the persistent state before this function runs.
+        overlay_state.open();
+        overlay_state.tick(std::time::Duration::from_secs(1));
+    }
+    frame.render_stateful_widget(
+        Overlay::new()
+            .anchor(Anchor::Center)
+            .slide(Slide::Bottom)
+            .width(Constraint::Length(width))
+            .height(Constraint::Length(height))
+            .backdrop(
+                Backdrop::new(ratatui::style::Color::Black).fg(ratatui::style::Color::DarkGray),
+            )
+            .bg(ratatui::style::Color::Reset)
+            .block(block),
+        area,
+        overlay_state,
+    );
+    let Some(inner) = overlay_state.inner_area() else {
+        return 1;
+    };
+    let [body, footer] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+    let [search_area, list_area] =
+        Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(body);
+    let search_style = if searching {
+        focused
+    } else {
+        Style::new().fg(palette.idle)
+    };
+    let search_block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(search_style)
+        .style(Style::new().bg(palette.focus_box))
+        .title(Line::styled(" SEARCH COMMAND ", search_style));
+    let input_area = search_block.inner(search_area);
+    frame.render_widget(search_block, search_area);
+    let [label_area, value_area] =
+        Layout::horizontal([Constraint::Length(9), Constraint::Min(0)]).areas(input_area);
+    frame.render_widget(
+        Paragraph::new(Line::styled("query: /", Style::new().fg(palette.key))),
+        label_area,
+    );
+    if searching {
+        query.render(frame, value_area);
+    } else {
+        query.render_inactive(frame, value_area);
+    }
+
+    let rows = usize::from(list_area.height);
+    let max = filtered.len().saturating_sub(rows.max(1));
     let start = scroll.min(max);
-    let key_width = lines
+    let key_width = filtered
         .iter()
         .filter_map(|line| match line {
             HelpLine::Entry { keys, .. } => Some(keys.chars().count()),
@@ -56,7 +110,7 @@ pub(super) fn draw_help(
         .max()
         .unwrap_or(0)
         .min(24);
-    let rendered: Vec<Line<'static>> = lines
+    let rendered: Vec<Line<'static>> = filtered
         .iter()
         .skip(start)
         .take(rows)
@@ -76,22 +130,39 @@ pub(super) fn draw_help(
         })
         .collect();
     let [text_area, bar_area] =
-        Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(dialog.body);
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(1)]).areas(list_area);
+    let rendered = if rendered.is_empty() {
+        vec![Line::styled(
+            format!("no command matches {:?}", query.text()),
+            Style::new().fg(palette.idle),
+        )]
+    } else {
+        rendered
+    };
     frame.render_widget(Paragraph::new(rendered), text_area);
-    ScrollBar::new(lines.len(), rows, start)
+    ScrollBar::new(filtered.len(), rows, start)
         .style(Style::new().fg(palette.idle))
         .render(frame, bar_area);
     let position = if max == 0 {
         String::new()
     } else {
-        format!(" \u{b7} {}/{}", start + rows.min(lines.len()), lines.len())
+        format!(
+            " \u{b7} {}/{}",
+            start + rows.min(filtered.len()),
+            filtered.len()
+        )
+    };
+    let footer_text = if searching {
+        "type to filter \u{b7} enter apply \u{b7} esc cancel"
+    } else {
+        " / search \u{b7} j/k scroll \u{b7} ?/esc close"
     };
     frame.render_widget(
         Paragraph::new(Line::styled(
-            format!("j/k scroll \u{b7} ? / Esc close{position}"),
+            format!("{footer_text}{position}"),
             Style::new().fg(palette.idle),
         )),
-        dialog.footer,
+        footer,
     );
     rows
 }

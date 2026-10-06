@@ -5,6 +5,8 @@ use super::{
     App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
     MouseEventKind, PANES, Pane, Position,
 };
+use crate::app::hints;
+use crate::components::ui::text_input::TextInputMode;
 
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
@@ -47,8 +49,10 @@ impl App {
             return;
         }
 
-        if self.show_help {
-            self.help_key(key);
+        if self.show_help || !self.help_overlay.is_closed() {
+            if self.show_help {
+                self.help_key(key);
+            }
             return;
         }
 
@@ -75,17 +79,42 @@ impl App {
         self.dispatch_key(key);
     }
 
-    /// Every key while the help screen is up: `j` / `k` and the arrows scroll,
-    /// `PgUp` / `PgDn` a page, `Home` / `End` the ends; `?`, `q` and `Esc`
-    /// close it. Not remappable, like the other overlays.
+    /// Every key while the help screen is up: `/` searches, `j` / `k` and the
+    /// arrows scroll, `PgUp` / `PgDn` a page, `Home` / `End` the ends; `?`,
+    /// `q` and `Esc` close it. Not remappable, like the other overlays.
     fn help_key(&mut self, key: KeyEvent) {
-        let total = self.help_lines().len();
+        if self.help_searching {
+            match key.code {
+                KeyCode::Enter | KeyCode::Esc => self.help_searching = false,
+                _ if self
+                    .help_query
+                    .handle_key_event(key, TextInputMode::SingleLine) =>
+                {
+                    self.help_scroll = 0;
+                },
+                _ => {},
+            }
+            return;
+        }
+
+        if key.code == KeyCode::Char('/') {
+            self.help_query = super::TextInput::default();
+            self.help_searching = true;
+            self.help_scroll = 0;
+            return;
+        }
+
+        let filtered = hints::filter_help_lines(&self.help_lines(), &self.help_query.text());
+        let total = filtered.len();
         let max = total.saturating_sub(self.help_rows.max(1));
         let page = self.help_rows.saturating_sub(1).max(1);
         match key.code {
             KeyCode::Char('?' | 'q') | KeyCode::Esc => {
                 self.show_help = false;
                 self.help_scroll = 0;
+                self.help_query = super::TextInput::default();
+                self.help_searching = false;
+                self.help_overlay.close();
             },
             KeyCode::Char('j') | KeyCode::Down => {
                 self.help_scroll = (self.help_scroll + 1).min(max);
@@ -150,9 +179,12 @@ impl App {
             _ => return, // middle click, drag, move
         }
 
-        if self.show_help {
+        if self.show_help || !self.help_overlay.is_closed() {
             self.show_help = false; // any click dismisses the overlay
             self.help_scroll = 0;
+            self.help_query = super::TextInput::default();
+            self.help_searching = false;
+            self.help_overlay.close();
             return;
         }
 

@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::app::config::{Config, ConfigLoad};
-use ferrit::app::hints::{Bar, HelpLine, help_lines, keybar_layout};
+use ferrit::app::hints::{Bar, HelpLine, filter_help_lines, help_lines, keybar_layout};
 use ferrit::app::keymap::{Action, Context, Keymap};
 use ferrit::app::{App, Pane};
 use git2::{IndexAddOption, Repository, Signature};
@@ -231,11 +231,29 @@ fn the_screen_shows_the_remapped_key_in_the_bar_and_in_the_help() {
         .lines()
         .find(|l| l.contains("toggle this help"))
         .unwrap();
-    let column = line.split('\u{2502}').nth(1).unwrap_or_default();
     assert!(
-        column.starts_with("H "),
+        line.contains("│H ") || line.contains(" H "),
         "the key column starts with H: {line}"
     );
+}
+
+#[test]
+fn help_search_matches_keys_and_descriptions_and_keeps_section_heading() {
+    let lines = help_lines(&Keymap::default(), &[Context::Files, Context::Global]);
+    let filtered = filter_help_lines(&lines, "stash");
+    assert!(
+        filtered
+            .iter()
+            .any(|line| { matches!(line, HelpLine::Entry { text, .. } if text.contains("stash")) })
+    );
+    assert!(
+        filtered
+            .iter()
+            .any(|line| { matches!(line, HelpLine::Heading(text) if text == "Files keys") })
+    );
+    assert!(!filtered.iter().any(|line| {
+        matches!(line, HelpLine::Entry { text, .. } if text.contains("toggle this help"))
+    }));
 }
 
 #[test]
@@ -252,7 +270,8 @@ fn the_help_lists_the_focused_panes_keys_then_the_global_ones() {
         !out.contains("Files keys"),
         "other panes' sections are left out"
     );
-    assert!(out.contains("Fixed keys"), "{out}");
+    app.feed_key(KeyEvent::from(KeyCode::End));
+    assert!(frame(&mut app, 120, 60).contains("Fixed keys"));
 }
 
 #[test]
@@ -362,7 +381,10 @@ fn while_the_help_is_open_the_bar_shows_only_the_keys_that_work_in_it() {
             .unwrap()
             .trim_matches(|c: char| c == '"' || c.is_whitespace())
             .to_owned();
-        assert_eq!(last, "Close: esc/? | Scroll: j/k", "pane {pane}");
+        assert_eq!(
+            last, "Search: / | Close: esc/? | Scroll: j/k",
+            "pane {pane}"
+        );
         app.feed_key(key('?'));
         let back = frame(&mut app, 100, 24);
         assert!(!back.lines().last().unwrap().contains("Close"), "{back}");

@@ -531,6 +531,9 @@ pub struct App {
     /// (set by the renderer), so scroll keys can stop at the end.
     help_scroll: usize,
     help_rows: usize,
+    /// Text and focus state for the help command search.
+    help_query: TextInput,
+    help_searching: bool,
     should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
@@ -627,6 +630,8 @@ pub struct App {
     mouse_pointer: MousePointer,
     /// The side sheet's drawer: one for every sheet (`app::sheet`).
     pub(crate) sheet_overlay: OverlayState,
+    /// Centered help dialog animation and backdrop state.
+    pub(crate) help_overlay: OverlayState,
     /// Which sheet the drawer holds while it is not closed.
     sheet: sheet::Sheet,
     /// Backdrop state for the commit editor modal.
@@ -793,6 +798,8 @@ impl App {
             show_help: false,
             help_scroll: 0,
             help_rows: 0,
+            help_query: TextInput::default(),
+            help_searching: false,
             should_quit: false,
             repo,
             repo_name,
@@ -838,6 +845,7 @@ impl App {
             keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),
             sheet_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
+            help_overlay: OverlayState::new().with_duration(Duration::from_millis(180)),
             sheet: sheet::Sheet::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
@@ -1536,6 +1544,11 @@ impl App {
         self.palette
     }
 
+    /// Whether help is visible or still animating out.
+    pub(crate) fn help_is_open(&self) -> bool {
+        self.show_help || !self.help_overlay.is_closed()
+    }
+
     /// The keybar's rect and click targets, written by `ui::draw_keybar`
     /// each frame.
     pub fn set_keybar_hits(&mut self, area: Rect, hits: Vec<hints::KeybarHit>) {
@@ -1591,6 +1604,12 @@ impl App {
     #[doc(hidden)]
     pub fn feed_key(&mut self, key: KeyEvent) {
         self.on_key(key);
+        // Test frames have no event loop to advance the help animation. The
+        // real terminal loop keeps the animation; this seam makes one fed key
+        // produce a stable frame like the other synchronous test inputs.
+        if self.help_overlay.is_animating() {
+            self.help_overlay.tick(Duration::from_secs(1));
+        }
     }
 
     /// Has a quit key been pressed? Integration-test seam: `run()` reads the
@@ -2098,17 +2117,19 @@ impl App {
             terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
             let was_animating = self.sheet_overlay.is_animating();
+            let help_was_animating = self.help_overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
             let remote_animating = self.remote_busy.is_some();
             // Frames while something animates; a slower tick while a toast is up,
             // so it can time out without waiting for a key.
-            let timeout = (was_animating || toast_animating || remote_animating)
-                .then_some(Duration::from_millis(16))
-                .or_else(|| {
-                    self.toast
-                        .is_some()
-                        .then_some(Duration::from_millis(TOAST_TICK_MS))
-                });
+            let timeout =
+                (was_animating || help_was_animating || toast_animating || remote_animating)
+                    .then_some(Duration::from_millis(16))
+                    .or_else(|| {
+                        self.toast
+                            .is_some()
+                            .then_some(Duration::from_millis(TOAST_TICK_MS))
+                    });
             let batch = if let Some(timeout) = timeout {
                 match events.next_batch_timeout(timeout) {
                     Err(error) => return Err(error),
@@ -2116,6 +2137,7 @@ impl App {
                     Ok(None) => {
                         let elapsed = overlay_tick.elapsed();
                         self.sheet_overlay.tick(elapsed);
+                        self.help_overlay.tick(elapsed);
                         self.tick_toast(elapsed);
                         overlay_tick = Instant::now();
                         continue;
@@ -2164,6 +2186,9 @@ impl App {
             if self.sheet_overlay.is_animating() && was_animating {
                 self.sheet_overlay.tick(overlay_tick.elapsed());
             }
+            if self.help_overlay.is_animating() && help_was_animating {
+                self.help_overlay.tick(overlay_tick.elapsed());
+            }
             self.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
         }
@@ -2185,6 +2210,7 @@ impl App {
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
         self.sheet_overlay.tick(elapsed);
+        self.help_overlay.tick(elapsed);
     }
 
     /// Let the settings sheet's slide end now. Integration-test seam for the
@@ -2192,12 +2218,13 @@ impl App {
     #[doc(hidden)]
     pub fn finish_animations(&mut self) {
         self.sheet_overlay.tick(Duration::from_secs(1));
+        self.help_overlay.tick(Duration::from_secs(1));
     }
 
     /// Close the error toast now (`Esc`), unless something else owns the key:
     /// a popup, a question or the help. `true` when there was one to close.
     pub(super) fn dismiss_toast(&mut self) -> bool {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.show_help {
+        if self.popup.is_some() || self.pending_confirm.is_some() || self.help_is_open() {
             return false;
         }
         match &mut self.toast {

@@ -60,7 +60,7 @@ impl App {
     pub(super) fn run_action(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
-            Action::Help => self.show_help = true,
+            Action::Help => self.open_help(),
             Action::CommandLog => self.open_command_log(),
             Action::Dashboard => self.open_dashboard(),
             Action::GitConfig => self.open_git_config(),
@@ -146,6 +146,13 @@ impl App {
             Action::PopStash => self.restore_stash_prompt(true),
             Action::DropStash => self.drop_stash_prompt(),
         }
+    }
+
+    pub(super) fn open_help(&mut self) {
+        self.show_help = true;
+        self.help_scroll = 0;
+        self.help_query = super::TextInput::default();
+        self.help_searching = false;
     }
 }
 
