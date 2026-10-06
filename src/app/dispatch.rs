@@ -152,7 +152,7 @@ impl App {
         self.show_help = true;
         self.help_scroll = 0;
         self.help_query = super::TextInput::default();
-        self.help_searching = false;
+        self.help_mode = super::HelpMode::Browse;
     }
 }
 

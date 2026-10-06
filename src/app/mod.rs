@@ -520,6 +520,12 @@ impl Pane {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HelpMode {
+    Browse,
+    Search,
+}
+
 pub struct App {
     /// Which left pane has focus.
     pub focus: Pane,
@@ -533,7 +539,7 @@ pub struct App {
     help_rows: usize,
     /// Text and focus state for the help command search.
     help_query: TextInput,
-    help_searching: bool,
+    help_mode: HelpMode,
     should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
@@ -801,7 +807,7 @@ impl App {
             help_scroll: 0,
             help_rows: 0,
             help_query: TextInput::default(),
-            help_searching: false,
+            help_mode: HelpMode::Browse,
             should_quit: false,
             repo,
             repo_name,

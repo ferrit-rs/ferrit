@@ -27,17 +27,26 @@ use crate::domain::git::host::Visibility;
 /// The help screen: one line per binding of the focused pane and of the global
 /// context, scrolled to `scroll`. Returns how many lines fit, so the scroll
 /// keys know where the end is.
-pub(super) fn draw_help(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    accent: ratatui::style::Color,
-    lines: &[HelpLine],
-    scroll: usize,
-    overlay_state: &mut OverlayState,
-    query: &TextInput,
-    searching: bool,
-    palette: &Palette,
-) -> usize {
+pub(super) struct HelpView<'a> {
+    pub(super) accent: ratatui::style::Color,
+    pub(super) lines: &'a [HelpLine],
+    pub(super) scroll: usize,
+    pub(super) overlay_state: &'a mut OverlayState,
+    pub(super) query: &'a TextInput,
+    pub(super) searching: bool,
+    pub(super) palette: &'a Palette,
+}
+
+pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, view: HelpView<'_>) -> usize {
+    let HelpView {
+        accent,
+        lines,
+        scroll,
+        overlay_state,
+        query,
+        searching,
+        palette,
+    } = view;
     let filtered = hints::filter_help_lines(lines, &query.text());
     let width = 80.min(area.width);
     let desired_height = u16::try_from(filtered.len().saturating_add(6)).unwrap_or(u16::MAX);

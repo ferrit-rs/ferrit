@@ -83,9 +83,9 @@ impl App {
     /// arrows scroll, `PgUp` / `PgDn` a page, `Home` / `End` the ends; `?`,
     /// `q` and `Esc` close it. Not remappable, like the other overlays.
     fn help_key(&mut self, key: KeyEvent) {
-        if self.help_searching {
+        if self.help_mode == super::HelpMode::Search {
             match key.code {
-                KeyCode::Enter | KeyCode::Esc => self.help_searching = false,
+                KeyCode::Enter | KeyCode::Esc => self.help_mode = super::HelpMode::Browse,
                 _ if self
                     .help_query
                     .handle_key_event(key, TextInputMode::SingleLine) =>
@@ -99,7 +99,7 @@ impl App {
 
         if key.code == KeyCode::Char('/') {
             self.help_query = super::TextInput::default();
-            self.help_searching = true;
+            self.help_mode = super::HelpMode::Search;
             self.help_scroll = 0;
             return;
         }
@@ -113,7 +113,7 @@ impl App {
                 self.show_help = false;
                 self.help_scroll = 0;
                 self.help_query = super::TextInput::default();
-                self.help_searching = false;
+                self.help_mode = super::HelpMode::Browse;
                 self.help_overlay.close();
             },
             KeyCode::Char('j') | KeyCode::Down => {
@@ -187,7 +187,7 @@ impl App {
             self.show_help = false; // any click dismisses the overlay
             self.help_scroll = 0;
             self.help_query = super::TextInput::default();
-            self.help_searching = false;
+            self.help_mode = super::HelpMode::Browse;
             self.help_overlay.close();
             return;
         }

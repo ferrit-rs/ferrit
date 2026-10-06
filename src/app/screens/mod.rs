@@ -66,13 +66,15 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         let rows = popups::draw_help(
             frame,
             above_bar,
-            app.theme_config.color(),
-            &lines,
-            app.help_scroll(),
-            &mut app.help_overlay,
-            &app.help_query,
-            app.help_searching,
-            &palette,
+            popups::HelpView {
+                accent: app.theme_config.color(),
+                lines: &lines,
+                scroll: app.help_scroll(),
+                overlay_state: &mut app.help_overlay,
+                query: &app.help_query,
+                searching: app.help_mode == super::HelpMode::Search,
+                palette: &palette,
+            },
         );
         app.set_help_rows(rows);
     }
