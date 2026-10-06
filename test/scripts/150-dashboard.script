@@ -37,7 +37,7 @@ key t
 
 key j j
 key esc
-expect-no-text "Dashboard"
+expect-no-text "Activity"
 expect-text "[2] Files"
 expect-text "[4] Commits"
 
@@ -45,15 +45,15 @@ expect-text "[4] Commits"
 key D
 expect-text "Dashboard"
 key D
-expect-no-text "Dashboard"
+expect-no-text "Activity"
 key D
 key q
-expect-no-text "Dashboard"
+expect-no-text "Activity"
 expect-text "[4] Commits"
 
 # A click on the dimmed panes slides the sheet out too, and the click goes to no pane.
 key D
 expect-text "Dashboard"
 click-text "[4] Commits"
-expect-no-text "Dashboard"
+expect-no-text "Activity"
 expect-text "[4] Commits"

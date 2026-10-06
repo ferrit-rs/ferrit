@@ -166,11 +166,11 @@ fn a_short_diff_has_no_scrollbar() {
 fn right_pane_thumb_reaches_the_bottom_at_max_scroll() {
     let (_dir, mut app) = tall_diff_repo("sb-right-bottom");
     let buf = render_buffer(&mut app, 100, 14); // establishes the real viewport height
-    // Counted up from the bottom edge: the 1-row keybar, the 5-row command
+    // Counted up from the bottom edge: the 1-row keybar, the 6-row command
     // log (its `Infos` heading included) and the pane's bottom border sit
     // below the track; the top border and stat line are above it and do not
     // move its end. `- 1` turns a row count into the last row's index.
-    let track_bottom = buf.area.height - 1 - 5 - 1 - 1;
+    let track_bottom = buf.area.height - 1 - 6 - 1 - 1;
     for _ in 0..1000 {
         app.feed_key(ratatui::crossterm::event::KeyEvent::from(
             ratatui::crossterm::event::KeyCode::Char('J'),
@@ -178,7 +178,7 @@ fn right_pane_thumb_reaches_the_bottom_at_max_scroll() {
     }
 
     let buf = render_buffer(&mut app, 100, 14);
-    let (_, max_y) = thumb_span(&buf, 0..buf.area.width);
+    let (_, max_y) = thumb_span(&buf, 34..buf.area.width);
     assert_eq!(
         max_y, track_bottom,
         "thumb should touch the track's bottom once scrolled to the max\n{buf:?}"
@@ -259,7 +259,7 @@ fn left_scrollbar_is_not_green_when_its_pane_is_unfocused() {
     let (_dir, mut app) = many_commits_repo("sb-left-grey");
     app.focus = Pane::Status; // Commits still overflows, but is not focused
 
-    let buf = render_buffer(&mut app, 100, 20);
+    let buf = render_buffer(&mut app, 100, 21);
     let scrollbar_cells: Vec<_> = LEFT_COLUMN
         .flat_map(|x| (0..buf.area.height).map(move |y| (x, y)))
         .filter(|&(x, y)| {

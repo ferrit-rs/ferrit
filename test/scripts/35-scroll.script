@@ -4,7 +4,7 @@
 # what is on screen tells where the viewport is (seven rows of diff at this
 # height: the first hunk's `-` line is visible, the last function is not).
 fixture canonical
-size 120x16
+size 120x17
 
 key 2 j j j j j                            # src/main.rs
 expect-text "-    println!(\"ferrit\");"   # the top of the diff is on screen
