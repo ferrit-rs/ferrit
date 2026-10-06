@@ -7,6 +7,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-06
+
 - The `?` help now uses a centered `tui_overlay` with a dimmed backdrop and a
   content-sized height, scrolls reliably above the keybar, and searches command
   keys and descriptions with `/` in a separate, visibly focused search panel.
@@ -440,7 +442,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
   changes) showed `App::mock()`'s hardcoded sample diff instead of staying
   blank. `App::is_mock()` now gates that fallback to the repo-free path only.
 
-[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ferrit-rs/ferrit/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/ferrit-rs/ferrit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ferrit-rs/ferrit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ferrit-rs/ferrit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ferrit-rs/ferrit/compare/v0.6.0...v0.7.0

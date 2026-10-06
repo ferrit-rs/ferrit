@@ -1,6 +1,6 @@
 [package]
 name = "ferrit"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.86"
 description = "The everyday git manager for the terminal: a full TUI for your repository, and an empty folder to GitHub without leaving it"
