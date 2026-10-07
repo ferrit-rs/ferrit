@@ -120,12 +120,13 @@ export default function Home() {
       >
         <div className="flex flex-col items-start gap-6">
           <BracketHeading as="h1" kicker="Ferrit · Rust terminal application">
-            Git work, made visible.
+            A Git manager rebuilt in Rust.
           </BracketHeading>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Ferrit is the everyday Git manager for your terminal. It brings status, files,
-            branches, history, staging, remotes, and repository setup into one focused
-            Rust workflow without hiding the Git behavior underneath.
+            Inspired by lazygit, Ferrit brings Git status, files, branches, history,
+            staging, remotes, and repository setup into one focused Rust workflow, then
+            adds dashboards, configuration tools, precise staging, and GitHub setup
+            without hiding the Git behavior underneath.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
