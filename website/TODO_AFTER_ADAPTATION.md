@@ -1,0 +1,9 @@
+- Confirm final domain and public site URL.
+- Confirm final headline, target role, and Rust positioning.
+- Confirm Microsoft Fabric CLI production status.
+- Confirm Ferrit public release URL and crates.io metrics.
+- Confirm crates.io download count; local Ferrit metrics are verified.
+- Confirm permission for portrait, Rustify screenshots, logos, and client names.
+- Replace or approve hero video asset.
+- Approve article list and publication language.
+- Add final analytics and deployment environment variables.

@@ -1,0 +1,48 @@
+# Supply-chain hardening for this website's npm tree (pnpm >= 11).
+# pnpm reads its settings from this file since 10.16; there are no workspace
+# packages here — this project is a single package.
+
+# Refuse to install any version published less than 7 days ago (10080 min).
+# Gives the ecosystem a week to catch a compromised release before it lands.
+minimumReleaseAge: 10080
+# Non-strict: an already-pinned lockfile entry younger than the cutoff warns
+# instead of aborting the install. New resolutions are still delayed. Flip to
+# `true` once minimumReleaseAgeExclude covers everything currently too fresh.
+minimumReleaseAgeStrict: false
+minimumReleaseAgeIgnoreMissingTime: false
+overrides:
+  nanoid: 3.3.18
+  source-map-js: 1.2.2
+# Deps we knowingly pulled in before they aged past the cutoff. Prune as they age.
+minimumReleaseAgeExclude: [ source-map-js@1.2.2 ]
+
+# Lockfile / registry trust.
+trustPolicy: no-downgrade
+# Both flagged by the "possible package takeover" heuristic as false positives:
+# undici-types is types-only (.d.ts, Node.js undici team); semver 6.x is npm's
+# own long-stable legacy major line, pulled in transitively.
+trustPolicyExclude:
+  - undici-types
+  - semver
+blockExoticSubdeps: true
+trustLockfile: false
+
+# Dependency build scripts. strictDepBuilds makes an unreviewed postinstall a
+# hard error, so every dep that ships one must get an explicit entry in
+# allowBuilds (pnpm 11 replaced onlyBuiltDependencies / ignoredBuiltDependencies
+# with this map: true = allowed to run its install script, false = skipped).
+strictDepBuilds: true
+dangerouslyAllowAllBuilds: false
+allowBuilds:
+  # postinstall is only a funding banner
+  core-js: false
+  # platform binary comes from the @esbuild/<platform> optional dep; the install
+  # script is not needed when that package is present
+  esbuild: false
+  # native addons that ship prebuilt binaries via their @<pkg>/<platform> optional
+  # deps — the source-build install script is redundant
+  sharp: false
+  unrs-resolver: false
+
+audit:
+  level: high

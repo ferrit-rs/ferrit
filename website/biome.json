@@ -1,0 +1,88 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "assist": { "actions": { "source": { "organizeImports": "off" } } },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/.source",
+      "!**/*.css",
+      "!**/*.mdx",
+      "!components/ui",
+      "!next-env.d.ts"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "warn",
+        "noUnusedImports": "warn",
+        "useExhaustiveDependencies": "warn",
+        "noInvalidUseBeforeDeclaration": "warn",
+        "useJsxKeyInIterable": "warn",
+        "noInnerDeclarations": "warn"
+      },
+      "a11y": {
+        "useValidAnchor": "off",
+        "noSvgWithoutTitle": "off",
+        "useButtonType": "off",
+        "noNoninteractiveTabindex": "off",
+        "useMediaCaption": "warn",
+        "noRedundantAlt": "error",
+        "useKeyWithClickEvents": "warn",
+        "noAutofocus": "warn",
+        "useIframeTitle": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "off",
+        "noAssignInExpressions": "off",
+        "noImplicitAnyLet": "off",
+        "noSuspiciousSemicolonInJsx": "warn",
+        "noGlobalIsNan": "warn",
+        "noVar": "warn"
+      },
+      "style": {
+        "noUselessElse": "warn",
+        "noNonNullAssertion": "warn",
+        "noUnusedTemplateLiteral": "error",
+        "useSingleVarDeclarator": "warn",
+        "useConst": "warn",
+        "noParameterAssign": "warn",
+        "useNumberNamespace": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "complexity": {
+        "noBannedTypes": "off",
+        "noForEach": "off",
+        "useLiteralKeys": "warn",
+        "noCommaOperator": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off",
+        "noImgElement": "warn"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "lineWidth": 90,
+    "indentWidth": 2
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double"
+    }
+  }
+}

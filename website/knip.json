@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["components/ui/**"],
+  "ignoreBinaries": ["similarity-ts"],
+  "next": {
+    "entry": [
+      "app/**/{page,layout,not-found,error,loading,route,template,default}.{ts,tsx}",
+      "app/{robots,sitemap}.ts",
+      "app/**/route.ts",
+      "mdx-components.tsx",
+      "source.config.ts",
+      "next.config.ts"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+---
+title: "Testing a Terminal Workflow With Deterministic Replay"
+description: "How replay fixtures and integration tests make Ferrit's stateful Git flows easier to inspect."
+date: 2026-10-04
+tags: ["ferrit", "testing", "ratatui"]
+category: guides
+author: "Richard Lavoura"
+authorImage: "/images/richard/portrait.webp"
+---
+
+Terminal applications are stateful. A single action can change repository state, update the screen, open a confirmation, and expose a process error. Testing only individual functions misses the behavior users actually experience.
+
+## Replay the important path
+
+Ferrit uses replay scripts and flow specifications to keep complete interactions inspectable. A scenario can start from a known repository state, perform a sequence such as stage, commit, rebase, or resolve a conflict, and compare the resulting behavior with an expected outcome.
+
+The value is repeatability. A developer can investigate a failure with the same inputs instead of reconstructing a repository by hand and hoping the missing detail was not the cause.
+
+## Integration coverage gives context
+
+Integration tests cover the seams between the Git domain, process execution, and terminal behavior. They do not replace focused unit tests. They answer a different question: does the feature still work when the pieces meet?
+
+## A release trail people can trust
+
+Testing becomes more useful when the project leaves evidence around it. Ferrit's replay fixtures, integration tests, flow specs, strict lints, and release tags turn terminal behavior into something another contributor can inspect before changing it.

@@ -1,0 +1,25 @@
+---
+title: "Git Fidelity Is a Product Feature"
+description: "Why Ferrit uses both libgit2 and the real Git process instead of forcing every operation through one abstraction."
+date: 2026-10-05
+tags: ["ferrit", "git", "rust"]
+category: comparisons
+author: "Richard Lavoura"
+authorImage: "/images/richard/portrait.webp"
+---
+
+Ferrit is a Git manager, so its first responsibility is to keep Git recognizable. A faster interface is not useful if it changes the behavior users depend on.
+
+## Structured reads, faithful commands
+
+libgit2 is useful for structured repository reads. It gives the application direct access to status, branches, commits, and other state without parsing every screen-oriented command.
+
+The real Git binary still matters. User configuration, hooks, diff drivers, credential behavior, and command semantics are part of a developer's environment. Replacing those details with a simplified imitation would make the interface look consistent while making the result less trustworthy.
+
+## One seam for process behavior
+
+Ferrit keeps external Git execution behind one process boundary. That is where command construction, output capture, secret redaction, and authentication prompts become explicit. The UI receives a result it can present instead of owning a collection of hidden process rules.
+
+## Convenience with a recognizable outcome
+
+The goal is not to make Git disappear. The goal is to make its state easier to inspect and its common actions easier to perform while leaving the underlying behavior legible.

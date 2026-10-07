@@ -1,0 +1,25 @@
+---
+title: "Why Ferrit Keeps Git Logic Outside the TUI"
+description: "The architecture boundary that keeps repository behavior testable while Ratatui handles the terminal surface."
+date: 2026-10-06
+tags: ["ferrit", "rust", "architecture"]
+category: guides
+author: "Richard Lavoura"
+authorImage: "/images/richard/portrait.webp"
+---
+
+A terminal interface is not the repository model. Ferrit treats that distinction as a first-class design constraint.
+
+## The UI expresses intent
+
+Ratatui renders the current repository state and turns keyboard input into user intent. It should not own the rules for staging, branching, rebasing, or interpreting Git output. When those rules sit inside rendering code, every new screen makes the system harder to test.
+
+## The domain owns behavior
+
+Ferrit's headless Git domain owns repository operations and the state needed to explain them. That gives the project a place to answer important questions without a terminal frame: what changed, what can be confirmed, and which failure should return to the user.
+
+This boundary also keeps the implementation honest. A UI test can prove that a key opens a screen. A domain test can prove that staging a hunk produces the expected repository state. The two tests answer different questions.
+
+## The boundary pays off later
+
+The result is not abstraction for its own sake. It keeps the TUI replaceable, makes integration tests more direct, and lets the project reason about Git behavior before styling the screen that presents it.
