@@ -4,6 +4,11 @@
 
 # ferrit
 
+[![CI](https://github.com/ferrit-rs/ferrit/actions/workflows/ci.yml/badge.svg)](https://github.com/ferrit-rs/ferrit/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/ferrit.svg)](https://crates.io/crates/ferrit)
+[![MSRV](https://img.shields.io/badge/rustc-1.86%2B-orange.svg)](Cargo.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 *The everyday git manager for your terminal.*
 
 **Live in your repository every day. Start a GitHub project from nothing.**
@@ -154,6 +159,17 @@ git clone https://github.com/ferrit-rs/ferrit
 cd ferrit
 cargo run
 ```
+
+## Architecture
+
+One crate, three layers: `app/` (state, events, screens), `domain/` (git and the
+model the UI reads) and `components/` (reusable widgets). Reads go through `git2`,
+changes through the `git` subprocess so hooks and signing behave as in your shell.
+Slow work runs in worker threads and comes back on one event channel. Behaviour is
+tested end to end by replay scripts that press keys on a deterministic repository.
+
+See [`docs/architecture.md`](docs/architecture.md), the decisions in
+[`docs/adr/`](docs/adr/) and the design history in [`docs/`](docs/README.md).
 
 ## Contributing
 
