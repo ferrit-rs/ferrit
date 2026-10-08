@@ -63,20 +63,22 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             height: area.height.saturating_sub(keybar.height),
             ..area
         };
+        let accent = app.theme_config.color();
+        let (scroll, query, searching, overlay_state) = app.help.view_parts();
         let rows = popups::draw_help(
             frame,
             above_bar,
             popups::HelpView {
-                accent: app.theme_config.color(),
+                accent,
                 lines: &lines,
-                scroll: app.help_scroll(),
-                overlay_state: &mut app.help_overlay,
-                query: &app.help_query,
-                searching: app.help_mode == super::HelpMode::Search,
+                scroll,
+                overlay_state,
+                query,
+                searching,
                 palette: &palette,
             },
         );
-        app.set_help_rows(rows);
+        app.help.set_rows(rows);
     }
     let accent = app.theme_config.color();
     match app.popup_view() {

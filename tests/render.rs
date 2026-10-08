@@ -390,7 +390,7 @@ fn help_overlay_toggles() {
     // keybindings"), so check for text unique to the help overlay's body.
     assert!(!frame(&mut app, 120, 40).contains("toggle this help"));
 
-    app.show_help = true;
+    app.help.open = true;
     assert!(frame(&mut app, 120, 40).contains("toggle this help"));
 }
 

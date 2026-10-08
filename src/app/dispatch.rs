@@ -149,10 +149,7 @@ impl App {
     }
 
     pub(super) fn open_help(&mut self) {
-        self.show_help = true;
-        self.help_scroll = 0;
-        self.help_query = super::TextInput::default();
-        self.help_mode = super::HelpMode::Browse;
+        self.help.show();
     }
 }
 

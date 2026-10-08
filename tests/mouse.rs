@@ -145,12 +145,12 @@ fn click_outside_every_pane_is_a_no_op() {
 #[test]
 fn any_click_dismisses_the_help_overlay_and_nothing_else() {
     let mut app = App::mock();
-    app.show_help = true;
+    app.help.open = true;
     let focus_before = app.focus;
 
     app.feed_mouse(left_click(5, 5));
 
-    assert!(!app.show_help, "the click dismissed the overlay");
+    assert!(!app.help.open, "the click dismissed the overlay");
     assert_eq!(app.focus, focus_before, "the same click did nothing else");
 }
 

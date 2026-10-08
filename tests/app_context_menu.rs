@@ -523,7 +523,7 @@ fn clicking_a_keybar_hint_runs_its_action() {
     let mut app = App::open(dir.path()).unwrap();
     let column = keybar_column(&mut app, "Help: ?");
     left_click(&mut app, column + 2, 39);
-    assert!(app.show_help, "the help screen opened");
+    assert!(app.help.open, "the help screen opened");
 
     let mut app = App::open(dir.path()).unwrap();
     let column = keybar_column(&mut app, "Quit: q");

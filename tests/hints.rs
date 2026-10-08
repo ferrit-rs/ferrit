@@ -396,11 +396,11 @@ fn every_help_close_key_works_and_other_keys_are_swallowed() {
     let (_dir, mut app) = app_with("hints-close", "");
     for close in [key('?'), key('q'), KeyEvent::from(KeyCode::Esc)] {
         app.feed_key(key('?'));
-        assert!(app.show_help);
+        assert!(app.help.open);
         app.feed_key(key('d')); // would open a discard confirm
         assert!(app.confirm_message().is_none());
         app.feed_key(close);
-        assert!(!app.show_help);
+        assert!(!app.help.open);
     }
     assert!(!app.is_quitting(), "q closed the help, it did not quit");
 }

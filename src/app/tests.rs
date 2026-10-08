@@ -85,11 +85,11 @@ fn image_selection_builds_an_image_preview() {
 fn help_overlay_swallows_navigation() {
     let mut app = App::mock();
     press(&mut app, KeyCode::Char('?'));
-    assert!(app.show_help);
+    assert!(app.help.open);
     press(&mut app, KeyCode::Right);
     assert_eq!(app.focus, Pane::Files, "nav is inert while help is up");
     press(&mut app, KeyCode::Char('?'));
-    assert!(!app.show_help);
+    assert!(!app.help.open);
 }
 
 #[test]

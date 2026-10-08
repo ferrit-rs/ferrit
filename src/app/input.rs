@@ -6,7 +6,6 @@ use super::{
     MouseEventKind, PANES, Pane, Position,
 };
 use crate::app::hints;
-use crate::components::ui::text_input::TextInputMode;
 
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
@@ -49,8 +48,8 @@ impl App {
             return;
         }
 
-        if self.show_help || !self.help_overlay.is_closed() {
-            if self.show_help {
+        if self.help.is_visible() {
+            if self.help.open {
                 self.help_key(key);
             }
             return;
@@ -83,51 +82,20 @@ impl App {
     /// arrows scroll, `PgUp` / `PgDn` a page, `Home` / `End` the ends; `?`,
     /// `q` and `Esc` close it. Not remappable, like the other overlays.
     fn help_key(&mut self, key: KeyEvent) {
-        if self.help_mode == super::HelpMode::Search {
-            match key.code {
-                KeyCode::Enter | KeyCode::Esc => self.help_mode = super::HelpMode::Browse,
-                _ if self
-                    .help_query
-                    .handle_key_event(key, TextInputMode::SingleLine) =>
-                {
-                    self.help_scroll = 0;
-                },
-                _ => {},
-            }
+        if self.help.is_searching() {
+            self.help.search_key(key);
             return;
         }
-
         if key.code == KeyCode::Char('/') {
-            self.help_query = super::TextInput::default();
-            self.help_mode = super::HelpMode::Search;
-            self.help_scroll = 0;
+            self.help.start_search();
             return;
         }
-
-        let filtered = hints::filter_help_lines(&self.help_lines(), &self.help_query.text());
-        let total = filtered.len();
-        let max = total.saturating_sub(self.help_rows.max(1));
-        let page = self.help_rows.saturating_sub(1).max(1);
-        match key.code {
-            KeyCode::Char('?' | 'q') | KeyCode::Esc => {
-                self.show_help = false;
-                self.help_scroll = 0;
-                self.help_query = super::TextInput::default();
-                self.help_mode = super::HelpMode::Browse;
-                self.help_overlay.close();
-            },
-            KeyCode::Char('j') | KeyCode::Down => {
-                self.help_scroll = (self.help_scroll + 1).min(max);
-            },
-            KeyCode::Char('k') | KeyCode::Up => {
-                self.help_scroll = self.help_scroll.saturating_sub(1);
-            },
-            KeyCode::PageDown => self.help_scroll = (self.help_scroll + page).min(max),
-            KeyCode::PageUp => self.help_scroll = self.help_scroll.saturating_sub(page),
-            KeyCode::Home | KeyCode::Char('g') => self.help_scroll = 0,
-            KeyCode::End | KeyCode::Char('G') => self.help_scroll = max,
-            _ => {},
+        if matches!(key.code, KeyCode::Char('?' | 'q') | KeyCode::Esc) {
+            self.help.dismiss();
+            return;
         }
+        let total = hints::filter_help_lines(&self.help_lines(), &self.help.query().text()).len();
+        self.help.scroll_key(key.code, total);
     }
 
     /// A left click focuses the pane it lands in and, when it lands on a
@@ -183,12 +151,8 @@ impl App {
             _ => return, // middle click, drag, move
         }
 
-        if self.show_help || !self.help_overlay.is_closed() {
-            self.show_help = false; // any click dismisses the overlay
-            self.help_scroll = 0;
-            self.help_query = super::TextInput::default();
-            self.help_mode = super::HelpMode::Browse;
-            self.help_overlay.close();
+        if self.help.is_visible() {
+            self.help.dismiss(); // any click dismisses the overlay
             return;
         }
 

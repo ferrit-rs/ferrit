@@ -276,7 +276,7 @@ impl App {
     /// open its menu. Off any row it does nothing. (A left click also toggles a
     /// directory; this one must not.)
     pub(super) fn right_click(&mut self, column: u16, row: u16) {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.show_help {
+        if self.popup.is_some() || self.pending_confirm.is_some() || self.help.open {
             return;
         }
         let Some(pane) = self.pane_at(column, row) else {
