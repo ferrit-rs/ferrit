@@ -904,6 +904,15 @@ impl App {
         Self::open_with(path, config::ConfigLoad::default())
     }
 
+    /// The app on any git port, with the default configuration, after one
+    /// snapshot. `open` is this with the real adapter; tests pass a
+    /// `domain::git::fake::FakeGit`.
+    pub fn with_git(git: Box<dyn GitPort>) -> Self {
+        let mut app = Self::base(Some(git), config::Config::default());
+        app.refresh();
+        app
+    }
+
     /// Open the repo at or above `path` with a loaded configuration. Whatever
     /// was wrong with the file is reported once, as an error toast.
     pub fn open_with(path: &Path, load: config::ConfigLoad) -> GitResult<Self> {

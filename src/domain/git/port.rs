@@ -235,10 +235,6 @@ impl GitPort for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitRead for Repo {
     fn path(&self) -> &Path {
         Self::reopen_path(self)
@@ -308,10 +304,6 @@ impl GitRead for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitIndex for Repo {
     fn stage_file(&self, path: &Path, dir: ApplyDir) -> GitResult<()> {
         Self::stage_file(self, path, dir)
@@ -352,10 +344,6 @@ impl GitIndex for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitHistory for Repo {
     fn commit(&self, kind: &CommitKind, message: &str, opts: CommitOpts) -> GitResult<String> {
         Self::commit(self, kind, message, opts)
@@ -374,10 +362,6 @@ impl GitHistory for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitBranches for Repo {
     fn checkout(&self, name: &str) -> GitResult<()> {
         Self::checkout(self, name)
@@ -408,10 +392,6 @@ impl GitBranches for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitStash for Repo {
     fn stash_push(&self, message: &str) -> GitResult<()> {
         Self::stash_push(self, message)
@@ -433,10 +413,6 @@ impl GitStash for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitRemote for Repo {
     fn set_remote_url(&self, name: &str, url: &str) -> GitResult<()> {
         Self::set_remote_url(self, name, url)
@@ -477,10 +453,6 @@ impl GitRemote for Repo {
     }
 }
 
-#[allow(
-    clippy::same_name_method,
-    reason = "each method forwards to the inherent method of the same name"
-)]
 impl GitConfig for Repo {
     fn config(&self) -> GitResult<ConfigView> {
         Self::config(self)
@@ -520,6 +492,6 @@ impl GitConfig for Repo {
         Self::config_unset(self, scope, key)
     }
     fn isolate_config(&mut self, global: &Path) {
-        Self::isolate_config(self, global)
+        Self::isolate_config(self, global);
     }
 }

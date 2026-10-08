@@ -20,6 +20,7 @@ pub mod config_keys;
 pub mod diff;
 pub mod error;
 mod exec;
+pub mod fake;
 pub mod host;
 mod init;
 pub mod log;
@@ -174,6 +175,10 @@ pub(crate) fn short_hash(oid: &git2::Oid) -> String {
     oid.to_string().chars().take(7).collect()
 }
 
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` roles forward to these methods under the same names"
+)]
 impl Repo {
     /// Open the repository at or above `path`. Walks up like `git` does.
     pub fn open(path: &Path) -> GitResult<Self> {
