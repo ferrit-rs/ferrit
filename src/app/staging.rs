@@ -50,7 +50,7 @@ impl App {
     /// line to put the cursor on (binary, a pure rename, no change at all) —
     /// those stage whole-file only, from `Mode::Nav`.
     pub(super) fn enter_diff_mode(&mut self) {
-        if self.focus != Pane::Files || self.mode == Mode::Diff {
+        if self.nav.focus != Pane::Files || self.nav.mode == Mode::Diff {
             return;
         }
         let Some(entry) = self.selected_file() else {
@@ -79,7 +79,7 @@ impl App {
             return;
         };
 
-        self.mode = Mode::Diff;
+        self.nav.mode = Mode::Diff;
         self.right.cursor = DiffCursor {
             side,
             line,
@@ -91,7 +91,7 @@ impl App {
 
     /// `Esc` / `h` in `Mode::Diff`: back to `Mode::Nav`.
     pub(super) fn leave_diff_mode(&mut self) {
-        self.mode = Mode::Nav;
+        self.nav.mode = Mode::Nav;
     }
 
     /// `j` / `k` in `Mode::Diff`: move the line cursor over selectable
@@ -238,7 +238,7 @@ impl App {
     /// file, direction inferred from which side has a change
     /// (`docs/PLAN_6_STAGING.md` "Stage vs unstage is one key").
     pub(super) fn stage_selected_file(&mut self) {
-        if self.focus != Pane::Files {
+        if self.nav.focus != Pane::Files {
             return;
         }
         let directory = match self.files_tree_rows().get(self.selected(Pane::Files)) {
@@ -359,7 +359,7 @@ impl App {
     /// unstaged, else unstage everything — one `git` call either way
     /// (`docs/PLAN_6_STAGING.md` milestone S4).
     pub(super) fn stage_all_files(&mut self) {
-        if self.focus != Pane::Files {
+        if self.nav.focus != Pane::Files {
             return;
         }
         let dir = if self
@@ -404,8 +404,8 @@ impl App {
     /// worktree (`docs/PLAN_6_STAGING.md`'s own scope), so it is a no-op on
     /// the Staged side and on a file with no worktree change of its own.
     pub(super) fn discard_prompt(&mut self) {
-        match self.mode {
-            Mode::Nav if self.focus == Pane::Files => {
+        match self.nav.mode {
+            Mode::Nav if self.nav.focus == Pane::Files => {
                 let Some(entry) = self.selected_file() else {
                     return;
                 };
@@ -519,7 +519,7 @@ impl App {
     /// range)` while `Mode::Diff` is up, else `None`. The range is
     /// inclusive-exclusive (`a..b`) over `side`'s own `Diff::text` lines.
     pub fn diff_cursor(&self) -> Option<(DiffSide, usize, Option<Range<usize>>)> {
-        if self.mode != Mode::Diff {
+        if self.nav.mode != Mode::Diff {
             return None;
         }
         let range = self
@@ -533,7 +533,7 @@ impl App {
     /// Right-pane title suffix while `Mode::Diff` is up: `hunk 1/3` or
     /// `lines 41-42`/`line 41`, so it is obvious what `<space>` will hit.
     pub fn diff_granule_hint(&self) -> Option<String> {
-        if self.mode != Mode::Diff {
+        if self.nav.mode != Mode::Diff {
             return None;
         }
         let diff = self.cursor_diff()?;

@@ -90,7 +90,7 @@ impl App {
             self.right.key = None;
             self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
             self.workers.diff.pending = None;
-            self.mode = Mode::Nav;
+            self.nav.mode = Mode::Nav;
             return;
         }
         match self.right_key_for() {
@@ -100,7 +100,7 @@ impl App {
                 self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
                 self.workers.diff.pending = None;
                 self.right.scroll = 0;
-                self.mode = Mode::Nav;
+                self.nav.mode = Mode::Nav;
             },
             Some(key) if self.right.key.as_ref() == Some(&key) => {
                 if std::mem::take(&mut self.workers.diff.refresh_requested) {
@@ -118,7 +118,7 @@ impl App {
                 self.right.diff = DiffView::Note("loading diff...".into());
                 self.workers.diff.refresh_requested = false;
                 self.queue_diff_query(key, self.workers.diff.generation);
-                self.mode = Mode::Nav;
+                self.nav.mode = Mode::Nav;
             },
         }
     }
@@ -186,7 +186,7 @@ impl App {
     /// The diff identity for the current focus and selection: a worktree /
     /// staged file for Files, a commit for Commits, nothing elsewhere.
     fn right_key_for(&self) -> Option<RightKey> {
-        match self.focus {
+        match self.nav.focus {
             Pane::Files => {
                 let rows = self.files_tree_rows();
                 match rows.get(self.selected(Pane::Files))? {
@@ -202,7 +202,7 @@ impl App {
             // (`commit_tree_rows`), so the diff stays keyed on the drilled
             // commit's own hash regardless of which file row is highlighted.
             Pane::Commits => {
-                if let Some(drill) = &self.commit_drill {
+                if let Some(drill) = &self.nav.commit_drill {
                     Some(RightKey::Commit {
                         full_hash: drill.hash.clone(),
                     })
@@ -217,7 +217,7 @@ impl App {
             // drilled: no Enter yet, so preview the selected branch's own
             // log passively (lazygit's live branch -> log, no key needed).
             Pane::Branches => {
-                if let Some(drill) = &self.branch_drill {
+                if let Some(drill) = &self.nav.branch_drill {
                     let entry = drill.commits.get(self.selected(Pane::Branches))?;
                     Some(RightKey::Commit {
                         full_hash: entry.full_hash.clone(),
@@ -263,7 +263,7 @@ impl App {
                 DiffView::Files(FilesDiff { unstaged, staged })
             },
             (RightKey::Commit { full_hash }, DiffQueryResult::Commit(diff)) => {
-                let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
+                let drill_commits = self.nav.branch_drill.iter().flat_map(|d| d.commits.iter());
                 match self
                     .snapshot
                     .commits

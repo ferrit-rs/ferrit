@@ -83,7 +83,7 @@ fn wheel_over_an_unfocused_list_scrolls_it_and_leaves_focus_and_selection() {
 
     wheel(&mut app, &out, "[4] Commits", MouseEventKind::ScrollDown, 3);
 
-    assert_eq!(app.focus, Pane::Branches, "the focus did not move");
+    assert_eq!(app.nav.focus, Pane::Branches, "the focus did not move");
     assert_eq!(app.selected(Pane::Branches), 0, "Branches did not move");
     assert_eq!(app.selected(Pane::Commits), 0, "nor did the Commits row");
     assert_eq!(app.list_offset(Pane::Commits), 6, "two rows a tick");

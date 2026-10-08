@@ -107,7 +107,7 @@ impl App {
     /// real ones come from the machine's own git config.
     #[doc(hidden)]
     pub fn set_global_identities(&mut self, identities: Vec<(String, String)>) {
-        self.profile.settings.global_identities = identities
+        self.authorship.profile.settings.global_identities = identities
             .into_iter()
             .map(|(name, email)| crate::domain::profile::settings::Identity {
                 name,
@@ -119,32 +119,13 @@ impl App {
     /// The popup's author line: who the next commit is by. Ferrit's pick is for
     /// this run only and never writes git's config.
     fn author_line(&self) -> String {
-        let identity = |i: &crate::domain::profile::settings::Identity| match &i.email {
-            Some(email) => format!("{} <{email}>", i.name),
-            None => i.name.clone(),
-        };
-        match (
-            &self.selected_author,
-            &self.profile.settings.effective_identity,
-        ) {
-            (Some(chosen), _) => format!("author: {}", identity(chosen)),
-            (None, Some(own)) => format!("author: git's own ({})", identity(own)),
-            (None, None) => "author: git's own".to_owned(),
-        }
+        self.authorship.line()
     }
 
     /// `Ctrl-A`: the next identity git knows (from its global config), then
     /// git's own, then round again. Nothing to cycle when git knows none.
     fn cycle_author(&mut self) {
-        let identities = self.profile.settings.available_identities();
-        self.selected_author = match &self.selected_author {
-            None => identities.first().cloned(),
-            Some(current) => identities
-                .iter()
-                .position(|i| i == current)
-                .and_then(|index| identities.get(index + 1))
-                .cloned(),
-        };
+        self.authorship.cycle();
     }
 
     /// `c` / `A` / `w`: open the commit editor. Amend / Reword pre-fill
@@ -377,12 +358,7 @@ impl App {
         let opts = git::commit::CommitOpts {
             sign_off: draft.sign_off,
             no_verify: draft.no_verify,
-            author: self.selected_author.as_ref().and_then(|identity| {
-                identity
-                    .email
-                    .as_ref()
-                    .map(|email| format!("{} <{email}>", identity.name))
-            }),
+            author: self.authorship.author_arg(),
         };
         let kind = draft.kind.clone();
         let Some(repo) = &self.repo else { return };
@@ -395,7 +371,7 @@ impl App {
                 self.commit_overlay.close();
                 // The commit just made tops the list, and is the row selected
                 // once it shows up (lazygit).
-                if self.commit_drill.is_none() {
+                if self.nav.commit_drill.is_none() {
                     self.select_when_listed(Pane::Commits, SelectionKey::Commit(head));
                 }
                 self.request_refresh();

@@ -11,9 +11,9 @@ impl App {
     /// up, and no merge / rebase / cherry-pick / revert already stopped (that
     /// is what the `m` menu is for; say so instead of doing nothing).
     fn rewrite_target(&mut self) -> Option<git::model::CommitEntry> {
-        if self.focus != Pane::Commits
-            || self.mode != Mode::Nav
-            || self.commit_drill.is_some()
+        if self.nav.focus != Pane::Commits
+            || self.nav.mode != Mode::Nav
+            || self.nav.commit_drill.is_some()
             || self.modal.is_some()
             || self.repo.is_none()
         {
@@ -32,7 +32,7 @@ impl App {
     /// `w` on Commits: reword the selected commit. `HEAD` keeps phase 7's
     /// `git commit --amend` path, no rebase needed.
     pub(super) fn reword_selected_commit(&mut self) {
-        if self.focus == Pane::Commits && self.selected(Pane::Commits) == 0 {
+        if self.nav.focus == Pane::Commits && self.selected(Pane::Commits) == 0 {
             self.open_commit(git::commit::CommitKind::Reword);
             return;
         }
@@ -109,12 +109,7 @@ impl App {
         let opts = git::commit::CommitOpts {
             sign_off: false,
             no_verify: false,
-            author: self.selected_author.as_ref().and_then(|identity| {
-                identity
-                    .email
-                    .as_ref()
-                    .map(|email| format!("{} <{email}>", identity.name))
-            }),
+            author: self.authorship.author_arg(),
         };
         let kind = git::commit::CommitKind::Fixup {
             target: entry.full_hash,

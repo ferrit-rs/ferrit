@@ -160,7 +160,11 @@ fn a_click_on_the_panes_while_it_is_up_reaches_no_pane() {
     click(&mut app, 3, 20);
     settle(&mut app, 140, 40);
     assert_eq!(app.selected(ferrit::app::Pane::Commits), before);
-    assert_eq!(app.focus, ferrit::app::Pane::default(), "no focus moved");
+    assert_eq!(
+        app.nav.focus,
+        ferrit::app::Pane::default(),
+        "no focus moved"
+    );
 }
 
 #[test]

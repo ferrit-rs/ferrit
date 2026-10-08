@@ -31,7 +31,7 @@ use crate::components::ui::toast::Toast;
 use crate::domain::profile::Profile;
 use crate::domain::profile::settings::Settings;
 use color_eyre::Result;
-use enum_map::{Enum, EnumMap};
+use enum_map::Enum;
 use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -510,10 +510,8 @@ impl Pane {
 }
 
 pub struct App {
-    /// Which left pane has focus.
-    pub focus: Pane,
-    /// Selection cursor per pane, keyed by `Pane`.
-    pub selection: EnumMap<Pane, usize>,
+    /// Where the user is: focus, selection, drill-downs, tabs.
+    pub nav: nav::Nav,
     /// Whether the help overlay is up.
     pub help: help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
@@ -525,12 +523,8 @@ pub struct App {
     repo: Option<Box<dyn GitPort>>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     repo_name: String,
-    /// Git author name from the repository's effective config.
-    git_user_name: Option<String>,
-    /// The git identities (author label, Ferrit's commit author).
-    profile: Profile,
-    /// Optional per-commit author chosen from identities already in Git config.
-    selected_author: Option<crate::domain::profile::settings::Identity>,
+    /// Who commits are by: the identities git knows and ferrit's pick.
+    authorship: authorship::Authorship,
     /// First visible line of the settings sheet.
     settings_scroll: usize,
     pub theme: theme_editor::ThemeEditor,
@@ -547,21 +541,6 @@ pub struct App {
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     snapshot: git::Snapshot,
-    /// Directories collapsed in the Files pane's tree view (`FileRow`,
-    /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
-    /// default; paths persist across `refresh()`, only `Enter` on a
-    /// directory row changes this.
-    collapsed_dirs: HashSet<PathBuf>,
-    /// `Some` while the Branches pane is drilled into one branch's own log
-    /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
-    branch_drill: Option<BranchDrill>,
-    /// Which of the Branches pane's own two tabs is showing.
-    /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
-    branches_tab: BranchesTab,
-    /// `Some` while the Commits pane is drilled into one commit's own
-    /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
-    /// shows the commit list.
-    commit_drill: Option<CommitDrill>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<Arc<AppError>>,
     /// Optional worktree watcher failure; polling remains active as fallback.
@@ -584,21 +563,8 @@ pub struct App {
     pub(crate) commit_overlay: OverlayState,
     /// Persistent bottom-right error notification, dismissed by clicking `x`.
     pub(crate) toast: Option<Toast>,
-    /// Rows an action just created (the new branch, the new `HEAD`) that the
-    /// selection moves to once a refresh lists them, as lazygit does. Kept
-    /// until found, so a refresh already in flight when the action ran, which
-    /// cannot list them yet, does not lose it.
-    select_when_listed: Vec<(Pane, SelectionKey)>,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
     new_branch_title: String,
-    /// A click landed on the right pane. Purely a border-highlight flag for
-    /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
-    /// left-pane navigation and selection are untouched. Cleared by `Esc` or
-    /// a click back on a left pane.
-    right_focused: bool,
-    /// Whether keys go to the left panes or to the Files diff cursor
-    /// (`docs/PLAN_6_STAGING.md`).
-    mode: Mode,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
@@ -633,9 +599,11 @@ pub struct App {
     status_note: Option<String>,
 }
 
+mod authorship;
 pub mod help;
 pub mod hit_areas;
 mod modal;
+pub mod nav;
 pub mod right_pane;
 pub mod theme_editor;
 mod tree;
@@ -701,15 +669,12 @@ impl App {
             identity_source,
         });
         Self {
-            focus: Pane::default(),
-            selection: EnumMap::default(),
+            nav: nav::Nav::default(),
             help: help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
-            git_user_name,
-            profile,
-            selected_author: None,
+            authorship: authorship::Authorship::new(profile, git_user_name),
             settings_scroll: 0,
             theme: theme_editor::ThemeEditor::new(theme_config),
             config,
@@ -718,10 +683,6 @@ impl App {
             config_file: None,
             color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
             snapshot: git::Snapshot::default(),
-            collapsed_dirs: HashSet::new(),
-            branch_drill: None,
-            branches_tab: BranchesTab::default(),
-            commit_drill: None,
             last_error: None,
             watch_error: None,
             hits: hit_areas::HitAreas::default(),
@@ -731,10 +692,7 @@ impl App {
             sheet: sheet::Sheet::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
-            select_when_listed: Vec::new(),
             new_branch_title: String::new(),
-            right_focused: false,
-            mode: Mode::default(),
             modal: modal::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
@@ -924,8 +882,16 @@ impl App {
     /// Re-read the wired panes. On error keep the old snapshot and stash the
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
-        let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
-        let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
+        let branch = self
+            .nav
+            .branch_drill
+            .as_ref()
+            .map(|drill| drill.branch.clone());
+        let commit = self
+            .nav
+            .commit_drill
+            .as_ref()
+            .map(|drill| drill.hash.clone());
         let opts = self.diff_opts();
         let Some(repo) = &mut self.repo else { return };
         let completion = Self::load_refresh(repo.as_mut(), branch, commit, opts);
@@ -946,8 +912,16 @@ impl App {
         let Some(handle) = self.reopen_repo() else {
             return;
         };
-        let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
-        let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
+        let branch = self
+            .nav
+            .branch_drill
+            .as_ref()
+            .map(|drill| drill.branch.clone());
+        let commit = self
+            .nav
+            .commit_drill
+            .as_ref()
+            .map(|drill| drill.hash.clone());
         let opts = self.diff_opts();
         self.workers.refresh.in_flight = true;
         thread::spawn(move || {
@@ -1014,10 +988,10 @@ impl App {
 
     fn apply_refresh_result(&mut self, completion: RefreshCompletion) {
         if let Some(profile) = completion.profile {
-            self.profile = profile;
+            self.authorship.profile = profile;
         }
         let old_selection: [(Pane, usize, Option<SelectionKey>); 5] =
-            PANES.map(|pane| (pane, self.selection[pane], self.selection_key(pane)));
+            PANES.map(|pane| (pane, self.nav.selection[pane], self.selection_key(pane)));
         match completion.snapshot {
             Ok(snap) => {
                 self.snapshot = snap;
@@ -1043,17 +1017,18 @@ impl App {
         // the whole refresh.
         if let Some((branch, result)) = completion.branch_log
             && self
+                .nav
                 .branch_drill
                 .as_ref()
                 .is_some_and(|drill| drill.branch == branch)
         {
             match result {
                 Ok(commits) => {
-                    if let Some(drill) = &mut self.branch_drill {
+                    if let Some(drill) = &mut self.nav.branch_drill {
                         drill.commits = commits;
                     }
                 },
-                Err(_) => self.branch_drill = None,
+                Err(_) => self.nav.branch_drill = None,
             }
         }
 
@@ -1063,17 +1038,18 @@ impl App {
         // changed its hash) backs out rather than erroring the refresh.
         if let Some((hash, result)) = completion.commit_files
             && self
+                .nav
                 .commit_drill
                 .as_ref()
                 .is_some_and(|drill| drill.hash == hash)
         {
             match result {
                 Ok(files) => {
-                    if let Some(drill) = &mut self.commit_drill {
+                    if let Some(drill) = &mut self.nav.commit_drill {
                         drill.files = files;
                     }
                 },
-                Err(_) => self.commit_drill = None,
+                Err(_) => self.nav.commit_drill = None,
             }
         }
 
@@ -1083,17 +1059,17 @@ impl App {
                 .as_ref()
                 .and_then(|key| self.find_selection_key(pane, key))
                 .unwrap_or(old_index);
-            self.selection[pane] = new_index.min(last);
+            self.nav.selection[pane] = new_index.min(last);
         }
-        let mut waiting = std::mem::take(&mut self.select_when_listed);
+        let mut waiting = std::mem::take(&mut self.nav.select_when_listed);
         waiting.retain(|(pane, key)| match self.find_selection_key(*pane, key) {
             Some(index) => {
-                self.selection[*pane] = index;
+                self.nav.selection[*pane] = index;
                 false
             },
             None => true,
         });
-        self.select_when_listed = waiting;
+        self.nav.select_when_listed = waiting;
         self.workers.diff.refresh_requested = true;
         self.invalidate_image_query();
         self.update_right_pane();
@@ -1102,8 +1078,8 @@ impl App {
     /// After an action that created `key`'s row, select it in `pane` as soon as
     /// a refresh lists it.
     pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
-        self.select_when_listed.retain(|(p, _)| *p != pane);
-        self.select_when_listed.push((pane, key));
+        self.nav.select_when_listed.retain(|(p, _)| *p != pane);
+        self.nav.select_when_listed.push((pane, key));
     }
 
     fn on_refresh_done(&mut self, completion: RefreshCompletion) {
@@ -1136,10 +1112,10 @@ impl App {
     /// "the file list drives the main view" behaviour. A no-op off the
     /// Commits pane, undrilled, or on a directory row.
     fn sync_commit_file_scroll(&mut self) {
-        if self.focus != Pane::Commits {
+        if self.nav.focus != Pane::Commits {
             return;
         }
-        let Some(drill) = &self.commit_drill else {
+        let Some(drill) = &self.nav.commit_drill else {
             return;
         };
         let rows = drill_tree_rows(&drill.files, &drill.collapsed);
@@ -1169,11 +1145,11 @@ impl App {
     /// all — even if the other side now does; switching sides on the user's
     /// behalf would silently change what the next `<space>` does.
     fn resync_diff_cursor(&mut self) {
-        if self.mode != Mode::Diff {
+        if self.nav.mode != Mode::Diff {
             return;
         }
         let DiffView::Files(files) = &self.right.diff else {
-            self.mode = Mode::Nav;
+            self.nav.mode = Mode::Nav;
             return;
         };
         let diff = match self.right.cursor.side {
@@ -1208,23 +1184,23 @@ impl App {
             self.right.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
             self.ensure_cursor_visible();
         } else {
-            self.mode = Mode::Nav;
+            self.nav.mode = Mode::Nav;
         }
     }
 
     /// Files pane rows, lazygit-style directory tree: single-child directory
     /// chains folded, a root ("/") first only when it has two or more
     /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
-    /// `self.snapshot.files` and `self.collapsed_dirs` on every call; cheap at
+    /// `self.snapshot.files` and `self.nav.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.snapshot.files, &self.collapsed_dirs)
+        tree_rows(&self.snapshot.files, &self.nav.collapsed_dirs)
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
     /// changed files instead of the worktree's. Empty while not drilled.
     fn commit_tree_rows(&self) -> Vec<FileRow> {
-        match &self.commit_drill {
+        match &self.nav.commit_drill {
             Some(drill) => drill_tree_rows(&drill.files, &drill.collapsed),
             None => Vec::new(),
         }
@@ -1328,7 +1304,7 @@ impl App {
     }
 
     pub fn git_user_name(&self) -> Option<&str> {
-        self.git_user_name.as_deref()
+        self.authorship.git_user_name.as_deref()
     }
 
     /// Return cached styled diff. Cache invalidates on selection, diff text,
@@ -1439,7 +1415,7 @@ impl App {
     /// Whether the right pane was last clicked, for `ui::draw_right_pane`'s
     /// border highlight.
     pub fn right_focused(&self) -> bool {
-        self.right_focused
+        self.nav.right_focused
     }
 
     /// A left pane's list scroll offset, read by `ui::draw_left_column`
@@ -1458,7 +1434,7 @@ impl App {
     /// Whether a wheel scroll left `pane`'s view away from its selection. Read
     /// by `ui::draw_left_column`; forgets a detachment the selection has left.
     pub fn view_detached(&mut self, pane: Pane) -> bool {
-        let selected = self.selection[pane];
+        let selected = self.nav.selection[pane];
         if self.hits.view_detached_at[pane] != Some(selected) {
             self.hits.view_detached_at[pane] = None;
         }
@@ -1469,7 +1445,7 @@ impl App {
     /// where it is, which may leave it off screen. `draw_left_column` clamps
     /// the offset to the list's length on the next frame.
     pub(super) fn scroll_list(&mut self, pane: Pane, rows: isize) {
-        self.hits.view_detached_at[pane] = Some(self.selection[pane]);
+        self.hits.view_detached_at[pane] = Some(self.nav.selection[pane]);
         self.hits.list_offset[pane] = self.hits.list_offset[pane].saturating_add_signed(rows);
     }
 
@@ -1590,15 +1566,15 @@ impl App {
     /// Focus `pane` and move its cursor to `index`, rebuilding the preview.
     /// Test and example helper; the running app goes through `on_key`.
     pub fn select(&mut self, pane: Pane, index: usize) {
-        self.focus = pane;
+        self.nav.focus = pane;
         let last = self.row_count(pane).saturating_sub(1);
-        self.selection[pane] = index.min(last);
+        self.nav.selection[pane] = index.min(last);
         self.update_right_pane();
     }
 
     /// Selection cursor for a given pane.
     pub fn selected(&self, pane: Pane) -> usize {
-        self.selection[pane]
+        self.nav.selection[pane]
     }
 
     /// Selectable row count for a pane, for clamping the cursor and deciding
@@ -1607,12 +1583,13 @@ impl App {
         match pane {
             Pane::Status => 0,
             Pane::Files => self.files_tree_rows().len(),
-            Pane::Branches if self.branches_tab == BranchesTab::Remotes => 0,
+            Pane::Branches if self.nav.branches_tab == BranchesTab::Remotes => 0,
             Pane::Branches => self
+                .nav
                 .branch_drill
                 .as_ref()
                 .map_or(self.snapshot.branches.len(), |drill| drill.commits.len()),
-            Pane::Commits => match &self.commit_drill {
+            Pane::Commits => match &self.nav.commit_drill {
                 Some(_) => self.commit_tree_rows().len(),
                 None => self.snapshot.commits.len(),
             },
@@ -1628,8 +1605,8 @@ impl App {
                 &self.snapshot.files,
                 self.selected(pane),
             ),
-            Pane::Branches if self.branches_tab == BranchesTab::Remotes => None,
-            Pane::Branches => self.branch_drill.as_ref().map_or_else(
+            Pane::Branches if self.nav.branches_tab == BranchesTab::Remotes => None,
+            Pane::Branches => self.nav.branch_drill.as_ref().map_or_else(
                 || {
                     self.snapshot
                         .branches
@@ -1643,7 +1620,7 @@ impl App {
                         .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
                 },
             ),
-            Pane::Commits => self.commit_drill.as_ref().map_or_else(
+            Pane::Commits => self.nav.commit_drill.as_ref().map_or_else(
                 || {
                     self.snapshot
                         .commits
@@ -1671,24 +1648,25 @@ impl App {
             (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
                 find_file_row_key(&self.files_tree_rows(), &self.snapshot.files, key)
             },
-            (Pane::Branches, SelectionKey::Branch(name)) if self.branch_drill.is_none() => self
+            (Pane::Branches, SelectionKey::Branch(name)) if self.nav.branch_drill.is_none() => self
                 .snapshot
                 .branches
                 .iter()
                 .position(|entry| entry.name == *name),
             (Pane::Branches, SelectionKey::Commit(hash)) => self
+                .nav
                 .branch_drill
                 .as_ref()?
                 .commits
                 .iter()
                 .position(|entry| entry.full_hash == *hash),
-            (Pane::Commits, SelectionKey::Commit(hash)) if self.commit_drill.is_none() => self
+            (Pane::Commits, SelectionKey::Commit(hash)) if self.nav.commit_drill.is_none() => self
                 .snapshot
                 .commits
                 .iter()
                 .position(|entry| entry.full_hash == *hash),
             (Pane::Commits, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                let drill = self.commit_drill.as_ref()?;
+                let drill = self.nav.commit_drill.as_ref()?;
                 find_file_row_key(&self.commit_tree_rows(), &drill.files, key)
             },
             (Pane::Stash, SelectionKey::Stash(oid)) => self
@@ -1766,7 +1744,7 @@ impl App {
     /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
     /// own empty-state line.
     pub fn branch_lines(&self) -> Vec<Line<'static>> {
-        if let Some(drill) = &self.branch_drill {
+        if let Some(drill) = &self.nav.branch_drill {
             if drill.commits.is_empty() {
                 return vec![Line::raw("no commits yet")];
             }
@@ -1776,7 +1754,7 @@ impl App {
                 .map(|entry| theme::commit_line(&self.palette, entry))
                 .collect();
         }
-        if self.branches_tab == BranchesTab::Remotes {
+        if self.nav.branches_tab == BranchesTab::Remotes {
             if self.snapshot.remotes.is_empty() {
                 return vec![Line::raw("no remotes configured")];
             }
@@ -1807,7 +1785,7 @@ impl App {
     /// while drilled into a branch's log (Enter on a branch, `Esc` to back
     /// out; see `enter_branch_log`).
     pub fn branches_title(&self) -> String {
-        match &self.branch_drill {
+        match &self.nav.branch_drill {
             Some(drill) => format!("[3] Commits ({})", drill.branch),
             None => Pane::Branches.title().to_owned(),
         }
@@ -1819,7 +1797,7 @@ impl App {
     /// list row, not a commit row, so the Branches-specific hints would be
     /// misleading while drilled in.
     pub fn branches_drilled(&self) -> bool {
-        self.branch_drill.is_some()
+        self.nav.branch_drill.is_some()
     }
 
     /// Is the selected Files row a directory (the root row included)?
@@ -1834,14 +1812,14 @@ impl App {
     /// commit list? The commit rewrite keys and their keybar apply only to the
     /// list.
     pub fn commits_drilled(&self) -> bool {
-        self.commit_drill.is_some()
+        self.nav.commit_drill.is_some()
     }
 
     /// Commits pane rows: the commit list, or one commit's own changed-file
     /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
     /// shape `branch_lines` gives the Branches pane.
     pub fn commit_lines(&self) -> Vec<Line<'static>> {
-        if let Some(drill) = &self.commit_drill {
+        if let Some(drill) = &self.nav.commit_drill {
             return self
                 .commit_tree_rows()
                 .iter()
@@ -1879,7 +1857,7 @@ impl App {
     /// drilled into a commit's own changed-file tree (Enter on a commit,
     /// `Esc` to back out; see `enter_commit_files`).
     pub fn commits_title(&self) -> String {
-        match &self.commit_drill {
+        match &self.nav.commit_drill {
             Some(drill) => format!("[4] Diff files ({})", drill.title),
             None => Pane::Commits.title().to_owned(),
         }

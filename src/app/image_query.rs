@@ -66,7 +66,7 @@ pub(crate) fn load(
 
 impl App {
     pub(super) fn update_preview(&mut self) {
-        if self.focus != Pane::Files {
+        if self.nav.focus != Pane::Files {
             self.invalidate_image_query();
             self.right.preview = Preview::None;
             return;

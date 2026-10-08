@@ -106,7 +106,7 @@ fn a_tall_diff_gets_a_scrollbar() {
 #[test]
 fn a_short_diff_has_no_scrollbar() {
     let mut app = App::mock();
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     let buf = render_buffer(&mut app, 120, 40);
     // Right pane only (`side = (120 / 3).max(24) == 40`): with Files focused
     // the accordion squashes Branches/Commits/Stash to their 3-row floor, so
@@ -166,7 +166,7 @@ const LEFT_COLUMN: std::ops::Range<u16> = 0..33;
 #[test]
 fn an_overflowing_list_gets_a_scrollbar() {
     let (_dir, mut app) = many_commits_repo("sb-left-yes");
-    app.focus = Pane::Commits;
+    app.nav.focus = Pane::Commits;
     let buf = render_buffer(&mut app, 100, 20);
     assert!(
         !cells_with(&buf, THUMB, LEFT_COLUMN).is_empty(),
@@ -190,7 +190,7 @@ fn a_short_list_has_no_scrollbar() {
 #[test]
 fn left_scrollbar_is_green_when_its_pane_is_focused() {
     let (_dir, mut app) = many_commits_repo("sb-left-green");
-    app.focus = Pane::Commits;
+    app.nav.focus = Pane::Commits;
     let buf = render_buffer(&mut app, 100, 20);
 
     let coloured: Vec<_> = LEFT_COLUMN
@@ -216,7 +216,7 @@ fn left_scrollbar_is_green_when_its_pane_is_focused() {
 #[test]
 fn left_scrollbar_is_not_green_when_its_pane_is_unfocused() {
     let (_dir, mut app) = many_commits_repo("sb-left-grey");
-    app.focus = Pane::Status; // Commits still overflows, but is not focused
+    app.nav.focus = Pane::Status; // Commits still overflows, but is not focused
 
     let buf = render_buffer(&mut app, 100, 21);
     let scrollbar_cells: Vec<_> = LEFT_COLUMN

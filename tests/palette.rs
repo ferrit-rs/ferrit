@@ -94,7 +94,7 @@ fn a_frame_on_the_default_palette_paints_borders_in_its_idle_colour() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     let mut app = App::mock();
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal
         .draw(|f| ferrit::app::screens::draw(f, &mut app))

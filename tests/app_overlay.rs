@@ -47,7 +47,7 @@ fn app_with_fake() -> (App, FakeGit) {
 }
 
 fn ask_to_delete_feat(app: &mut App) {
-    app.focus = Pane::Branches;
+    app.nav.focus = Pane::Branches;
     let feat = app
         .branch_lines()
         .iter()

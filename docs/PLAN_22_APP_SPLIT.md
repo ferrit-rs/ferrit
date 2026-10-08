@@ -1,6 +1,6 @@
 # Plan: phase 22, break up `App`
 
-**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms, `Nav` and `Authorship` done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
 
 What differs from the sketch below, and why:
@@ -28,7 +28,7 @@ What differs from the sketch below, and why:
 - **Not done: step 6, a `ViewState` for drawing.** `screens::draw` still takes `&mut App`.
   `HitAreas` is what a draw function writes, so it can now be passed on its own, but the
   sheets and popups still read half of `App`. Left for a later phase.
-- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 47 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
+- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 37 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
 
 ## Goal
 
@@ -212,12 +212,19 @@ Action::Help => self.help.open(self.hints.row_count()),   // one line per arm
 Phase 23 (`PLAN_23_TEST_SUPPORT.md`) cleans the test suite and narrows the public API, now
 that the types it exposes are small and named.
 
-## What is left on `App` (47 fields)
+- **`Nav` and `Authorship`.** `App.nav` holds focus, the cursor of each pane, the two drills,
+  the collapsed directories, the Branches tab, the rows to select once listed, the
+  right-pane focus flag and the keyboard mode (nine fields; `focus` and `selection` stay
+  public, now as `app.nav.focus`). `App.authorship` holds the git profile, ferrit's author
+  pick and `user.name` (three fields) and the three methods that were scattered: the author
+  line, `Ctrl-A` cycling and the `--author` value, which was built by the same closure in
+  three places (`commit`, `rebase_actions`, `create_remote`) and is now `author_arg()`.
+  `repo_name` stayed on `App`: it names the repository, not the author.
 
-Navigation and selection (`focus`, `selection`, `mode`, `right_focused`, the two drills,
-`collapsed_dirs`, `branches_tab`, `select_when_listed`), identity (`profile`,
-`selected_author`, `git_user_name`, `repo_name`), configuration (`config`, `keymap`,
-`config_file`, `color_depth`, `palette`), and the full-screen and sheet layers
-(`full_screen`, `dashboard`, `git_config`, `welcome_*`, `settings*`, `sheet*`,
-`create_remote`). The next cuts, in order of cohesion: `Nav` (focus, selection, mode, drills),
-`Identity`, then a `Screens` group for the full-screen views.
+## What is left on `App` (37 fields)
+
+Configuration (`config`, `keymap`, `config_file`, `color_depth`, `palette`), the
+full-screen and sheet layers (`full_screen`, `dashboard`, `git_config`, `welcome_*`,
+`settings*`, `sheet*`, `create_remote`), and a few singles (`repo`, `repo_name`, `toast`,
+`status_note`, `last_error`, `watch_error`, `should_quit`, `mouse_pointer`, `commit_draft`).
+The next cut, by cohesion: a `Screens` group for the full-screen views and the sheets.

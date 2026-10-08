@@ -70,7 +70,7 @@ into its own crate remains deferred.
 | 19 | `PLAN_19_DASHBOARD_SHEET.md` | the dashboard (`D`) as a drawer over the dimmed panes, like the settings sheet, instead of a full-screen view; same content and worker; as wide as the page so two columns fit; one shared sheet state | ✅ done |
 | 20 | `PLAN_20_TYPED_ERRORS.md` | typed errors end to end: no `Result<_, String>` in `app` and `domain`, `AppError` without a catch-all, errors rendered only at the UI edge | ✅ done |
 | 21 | `PLAN_21_GIT_PORT.md` | a `GitPort` trait in the domain, `git2` + subprocess code moved to `infra/git`, an in-memory `FakeGit` checked by the same contract suite | 🔄 C0 to C3 done, adapter move (C4) open |
-| 22 | `PLAN_22_APP_SPLIT.md` | `App` split into named sub-states (help, theme editor, snapshot, right pane, workers, hit areas), one `Modal` value for a popup or a key-bar question, `dispatch` as a router | 🔄 87 to 47 fields, navigation / identity / draw view open |
+| 22 | `PLAN_22_APP_SPLIT.md` | `App` split into named sub-states (help, theme editor, snapshot, right pane, workers, hit areas), one `Modal` value for a popup or a key-bar question, `dispatch` as a router | 🔄 87 to 37 fields, full-screen views / draw view open |
 | 23 | `PLAN_23_TEST_SUPPORT.md` | shared `tests/common` kit, property tests for the diff parsers, big test files split, narrow public API with a `test-support` feature | 🔄 kit and file splits done, property tests and API narrowing open |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo

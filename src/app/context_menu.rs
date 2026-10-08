@@ -70,9 +70,9 @@ impl App {
         if self.modal.is_some() || self.repo.is_none() {
             return;
         }
-        let index = self.selected(self.focus);
-        let (title, mut items) = match self.focus {
-            Pane::Files if self.mode == Mode::Nav => match self.selected_file() {
+        let index = self.selected(self.nav.focus);
+        let (title, mut items) = match self.nav.focus {
+            Pane::Files if self.nav.mode == Mode::Nav => match self.selected_file() {
                 Some(file)
                     if file.staged == git::model::Change::Conflicted
                         || file.worktree == git::model::Change::Conflicted =>
@@ -88,7 +88,8 @@ impl App {
                 _ => (String::new(), Vec::new()),
             },
             Pane::Branches
-                if self.branch_drill.is_none() && self.branches_tab == BranchesTab::Local =>
+                if self.nav.branch_drill.is_none()
+                    && self.nav.branches_tab == BranchesTab::Local =>
             {
                 match self.snapshot.branches.get(index) {
                     Some(branch) => (
@@ -101,7 +102,7 @@ impl App {
                     None => (String::new(), Vec::new()),
                 }
             },
-            Pane::Commits if self.commit_drill.is_none() => {
+            Pane::Commits if self.nav.commit_drill.is_none() => {
                 match self.snapshot.commits.get(index) {
                     Some(commit) => (
                         commit.short_hash.clone(),
@@ -129,8 +130,8 @@ impl App {
         };
         // A repository with no remote can be published: optional, any time.
         let publishable = self.snapshot.remotes.is_empty()
-            && (self.focus == Pane::Status
-                || (self.focus == Pane::Branches && self.branch_drill.is_none()));
+            && (self.nav.focus == Pane::Status
+                || (self.nav.focus == Pane::Branches && self.nav.branch_drill.is_none()));
         if publishable {
             items.push(MenuItem {
                 label: "Create a repository on GitHub",
@@ -157,7 +158,7 @@ impl App {
     /// Run a menu action that belongs to the `x` menu, on the row it was opened
     /// for (the selection has not moved: a menu is modal).
     pub(super) fn run_context_action(&mut self, action: MenuAction) {
-        let index = self.selected(self.focus);
+        let index = self.selected(self.nav.focus);
         match action {
             MenuAction::RenameBranch => {
                 let Some(branch) = self.snapshot.branches.get(index) else {
@@ -285,8 +286,8 @@ impl App {
         let Some(pane) = self.pane_at(column, row) else {
             return;
         };
-        self.right_focused = false;
-        self.mode = Mode::Nav;
+        self.nav.right_focused = false;
+        self.nav.mode = Mode::Nav;
         if self.click_pane(pane, row) {
             self.update_right_pane();
             self.open_context_menu();

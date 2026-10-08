@@ -21,7 +21,7 @@ fn main() {
         Pane::Stash,
     ] {
         let mut app = App::mock();
-        app.focus = focus;
+        app.nav.focus = focus;
         let mut t = Terminal::new(TestBackend::new(90, 30)).unwrap();
         t.draw(|f| ui::draw(f, &mut app)).unwrap();
         println!("== {focus:?} ==\n{}", t.backend());

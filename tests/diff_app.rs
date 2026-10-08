@@ -402,7 +402,11 @@ fn enter_on_branches_drills_into_that_branchs_log() {
     app.select(Pane::Branches, 1);
     app.feed_key(KeyEvent::from(KeyCode::Enter));
 
-    assert_eq!(app.focus, Pane::Branches, "Enter stays in the same panel");
+    assert_eq!(
+        app.nav.focus,
+        Pane::Branches,
+        "Enter stays in the same panel"
+    );
     assert_eq!(
         app.row_count(Pane::Branches),
         1,
@@ -420,7 +424,7 @@ fn enter_on_branches_drills_into_that_branchs_log() {
     );
 
     app.feed_key(KeyEvent::from(KeyCode::Esc));
-    assert_eq!(app.focus, Pane::Branches);
+    assert_eq!(app.nav.focus, Pane::Branches);
     assert_eq!(
         app.selected(Pane::Branches),
         1,

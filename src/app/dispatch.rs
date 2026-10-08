@@ -13,10 +13,10 @@ impl App {
     /// cursor while it is up, then the focused pane, then everything.
     pub(super) fn key_contexts(&self) -> Vec<Context> {
         let mut contexts = Vec::with_capacity(3);
-        if self.mode == Mode::Diff {
+        if self.nav.mode == Mode::Diff {
             contexts.push(Context::Diff);
         }
-        contexts.extend(Context::for_pane(self.focus));
+        contexts.extend(Context::for_pane(self.nav.focus));
         contexts.push(Context::Global);
         contexts
     }
@@ -126,12 +126,12 @@ impl App {
     /// `Esc` on a pane: back out of a drilled branch or commit, restoring the
     /// cursor it was opened from.
     fn go_back(&mut self) {
-        self.right_focused = false;
-        if let Some(drill) = self.branch_drill.take() {
-            self.selection[Pane::Branches] = drill.return_index;
+        self.nav.right_focused = false;
+        if let Some(drill) = self.nav.branch_drill.take() {
+            self.nav.selection[Pane::Branches] = drill.return_index;
         }
-        if let Some(drill) = self.commit_drill.take() {
-            self.selection[Pane::Commits] = drill.return_index;
+        if let Some(drill) = self.nav.commit_drill.take() {
+            self.nav.selection[Pane::Commits] = drill.return_index;
         }
     }
 
@@ -148,8 +148,8 @@ impl App {
     }
 
     fn focus_pane(&mut self, pane: Pane) {
-        self.right_focused = false;
-        self.focus = pane;
+        self.nav.right_focused = false;
+        self.nav.focus = pane;
     }
 
     pub(super) fn open_help(&mut self) {

@@ -333,7 +333,7 @@ fn a_clean_apply_or_pop_moves_focus_to_files_on_the_restored_file() {
         app.feed_key(char_key(key));
         app.feed_key(char_key('y'));
 
-        assert_eq!(app.focus, Pane::Files, "{key:?}");
+        assert_eq!(app.nav.focus, Pane::Files, "{key:?}");
         assert!(app.row_count(Pane::Files) > 1, "restored files are listed");
         assert!(
             app.selected(Pane::Files) > 0,
@@ -352,7 +352,7 @@ fn drop_and_a_conflicting_pop_keep_the_focus_on_stash() {
     let (_dir, mut app) = stashed_app("app-stash-focus-drop");
     app.feed_key(char_key('d'));
     app.feed_key(char_key('y'));
-    assert_eq!(app.focus, Pane::Stash);
+    assert_eq!(app.nav.focus, Pane::Stash);
 
     let (dir, mut app) = stashed_app("app-stash-focus-conflict");
     fs::write(dir.path().join("a.txt"), "one\ncommitted\n").unwrap();
@@ -360,5 +360,5 @@ fn drop_and_a_conflicting_pop_keep_the_focus_on_stash() {
     app.refresh();
     app.feed_key(char_key('g'));
     app.feed_key(char_key('y'));
-    assert_eq!(app.focus, Pane::Stash);
+    assert_eq!(app.nav.focus, Pane::Stash);
 }

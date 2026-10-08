@@ -90,7 +90,7 @@ fn keybar_swaps_for_the_branches_pane() {
     assert!(branches_out.contains("Merge:"), "{branches_out}");
     assert!(!branches_out.contains("Stage:"), "{branches_out}");
 
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     assert!(
         frame(&mut app, 120, 40).contains("Stage:"),
         "back to default"
@@ -101,16 +101,16 @@ fn keybar_swaps_for_the_branches_pane() {
 fn right_pane_follows_focus() {
     let mut app = App::mock();
 
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     assert!(frame(&mut app, 120, 40).contains("diff --git a/src/main.rs"));
 
-    app.focus = Pane::Branches;
+    app.nav.focus = Pane::Branches;
     assert!(
         !frame(&mut app, 120, 40).contains("diff --git"),
         "Branches has no mock body since G7: Enter drills into a real branch log instead"
     );
 
-    app.focus = Pane::Stash;
+    app.nav.focus = Pane::Stash;
     assert!(frame(&mut app, 120, 40).contains("(no stash entries)"));
 }
 
@@ -160,7 +160,7 @@ fn one_sided_file_diff_uses_one_full_width_panel() {
 #[test]
 fn status_shows_the_welcome_screen() {
     let mut app = App::mock();
-    app.focus = Pane::Status;
+    app.nav.focus = Pane::Status;
     let small = "\u{2590}\u{2588}\u{2588}\u{2588}"; // ▐███
     let medium = "\u{2584}\u{2584}\u{2584}\u{2584}"; // ▄▄▄▄
     let large = "\u{2592}\u{2588}\u{2588}\u{2588}\u{2588}"; // ▒████
@@ -202,11 +202,11 @@ fn status_shows_the_welcome_screen() {
 fn only_the_focused_pane_shows_the_selection_bar() {
     let mut app = App::mock();
 
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     let files = selection_bar_rows(&mut app);
-    app.focus = Pane::Branches;
+    app.nav.focus = Pane::Branches;
     let branches = selection_bar_rows(&mut app);
-    app.focus = Pane::Commits;
+    app.nav.focus = Pane::Commits;
     let commits = selection_bar_rows(&mut app);
 
     // Each focused pane paints exactly one blue bar...
@@ -266,7 +266,11 @@ fn click_moves_focus_and_selection_on_screen() {
         modifiers: KeyModifiers::NONE,
     });
 
-    assert_eq!(app.focus, Pane::Commits, "the click moved focus to Commits");
+    assert_eq!(
+        app.nav.focus,
+        Pane::Commits,
+        "the click moved focus to Commits"
+    );
     assert_eq!(
         app.selected(Pane::Commits),
         1,
@@ -312,7 +316,7 @@ fn click_on_the_command_log_or_keybar_is_a_no_op() {
     }
 
     assert_eq!(
-        app.focus,
+        app.nav.focus,
         Pane::Files,
         "a click on the log or the keybar moves nothing"
     );
@@ -346,7 +350,7 @@ fn image_selection_takes_over_the_right_pane() {
 #[test]
 fn ferrit_opens_on_files_and_status_keeps_the_welcome_screen() {
     let mut app = App::mock();
-    assert_eq!(app.focus, Pane::Files);
+    assert_eq!(app.nav.focus, Pane::Files);
     assert_eq!(app.selected(Pane::Files), 0);
     let start = frame(&mut app, 160, 50);
     assert!(!start.contains("Press ? for keybindings"), "{start}");
@@ -501,7 +505,7 @@ fn busy_and_status_note_render_on_the_status_pane_and_are_exclusive() {
 #[test]
 fn keybar_swaps_for_the_stash_pane() {
     let mut app = App::mock();
-    app.focus = Pane::Stash;
+    app.nav.focus = Pane::Stash;
     let out = frame(&mut app, 120, 40);
     for hint in ["Apply:", "Pop:", "Drop:", "Stage:"] {
         assert!(!out.contains(hint), "{hint}\n{out}");
@@ -514,7 +518,7 @@ fn keybar_swaps_for_the_stash_pane() {
 #[test]
 fn stash_popup_renders_title_and_hints() {
     let mut app = App::mock();
-    app.focus = Pane::Files;
+    app.nav.focus = Pane::Files;
     app.feed_key(KeyEvent::from(KeyCode::Char('s')));
 
     let out = frame(&mut app, 120, 40);

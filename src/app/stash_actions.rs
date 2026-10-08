@@ -12,7 +12,10 @@ impl App {
     /// The selected stash entry's oid, only while Stash is focused, in
     /// `Mode::Nav` and no popup is up.
     fn selected_stash(&self) -> Option<&git::model::StashEntry> {
-        if self.focus != Pane::Stash || self.mode != Mode::Nav || self.modal.popup().is_some() {
+        if self.nav.focus != Pane::Stash
+            || self.nav.mode != Mode::Nav
+            || self.modal.popup().is_some()
+        {
             return None;
         }
         self.snapshot.stashes.get(self.selected(Pane::Stash))
@@ -21,7 +24,10 @@ impl App {
     /// `s` (Nav, Files focused): open the stash message popup. A clean tree
     /// opens nothing and says so.
     pub(super) fn open_stash_popup(&mut self) {
-        if self.focus != Pane::Files || self.mode != Mode::Nav || self.modal.popup().is_some() {
+        if self.nav.focus != Pane::Files
+            || self.nav.mode != Mode::Nav
+            || self.modal.popup().is_some()
+        {
             return;
         }
         if self.snapshot.files.is_empty() {
@@ -89,7 +95,7 @@ impl App {
             repo.stash_apply(oid)
         };
         if matches!(result, Ok(StashOutcome::Done)) {
-            self.focus = Pane::Files;
+            self.nav.focus = Pane::Files;
             if let Some(path) = first_file {
                 self.select_when_listed(Pane::Files, SelectionKey::File(path));
             }

@@ -124,7 +124,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     // LazyGit splits the diff only for partially staged files. One-sided
     // changes use the full-width diff pane.
     // A directory row never splits (nor narrows the side column): it shows one side.
-    let files_split = app.focus == Pane::Files
+    let files_split = app.nav.focus == Pane::Files
         && !app.files_selection_is_dir()
         && matches!(app.diff_view(), DiffView::Files(files)
             if !files.unstaged.text.trim().is_empty() && !files.staged.text.trim().is_empty());
@@ -142,7 +142,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     draw_left_column(frame, app, left);
     if files_split {
         diff::draw_files_columns(frame, app, right);
-    } else if app.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
+    } else if app.nav.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
         diff::draw_single_file_diff(frame, app, right);
     } else {
         draw_right_pane(frame, app, right);
@@ -249,7 +249,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     const DYNAMIC: [Pane; 4] = [Pane::Files, Pane::Branches, Pane::Commits, Pane::Stash];
     const FOCUS_WEIGHT: u16 = 4;
     const MIN_HEIGHT: u16 = 2; // a collapsed but still-bordered box: no room for a content row
-    let focus_index = DYNAMIC.iter().position(|&p| p == app.focus);
+    let focus_index = DYNAMIC.iter().position(|&p| p == app.nav.focus);
 
     let weights: [u16; 4] = focus_index.map_or([1; 4], |idx| {
         std::array::from_fn(|i| if i == idx { FOCUS_WEIGHT } else { 1 })
@@ -303,7 +303,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         // read, so this `&mut` borrow never overlaps the `&self` one below.
         app.set_left_area(pane, row);
 
-        let focused = app.focus == pane && !app.right_focused();
+        let focused = app.nav.focus == pane && !app.right_focused();
         let border = if focused {
             Style::new()
                 .fg(app.theme.config.color())
@@ -505,16 +505,17 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // Branches normally previews nothing (" Log "); once drilled into a
     // branch's commit list, a selected row shows a real diff, so the title
     // matches what the Commits pane calls the same view: " Patch ".
-    let right_title =
-        if app.focus == Pane::Branches && matches!(app.diff_view(), DiffView::Commit(..)) {
-            " Patch "
-        } else if app.focus == Pane::Files && !app.is_mock() && app.row_count(Pane::Files) == 0 {
-            // Nothing changed: lazygit's "Diff" pane says so, instead of keeping
-            // the "Unstaged changes" title over an empty box.
-            " Diff "
-        } else {
-            app.focus.right_title()
-        };
+    let right_title = if app.nav.focus == Pane::Branches
+        && matches!(app.diff_view(), DiffView::Commit(..))
+    {
+        " Patch "
+    } else if app.nav.focus == Pane::Files && !app.is_mock() && app.row_count(Pane::Files) == 0 {
+        // Nothing changed: lazygit's "Diff" pane says so, instead of keeping
+        // the "Unstaged changes" title over an empty box.
+        " Diff "
+    } else {
+        app.nav.focus.right_title()
+    };
     let border = if app.right_focused() { focused } else { idle };
 
     // An image selection takes over the right pane; otherwise it is mock text.
@@ -651,7 +652,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 
     // Status: lazygit's welcome screen, not repo data — same in mock and on
     // a real repo, so this comes before the mock/real split below.
-    if app.focus == Pane::Status {
+    if app.nav.focus == Pane::Status {
         let panel = Paragraph::new(welcome_lines(
             area.width,
             area.height,
@@ -667,8 +668,8 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // `App::mock()`: the sample text. A real repo with nothing selected (no
     // files, no commits) just leaves the pane blank.
     if !app.is_mock() {
-        let empty_files = app.focus == Pane::Files && app.row_count(Pane::Files) == 0;
-        let empty_stash = app.focus == Pane::Stash && app.row_count(Pane::Stash) == 0;
+        let empty_files = app.nav.focus == Pane::Files && app.row_count(Pane::Files) == 0;
+        let empty_stash = app.nav.focus == Pane::Stash && app.row_count(Pane::Stash) == 0;
         let text = if empty_files {
             "No changed files"
         } else if empty_stash {
@@ -684,14 +685,14 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     // Branches has no mock body either: `App::mock()` has no repo, so there
     // is nothing to preview or drill into (G7); the mock path matches that
     // by leaving it blank rather than showing a fake sample.
-    let body = match app.focus {
+    let body = match app.nav.focus {
         Pane::Status | Pane::Branches => "",
         Pane::Files => mock::RIGHT_DIFF,
         Pane::Commits => mock::RIGHT_COMMIT,
         Pane::Stash => mock::RIGHT_STASH,
     };
 
-    let text: Text<'_> = match app.focus {
+    let text: Text<'_> = match app.nav.focus {
         Pane::Files | Pane::Commits => theme::diff_lines(palette, body, None),
         _ => body.into(),
     };
@@ -835,17 +836,17 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::Operation
     } else if app.right_focused() {
         Bar::RightPane
-    } else if (app.focus == Pane::Branches && app.branches_drilled())
-        || (app.focus == Pane::Commits && app.commits_drilled())
+    } else if (app.nav.focus == Pane::Branches && app.branches_drilled())
+        || (app.nav.focus == Pane::Commits && app.commits_drilled())
     {
         Bar::Drilled
-    } else if app.focus == Pane::Branches {
+    } else if app.nav.focus == Pane::Branches {
         Bar::Branches
-    } else if app.focus == Pane::Stash && app.row_count(Pane::Stash) == 0 {
+    } else if app.nav.focus == Pane::Stash && app.row_count(Pane::Stash) == 0 {
         Bar::StashEmpty
-    } else if app.focus == Pane::Stash {
+    } else if app.nav.focus == Pane::Stash {
         Bar::Stash
-    } else if app.focus == Pane::Commits {
+    } else if app.nav.focus == Pane::Commits {
         Bar::Commits
     } else if app.row_count(Pane::Files) == 0 {
         Bar::FilesEmpty

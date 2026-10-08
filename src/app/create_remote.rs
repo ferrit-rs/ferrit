@@ -506,12 +506,7 @@ impl App {
             .into_iter()
             .next()
             .unwrap_or_default();
-        let author = self.selected_author.as_ref().and_then(|identity| {
-            identity
-                .email
-                .as_ref()
-                .map(|email| format!("{} <{email}>", identity.name))
-        });
+        let author = self.authorship.author_arg();
         self.create_remote.draft = Some(draft);
         self.create_remote.error = None;
         self.workers.remote_busy = Some(events::RemoteOp::Create);

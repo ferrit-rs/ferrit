@@ -18,17 +18,17 @@ fn press(app: &mut App, code: KeyCode) {
 fn arrows_cycle_panes_and_wrap() {
     let mut app = App::mock();
     assert_eq!(
-        app.focus,
+        app.nav.focus,
         Pane::Files,
         "ferrit opens on Files, like lazygit"
     );
     press(&mut app, KeyCode::Right);
-    assert_eq!(app.focus, Pane::Branches);
+    assert_eq!(app.nav.focus, Pane::Branches);
     press(&mut app, KeyCode::Left);
     press(&mut app, KeyCode::Left);
-    assert_eq!(app.focus, Pane::Status);
+    assert_eq!(app.nav.focus, Pane::Status);
     press(&mut app, KeyCode::Left);
-    assert_eq!(app.focus, Pane::Stash, "Left from the first pane wraps");
+    assert_eq!(app.nav.focus, Pane::Stash, "Left from the first pane wraps");
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn help_overlay_swallows_navigation() {
     press(&mut app, KeyCode::Char('?'));
     assert!(app.help.open);
     press(&mut app, KeyCode::Right);
-    assert_eq!(app.focus, Pane::Files, "nav is inert while help is up");
+    assert_eq!(app.nav.focus, Pane::Files, "nav is inert while help is up");
     press(&mut app, KeyCode::Char('?'));
     assert!(!app.help.open);
 }

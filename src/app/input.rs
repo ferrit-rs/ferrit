@@ -187,8 +187,8 @@ impl App {
         }
 
         if let Some(pane) = self.pane_at(ev.column, ev.row) {
-            self.right_focused = false; // a left click always returns focus left
-            self.mode = Mode::Nav; // a click is a Nav-mode gesture, not diff-cursor movement
+            self.nav.right_focused = false; // a left click always returns focus left
+            self.nav.mode = Mode::Nav; // a click is a Nav-mode gesture, not diff-cursor movement
             let landed = self.click_pane(pane, ev.row);
             // lazygit toggles a Files directory row on click, not just on
             // Enter — the whole row is the target, not just its arrow
@@ -198,7 +198,7 @@ impl App {
             }
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
         } else if self.right.area.contains(Position::new(ev.column, ev.row)) {
-            self.right_focused = true;
+            self.nav.right_focused = true;
         }
         // else: command log / keybar / gap. no-op.
     }
@@ -216,11 +216,11 @@ impl App {
     /// to a real entry. Returns whether the cursor moved: `false` for the
     /// border / title row and for a click past the last entry.
     pub(super) fn click_pane(&mut self, pane: Pane, screen_row: u16) -> bool {
-        self.focus = pane; // focus first, even on the border or past the tail
+        self.nav.focus = pane; // focus first, even on the border or past the tail
         let Some(idx) = self.click_row(pane, screen_row) else {
             return false;
         };
-        self.selection[pane] = idx;
+        self.nav.selection[pane] = idx;
         true
     }
 
@@ -251,18 +251,18 @@ impl App {
     }
 
     pub(super) fn pane_offset(&self, delta: usize) -> Pane {
-        let idx = (self.focus.index() + delta) % PANES.len();
-        PANES.get(idx).copied().unwrap_or(self.focus)
+        let idx = (self.nav.focus.index() + delta) % PANES.len();
+        PANES.get(idx).copied().unwrap_or(self.nav.focus)
     }
 
     pub(super) fn select_down(&mut self) {
-        let last = self.row_count(self.focus).saturating_sub(1);
-        let cursor = &mut self.selection[self.focus];
+        let last = self.row_count(self.nav.focus).saturating_sub(1);
+        let cursor = &mut self.nav.selection[self.nav.focus];
         *cursor = (*cursor + 1).min(last);
     }
 
     pub(super) fn select_up(&mut self) {
-        let cursor = &mut self.selection[self.focus];
+        let cursor = &mut self.nav.selection[self.nav.focus];
         *cursor = cursor.saturating_sub(1);
     }
 }

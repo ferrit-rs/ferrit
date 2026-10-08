@@ -647,7 +647,7 @@ fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
         app.set_left_area(Pane::Branches, Rect::new(0, 10, 40, 6));
         click(&mut app, MouseEventKind::Down(MouseButton::Left));
         click(&mut app, MouseEventKind::ScrollDown);
-        assert_eq!(app.focus, expected_focus, "mouse = {mouse}");
+        assert_eq!(app.nav.focus, expected_focus, "mouse = {mouse}");
     }
 }
 

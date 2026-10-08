@@ -20,10 +20,10 @@ impl App {
     /// branches / Remotes tab. A no-op while drilled into a branch's log —
     /// there is only one tab's worth of content to show there.
     pub(super) fn toggle_branches_tab(&mut self) {
-        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+        if self.nav.focus != Pane::Branches || self.nav.branch_drill.is_some() {
             return;
         }
-        self.branches_tab = match self.branches_tab {
+        self.nav.branches_tab = match self.nav.branches_tab {
             BranchesTab::Local => BranchesTab::Remotes,
             BranchesTab::Remotes => BranchesTab::Local,
         };
@@ -34,9 +34,9 @@ impl App {
     /// in place — focus stays on Branches, only its rows and title change
     /// (`branches_title`). Read only, no checkout. `Esc` backs out (`on_key`).
     pub(super) fn enter_branch_log(&mut self) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }
@@ -48,12 +48,12 @@ impl App {
         let name = branch.name.clone();
         match repo.branch_log(&name) {
             Ok(commits) => {
-                self.branch_drill = Some(BranchDrill {
+                self.nav.branch_drill = Some(BranchDrill {
                     branch: name,
                     commits,
                     return_index,
                 });
-                self.selection[Pane::Branches] = 0;
+                self.nav.selection[Pane::Branches] = 0;
             },
             Err(e) => self.report_error(e),
         }
@@ -74,9 +74,9 @@ impl App {
     /// checkout changes the working tree too). No-op while drilled into a
     /// branch's log, where the selected row is a commit, not a branch.
     pub(super) fn checkout_selected_branch(&mut self) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }
@@ -99,10 +99,10 @@ impl App {
     /// `n` (Nav, Branches focused): open the new-branch popup, named from
     /// the selected branch once submitted.
     pub(super) fn open_new_branch_popup(&mut self) {
-        if self.focus != Pane::Branches
+        if self.nav.focus != Pane::Branches
             || self.modal.popup().is_some()
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }
@@ -137,7 +137,7 @@ impl App {
                 self.modal.close_popup();
                 // The new branch is the checked-out one: select it, not the
                 // row the cursor was on (lazygit).
-                if self.branch_drill.is_none() && self.branches_tab == BranchesTab::Local {
+                if self.nav.branch_drill.is_none() && self.nav.branches_tab == BranchesTab::Local {
                     self.select_when_listed(Pane::Branches, SelectionKey::Branch(name));
                 }
                 self.request_refresh();
@@ -153,9 +153,9 @@ impl App {
     /// nothing" path an invalid discard already takes, rather than
     /// opening a confirm for an outcome that is already certain.
     pub(super) fn delete_branch_prompt(&mut self) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }
@@ -181,9 +181,9 @@ impl App {
     /// command, the reflog has your back the same way it does from a
     /// shell.
     pub(super) fn fast_forward_selected_branch(&mut self) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }
@@ -215,9 +215,9 @@ impl App {
     /// there is nothing to choose between, so it merges straight away (git
     /// answers "Already up to date").
     pub(super) fn merge_selected_branch(&mut self) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
             || self.modal.is_some()
         {
             return;
@@ -272,9 +272,9 @@ impl App {
     /// renders `Change::Conflicted`, so the conflicted paths are visible
     /// without a dedicated flow.
     pub(super) fn merge_selected_branch_with(&mut self, kind: MergeKind) {
-        if self.focus != Pane::Branches
-            || self.branch_drill.is_some()
-            || self.branches_tab == BranchesTab::Remotes
+        if self.nav.focus != Pane::Branches
+            || self.nav.branch_drill.is_some()
+            || self.nav.branches_tab == BranchesTab::Remotes
         {
             return;
         }

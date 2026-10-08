@@ -33,7 +33,7 @@ fn click_selects_a_row_in_files() {
     // row 6: inner_row = 6 - 4 - 1 = 1
     app.feed_mouse(left_click(10, 6));
 
-    assert_eq!(app.focus, Pane::Files);
+    assert_eq!(app.nav.focus, Pane::Files);
     assert_eq!(app.selected(Pane::Files), 1);
 }
 
@@ -52,7 +52,7 @@ fn click_focuses_commits_and_selects_its_row() {
     // row 22: inner_row = 22 - 20 - 1 = 1
     app.feed_mouse(left_click(5, 22));
 
-    assert_eq!(app.focus, Pane::Commits);
+    assert_eq!(app.nav.focus, Pane::Commits);
     assert_eq!(app.selected(Pane::Commits), 1);
 }
 
@@ -95,7 +95,7 @@ fn click_on_the_border_focuses_without_moving_the_cursor() {
     app.feed_mouse(left_click(5, commits.y)); // the title/border row itself
 
     assert_eq!(
-        app.focus,
+        app.nav.focus,
         Pane::Commits,
         "a border click still focuses the pane"
     );
@@ -124,7 +124,7 @@ fn click_past_the_last_row_focuses_without_moving_the_cursor() {
     // row 15: inner_row = 15 - 10 - 1 = 4, past mock_branches' 2 entries.
     app.feed_mouse(left_click(5, 15));
 
-    assert_eq!(app.focus, Pane::Branches);
+    assert_eq!(app.nav.focus, Pane::Branches);
     assert_eq!(
         app.selected(Pane::Branches),
         1,
@@ -139,19 +139,22 @@ fn click_outside_every_pane_is_a_no_op() {
     // nothing on screen contains a click, whatever the coordinates.
     app.feed_mouse(left_click(50, 50));
 
-    assert_eq!(app.focus, Pane::Files, "the default focus is unchanged");
+    assert_eq!(app.nav.focus, Pane::Files, "the default focus is unchanged");
 }
 
 #[test]
 fn any_click_dismisses_the_help_overlay_and_nothing_else() {
     let mut app = App::mock();
     app.help.open = true;
-    let focus_before = app.focus;
+    let focus_before = app.nav.focus;
 
     app.feed_mouse(left_click(5, 5));
 
     assert!(!app.help.open, "the click dismissed the overlay");
-    assert_eq!(app.focus, focus_before, "the same click did nothing else");
+    assert_eq!(
+        app.nav.focus, focus_before,
+        "the same click did nothing else"
+    );
 }
 
 #[test]
@@ -177,7 +180,7 @@ fn middle_click_drag_and_move_do_not_route_to_a_pane() {
     app.feed_mouse(ev(MouseEventKind::Drag(MouseButton::Left)));
     app.feed_mouse(ev(MouseEventKind::Moved));
 
-    assert_eq!(app.focus, Pane::Status, "none of these focus Files");
+    assert_eq!(app.nav.focus, Pane::Status, "none of these focus Files");
     assert_eq!(app.selected(Pane::Files), 0);
 }
 
@@ -236,7 +239,7 @@ fn click_on_a_files_directory_row_toggles_it() {
         u16::try_from(dir_row).unwrap_or(u16::MAX) + 1,
     ));
 
-    assert_eq!(app.focus, Pane::Files, "the click also focused Files");
+    assert_eq!(app.nav.focus, Pane::Files, "the click also focused Files");
     assert_eq!(app.selected(Pane::Files), dir_row);
     assert!(
         app.row_count(Pane::Files) < before,
