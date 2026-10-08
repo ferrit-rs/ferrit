@@ -1,8 +1,38 @@
 # Plan: phase 21, a port for git
 
-**Status: planned.** Second slice of the architecture clean-up. After phase 20 every
+**Status: in progress (C0 to C3 done; C4, the adapter move, open).** Second slice of the architecture clean-up. After phase 20 every
 git call returns `Result<_, GitError>`; this phase puts a trait in front of them so
 `app` depends on an abstraction and `git2` lives in an adapter.
+
+What differs from the sketch below, and why:
+
+- **Done.** `src/domain/git/port.rs` has seven role traits and `GitPort` (the bundle plus
+  `reopen`). `Repo` implements each role by forwarding to its inherent method (the
+  inherent `impl Repo` carries one `#[allow(clippy::same_name_method)]` with the reason, so
+  the existing tests that call `Repo` directly keep working). `App.repo` is
+  `Option<Box<dyn GitPort>>`; workers (refresh, diff, image, statistics, remote, create)
+  get their handle from `GitPort::reopen`, so `app/` names the concrete `Repo` only in
+  `App::open` (the composition root) and for `git init`, which runs before any repository
+  exists. `Result<Box<RepoStats>, String>` in the dashboard became `AppError` on the way.
+- **`FakeGit` and `App::with_git`** exist (`src/domain/git/fake.rs`). It models stage,
+  unstage, discard, commit, checkout, create and delete branch; everything else returns
+  `GitError::OperationFailed("FakeGit does not implement ...")`. It is not gated behind a
+  feature yet: `PLAN_23_TEST_SUPPORT.md` moves it behind `test-support`.
+- **The contract suite found a real gap**: on a repository with no commit yet, `Repo`
+  cannot unstage (`could not resolve HEAD`), while the fake can. The scenario starts from
+  one commit; the gap is recorded in the test, not fixed here.
+- **`mock.rs` was not rebuilt on `FakeGit`.** It feeds `App::mock()` with canned rows and
+  the render tests rely on those exact values; rewriting it would change frames for no gain.
+- **C4 is not done, and is bigger than the sketch said.** 21 of the 33 files under
+  `src/domain/git/` import `git2`, and most of them define a public type (`Diff`,
+  `ConfigView`, `MergeOutcome`, `CommitKind`, ...) next to the code that reads it from
+  `git2`. Moving the adapter means splitting each file into its types (staying in
+  `domain/git/`) and its `git2` code (going to `infra/git/`), and `GitError` first has to
+  stop naming `git2::Error` (box the source). 33 integration test files import
+  `domain::git::` paths, so the move needs a path-compatibility step. Plan: (1) `GitError`
+  without `git2`, (2) move `model.rs`, `error.rs`, `port.rs`, `fake.rs` and the pure
+  parsers as they are, (3) one file per commit for the mixed ones, (4) turn on the layering
+  test last.
 
 ## Goal
 
