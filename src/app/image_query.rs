@@ -7,6 +7,8 @@ use super::{
     App, AppError, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker,
     thread,
 };
+use crate::domain::git::error::GitResult;
+use crate::domain::git::port::GitPort;
 
 /// Image worker result, applied only if selection and generation still match.
 #[doc(hidden)]
@@ -40,10 +42,10 @@ pub enum ImageError {
 }
 
 pub(crate) fn load(
-    repo_path: &Path,
+    repo: GitResult<Box<dyn GitPort>>,
     image_path: &Path,
 ) -> Result<::image::DynamicImage, ImageError> {
-    let repo = git::Repo::open(repo_path)?;
+    let repo = repo?;
     let bytes = repo
         .blob_bytes(image_path, git::blob::Rev::Workdir)
         .map_err(|source| ImageError::Read {
@@ -92,12 +94,9 @@ impl App {
         self.image_query.generation = self.image_query.generation.saturating_add(1);
         let generation = self.image_query.generation;
         self.image_query.path = Some(path.clone());
-        if let (Some(sender), Some(repo_path)) = (
-            self.event_sender.clone(),
-            self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
-        ) {
+        if let (Some(sender), true) = (self.event_sender.clone(), self.repo.is_some()) {
             self.preview = Preview::Note("loading image...".into());
-            self.queue_image_query(sender, repo_path, path, generation);
+            self.queue_image_query(sender, path, generation);
         } else {
             let bytes = match &self.repo {
                 Some(repo) => match repo.blob_bytes(&path, git::blob::Rev::Workdir) {
@@ -125,7 +124,6 @@ impl App {
     fn queue_image_query(
         &mut self,
         sender: mpsc::Sender<AppEvent>,
-        repo_path: PathBuf,
         path: PathBuf,
         generation: u64,
     ) {
@@ -133,19 +131,21 @@ impl App {
             self.image_query.pending = Some((path, generation));
             return;
         }
-        self.start_image_query(sender, repo_path, path, generation);
+        self.start_image_query(sender, path, generation);
     }
 
     fn start_image_query(
         &mut self,
         sender: mpsc::Sender<AppEvent>,
-        repo_path: PathBuf,
         path: PathBuf,
         generation: u64,
     ) {
+        let Some(handle) = self.reopen_repo() else {
+            return;
+        };
         self.image_query.in_flight = true;
         thread::spawn(move || {
-            let result = run_worker(WorkerKind::ImagePreview, || load(&repo_path, &path))
+            let result = run_worker(WorkerKind::ImagePreview, || load(handle, &path))
                 .map_err(AppError::from)
                 .and_then(|result| result.map_err(AppError::from));
             let _ = sender.send(AppEvent::ImageDone(ImageCompletion {
@@ -170,12 +170,9 @@ impl App {
         if let Some((path, generation)) = self.image_query.pending.take()
             && generation == self.image_query.generation
             && self.image_query.path.as_ref() == Some(&path)
-            && let (Some(sender), Some(repo_path)) = (
-                self.event_sender.clone(),
-                self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
-            )
+            && let Some(sender) = self.event_sender.clone()
         {
-            self.start_image_query(sender, repo_path, path, generation);
+            self.start_image_query(sender, path, generation);
         }
     }
 }

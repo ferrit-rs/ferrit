@@ -128,29 +128,26 @@ impl App {
             self.diff = self.build_diff(&key);
             return;
         };
-        let Some(path) = self.repo.as_ref().map(|repo| repo.path().to_path_buf()) else {
+        if self.repo.is_none() {
             self.diff = DiffView::None;
             return;
-        };
+        }
         if self.diff_query.in_flight {
             self.diff_query.pending = Some((key, generation));
             return;
         }
-        self.start_diff_query(sender, path, key, generation);
+        self.start_diff_query(sender, key, generation);
     }
 
-    fn start_diff_query(
-        &mut self,
-        sender: mpsc::Sender<AppEvent>,
-        path: PathBuf,
-        key: RightKey,
-        generation: u64,
-    ) {
+    fn start_diff_query(&mut self, sender: mpsc::Sender<AppEvent>, key: RightKey, generation: u64) {
+        let Some(handle) = self.reopen_repo() else {
+            return;
+        };
         self.diff_query.in_flight = true;
         let opts = self.diff_opts();
         thread::spawn(move || {
             let result = run_worker(WorkerKind::Diff, || {
-                git::Repo::open(&path).and_then(|repo| load(&repo, &key, opts))
+                handle.and_then(|repo| load(repo.as_ref(), &key, opts))
             })
             .map_err(AppError::from)
             .and_then(|result| result.map_err(AppError::from));
@@ -180,12 +177,9 @@ impl App {
         if let Some((next_key, next_generation)) = self.diff_query.pending.take()
             && next_generation == self.diff_query.generation
             && self.right_key.as_ref() == Some(&next_key)
-            && let (Some(sender), Some(path)) = (
-                self.event_sender.clone(),
-                self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
-            )
+            && let Some(sender) = self.event_sender.clone()
         {
-            self.start_diff_query(sender, path, next_key, next_generation);
+            self.start_diff_query(sender, next_key, next_generation);
         }
     }
 

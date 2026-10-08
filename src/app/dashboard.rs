@@ -16,8 +16,9 @@ use std::thread::{self, JoinHandle};
 use super::keymap::{Action, Context, KeyBinding};
 use super::sheet::Sheet;
 use super::{
-    App, AppEvent, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, git, run_worker,
+    App, AppError, AppEvent, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, run_worker,
 };
+use crate::domain::git::port::GitPort;
 use crate::domain::git::stats::{RepoStats, StatsOptions, Window};
 
 /// The windows `t` cycles through, shortest first.
@@ -42,7 +43,7 @@ pub struct StatsCompletion {
     window: Window,
     /// The full pass (with the numstat), not the quick one.
     full: bool,
-    result: Result<Box<RepoStats>, String>,
+    result: Result<Box<RepoStats>, AppError>,
 }
 
 #[derive(Debug)]
@@ -227,7 +228,7 @@ impl App {
         let Some(sender) = self.event_sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): do it now.
             for full in [false, true] {
-                let result = read_stats(&repo, window, full, &cancel);
+                let result = read_stats(repo.as_ref(), window, full, &cancel);
                 self.on_stats_done(StatsCompletion {
                     generation,
                     window,
@@ -242,7 +243,7 @@ impl App {
                 if cancel.load(Ordering::Acquire) {
                     break;
                 }
-                let result = read_stats(&repo, window, full, &cancel);
+                let result = read_stats(repo.as_ref(), window, full, &cancel);
                 let failed = result.is_err();
                 let _ = sender.send(AppEvent::StatsDone(StatsCompletion {
                     generation,
@@ -280,7 +281,7 @@ impl App {
             },
             Err(message) => {
                 if self.dashboard_is_open() {
-                    self.dashboard.error = Some(message);
+                    self.dashboard.error = Some(message.to_string());
                 }
             },
         }
@@ -364,14 +365,13 @@ impl App {
     }
 }
 
-/// One pass of the statistics behind the panic boundary, its errors flattened
-/// into text so they cross the channel.
+/// One pass of the statistics behind the panic boundary.
 fn read_stats(
-    repo: &git::Repo,
+    repo: &dyn GitPort,
     window: Window,
     full: bool,
     cancel: &AtomicBool,
-) -> Result<Box<RepoStats>, String> {
+) -> Result<Box<RepoStats>, AppError> {
     let options = StatsOptions {
         churn: full,
         ..StatsOptions::default()
@@ -379,7 +379,7 @@ fn read_stats(
     run_worker(WorkerKind::Stats, || {
         repo.stats_with(window, &options, cancel)
     })
-    .map_err(|error| error.to_string())
-    .and_then(|result| result.map_err(|error| error.to_string()))
+    .map_err(AppError::from)
+    .and_then(|result| result.map_err(AppError::from))
     .map(Box::new)
 }

@@ -1089,7 +1089,7 @@ impl App {
             self.refresh_query.pending = true;
             return;
         }
-        let Some(path) = self.repo.as_ref().map(|repo| repo.path().to_path_buf()) else {
+        let Some(handle) = self.reopen_repo() else {
             return;
         };
         let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
@@ -1097,8 +1097,8 @@ impl App {
         let opts = self.diff_opts();
         self.refresh_query.in_flight = true;
         thread::spawn(move || {
-            let completion = run_worker(WorkerKind::Refresh, || match git::Repo::open(&path) {
-                Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit, opts),
+            let completion = run_worker(WorkerKind::Refresh, || match handle {
+                Ok(mut repo) => Self::load_refresh(repo.as_mut(), branch, commit, opts),
                 Err(error) => {
                     let error = Arc::new(AppError::from(error));
                     RefreshCompletion {
@@ -2095,8 +2095,14 @@ impl App {
     /// at startup. `None` for `App::mock()` and for a bare repo (no
     /// worktree root to reopen from), same reach as `watch_root` already
     /// has.
-    fn repo_handle(&self) -> Option<git::Repo> {
-        git::Repo::open(&self.watch_root()?).ok()
+    fn repo_handle(&self) -> Option<Box<dyn GitPort>> {
+        self.repo.as_ref()?.reopen().ok()
+    }
+
+    /// A second handle on the repository for a worker thread, or why it could
+    /// not be opened; `None` without a repository.
+    fn reopen_repo(&self) -> Option<GitResult<Box<dyn GitPort>>> {
+        self.repo.as_ref().map(|repo| repo.reopen())
     }
 
     /// Draw, then block for the next event batch, until `should_quit`. Events
