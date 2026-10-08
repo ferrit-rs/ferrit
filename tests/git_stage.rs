@@ -16,51 +16,17 @@
 
 mod common;
 
-use common::TempDir;
+use common::{TempDir, commit_all, git};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use ferrit::domain::git::Repo;
 use ferrit::domain::git::apply::{ApplyDir, ApplyTarget};
 use ferrit::domain::git::diff::{DiffOpts, DiffSide};
 use ferrit::domain::git::error::GitError;
-use git2::{IndexAddOption, Repository, Signature};
-
-fn commit_all(repo: &Repository, message: &str) {
-    let mut index = repo.index().unwrap();
-    index
-        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
-        .unwrap();
-    index.write().unwrap();
-    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
-    let sig = Signature::now("Test", "test@example.com").unwrap();
-    let parent = repo
-        .head()
-        .ok()
-        .and_then(|h| h.target())
-        .and_then(|oid| repo.find_commit(oid).ok());
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
-        .unwrap();
-}
+use git2::Repository;
 
 /// `git <args>` in `dir`, output as trimmed stdout text.
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).trim().to_owned()
-}
-
 #[test]
 fn stage_file_then_reverse_puts_it_back() {
     let dir = TempDir::new("stage-file");

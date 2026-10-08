@@ -17,34 +17,16 @@
 
 mod common;
 
-use common::TempDir;
+use common::{TempDir, commit_all};
 use std::fs;
 
 use ferrit::app::mock;
 use ferrit::app::{App, Pane};
-use git2::{IndexAddOption, Repository, Signature};
+use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
-
-fn commit_all(repo: &Repository, message: &str) {
-    let mut index = repo.index().unwrap();
-    index
-        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
-        .unwrap();
-    index.write().unwrap();
-    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
-    let sig = Signature::now("Test", "test@example.com").unwrap();
-    let parent = repo
-        .head()
-        .ok()
-        .and_then(|h| h.target())
-        .and_then(|oid| repo.find_commit(oid).ok());
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
-        .unwrap();
-}
 
 /// A repo with 40 commits, so the Commits pane overflows any reasonable
 /// terminal height.

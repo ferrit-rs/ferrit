@@ -16,33 +16,15 @@
 
 mod common;
 
-use common::TempDir;
+use common::{TempDir, commit_all};
 use std::fs;
 
 use ferrit::app::{App, DiffView, Pane};
-use git2::{IndexAddOption, Repository, Signature};
+use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
-
-fn commit_all(repo: &Repository, message: &str) {
-    let mut index = repo.index().unwrap();
-    index
-        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
-        .unwrap();
-    index.write().unwrap();
-    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
-    let sig = Signature::now("Test", "test@example.com").unwrap();
-    let parent = repo
-        .head()
-        .ok()
-        .and_then(|h| h.target())
-        .and_then(|oid| repo.find_commit(oid).ok());
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
-        .unwrap();
-}
 
 fn diff_text(app: &App) -> String {
     match app.diff_view() {

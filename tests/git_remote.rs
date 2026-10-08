@@ -16,59 +16,13 @@
 
 mod common;
 
-use common::TempDir;
+use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use ferrit::domain::git::Repo;
 use ferrit::domain::git::error::GitError;
-use git2::{IndexAddOption, Repository, Signature};
-
-fn configure_identity(dir: &Path) {
-    for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(["config", key, value])
-            .output()
-            .unwrap();
-        assert!(out.status.success());
-    }
-}
-
-fn commit_all(repo: &Repository, message: &str) {
-    let mut index = repo.index().unwrap();
-    index
-        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
-        .unwrap();
-    index.write().unwrap();
-    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
-    let sig = Signature::now("Test", "test@example.com").unwrap();
-    let parent = repo
-        .head()
-        .ok()
-        .and_then(|h| h.target())
-        .and_then(|oid| repo.find_commit(oid).ok());
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
-        .unwrap();
-}
-
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).trim().to_owned()
-}
+use git2::Repository;
 
 /// `origin`, a normal (non-bare) repo with `receive.denyCurrentBranch =
 /// ignore` — git's own test-suite trick for a same-machine "remote" that
