@@ -1,0 +1,38 @@
+name: Release
+
+# `scripts/release.sh --execute` publishes the crate and pushes the tag. This
+# workflow only turns that tag into a GitHub Release, with the notes taken from
+# the version's section of CHANGELOG.md, so the release page and the changelog
+# cannot disagree.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  github-release:
+    name: GitHub Release from CHANGELOG.md
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract this version's changelog section
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "no CHANGELOG.md section for $version" >&2
+            exit 1
+          fi
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "ferrit ${GITHUB_REF_NAME#v}" --notes-file release-notes.md --verify-tag

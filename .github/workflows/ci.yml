@@ -58,6 +58,83 @@ jobs:
       - name: nextest
         run: cargo nextest run --all-features
 
+  # The declared minimum Rust version (`rust-version` in Cargo.toml, the one
+  # source of truth) must build the crate. rust-toolchain.toml pins the
+  # developer toolchain, so RUSTUP_TOOLCHAIN overrides it for this job.
+  msrv:
+    name: build on the minimum Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the toolchain named by rust-version
+        run: |
+          msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+          rustup toolchain install "$msrv" --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo check with the locked dependencies
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.MSRV }}
+        run: cargo check --locked --all-targets
+
+  # ferrit is used on macOS as much as on Linux: the same tests, on the macOS
+  # runner (git, file watching and temp dirs all behave a little differently).
+  test-macos:
+    name: nextest on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: nextest
+        run: cargo nextest run --all-features
+
+  # Informational, never a gate: line coverage of the test suite, in the job
+  # summary and as an lcov artifact.
+  coverage:
+    name: coverage (summary only)
+    runs-on: ubuntu-latest
+    needs: check
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: llvm-tools-preview
+          cache: true
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Run the tests with coverage
+        run: cargo llvm-cov nextest --all-features --lcov --output-path lcov.info
+
+      - name: Summary
+        run: |
+          {
+            echo '### Line coverage'
+            echo '```'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info
+
   # Human-facing proof, never a gate (`docs/PLAN_SELF_TESTING.md` ST5): tapes
   # generated from the same scripts the `nextest` step above already ran, and,
   # best effort, the screenshots `vhs` renders from them. A failure here does
