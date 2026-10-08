@@ -75,7 +75,7 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 | `src/components/ui/` | widgets (donut, heat map, palette, toast, drawer, ...) |
 | `src/components/tui_overlay/` | vendored overlay code, with its upstream licence |
 | `src/replay/` | the scripted test harness (see ADR 2) |
-| `tests/` | integration tests, `app_*` drive `App`, `git_*` drive a real repository |
+| `tests/` | integration tests, `app_*` drive `App`, `git_*` drive a real repository; `tests/common` holds the shared helpers, and the big ones are test crates in a folder (`main.rs`, `support.rs`, one module per behaviour) |
 | `test/scripts/` | replay scripts |
 
 ## How it is tested

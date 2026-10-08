@@ -71,7 +71,7 @@ into its own crate remains deferred.
 | 20 | `PLAN_20_TYPED_ERRORS.md` | typed errors end to end: no `Result<_, String>` in `app` and `domain`, `AppError` without a catch-all, errors rendered only at the UI edge | ✅ done |
 | 21 | `PLAN_21_GIT_PORT.md` | a `GitPort` trait in the domain, `git2` + subprocess code moved to `infra/git`, an in-memory `FakeGit` checked by the same contract suite | 🔄 C0 to C3 done, adapter move (C4) open |
 | 22 | `PLAN_22_APP_SPLIT.md` | `App` split into named sub-states, one `Overlay` enum for popup / confirm / sheet / full screen, `dispatch` as a router | 📅 planned |
-| 23 | `PLAN_23_TEST_SUPPORT.md` | shared `tests/common` kit, property tests for the diff parsers, big test files split, narrow public API with a `test-support` feature | 📅 planned |
+| 23 | `PLAN_23_TEST_SUPPORT.md` | shared `tests/common` kit, property tests for the diff parsers, big test files split, narrow public API with a `test-support` feature | 🔄 kit and file splits done, property tests and API narrowing open |
 
 Status legend: ✅ done, 🔄 in progress, 📅 planned (has a `PLAN_N` file), 👉 todo
 (no file yet), living (this page).

@@ -1,7 +1,28 @@
 # Plan: phase 23, test support and a narrow public API
 
-**Status: planned.** Fourth and last slice of the architecture clean-up. It makes the test
+**Status: in progress (C0 to C3 done: the shared kit and the file splits; the property tests and the API narrowing are open).** Fourth and last slice of the architecture clean-up. It makes the test
 suite easy to read and extend, and makes the library surface say what is public on purpose.
+
+What differs from the sketch below, and why:
+
+- **No `tempfile` dependency.** `tests/common/mod.rs` keeps a 20-line `TempDir` (now with a
+  counter in the name, and `child()` for a nested directory). Adding a crate to remove 20 lines
+  failed the "is it already in the codebase?" step of `AGENTS.md`.
+- **Shared in `tests/common`:** `TempDir`, `git`, `commit_all` and `configure_identity` (the
+  variants that were identical in 17 to 28 files). 28 files lost their copy, about 1,600 lines
+  went. Eight files keep a `TempDir` of their own on purpose: they build a repository in the
+  constructor, canonicalise the path, or expose the inner path (`git_init`, `git_backend`,
+  `app_welcome`, `app_attach`, `drilled_keybar`, `git_initial_commit`, `fake_git_contract`, and
+  the support modules of `git_stats` and `dashboard_screen`).
+- **Four files split into test crates** (`tests/<name>/main.rs` + `support.rs` + one module per
+  behaviour): `dashboard_screen`, `app_create_remote`, `git_stats`, `git_rebase`. Test names
+  and count are unchanged; the largest file left is `tests/config.rs` at 775 lines.
+- **The 10-line `#![allow]` header stays in each test crate.** Rust has no way to share an
+  inner attribute across crates, and a workspace lint table cannot differ per target.
+- **Not done:** `proptest` for the diff parsers (a new dependency to justify and a property
+  to find first), the `test-support` feature, `pub(crate)` for the library, and
+  `#![warn(missing_docs)]` on `domain`. Narrowing the API touches every `use ferrit::...` in
+  the tests, so it is its own step.
 
 ## Goal
 
