@@ -472,9 +472,7 @@ impl App {
                 let Some(repo) = &self.repo else { return };
                 match repo.delete_branch(&name, force) {
                     Ok(()) => self.request_refresh(),
-                    Err(git::error::GitError::BranchFailed(msg))
-                        if !force && msg.contains("is not fully merged") =>
-                    {
+                    Err(git::error::GitError::BranchNotMerged(_)) if !force => {
                         self.pending_confirm = Some(ConfirmPrompt {
                             message: format!(
                                 "'{name}' is not fully merged. Force delete? This may lose \

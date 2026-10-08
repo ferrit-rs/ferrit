@@ -1,8 +1,29 @@
 # Plan: phase 20, typed errors end to end
 
-**Status: planned.** First slice of the architecture clean-up (phases 20 to 23). It
+**Status: done (C0 to C5).** First slice of the architecture clean-up (phases 20 to 23). It
 changes no screen: every message the user reads today stays word for word. What
 changes is what travels between the layers: a typed error instead of a `String`.
+
+What differs from the sketch below, and why:
+
+- **`Arc<AppError>`, not `Option<AppError>`.** One error is held by three owners at once
+  (the Status line, the toast, and the refresh bookkeeping), and `AppError` is not `Clone`
+  (`git2::Error`). `last_error`, `watch_error` and `remote_refresh_error` are
+  `Option<Arc<AppError>>`, and a failed refresh carries `Shared<T> = Result<T, Arc<AppError>>`.
+- **No `last_error_text` seam.** The tests read errors through the rendered Status pane,
+  so no new accessor was needed; C0 only pinned the current texts.
+- **Named variants instead of a catch-all.** `NoRepository`, `BadUpstream`,
+  `ConflictMarkers`, `PartlyStaged`, `ConfigIssues`, `WatcherUnavailable`,
+  `PushAfterCreation` and `Notice` (for hints that are not failures) replace
+  `Operation(String)`. `AppError::NothingStaged` went to `GitError::NothingStaged`.
+- **`classify` stayed local.** Only one caller matched git's stderr outside the domain
+  (`staging.rs`, unmerged branch). It is now `GitError::BranchNotMerged`, built in
+  `domain/git/branch.rs`; a table-driven `classify` would have had one entry.
+- **`ConfigError` and `ImageError`** live next to their code (`app/config/error.rs`,
+  `app/image_query.rs`). `settle()` takes the error constructor instead of returning the
+  refusal text. `create_remote` validation returns `HostError` as it is.
+- The view-state types that show text (`DiffView::Note`, `Preview::Note`,
+  `SaveState::Failed`) keep a `String`: they are the rendering edge.
 
 ## Goal
 

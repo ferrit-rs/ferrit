@@ -194,8 +194,8 @@ fn delete_branch_unmerged_needs_force() {
 
     let backend = Repo::open(dir.path()).unwrap();
     let err = backend.delete_branch("feat", false).unwrap_err();
-    let GitError::BranchFailed(msg) = err else {
-        panic!("expected BranchFailed, got {err:?}");
+    let GitError::BranchNotMerged(msg) = err else {
+        panic!("expected BranchNotMerged, got {err:?}");
     };
     assert!(msg.contains("not fully merged"), "got: {msg}");
     assert!(git(dir.path(), &["branch", "--list"]).contains("feat"));

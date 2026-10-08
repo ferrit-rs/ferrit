@@ -54,6 +54,12 @@ pub enum GitError {
     /// `docs/PLAN_8_BRANCHES.md`.
     #[error("git branch failed: {0}")]
     BranchFailed(String),
+    /// `git branch -d` refused because the branch is not fully merged. The
+    /// one `BranchFailed` case the UI acts on (it offers a forced delete), so
+    /// it is told apart here, where git's stable wording is matched, and not
+    /// by the caller. Holds stderr.
+    #[error("git branch failed: {0}")]
+    BranchNotMerged(String),
     /// A `git merge` subprocess exited non-zero for a reason other than an
     /// ordinary conflict (`MergeOutcome::Conflicted` is not an error, see
     /// `branch::MergeOutcome`). Holds stderr. See `docs/PLAN_8_BRANCHES.md`.

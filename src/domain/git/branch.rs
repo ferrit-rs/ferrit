@@ -123,7 +123,13 @@ pub(super) fn delete_branch(repo: &Repository, name: &str, force: bool) -> GitRe
                 .arg(if force { "-D" } else { "-d" })
                 .arg(name);
         },
-        GitError::BranchFailed,
+        |stderr| {
+            if stderr.contains("is not fully merged") {
+                GitError::BranchNotMerged(stderr)
+            } else {
+                GitError::BranchFailed(stderr)
+            }
+        },
     )
 }
 
