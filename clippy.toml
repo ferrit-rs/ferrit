@@ -1,7 +1,7 @@
 # Thresholds + API bans that back the lint policy in Cargo.toml `[lints.clippy]`.
 # MSRV is lower than the pinned toolchain on purpose: clippy will not suggest a
 # rewrite that needs a newer stdlib than this.
-msrv = "1.86.0"
+msrv = "1.90.0"
 
 cognitive-complexity-threshold = 30
 excessive-nesting-threshold = 6

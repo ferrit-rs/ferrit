@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/ferrit-rs/ferrit/actions/workflows/ci.yml/badge.svg)](https://github.com/ferrit-rs/ferrit/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/ferrit.svg)](https://crates.io/crates/ferrit)
-[![MSRV](https://img.shields.io/badge/rustc-1.86%2B-orange.svg)](Cargo.toml)
+[![MSRV](https://img.shields.io/badge/rustc-1.90%2B-orange.svg)](Cargo.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 *The everyday git manager for your terminal.*
@@ -105,7 +105,7 @@ be extended with custom commands.
 cargo install ferrit
 ```
 
-Requires Rust 1.86+ (edition 2024).
+Requires Rust 1.90+ (edition 2024).
 
 ## Usage
 

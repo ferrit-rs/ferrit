@@ -7,6 +7,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Fixed
+
+- The declared minimum Rust version is now 1.90 (`Cargo.toml` `rust-version`, `clippy.toml`, the README). It said 1.86, which could not build: `ratatui-image` pulls in `quantette` (needs 1.90) and `wide` (needs 1.89), and the code uses `let` chains. CI now builds on that version.
+
 ### Added
 
 - Architecture overview, four decision records and a documentation index under `docs/`.

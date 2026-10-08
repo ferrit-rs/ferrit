@@ -2062,10 +2062,10 @@ impl App {
                 }
             }
             // A setting changed that only this loop can carry out.
-            if let Some(settings::TerminalRequest::Mouse(on)) = self.take_terminal_request() {
-                if let Err(error) = terminal::set_mouse(on) {
-                    self.report_notice(format!("cannot switch the mouse: {error}"));
-                }
+            if let Some(settings::TerminalRequest::Mouse(on)) = self.take_terminal_request()
+                && let Err(error) = terminal::set_mouse(on)
+            {
+                self.report_notice(format!("cannot switch the mouse: {error}"));
             }
             // The app was rebuilt on a new repository: watch its worktree.
             if let Some(root) = self.take_watch_request() {
