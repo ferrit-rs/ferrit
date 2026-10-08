@@ -20,9 +20,8 @@ use std::fmt::{self, Display, Write as _};
 use std::ops::Range;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, mpsc};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::components::tui_overlay::state::OverlayState;
@@ -170,20 +169,6 @@ pub struct RefreshCompletion {
     pub(crate) profile: Option<Profile>,
     pub(crate) branch_log: Option<(String, Shared<Vec<git::model::CommitEntry>>)>,
     pub(crate) commit_files: Option<(String, Shared<Vec<git::model::FileEntry>>)>,
-}
-
-#[derive(Default)]
-struct RefreshQueryState {
-    in_flight: bool,
-    pending: bool,
-}
-
-#[derive(Default)]
-struct ImageQueryState {
-    path: Option<PathBuf>,
-    generation: u64,
-    in_flight: bool,
-    pending: Option<(PathBuf, u64)>,
 }
 
 struct RenderedDiff {
@@ -641,15 +626,9 @@ pub struct App {
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
     commit_draft: Option<String>,
-    /// `Some` while a background fetch/pull/push is running. `f`/`p`/`P`
-    /// pressed again while `Some` are ignored outright — not queued —
-    /// sidestepping two git processes racing over the same `index.lock`.
-    /// See `docs/PLAN_9_REMOTE.md`.
-    remote_busy: Option<events::RemoteOp>,
-    /// Start time for the inline branch-row spinner.
-    remote_busy_started: Option<Instant>,
-    remote_cancel: Arc<AtomicBool>,
-    remote_worker: Option<JoinHandle<()>>,
+    /// Background work in flight: the event channel, the refresh, diff and
+    /// image workers, and the one network operation at a time.
+    workers: workers::Workers,
     /// The view that replaces the five panes, if any (`docs/PLAN_13_DASHBOARD.md`).
     full_screen: FullScreen,
     dashboard: dashboard::Dashboard,
@@ -671,24 +650,6 @@ pub struct App {
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
     /// case, not a repurposing of that one field with a colour flag.
     status_note: Option<String>,
-    /// A handle onto `Events`' own channel, so `on_key`'s `f`/`p`/`P` can
-    /// hand a background thread a way back onto it. `None` in `App::mock()`
-    /// and right after `App::open` — only `run()` has an `Events` to ask
-    /// for one, so it sets this once before its own loop starts; a
-    /// `feed_key`-driven test with no `run()` leaves `f`/`p`/`P` inert
-    /// unless it calls `start_remote_op` directly with its own channel.
-    event_sender: Option<mpsc::Sender<AppEvent>>,
-    /// One snapshot worker at a time. Bursty filesystem events collapse into
-    /// one follow-up snapshot instead of queuing stale concurrent reads.
-    refresh_query: RefreshQueryState,
-    /// Remote failure must outlive snapshot completion that was requested
-    /// immediately after the remote command.
-    remote_refresh_error: Option<Arc<AppError>>,
-    /// The snapshot error the last toast was about, so a repeat is not toasted again.
-    refresh_failure: Option<String>,
-    /// One selected-diff worker; only latest requested key waits behind it.
-    diff_query: DiffQueryState,
-    image_query: ImageQueryState,
 }
 
 pub mod help;
@@ -697,6 +658,7 @@ pub mod right_pane;
 pub mod theme_editor;
 mod tree;
 mod welcome;
+mod workers;
 
 mod askpass;
 mod branch_actions;
@@ -726,7 +688,7 @@ pub(crate) use error::AppError;
 #[cfg(test)]
 mod tests;
 
-use diff_query::{DiffQueryState, RightKey};
+use diff_query::RightKey;
 use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
 
 impl App {
@@ -800,10 +762,7 @@ impl App {
             mode: Mode::default(),
             modal: modal::Modal::default(),
             commit_draft: None,
-            remote_busy: None,
-            remote_busy_started: None,
-            remote_cancel: Arc::new(AtomicBool::new(false)),
-            remote_worker: None,
+            workers: workers::Workers::new(),
             full_screen: FullScreen::None,
             dashboard: dashboard::Dashboard::default(),
             git_config: git_config::GitConfigScreen::default(),
@@ -814,12 +773,6 @@ impl App {
             welcome_selected: 0,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
-            event_sender: None,
-            refresh_query: RefreshQueryState::default(),
-            remote_refresh_error: None,
-            refresh_failure: None,
-            diff_query: DiffQueryState::default(),
-            image_query: ImageQueryState::default(),
         }
     }
 
@@ -980,7 +933,7 @@ impl App {
             issues: Vec::new(),
         };
         let mut fresh = Self::open_with(path, load)?;
-        fresh.event_sender = self.event_sender.take();
+        fresh.workers.sender = self.workers.sender.take();
         fresh.right.picker = self.right.picker.clone();
         fresh.create_remote.carry_program_from(&self.create_remote);
         fresh.watch_request = fresh.watch_root();
@@ -1007,12 +960,12 @@ impl App {
     /// Request refresh without blocking the TUI. Outside `run()` (tests and
     /// startup helpers), retain synchronous behavior.
     pub(super) fn request_refresh(&mut self) {
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             self.refresh();
             return;
         };
-        if self.refresh_query.in_flight {
-            self.refresh_query.pending = true;
+        if self.workers.refresh.in_flight {
+            self.workers.refresh.pending = true;
             return;
         }
         let Some(handle) = self.reopen_repo() else {
@@ -1021,7 +974,7 @@ impl App {
         let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
         let opts = self.diff_opts();
-        self.refresh_query.in_flight = true;
+        self.workers.refresh.in_flight = true;
         thread::spawn(move || {
             let completion = run_worker(WorkerKind::Refresh, || match handle {
                 Ok(mut repo) => Self::load_refresh(repo.as_mut(), branch, commit, opts),
@@ -1094,15 +1047,17 @@ impl App {
             Ok(snap) => {
                 self.snapshot = snap;
                 self.last_error = None;
-                self.refresh_failure = None;
+                self.workers.refresh_failure = None;
             },
             // A failure that keeps repeating (every poll, every file change)
             // opens one toast, not a new one each time it is seen again.
-            Err(error) if self.refresh_failure.as_deref() == Some(error.to_string().as_str()) => {
+            Err(error)
+                if self.workers.refresh_failure.as_deref() == Some(error.to_string().as_str()) =>
+            {
                 self.last_error = Some(Arc::new(AppError::Refresh(error)));
             },
             Err(error) => {
-                self.refresh_failure = Some(error.to_string());
+                self.workers.refresh_failure = Some(error.to_string());
                 self.report_error(AppError::Refresh(error));
             },
         }
@@ -1164,7 +1119,7 @@ impl App {
             None => true,
         });
         self.select_when_listed = waiting;
-        self.diff_query.refresh_requested = true;
+        self.workers.diff.refresh_requested = true;
         self.invalidate_image_query();
         self.update_right_pane();
     }
@@ -1177,12 +1132,12 @@ impl App {
     }
 
     fn on_refresh_done(&mut self, completion: RefreshCompletion) {
-        self.refresh_query.in_flight = false;
-        let rerun = std::mem::take(&mut self.refresh_query.pending);
+        self.workers.refresh.in_flight = false;
+        let rerun = std::mem::take(&mut self.workers.refresh.pending);
         self.apply_refresh_result(completion);
         if rerun {
             self.request_refresh();
-        } else if let Some(error) = self.remote_refresh_error.take() {
+        } else if let Some(error) = self.workers.remote_refresh_error.take() {
             // The refresh just replaced the Status line: put the failed
             // operation's own message back. Its toast was shown when it failed;
             // it is not shown again, and it is not a refresh failure.
@@ -1587,7 +1542,7 @@ impl App {
     /// terminal) involved.
     #[doc(hidden)]
     pub fn set_event_sender(&mut self, sender: mpsc::Sender<AppEvent>) {
-        self.event_sender = Some(sender);
+        self.workers.sender = Some(sender);
     }
 
     /// The events a background worker or the watcher sends, as opposed to
@@ -1625,17 +1580,17 @@ impl App {
     /// events until this is `true` sees a settled screen with no sleeping.
     #[doc(hidden)]
     pub fn is_idle(&self) -> bool {
-        !self.refresh_query.in_flight
-            && !self.diff_query.in_flight
-            && !self.image_query.in_flight
-            && self.remote_busy.is_none()
+        !self.workers.refresh.in_flight
+            && !self.workers.diff.in_flight
+            && !self.workers.image.in_flight
+            && self.workers.remote_busy.is_none()
             && !self.dashboard.is_busy()
     }
 
     /// Back to synchronous work (undo `set_event_sender`).
     #[doc(hidden)]
     pub fn clear_event_sender(&mut self) {
-        self.event_sender = None;
+        self.workers.sender = None;
     }
 
     /// Is the right pane currently a native-graphics image? `run` watches this
@@ -2055,7 +2010,7 @@ impl App {
         // for one, so it hands `on_key` this clone rather than `on_key`
         // taking `&Events` directly (it is also called from `feed_key`,
         // which has none).
-        self.event_sender = Some(events.sender());
+        self.workers.sender = Some(events.sender());
         // Answers ssh/git credential prompts in a popup (`app::askpass`);
         // without it a passphrase question would hang on the raw terminal.
         let askpass_sender = events.sender();
@@ -2081,7 +2036,7 @@ impl App {
             let was_animating = self.sheet_overlay.is_animating();
             let help_was_animating = self.help.overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
-            let remote_animating = self.remote_busy.is_some();
+            let remote_animating = self.workers.remote_busy.is_some();
             // Frames while something animates; a slower tick while a toast is up,
             // so it can time out without waiting for a key.
             let timeout =
@@ -2152,13 +2107,14 @@ impl App {
             self.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
         }
-        if self.remote_worker.is_some() {
-            self.remote_cancel
+        if self.workers.remote_worker.is_some() {
+            self.workers
+                .remote_cancel
                 .store(true, std::sync::atomic::Ordering::Release);
-            if let Some(worker) = self.remote_worker.take() {
+            if let Some(worker) = self.workers.remote_worker.take() {
                 let _ = worker.join();
             }
-            self.remote_busy = None;
+            self.workers.remote_busy = None;
         }
         self.dashboard.stop_and_join();
         Ok(())

@@ -14,7 +14,7 @@ impl App {
     /// not a selected row. A no-op with no `event_sender` set
     /// (`App::mock()`, or a test driving `on_key` without `run()`).
     pub(super) fn trigger_remote_op(&mut self, op: events::RemoteOp) {
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             return;
         };
         self.start_remote_op(op, None, sender);
@@ -58,7 +58,7 @@ impl App {
         }
         let Some(repo) = &self.repo else { return };
         if repo.push_default_current() {
-            if let Some(sender) = self.event_sender.clone() {
+            if let Some(sender) = self.workers.sender.clone() {
                 self.start_remote_op_with_options(
                     events::RemoteOp::Push,
                     None,
@@ -101,7 +101,7 @@ impl App {
 
     /// `git push -u <remote> <local>:<remote branch>`.
     pub(super) fn push_with_upstream(&mut self, remote: String, branch: String) {
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             return;
         };
         self.start_remote_op_with_options(
@@ -125,7 +125,7 @@ impl App {
     /// `push_upstream` is only ever `Some` for `RemoteOp::Push`, from
     /// `push_with_upstream`; `f`/`p`/a plain `P` all pass `None`.
     ///
-    /// Takes `sender` as a parameter rather than reading `self.event_sender`
+    /// Takes `sender` as a parameter rather than reading `self.workers.sender`
     /// directly so a test can call this with its own channel, no `run()`
     /// (and its `Events`) required. `pub`, integration-test seam like
     /// `feed_key`: a test drives the resulting `AppEvent::RemoteDone`
@@ -167,18 +167,18 @@ impl App {
         set_upstream_current: bool,
         sender: mpsc::Sender<AppEvent>,
     ) {
-        if self.remote_busy.is_some() {
+        if self.workers.remote_busy.is_some() {
             return;
         }
         let Some(repo) = self.repo_handle() else {
             return;
         };
-        self.remote_busy = Some(op);
-        self.remote_busy_started = Some(Instant::now());
+        self.workers.remote_busy = Some(op);
+        self.workers.remote_started = Some(Instant::now());
         self.status_note = None;
-        self.remote_cancel.store(false, Ordering::Release);
-        let cancel = Arc::clone(&self.remote_cancel);
-        self.remote_worker = Some(thread::spawn(move || {
+        self.workers.remote_cancel.store(false, Ordering::Release);
+        let cancel = Arc::clone(&self.workers.remote_cancel);
+        self.workers.remote_worker = Some(thread::spawn(move || {
             let message = run_worker(WorkerKind::RemoteOperation, || match op {
                 events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
                 events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
@@ -206,9 +206,9 @@ impl App {
     /// a test that drove `start_remote_op` with its own channel and has no
     /// `run()` loop to receive the result for it.
     pub fn on_remote_done(&mut self, op: events::RemoteOp, message: Result<String, AppError>) {
-        self.remote_busy = None;
-        self.remote_busy_started = None;
-        if let Some(worker) = self.remote_worker.take() {
+        self.workers.remote_busy = None;
+        self.workers.remote_started = None;
+        if let Some(worker) = self.workers.remote_worker.take() {
             let _ = worker.join();
         }
         // Request refresh before setting the remote result. Async snapshot
@@ -224,7 +224,7 @@ impl App {
         };
         match message {
             Ok(line) => {
-                self.remote_refresh_error = None;
+                self.workers.remote_refresh_error = None;
                 self.last_error = None;
                 // git's own words after a push (`To github.com:…`, `branch 'main'
                 // set up to track …`) are noise in the Status pane: the line
@@ -234,7 +234,8 @@ impl App {
             },
             Err(error) => {
                 let error = Arc::new(error);
-                self.remote_refresh_error = self.event_sender.as_ref().map(|_| Arc::clone(&error));
+                self.workers.remote_refresh_error =
+                    self.workers.sender.as_ref().map(|_| Arc::clone(&error));
                 self.status_note = None;
                 self.report_error(AppError::Background(error));
             },
@@ -247,7 +248,7 @@ impl App {
     /// `--progress` stream, which is meant for a terminal's own
     /// carriage-return redraws, not structured data.
     pub fn remote_busy_label(&self) -> Option<&'static str> {
-        match self.remote_busy? {
+        match self.workers.remote_busy? {
             events::RemoteOp::Fetch => Some("Fetching\u{2026}"),
             events::RemoteOp::Pull => Some("Pulling\u{2026}"),
             events::RemoteOp::Push => Some("Pushing\u{2026}"),
@@ -257,13 +258,13 @@ impl App {
 
     /// LazyGit-style label attached to the checked-out branch row.
     pub(super) fn remote_branch_status(&self) -> Option<String> {
-        let label = match self.remote_busy? {
+        let label = match self.workers.remote_busy? {
             events::RemoteOp::Fetch => "Fetching",
             events::RemoteOp::Pull => "Pulling",
             events::RemoteOp::Push => "Pushing",
             events::RemoteOp::Create => "Creating",
         };
-        let elapsed = self.remote_busy_started?.elapsed().as_millis();
+        let elapsed = self.workers.remote_started?.elapsed().as_millis();
         let frame = ["●∙∙", "∙●∙", "∙∙●", "∙●∙"]
             .get(usize::try_from(elapsed / 120).unwrap_or(usize::MAX) % 4)
             .copied()

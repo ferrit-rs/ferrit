@@ -502,7 +502,7 @@ impl App {
             ConfirmAction::InitRepo(dir) => self.init_here(&dir),
             ConfirmAction::ConfigUnset(op) => self.confirm_git_config_unset(&op),
             ConfirmAction::ForcePush => {
-                if let Some(sender) = self.event_sender.clone() {
+                if let Some(sender) = self.workers.sender.clone() {
                     self.start_remote_op_with_force(
                         events::RemoteOp::Push,
                         None,

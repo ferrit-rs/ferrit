@@ -85,11 +85,11 @@ impl App {
     /// selection rebuilds the text but keeps `right_scroll`; a changed
     /// selection resets the scroll to the top.
     pub(super) fn update_diff(&mut self) {
-        if self.image_query.path.is_some() {
+        if self.workers.image.path.is_some() {
             self.right.diff = DiffView::None;
             self.right.key = None;
-            self.diff_query.generation = self.diff_query.generation.saturating_add(1);
-            self.diff_query.pending = None;
+            self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
+            self.workers.diff.pending = None;
             self.mode = Mode::Nav;
             return;
         }
@@ -97,16 +97,16 @@ impl App {
             None => {
                 self.right.diff = DiffView::None;
                 self.right.key = None;
-                self.diff_query.generation = self.diff_query.generation.saturating_add(1);
-                self.diff_query.pending = None;
+                self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
+                self.workers.diff.pending = None;
                 self.right.scroll = 0;
                 self.mode = Mode::Nav;
             },
             Some(key) if self.right.key.as_ref() == Some(&key) => {
-                if std::mem::take(&mut self.diff_query.refresh_requested) {
-                    self.diff_query.generation = self.diff_query.generation.saturating_add(1);
+                if std::mem::take(&mut self.workers.diff.refresh_requested) {
+                    self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
                     self.right.diff = DiffView::Note("loading diff...".into());
-                    self.queue_diff_query(key, self.diff_query.generation);
+                    self.queue_diff_query(key, self.workers.diff.generation);
                 }
                 self.clamp_right_scroll();
                 self.resync_diff_cursor();
@@ -114,17 +114,17 @@ impl App {
             Some(key) => {
                 self.right.scroll = 0;
                 self.right.key = Some(key.clone());
-                self.diff_query.generation = self.diff_query.generation.saturating_add(1);
+                self.workers.diff.generation = self.workers.diff.generation.saturating_add(1);
                 self.right.diff = DiffView::Note("loading diff...".into());
-                self.diff_query.refresh_requested = false;
-                self.queue_diff_query(key, self.diff_query.generation);
+                self.workers.diff.refresh_requested = false;
+                self.queue_diff_query(key, self.workers.diff.generation);
                 self.mode = Mode::Nav;
             },
         }
     }
 
     fn queue_diff_query(&mut self, key: RightKey, generation: u64) {
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             self.right.diff = self.build_diff(&key);
             return;
         };
@@ -132,8 +132,8 @@ impl App {
             self.right.diff = DiffView::None;
             return;
         }
-        if self.diff_query.in_flight {
-            self.diff_query.pending = Some((key, generation));
+        if self.workers.diff.in_flight {
+            self.workers.diff.pending = Some((key, generation));
             return;
         }
         self.start_diff_query(sender, key, generation);
@@ -143,7 +143,7 @@ impl App {
         let Some(handle) = self.reopen_repo() else {
             return;
         };
-        self.diff_query.in_flight = true;
+        self.workers.diff.in_flight = true;
         let opts = self.diff_opts();
         thread::spawn(move || {
             let result = run_worker(WorkerKind::Diff, || {
@@ -165,8 +165,8 @@ impl App {
             generation,
             result,
         } = completion;
-        self.diff_query.in_flight = false;
-        if generation == self.diff_query.generation && self.right.key.as_ref() == Some(&key) {
+        self.workers.diff.in_flight = false;
+        if generation == self.workers.diff.generation && self.right.key.as_ref() == Some(&key) {
             self.right.diff = match result {
                 Ok(result) => self.diff_view_from_query(&key, result),
                 Err(error) => DiffView::Note(error.to_string()),
@@ -174,10 +174,10 @@ impl App {
             self.clamp_right_scroll();
             self.resync_diff_cursor();
         }
-        if let Some((next_key, next_generation)) = self.diff_query.pending.take()
-            && next_generation == self.diff_query.generation
+        if let Some((next_key, next_generation)) = self.workers.diff.pending.take()
+            && next_generation == self.workers.diff.generation
             && self.right.key.as_ref() == Some(&next_key)
-            && let Some(sender) = self.event_sender.clone()
+            && let Some(sender) = self.workers.sender.clone()
         {
             self.start_diff_query(sender, next_key, next_generation);
         }

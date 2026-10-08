@@ -293,7 +293,7 @@ impl App {
             ));
             return;
         }
-        if self.remote_busy.is_some() {
+        if self.workers.remote_busy.is_some() {
             self.modal.open_popup(Popup::Note(
                 "another network operation is running".to_owned(),
             ));
@@ -304,7 +304,7 @@ impl App {
         self.modal
             .open_popup(Popup::CreateRemote(Step::Checking { generation }));
         let gh = self.create_remote.gh.clone();
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): ask now.
             let status = host::gh_status(&gh);
             self.on_gh_checked(generation, status);
@@ -450,7 +450,7 @@ impl App {
                 let Some(Popup::CreateRemote(Step::Confirm(form))) = self.modal.take_popup() else {
                     return;
                 };
-                let Some(sender) = self.event_sender.clone() else {
+                let Some(sender) = self.workers.sender.clone() else {
                     return;
                 };
                 self.start_create_remote(form.draft(), sender);
@@ -477,7 +477,7 @@ impl App {
     /// `start_remote_op`, so a test can drive the answer itself.
     #[doc(hidden)]
     pub fn start_create_remote(&mut self, draft: CreateDraft, sender: mpsc::Sender<AppEvent>) {
-        if self.remote_busy.is_some() {
+        if self.workers.remote_busy.is_some() {
             return;
         }
         let (owner, name) = match parse_target(&draft.target) {
@@ -514,12 +514,12 @@ impl App {
         });
         self.create_remote.draft = Some(draft);
         self.create_remote.error = None;
-        self.remote_busy = Some(events::RemoteOp::Create);
-        self.remote_busy_started = Some(Instant::now());
+        self.workers.remote_busy = Some(events::RemoteOp::Create);
+        self.workers.remote_started = Some(Instant::now());
         self.status_note = None;
-        self.remote_cancel.store(false, Ordering::Release);
-        let cancel = Arc::clone(&self.remote_cancel);
-        self.remote_worker = Some(thread::spawn(move || {
+        self.workers.remote_cancel.store(false, Ordering::Release);
+        let cancel = Arc::clone(&self.workers.remote_cancel);
+        self.workers.remote_worker = Some(thread::spawn(move || {
             let result = run_worker(WorkerKind::RemoteOperation, || {
                 // The first commit comes first, and is local: if it fails
                 // nothing has been created anywhere. A repository that already
@@ -543,9 +543,9 @@ impl App {
     /// draft, then pushes; a refusal keeps the draft and says
     /// why, nothing was configured.
     pub fn on_remote_created(&mut self, result: Result<String, AppError>) {
-        self.remote_busy = None;
-        self.remote_busy_started = None;
-        if let Some(worker) = self.remote_worker.take() {
+        self.workers.remote_busy = None;
+        self.workers.remote_started = None;
+        if let Some(worker) = self.workers.remote_worker.take() {
             let _ = worker.join();
         }
         self.request_refresh();
@@ -604,7 +604,7 @@ impl App {
             let branch = self.snapshot.header.branch.clone();
             self.push_with_upstream("origin".to_owned(), branch);
             // Only a push that really started is the one to explain if it fails.
-            self.create_remote.pushing_after = self.remote_busy.is_some();
+            self.create_remote.pushing_after = self.workers.remote_busy.is_some();
         }
     }
 

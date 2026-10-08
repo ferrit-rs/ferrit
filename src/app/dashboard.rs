@@ -229,7 +229,7 @@ impl App {
         let generation = self.dashboard.generation;
         let window = self.dashboard.window();
         let cancel = Arc::clone(&self.dashboard.cancel);
-        let Some(sender) = self.event_sender.clone() else {
+        let Some(sender) = self.workers.sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): do it now.
             for full in [false, true] {
                 let result = read_stats(repo.as_ref(), window, full, &cancel);

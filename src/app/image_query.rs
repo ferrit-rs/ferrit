@@ -88,13 +88,13 @@ impl App {
             return;
         }
         let path = entry.path.clone();
-        if self.image_query.path.as_ref() == Some(&path) {
+        if self.workers.image.path.as_ref() == Some(&path) {
             return;
         }
-        self.image_query.generation = self.image_query.generation.saturating_add(1);
-        let generation = self.image_query.generation;
-        self.image_query.path = Some(path.clone());
-        if let (Some(sender), true) = (self.event_sender.clone(), self.repo.is_some()) {
+        self.workers.image.generation = self.workers.image.generation.saturating_add(1);
+        let generation = self.workers.image.generation;
+        self.workers.image.path = Some(path.clone());
+        if let (Some(sender), true) = (self.workers.sender.clone(), self.repo.is_some()) {
             self.right.preview = Preview::Note("loading image...".into());
             self.queue_image_query(sender, path, generation);
         } else {
@@ -116,8 +116,8 @@ impl App {
     }
 
     pub(super) fn invalidate_image_query(&mut self) {
-        if self.image_query.path.take().is_some() {
-            self.image_query.generation = self.image_query.generation.saturating_add(1);
+        if self.workers.image.path.take().is_some() {
+            self.workers.image.generation = self.workers.image.generation.saturating_add(1);
         }
     }
 
@@ -127,8 +127,8 @@ impl App {
         path: PathBuf,
         generation: u64,
     ) {
-        if self.image_query.in_flight {
-            self.image_query.pending = Some((path, generation));
+        if self.workers.image.in_flight {
+            self.workers.image.pending = Some((path, generation));
             return;
         }
         self.start_image_query(sender, path, generation);
@@ -143,7 +143,7 @@ impl App {
         let Some(handle) = self.reopen_repo() else {
             return;
         };
-        self.image_query.in_flight = true;
+        self.workers.image.in_flight = true;
         thread::spawn(move || {
             let result = run_worker(WorkerKind::ImagePreview, || load(handle, &path))
                 .map_err(AppError::from)
@@ -157,9 +157,9 @@ impl App {
     }
 
     pub(super) fn on_image_done(&mut self, completion: ImageCompletion) {
-        self.image_query.in_flight = false;
-        if completion.generation == self.image_query.generation
-            && self.image_query.path.as_ref() == Some(&completion.path)
+        self.workers.image.in_flight = false;
+        if completion.generation == self.workers.image.generation
+            && self.workers.image.path.as_ref() == Some(&completion.path)
         {
             self.right.preview = match completion.result {
                 Ok(image) => Preview::Image(Box::new(self.right.picker.new_resize_protocol(image))),
@@ -167,10 +167,10 @@ impl App {
             };
             self.update_diff();
         }
-        if let Some((path, generation)) = self.image_query.pending.take()
-            && generation == self.image_query.generation
-            && self.image_query.path.as_ref() == Some(&path)
-            && let Some(sender) = self.event_sender.clone()
+        if let Some((path, generation)) = self.workers.image.pending.take()
+            && generation == self.workers.image.generation
+            && self.workers.image.path.as_ref() == Some(&path)
+            && let Some(sender) = self.workers.sender.clone()
         {
             self.start_image_query(sender, path, generation);
         }
