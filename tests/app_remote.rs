@@ -25,6 +25,7 @@ use std::time::Duration;
 
 use ferrit::app::App;
 use ferrit::app::events::{AppEvent, RemoteOp};
+use ferrit::domain::git::error::GitError;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -369,7 +370,10 @@ fn push_of_behind_branch_requires_confirm_and_uses_force_with_lease() {
 fn push_progress_is_visible_inline_even_when_status_has_old_error() {
     let (_origin, work) = two_repo_fixture("app-remote-p-visible");
     let mut app = App::open(work.path()).unwrap();
-    app.on_remote_done(RemoteOp::Push, Err("previous push failed".to_owned()));
+    app.on_remote_done(
+        RemoteOp::Push,
+        Err(GitError::PushFailed("previous push failed".to_owned()).into()),
+    );
     let (tx, rx) = mpsc::channel();
     app.set_event_sender(tx.clone());
     app.start_remote_op(RemoteOp::Push, None, tx);

@@ -11,6 +11,8 @@ use std::thread;
 use std::time::Duration;
 
 use color_eyre::Result;
+
+use crate::app::AppError;
 use notify_debouncer_full::notify::RecursiveMode;
 use notify_debouncer_full::{DebounceEventResult, new_debouncer};
 use ratatui::crossterm::event::{self, Event};
@@ -45,11 +47,11 @@ pub enum AppEvent {
     StatsDone(crate::app::dashboard::StatsCompletion),
     RemoteDone {
         op: RemoteOp,
-        message: Result<String, String>,
+        message: Result<String, AppError>,
     },
     /// `gh repo create` finished: the repository's web URL, or why not
     /// (`app::create_remote`).
-    RemoteCreated(Result<String, String>),
+    RemoteCreated(Result<String, AppError>),
     /// `gh` was asked whether it is installed and signed in; `generation`
     /// tells which popup asked (`app::create_remote`).
     GhChecked {

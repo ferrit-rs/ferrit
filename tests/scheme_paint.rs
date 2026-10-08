@@ -17,6 +17,7 @@ use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::theme_config::{Base, SchemeChoice};
 use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::scheme::{ColorDepth, Scheme, contrast};
+use ferrit::domain::git::error::GitError;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -134,7 +135,10 @@ fn it_covers_what_clear_wipes_a_popup_the_help_the_toast_and_the_drawer() {
         assert_eq!(unpainted(&frame(&mut app)), None, "{scheme} popup");
         press(&mut app, KeyCode::Esc);
         // The error toast.
-        app.on_remote_done(ferrit::app::events::RemoteOp::Fetch, Err("boom".to_owned()));
+        app.on_remote_done(
+            ferrit::app::events::RemoteOp::Fetch,
+            Err(GitError::FetchFailed("boom".to_owned()).into()),
+        );
         for _ in 0..40 {
             app.advance_clock(Duration::from_millis(16));
         }

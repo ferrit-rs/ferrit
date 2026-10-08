@@ -4,6 +4,7 @@ use super::{
     App, AppError, AppEvent, ConfirmAction, ConfirmPrompt, Popup, Result, TextInput, WorkerKind,
     events, mpsc, run_worker, thread,
 };
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
@@ -90,9 +91,7 @@ impl App {
     pub(super) fn submit_upstream(&mut self, value: &str) {
         let mut parts = value.split_whitespace();
         let (Some(remote), Some(branch), None) = (parts.next(), parts.next(), parts.next()) else {
-            self.report_error(AppError::Operation(
-                "upstream must be `<remote> <branch>`".to_owned(),
-            ));
+            self.report_error(AppError::BadUpstream);
             return;
         };
         self.popup = None;
@@ -177,7 +176,7 @@ impl App {
         self.remote_busy_started = Some(Instant::now());
         self.status_note = None;
         self.remote_cancel.store(false, Ordering::Release);
-        let cancel = std::sync::Arc::clone(&self.remote_cancel);
+        let cancel = Arc::clone(&self.remote_cancel);
         self.remote_worker = Some(thread::spawn(move || {
             let message = run_worker(WorkerKind::RemoteOperation, || match op {
                 events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
@@ -192,8 +191,8 @@ impl App {
                 // Started by `start_create_remote`, never through here.
                 events::RemoteOp::Create => Ok(String::new()),
             })
-            .map_err(|error| error.to_string())
-            .and_then(|result| result.map_err(|error| error.to_string()));
+            .map_err(AppError::from)
+            .and_then(|result| result.map_err(AppError::from));
             let _ = sender.send(AppEvent::RemoteDone { op, message });
         }));
     }
@@ -205,7 +204,7 @@ impl App {
     /// changes). `pub`: `App::run`'s own match arm calls this, and so does
     /// a test that drove `start_remote_op` with its own channel and has no
     /// `run()` loop to receive the result for it.
-    pub fn on_remote_done(&mut self, op: events::RemoteOp, message: Result<String, String>) {
+    pub fn on_remote_done(&mut self, op: events::RemoteOp, message: Result<String, AppError>) {
         self.remote_busy = None;
         self.remote_busy_started = None;
         if let Some(worker) = self.remote_worker.take() {
@@ -216,7 +215,7 @@ impl App {
         // line; eventless callers refresh synchronously, then set it here.
         self.request_refresh();
         let message = match message {
-            Err(line) => Err(self.explain_push_after_creation(line)),
+            Err(error) => Err(self.explain_push_after_creation(error)),
             ok => {
                 self.create_remote_push_done();
                 ok
@@ -232,10 +231,11 @@ impl App {
                 // has the command. A fetch or a pull keeps its line.
                 self.status_note = (op != events::RemoteOp::Push).then_some(line);
             },
-            Err(line) => {
-                self.remote_refresh_error = self.event_sender.as_ref().map(|_| line.clone());
+            Err(error) => {
+                let error = Arc::new(error);
+                self.remote_refresh_error = self.event_sender.as_ref().map(|_| Arc::clone(&error));
                 self.status_note = None;
-                self.report_error(AppError::Background(line));
+                self.report_error(AppError::Background(error));
             },
         }
     }

@@ -15,6 +15,7 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use ferrit::app::error::AppError;
 use ferrit::app::events::{AppEvent, RemoteOp};
 use ferrit::app::{App, screens as ui};
 use ferrit::components::ui::toast::Toast;
@@ -105,7 +106,7 @@ fn toast_up(app: &mut App) -> bool {
 }
 
 fn fail_a_fetch(app: &mut App, message: &str) {
-    app.on_remote_done(RemoteOp::Fetch, Err(message.to_owned()));
+    app.on_remote_done(RemoteOp::Fetch, Err(AppError::Notice(message.to_owned())));
 }
 
 /// Let the slide-out finish.

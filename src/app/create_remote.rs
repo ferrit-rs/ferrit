@@ -8,6 +8,7 @@
 //! cancels it the way it cancels them.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
@@ -512,7 +513,7 @@ impl App {
         self.remote_busy_started = Some(Instant::now());
         self.status_note = None;
         self.remote_cancel.store(false, Ordering::Release);
-        let cancel = std::sync::Arc::clone(&self.remote_cancel);
+        let cancel = Arc::clone(&self.remote_cancel);
         self.remote_worker = Some(thread::spawn(move || {
             let result = run_worker(WorkerKind::RemoteOperation, || {
                 // The first commit comes first, and is local: if it fails
@@ -525,8 +526,8 @@ impl App {
                 })?;
                 repo.create_repo(&gh, &request, &cancel)
             })
-            .map_err(|error| error.to_string())
-            .and_then(|result| result.map_err(|error| error.to_string()))
+            .map_err(AppError::from)
+            .and_then(|result| result.map_err(AppError::from))
             .map(|created| created.web_url);
             let _ = sender.send(AppEvent::RemoteCreated(result));
         }));
@@ -536,7 +537,7 @@ impl App {
     /// refresh (`gh` added `origin`). A success keeps the web URL and drops the
     /// draft, then pushes; a refusal keeps the draft and says
     /// why, nothing was configured.
-    pub fn on_remote_created(&mut self, result: Result<String, String>) {
+    pub fn on_remote_created(&mut self, result: Result<String, AppError>) {
         self.remote_busy = None;
         self.remote_busy_started = None;
         if let Some(worker) = self.remote_worker.take() {
@@ -553,11 +554,12 @@ impl App {
                 self.create_remote.web_url = Some(url.clone());
                 self.after_creation(&url, &ssh_host);
             },
-            Err(message) => {
+            Err(error) => {
+                let message = error.to_string();
                 self.create_remote.error = Some(message.clone());
                 self.status_note = None;
-                self.reopen_form(message.clone());
-                self.report_error(AppError::Background(message));
+                self.reopen_form(message);
+                self.report_error(AppError::Background(Arc::new(error)));
             },
         }
     }
@@ -608,14 +610,15 @@ impl App {
 
     /// The failure of the push that followed a creation says the repository
     /// exists and how to retry; any other failure is left as it is.
-    pub(super) fn explain_push_after_creation(&mut self, failure: String) -> String {
+    pub(super) fn explain_push_after_creation(&mut self, failure: AppError) -> AppError {
         if !std::mem::take(&mut self.create_remote.pushing_after) {
             return failure;
         }
         match &self.create_remote.web_url {
-            Some(url) => format!(
-                "{failure}\nThe repository {url} exists and origin is set: P retries the push."
-            ),
+            Some(url) => AppError::PushAfterCreation {
+                source: Arc::new(failure),
+                url: url.clone(),
+            },
             None => failure,
         }
     }

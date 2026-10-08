@@ -4,7 +4,7 @@
 //! so git stays the owner of the file format.
 
 use super::keymap::{Action, Context, KeyBinding};
-use super::{App, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use super::{App, AppError, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use crate::domain::git::config::{
     ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value,
 };
@@ -198,7 +198,7 @@ impl App {
     /// could not answer or there is no repository.
     pub(super) fn reread_git_config(&mut self) -> bool {
         let Some(repo) = &self.repo else {
-            self.report_error("no repository: git config needs one");
+            self.report_error(AppError::NoRepository);
             return false;
         };
         match repo.config() {

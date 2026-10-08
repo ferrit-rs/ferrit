@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    App, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide, DiffView,
-    FileRow, GitResult, Granule, Mode, Pane, Range, events, git, hunk_content_id, hunk_id_at,
-    hunk_lines_for, selectable_lines,
+    App, AppError, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide,
+    DiffView, FileRow, GitResult, Granule, Mode, Pane, Range, events, git, hunk_content_id,
+    hunk_id_at, hunk_lines_for, selectable_lines,
 };
 
 impl App {
@@ -265,10 +265,7 @@ impl App {
         // `git add` on an unmerged path marks it resolved whatever the file
         // holds; refuse while conflict markers remain.
         if dir == ApplyDir::Forward && conflicted && self.has_markers(&path) {
-            self.report_error(format!(
-                "{} still has conflict markers, resolve them before staging",
-                path.display()
-            ));
+            self.report_error(AppError::ConflictMarkers(path));
             return;
         }
         let Some(repo) = &self.repo else {
@@ -304,12 +301,9 @@ impl App {
             .map(|f| f.path.clone())
             .collect();
         if dir == ApplyDir::Forward && !blocked.is_empty() {
-            self.report_error(format!(
-                "{} still has conflict markers, resolve them before staging",
-                blocked
-                    .first()
-                    .map_or_else(String::new, |p| p.display().to_string())
-            ));
+            if let Some(first) = blocked.first() {
+                self.report_error(AppError::ConflictMarkers(first.clone()));
+            }
             return;
         }
         let Some(repo) = &self.repo else {
@@ -396,11 +390,7 @@ impl App {
         };
         self.finish_apply(result);
         if !blocked.is_empty() {
-            let names: Vec<String> = blocked.iter().map(|p| p.display().to_string()).collect();
-            self.report_error(format!(
-                "not staged, still has conflict markers: {}",
-                names.join(", ")
-            ));
+            self.report_error(AppError::PartlyStaged(blocked));
         }
     }
 

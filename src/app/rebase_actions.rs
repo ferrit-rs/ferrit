@@ -2,7 +2,7 @@
 //! selected commit, each as one `git rebase -i`. See
 //! `docs/PLAN_11_REBASE.md` R4.
 
-use super::{App, AppError, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
+use super::{App, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
 use crate::domain::git::rebase::RebaseEdit;
 
 impl App {
@@ -121,7 +121,7 @@ impl App {
         match repo.commit(&kind, "", opts) {
             Ok(_) => self.request_refresh(),
             Err(git::error::GitError::NothingStaged) => {
-                self.report_error(AppError::NothingStaged);
+                self.report_error(git::error::GitError::NothingStaged);
             },
             Err(error) => self.report_error(error),
         }

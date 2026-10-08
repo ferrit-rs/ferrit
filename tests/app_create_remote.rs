@@ -20,6 +20,7 @@ use std::time::Duration;
 use ferrit::app::create_remote::{CreateDraft, CreateRemoteView, Field};
 use ferrit::app::events::{AppEvent, RemoteOp};
 use ferrit::app::{App, PopupView};
+use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::host::{GhProgram, Visibility};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -870,7 +871,10 @@ fn a_failed_push_says_the_repository_exists_and_that_p_retries() {
 fn an_ordinary_push_failure_later_is_not_dressed_as_a_creation() {
     let project = Project::new("cr-plain-push");
     let (mut app, _rx) = ready_app(&project);
-    app.on_remote_done(RemoteOp::Push, Err("plain failure".to_owned()));
+    app.on_remote_done(
+        RemoteOp::Push,
+        Err(GitError::PushFailed("plain failure".to_owned()).into()),
+    );
     let shown = status_text(&app);
     assert!(shown.contains("plain failure"), "{shown}");
     assert!(!shown.contains("P retries"), "{shown}");

@@ -159,13 +159,17 @@ pub struct BranchLog {
 }
 
 /// Snapshot plus any active drill-down data loaded in the same worker.
+/// A result whose error is shared between the Status line, the toast and the
+/// refresh bookkeeping, none of which can own it alone.
+type Shared<T> = Result<T, Arc<AppError>>;
+
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct RefreshCompletion {
-    pub(crate) snapshot: Result<git::Snapshot, String>,
+    pub(crate) snapshot: Shared<git::Snapshot>,
     pub(crate) profile: Option<Profile>,
-    pub(crate) branch_log: Option<(String, Result<Vec<git::model::CommitEntry>, String>)>,
-    pub(crate) commit_files: Option<(String, Result<Vec<git::model::FileEntry>, String>)>,
+    pub(crate) branch_log: Option<(String, Shared<Vec<git::model::CommitEntry>>)>,
+    pub(crate) commit_files: Option<(String, Shared<Vec<git::model::FileEntry>>)>,
 }
 
 #[derive(Default)]
@@ -596,9 +600,9 @@ pub struct App {
     /// A merge, rebase, cherry-pick or revert stopped mid-way (`Snapshot`).
     operation: Option<git::model::Operation>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
-    last_error: Option<String>,
+    last_error: Option<Arc<AppError>>,
     /// Optional worktree watcher failure; polling remains active as fallback.
-    watch_error: Option<String>,
+    watch_error: Option<Arc<AppError>>,
 
     /// Terminal graphics backend for the image preview. Starts on half-blocks
     /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
@@ -727,7 +731,7 @@ pub struct App {
     refresh_query: RefreshQueryState,
     /// Remote failure must outlive snapshot completion that was requested
     /// immediately after the remote command.
-    remote_refresh_error: Option<String>,
+    remote_refresh_error: Option<Arc<AppError>>,
     /// The snapshot error the last toast was about, so a repeat is not toasted again.
     refresh_failure: Option<String>,
     /// One selected-diff worker; only latest requested key waits behind it.
@@ -747,7 +751,7 @@ pub mod dashboard;
 pub mod diff_query;
 mod dispatch;
 mod drill_nav;
-mod error;
+pub mod error;
 pub mod git_config;
 mod git_config_edit;
 pub mod image_query;
@@ -942,7 +946,10 @@ impl App {
             .config_file
             .as_deref()
             .map_or_else(String::new, |f| format!(" {}", f.display()));
-        self.report_error(format!("config{location}: {}", issues.join("; ")));
+        self.report_error(AppError::Config {
+            location,
+            issues: issues.to_vec(),
+        });
     }
 
     /// The app for a folder with no repository in it or above it: the welcome
@@ -1096,17 +1103,17 @@ impl App {
             let completion = run_worker(WorkerKind::Refresh, || match git::Repo::open(&path) {
                 Ok(mut repo) => Self::load_refresh(&mut repo, branch, commit, opts),
                 Err(error) => {
-                    let message = error.to_string();
+                    let error = Arc::new(AppError::from(error));
                     RefreshCompletion {
-                        snapshot: Err(message.clone()),
+                        snapshot: Err(Arc::clone(&error)),
                         profile: None,
-                        branch_log: branch.map(|name| (name, Err(message.clone()))),
-                        commit_files: commit.map(|hash| (hash, Err(message))),
+                        branch_log: branch.map(|name| (name, Err(Arc::clone(&error)))),
+                        commit_files: commit.map(|hash| (hash, Err(error))),
                     }
                 },
             })
             .unwrap_or_else(|error| RefreshCompletion {
-                snapshot: Err(error.to_string()),
+                snapshot: Err(Arc::new(error.into())),
                 profile: None,
                 branch_log: None,
                 commit_files: None,
@@ -1121,16 +1128,20 @@ impl App {
         commit: Option<String>,
         opts: DiffOpts,
     ) -> RefreshCompletion {
-        let snapshot = repo.snapshot().map_err(|error| error.to_string());
+        let snapshot = repo
+            .snapshot()
+            .map_err(|error| Arc::new(AppError::from(error)));
         let branch_log = branch.map(|name| {
-            let result = repo.branch_log(&name).map_err(|error| error.to_string());
+            let result = repo
+                .branch_log(&name)
+                .map_err(|error| Arc::new(AppError::from(error)));
             (name, result)
         });
         let commit_files = commit.map(|hash| {
             let result = repo
                 .commit_diff(&hash, opts)
                 .map(|diff| commit_drill_files(&diff))
-                .map_err(|error| error.to_string());
+                .map_err(|error| Arc::new(AppError::from(error)));
             (hash, result)
         });
         RefreshCompletion {
@@ -1170,11 +1181,11 @@ impl App {
             },
             // A failure that keeps repeating (every poll, every file change)
             // opens one toast, not a new one each time it is seen again.
-            Err(error) if self.refresh_failure.as_deref() == Some(error.as_str()) => {
-                self.last_error = Some(AppError::Refresh(error).to_string());
+            Err(error) if self.refresh_failure.as_deref() == Some(error.to_string().as_str()) => {
+                self.last_error = Some(Arc::new(AppError::Refresh(error)));
             },
             Err(error) => {
-                self.refresh_failure = Some(error.clone());
+                self.refresh_failure = Some(error.to_string());
                 self.report_error(AppError::Refresh(error));
             },
         }
@@ -1258,7 +1269,7 @@ impl App {
             // The refresh just replaced the Status line: put the failed
             // operation's own message back. Its toast was shown when it failed;
             // it is not shown again, and it is not a refresh failure.
-            self.last_error = Some(AppError::Background(error).to_string());
+            self.last_error = Some(Arc::new(AppError::Background(error)));
         }
         if self.last_error.is_none() {
             self.last_error = self.watch_error.clone();
@@ -1885,13 +1896,13 @@ impl App {
 
     /// Keep persistent Status text while moving typed error into transient toast.
     pub(super) fn report_error(&mut self, error: impl Into<AppError>) {
-        let error = error.into();
-        self.last_error = Some(error.to_string());
+        let error = Arc::new(error.into());
+        self.last_error = Some(Arc::clone(&error));
         self.toast = Some(Toast::error(error));
     }
 
     pub(super) fn report_notice(&mut self, message: impl Into<String>) {
-        self.last_error = Some(message.into());
+        self.last_error = Some(Arc::new(AppError::Notice(message.into())));
     }
 
     /// Branches pane rows: the branch list, or one branch's own commit log
@@ -2098,9 +2109,7 @@ impl App {
     /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
         let mut events = Events::new(self.watch_root().as_deref(), self.poll_interval())?;
-        self.watch_error = events.watch_error().map(|error| {
-            format!("filesystem watcher unavailable; polling fallback active: {error}")
-        });
+        self.watch_error = watcher_error(&events);
         self.last_error = self.watch_error.clone();
         // A background fetch/pull/push (`start_remote_op`) needs its own
         // way back onto this channel; only `run()` has an `Events` to ask
@@ -2192,9 +2201,7 @@ impl App {
             // The app was rebuilt on a new repository: watch its worktree.
             if let Some(root) = self.take_watch_request() {
                 events.watch(&root);
-                self.watch_error = events.watch_error().map(|error| {
-                    format!("filesystem watcher unavailable; polling fallback active: {error}")
-                });
+                self.watch_error = watcher_error(&events);
                 self.last_error = self.watch_error.clone();
             }
             if self.sheet_overlay.is_animating() && was_animating {
@@ -2310,7 +2317,7 @@ impl Display for WorkerKind {
 }
 
 #[derive(Debug)]
-pub(super) struct WorkerError {
+pub struct WorkerError {
     worker: WorkerKind,
     detail: String,
 }
@@ -2319,6 +2326,17 @@ impl Display for WorkerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} worker panicked: {}", self.worker, self.detail)
     }
+}
+
+impl std::error::Error for WorkerError {}
+
+/// The Status line for a filesystem watcher that could not start, if any.
+fn watcher_error(events: &Events) -> Option<Arc<AppError>> {
+    events.watch_error().map(|detail| {
+        Arc::new(AppError::WatcherUnavailable {
+            detail: detail.to_owned(),
+        })
+    })
 }
 
 /// Run worker logic behind a panic boundary so completion events can release

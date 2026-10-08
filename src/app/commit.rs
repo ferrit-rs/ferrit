@@ -400,7 +400,7 @@ impl App {
                 self.request_refresh();
             },
             Err(git::error::GitError::NothingStaged) => {
-                self.report_error(AppError::NothingStaged);
+                self.report_error(git::error::GitError::NothingStaged);
             },
             Err(error) => self.report_error(error),
         }
