@@ -6,7 +6,6 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-use ratatui::style::Color;
 
 use super::config::{Config, Section};
 use super::theme_config::{Preset, SchemeChoice, ThemeMode};
@@ -178,18 +177,18 @@ impl App {
     #[must_use]
     pub fn choice_index(&self, row: SettingsRow) -> Option<usize> {
         match row {
-            SettingsRow::Theme => Some(match self.theme_config.effective_scheme() {
+            SettingsRow::Theme => Some(match self.theme.config.effective_scheme() {
                 SchemeChoice::Terminal => 0,
                 SchemeChoice::Dark => 1,
                 SchemeChoice::Light => 2,
             }),
             SettingsRow::Accent => {
-                if self.theme_config.accent.is_some() {
+                if self.theme.config.accent.is_some() {
                     None
                 } else {
                     Preset::ALL
                         .iter()
-                        .position(|p| *p == self.theme_config.preset)
+                        .position(|p| *p == self.theme.config.preset)
                 }
             },
             _ => None,
@@ -232,12 +231,12 @@ impl App {
                 return;
             },
             SettingsRow::Accent => {
-                self.theme_config.preset = if up {
-                    self.theme_config.preset.next()
+                self.theme.config.preset = if up {
+                    self.theme.config.preset.next()
                 } else {
-                    self.theme_config.preset.prev()
+                    self.theme.config.preset.prev()
                 };
-                self.theme_config.accent = None;
+                self.theme.config.accent = None;
                 self.sync_theme_picker_selection();
                 self.theme_changed();
             },
@@ -268,14 +267,14 @@ impl App {
     /// was drawn from it, and mirror it into the live config so a clone of the
     /// config (the app rebuilt on a new repository) carries it.
     pub(super) fn theme_changed(&mut self) {
-        let palette = self.theme_config.palette();
+        let palette = self.theme.config.palette();
         // The cached diff holds syntax colours, which follow the base only: an
         // accent change must not make every click re-highlight the diff.
         if palette.light != self.palette.light {
             self.rendered_diff = None;
         }
         self.palette = palette;
-        self.config.theme = self.theme_config.clone();
+        self.config.theme = self.theme.config.clone();
     }
 
     /// Write `section` of the live config to `config.toml`. No file (tests, a
@@ -302,7 +301,7 @@ impl App {
     pub fn set_choice(&mut self, row: SettingsRow, index: usize) {
         match row {
             SettingsRow::Theme => {
-                self.theme_config.scheme = Some(match index {
+                self.theme.config.scheme = Some(match index {
                     0 => SchemeChoice::Terminal,
                     1 => SchemeChoice::Dark,
                     _ => SchemeChoice::Light,
@@ -311,8 +310,8 @@ impl App {
             },
             SettingsRow::Accent => {
                 if let Some(preset) = Preset::ALL.get(index) {
-                    self.theme_config.preset = *preset;
-                    self.theme_config.accent = None;
+                    self.theme.config.preset = *preset;
+                    self.theme.config.accent = None;
                     self.sync_theme_picker_selection();
                     self.accent_changed();
                 }
@@ -337,7 +336,7 @@ impl App {
     /// The sheet is about to open: back on the rows, at the top, the selected row
     /// scrolled into view.
     pub(super) fn prepare_settings_sheet(&mut self) {
-        self.theme_mode = ThemeMode::Idle;
+        self.theme.mode = ThemeMode::Idle;
         self.settings_scroll = 0;
         self.settings.follow = true;
     }
@@ -346,7 +345,7 @@ impl App {
     /// between rows, `←` `→` and `Space` change the value, `Enter` opens the
     /// colour picker on the accent, `Esc` goes back (picker) or closes.
     pub(super) fn settings_key(&mut self, key: KeyEvent) {
-        match self.theme_mode {
+        match self.theme.mode {
             ThemeMode::Palette => self.picker_key(key),
             ThemeMode::EditingRgb => self.rgb_key(key),
             ThemeMode::Idle => self.row_key(key),
@@ -372,7 +371,7 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') => self.change_setting(row, false),
             KeyCode::Right | KeyCode::Char('l' | ' ') => self.change_setting(row, true),
             KeyCode::Enter if row == SettingsRow::Accent => {
-                self.theme_mode = ThemeMode::Palette;
+                self.theme.mode = ThemeMode::Palette;
                 self.sync_theme_picker_selection();
             },
             KeyCode::PageUp => self.settings_scroll = self.settings_scroll.saturating_sub(10),
@@ -387,13 +386,13 @@ impl App {
 
     fn picker_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.theme_mode = ThemeMode::Idle,
+            KeyCode::Esc => self.theme.mode = ThemeMode::Idle,
             KeyCode::Left | KeyCode::Char('h') => self.move_theme_palette(PaletteDirection::Left),
             KeyCode::Right | KeyCode::Char('l') => self.move_theme_palette(PaletteDirection::Right),
             KeyCode::Up | KeyCode::Char('k') => self.move_theme_palette(PaletteDirection::Up),
             KeyCode::Down | KeyCode::Char('j') => self.move_theme_palette(PaletteDirection::Down),
-            KeyCode::Char('v') => self.toggle_theme_picker_display(),
-            KeyCode::Char('e') => self.theme_mode = ThemeMode::EditingRgb,
+            KeyCode::Char('v') => self.theme.toggle_picker_display(),
+            KeyCode::Char('e') => self.theme.mode = ThemeMode::EditingRgb,
             KeyCode::Enter => self.apply_theme_picker_selection(),
             _ => {},
         }
@@ -402,12 +401,11 @@ impl App {
     fn rgb_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Tab => {
-                self.theme_rgb_channel =
-                    (self.theme_rgb_channel + 1) % super::theme_config::RGB_CHANNEL_COUNT;
+                self.theme.next_rgb_channel();
             },
             KeyCode::Up | KeyCode::Right => self.adjust_theme_rgb(RGB_CHANNEL_STEP),
             KeyCode::Down | KeyCode::Left => self.adjust_theme_rgb(-RGB_CHANNEL_STEP),
-            KeyCode::Esc => self.theme_mode = ThemeMode::Palette,
+            KeyCode::Esc => self.theme.mode = ThemeMode::Palette,
             _ => {},
         }
     }
@@ -427,7 +425,7 @@ impl App {
             MouseEventKind::Down(MouseButton::Left) => {
                 let grid = self.settings_hits.color_grid;
                 if grid.contains(point) {
-                    let metrics = color_picker::grid_metrics(self.theme_picker_display);
+                    let metrics = color_picker::grid_metrics(self.theme.picker_display);
                     let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
                     let row = self.settings_hits.color_grid_first_row
                         + usize::from(ev.row.saturating_sub(grid.y));
@@ -458,58 +456,31 @@ impl App {
         }
     }
 
-    fn move_theme_palette(&mut self, direction: PaletteDirection) {
-        self.theme_palette_selected = color_picker::move_selection(
-            self.theme_palette_selected,
-            direction,
-            self.theme_picker_display,
-        );
-        self.apply_theme_picker_selection();
-    }
-
-    fn toggle_theme_picker_display(&mut self) {
-        use color_picker::ColorPickerDisplay;
-
-        self.theme_picker_display = match self.theme_picker_display {
-            ColorPickerDisplay::Palette => ColorPickerDisplay::Spectrum,
-            ColorPickerDisplay::Spectrum => ColorPickerDisplay::Palette,
-        };
-        self.sync_theme_picker_selection();
-    }
-
     pub(super) fn sync_theme_picker_selection(&mut self) {
-        self.theme_palette_selected =
-            color_picker::nearest_index(self.theme_config.color(), self.theme_picker_display);
+        self.theme.sync_picker_selection();
+    }
+
+    fn move_theme_palette(&mut self, direction: PaletteDirection) {
+        if self.theme.move_palette(direction) {
+            self.accent_changed();
+        }
     }
 
     /// The highlighted swatch becomes the accent, applied and saved.
     fn apply_theme_picker_selection(&mut self) {
-        if let Some(color) =
-            color_picker::color_at(self.theme_picker_display, self.theme_palette_selected)
-        {
-            self.theme_config.accent = Some(color);
+        if self.theme.pick_selected() {
             self.accent_changed();
         }
     }
 
     fn select_theme_picker_cell(&mut self, column: usize, row: usize) {
-        if let Some(selected) = color_picker::selection_at(self.theme_picker_display, column, row) {
-            self.theme_mode = ThemeMode::Palette;
-            self.theme_palette_selected = selected;
-            self.apply_theme_picker_selection();
+        if self.theme.select_cell(column, row) {
+            self.accent_changed();
         }
     }
 
     fn adjust_theme_rgb(&mut self, delta: i16) {
-        let (mut r, mut g, mut b) = color_picker::rgb(self.theme_config.color());
-        let channel = match self.theme_rgb_channel {
-            super::theme_config::RGB_RED_CHANNEL => &mut r,
-            super::theme_config::RGB_GREEN_CHANNEL => &mut g,
-            _ => &mut b,
-        };
-        *channel = u8::try_from((i16::from(*channel) + delta).clamp(0, 255)).unwrap_or_default();
-        self.theme_config.accent = Some(Color::Rgb(r, g, b));
-        self.sync_theme_picker_selection();
+        self.theme.adjust_rgb(delta);
         self.accent_changed();
     }
 }

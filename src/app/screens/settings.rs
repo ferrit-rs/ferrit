@@ -58,7 +58,7 @@ impl RowLine {
 
 /// The row's line: the marker, the label and the value with its click parts.
 fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> RowLine {
-    let accent = app.theme_config.color();
+    let accent = app.theme.config.color();
     let mut line = RowLine {
         row,
         spans: Vec::new(),
@@ -153,7 +153,7 @@ fn footer(app: &App, palette: &Palette) -> Line<'static> {
 }
 
 fn hint(app: &App) -> &'static str {
-    match app.theme_mode {
+    match app.theme.mode {
         ThemeMode::Idle => {
             "\u{2191}\u{2193} row \u{b7} \u{2190}\u{2192} or Space change \u{b7} Enter picker (Accent) \u{b7} Esc close"
         },
@@ -167,7 +167,7 @@ fn hint(app: &App) -> &'static str {
 /// Draw the sheet and record where its clickable parts landed (nothing
 /// clickable when it is not on screen).
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
-    let accent = app.theme_config.color();
+    let accent = app.theme.config.color();
     let selected_row = app.settings().selected;
     let Some(inner) = Drawer::new(&mut app.sheet_overlay, " Settings ")
         .width(Constraint::Percentage(75))
@@ -214,18 +214,18 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
             grid_line = lines.len() + 1;
             lines.extend(
                 ColorPicker::new(accent)
-                    .selected(app.theme_palette_selected)
-                    .active(app.theme_mode == ThemeMode::Palette)
-                    .display(app.theme_picker_display)
+                    .selected(app.theme.palette_selected)
+                    .active(app.theme.mode == ThemeMode::Palette)
+                    .display(app.theme.picker_display)
                     .lines(),
             );
             let (r, g, b) = rgb(accent);
             let channel = RGB_LABELS
-                .get(app.theme_rgb_channel)
+                .get(app.theme.rgb_channel)
                 .copied()
                 .unwrap_or("B");
             lines.push(Line::styled(
-                if app.theme_mode == ThemeMode::EditingRgb {
+                if app.theme.mode == ThemeMode::EditingRgb {
                     format!("RGB: [R {r:03}] [G {g:03}] [B {b:03}] \u{b7} channel {channel}")
                 } else {
                     "Enter opens the picker \u{b7} click a colour".to_owned()
@@ -254,7 +254,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
             .then(|| body.y + u16::try_from(line - scroll).unwrap_or(u16::MAX))
     };
     let mut hits = SettingsHits::default();
-    let grid_rows = grid_metrics(app.theme_picker_display).rows;
+    let grid_rows = grid_metrics(app.theme.picker_display).rows;
     let first = grid_line.max(scroll);
     let last = (grid_line + grid_rows).min(scroll + viewport);
     if first < last {

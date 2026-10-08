@@ -39,7 +39,7 @@ pub mod welcome;
 /// (the palette's `Red`, `Blue`...), which is what most tests look at.
 pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
     draw(frame, app);
-    if let Some(scheme) = app.theme_config.scheme() {
+    if let Some(scheme) = app.theme.config.scheme() {
         scheme.paint(frame.buffer_mut(), app.color_depth);
     }
 }
@@ -63,7 +63,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
             height: area.height.saturating_sub(keybar.height),
             ..area
         };
-        let accent = app.theme_config.color();
+        let accent = app.theme.config.color();
         let (scroll, query, searching, overlay_state) = app.help.view_parts();
         let rows = popups::draw_help(
             frame,
@@ -80,7 +80,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         );
         app.help.set_rows(rows);
     }
-    let accent = app.theme_config.color();
+    let accent = app.theme.config.color();
     match app.popup_view() {
         Some(
             PopupView::Commit(mut view)
@@ -176,7 +176,7 @@ fn draw_welcome(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
             dir,
             selected: app.welcome_selected(),
             palette: app.palette(),
-            accent: app.theme_config.color(),
+            accent: app.theme.config.color(),
         };
         welcome::draw(frame, page, &view);
     }
@@ -306,7 +306,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let focused = app.focus == pane && !app.right_focused();
         let border = if focused {
             Style::new()
-                .fg(app.theme_config.color())
+                .fg(app.theme.config.color())
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::new().fg(palette.idle)
@@ -322,7 +322,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             format!(" {title_text} "),
             if focused {
                 Style::new()
-                    .fg(app.theme_config.color())
+                    .fg(app.theme.config.color())
                     .add_modifier(Modifier::BOLD)
             } else {
                 Style::new().fg(palette.idle)
@@ -499,7 +499,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     app.set_right_area(area);
 
     let focused = Style::new()
-        .fg(app.theme_config.color())
+        .fg(app.theme.config.color())
         .add_modifier(Modifier::BOLD);
     let idle = Style::new().fg(palette.idle);
     // Branches normally previews nothing (" Log "); once drilled into a
@@ -655,7 +655,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         let panel = Paragraph::new(welcome_lines(
             area.width,
             area.height,
-            app.theme_config.color(),
+            app.theme.config.color(),
             palette,
         ))
         .block(block)

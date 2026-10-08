@@ -549,11 +549,7 @@ pub struct App {
     selected_author: Option<crate::domain::profile::settings::Identity>,
     /// First visible line of the settings sheet.
     settings_scroll: usize,
-    theme_config: theme_config::ThemeConfig,
-    theme_rgb_channel: usize,
-    theme_mode: theme_config::ThemeMode,
-    theme_palette_selected: usize,
-    theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay,
+    pub theme: theme_editor::ThemeEditor,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
     config_file: Option<PathBuf>,
     /// What the terminal can show; the painted theme is RGB and is approximated
@@ -730,6 +726,7 @@ pub struct App {
 }
 
 pub mod help;
+pub mod theme_editor;
 mod tree;
 mod welcome;
 
@@ -791,10 +788,6 @@ impl App {
             effective_identity,
             identity_source,
         });
-        let theme_palette_selected = crate::components::ui::color_picker::nearest_index(
-            theme_config.color(),
-            crate::components::ui::color_picker::ColorPickerDisplay::default(),
-        );
         Self {
             focus: Pane::default(),
             selection: EnumMap::default(),
@@ -806,12 +799,7 @@ impl App {
             profile,
             selected_author: None,
             settings_scroll: 0,
-            theme_config,
-            theme_rgb_channel: theme_config::RGB_RED_CHANNEL,
-            theme_mode: theme_config::ThemeMode::Idle,
-            theme_palette_selected,
-            theme_picker_display: crate::components::ui::color_picker::ColorPickerDisplay::default(
-            ),
+            theme: theme_editor::ThemeEditor::new(theme_config),
             config,
             keymap,
             config_file: None,
