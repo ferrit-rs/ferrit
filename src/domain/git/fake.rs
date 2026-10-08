@@ -83,6 +83,20 @@ impl FakeGit {
         self
     }
 
+    /// Add a local branch that is not checked out.
+    #[must_use]
+    pub fn with_branch(self, name: &str) -> Self {
+        self.lock().snapshot.branches.push(BranchEntry {
+            name: name.to_owned(),
+            is_head: false,
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+            tip_time: 0,
+        });
+        self
+    }
+
     /// Add a commit at the top of the history.
     #[must_use]
     pub fn with_commit(self, summary: &str) -> Self {
