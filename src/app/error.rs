@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::app::WorkerError;
+use crate::app::config::error::ConfigError;
+use crate::app::image_query::ImageError;
 use crate::domain::git::error::GitError;
 
 /// Errors surfaced by app actions. Every variant says what went wrong; there is
@@ -13,6 +15,10 @@ pub enum AppError {
     Git(#[from] GitError),
     #[error(transparent)]
     Worker(#[from] WorkerError),
+    #[error(transparent)]
+    Image(#[from] ImageError),
+    #[error(transparent)]
+    Config(#[from] ConfigError),
     #[error("no commit yet to amend")]
     NoCommitToAmend,
     #[error("commit message cannot be empty")]
@@ -30,7 +36,7 @@ pub enum AppError {
     /// The configuration file had problems; `location` is already formatted
     /// (` /path/to/config.toml` or empty).
     #[error("config{location}: {}", .issues.join("; "))]
-    Config {
+    ConfigIssues {
         location: String,
         issues: Vec<String>,
     },

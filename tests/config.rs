@@ -17,6 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ferrit::app::config::error::ConfigError;
 use ferrit::app::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::app::theme_config::{Preset, ThemeConfig};
 use ferrit::app::{App, DiffView, Pane};
@@ -258,7 +259,7 @@ fn saving_refuses_to_overwrite_a_file_that_is_not_toml() {
     fs::write(&path, original).unwrap();
 
     let error = Config::save_theme(&path, &theme(Preset::Blue, None)).unwrap_err();
-    assert!(error.contains("not overwritten"), "{error}");
+    assert!(matches!(error, ConfigError::NotToml { .. }), "{error}");
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         original,
@@ -809,7 +810,7 @@ fn saving_sections_refuses_a_file_that_is_not_toml_and_leaves_it_alone() {
     fs::write(&path, original).unwrap();
 
     let error = Config::save_sections(&path, &Config::default(), &[Section::Ui]).unwrap_err();
-    assert!(error.contains("not overwritten"), "{error}");
+    assert!(matches!(error, ConfigError::NotToml { .. }), "{error}");
     assert_eq!(fs::read_to_string(&path).unwrap(), original);
 }
 

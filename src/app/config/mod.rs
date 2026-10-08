@@ -24,7 +24,10 @@ use directories::ProjectDirs;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+pub mod error;
+
 use super::theme_config::ThemeConfig;
+use error::ConfigError;
 
 const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file when it saves a\n\
                            # setting: unknown sections are kept, comments are not.\n\n";
@@ -273,7 +276,7 @@ impl Config {
     /// # Errors
     /// The file is not valid TOML (it is not overwritten), or cannot be
     /// read or written.
-    pub fn save_theme(path: &Path, theme: &ThemeConfig) -> Result<(), String> {
+    pub fn save_theme(path: &Path, theme: &ThemeConfig) -> Result<(), ConfigError> {
         let config = Self {
             theme: theme.clone(),
             ..Self::default()
@@ -290,33 +293,42 @@ impl Config {
     /// # Errors
     /// The file is not valid TOML (it is not overwritten), or cannot be read or
     /// written.
-    pub fn save_sections(path: &Path, config: &Self, sections: &[Section]) -> Result<(), String> {
+    pub fn save_sections(
+        path: &Path,
+        config: &Self,
+        sections: &[Section],
+    ) -> Result<(), ConfigError> {
         let mut table = match fs::read_to_string(path) {
-            Ok(text) => toml::from_str::<toml::Table>(&text).map_err(|e| {
-                format!(
-                    "{} is not valid TOML, fix it first (not overwritten): {e}",
-                    path.display()
-                )
-            })?,
+            Ok(text) => {
+                toml::from_str::<toml::Table>(&text).map_err(|source| ConfigError::NotToml {
+                    path: path.to_path_buf(),
+                    source,
+                })?
+            },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => toml::Table::new(),
-            Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
+            Err(source) => {
+                return Err(ConfigError::Read {
+                    path: path.to_path_buf(),
+                    source,
+                });
+            },
         };
         for section in sections {
             table.insert(section.name().to_owned(), config.section_value(*section)?);
         }
-        let body = toml::to_string_pretty(&table).map_err(|e| e.to_string())?;
+        let body = toml::to_string_pretty(&table)?;
 
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            fs::create_dir_all(parent)?;
         }
         // Write beside the target and rename, so a crash mid-write cannot
         // leave a truncated config behind.
         let staging = path.with_extension("toml.tmp");
-        fs::write(&staging, format!("{FILE_HEADER}{body}")).map_err(|e| e.to_string())?;
-        fs::rename(&staging, path).map_err(|e| e.to_string())
+        fs::write(&staging, format!("{FILE_HEADER}{body}"))?;
+        Ok(fs::rename(&staging, path)?)
     }
 
-    fn section_value(&self, section: Section) -> Result<toml::Value, String> {
+    fn section_value(&self, section: Section) -> Result<toml::Value, ConfigError> {
         let value = match section {
             Section::Theme => toml::Value::try_from(&self.theme),
             Section::Ui => toml::Value::try_from(&self.ui),
@@ -324,7 +336,7 @@ impl Config {
             Section::Commit => toml::Value::try_from(&self.commit),
             Section::Log => toml::Value::try_from(&self.log),
         };
-        value.map_err(|e| e.to_string())
+        Ok(value?)
     }
 }
 

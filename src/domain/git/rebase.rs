@@ -130,7 +130,7 @@ pub(super) fn rebase_edit(
     )?;
 
     let out = run_rebase(repo, anchor, &todo_file)?;
-    finish(repo, &dir, settle(repo, &out))
+    finish(repo, &dir, settle(repo, &out, GitError::RebaseFailed))
 }
 
 /// Fold every `fixup!` / `squash!` commit after `hash`'s parent into its
@@ -146,7 +146,7 @@ pub(super) fn autosquash(repo: &Repository, hash: &str) -> GitResult<OperationOu
     cmd.arg("--autosquash").env("GIT_SEQUENCE_EDITOR", "true");
     let out = exec::output(&mut cmd)
         .map_err(|e| GitError::RebaseFailed(format!("cannot run git: {e}")))?;
-    finish(repo, &dir, settle(repo, &out))
+    finish(repo, &dir, settle(repo, &out, GitError::RebaseFailed))
 }
 
 /// Refuse to start a rewrite while a merge, rebase, cherry-pick or revert is
@@ -216,12 +216,12 @@ fn run_rebase(
 fn finish(
     repo: &Repository,
     dir: &Path,
-    settled: Result<OperationOutcome, String>,
+    settled: GitResult<OperationOutcome>,
 ) -> GitResult<OperationOutcome> {
     if !matches!(settled, Ok(OperationOutcome::Stopped { .. })) && current(repo).is_none() {
         let _ = fs::remove_dir_all(dir);
     }
-    settled.map_err(GitError::RebaseFailed)
+    settled
 }
 
 /// `<git dir>/ferrit/`, emptied. Never inside the worktree: a helper file

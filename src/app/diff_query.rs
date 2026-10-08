@@ -5,11 +5,13 @@ use std::sync::mpsc;
 use std::thread;
 
 use super::{
-    App, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane, WorkerKind, run_worker,
+    App, AppError, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane, WorkerKind,
+    run_worker,
 };
 
 use crate::domain::git;
 use crate::domain::git::diff::{DiffOpts, DiffSide};
+use crate::domain::git::error::GitError;
 
 #[derive(Default)]
 pub(super) struct DiffQueryState {
@@ -45,14 +47,14 @@ pub(crate) enum DiffQueryResult {
 pub struct DiffCompletion {
     pub(crate) key: RightKey,
     pub(crate) generation: u64,
-    pub(crate) result: Result<DiffQueryResult, String>,
+    pub(crate) result: Result<DiffQueryResult, AppError>,
 }
 
 pub(crate) fn load(
     repo: &git::Repo,
     key: &RightKey,
     opts: DiffOpts,
-) -> Result<DiffQueryResult, String> {
+) -> Result<DiffQueryResult, GitError> {
     match key {
         RightKey::File { path } => {
             // The root directory row has an empty path: `git diff -- .` is every file.
@@ -62,26 +64,17 @@ pub(crate) fn load(
                 path.as_path()
             };
             Ok(DiffQueryResult::File {
-                unstaged: repo
-                    .file_diff(path, DiffSide::Worktree, opts)
-                    .map_err(|error| error.to_string())?,
-                staged: repo
-                    .file_diff(path, DiffSide::Staged, opts)
-                    .map_err(|error| error.to_string())?,
+                unstaged: repo.file_diff(path, DiffSide::Worktree, opts)?,
+                staged: repo.file_diff(path, DiffSide::Staged, opts)?,
             })
         },
         RightKey::Commit { full_hash } => repo
             .commit_diff(full_hash, opts)
-            .map(DiffQueryResult::Commit)
-            .map_err(|error| error.to_string()),
-        RightKey::BranchLog { branch } => repo
-            .branch_log(branch)
-            .map(DiffQueryResult::BranchLog)
-            .map_err(|error| error.to_string()),
+            .map(DiffQueryResult::Commit),
+        RightKey::BranchLog { branch } => repo.branch_log(branch).map(DiffQueryResult::BranchLog),
         RightKey::Stash { oid, header } => repo
             .stash_diff(oid, header, opts)
-            .map(DiffQueryResult::Stash)
-            .map_err(|error| error.to_string()),
+            .map(DiffQueryResult::Stash),
     }
 }
 
@@ -160,12 +153,10 @@ impl App {
         let opts = self.diff_opts();
         thread::spawn(move || {
             let result = run_worker(WorkerKind::Diff, || {
-                git::Repo::open(&path)
-                    .map_err(|error| error.to_string())
-                    .and_then(|repo| load(&repo, &key, opts))
+                git::Repo::open(&path).and_then(|repo| load(&repo, &key, opts))
             })
-            .map_err(|error| error.to_string())
-            .and_then(|result| result);
+            .map_err(AppError::from)
+            .and_then(|result| result.map_err(AppError::from));
             let _ = sender.send(AppEvent::DiffDone(DiffCompletion {
                 key,
                 generation,
@@ -184,7 +175,7 @@ impl App {
         if generation == self.diff_query.generation && self.right_key.as_ref() == Some(&key) {
             self.diff = match result {
                 Ok(result) => self.diff_view_from_query(&key, result),
-                Err(error) => DiffView::Note(error),
+                Err(error) => DiffView::Note(error.to_string()),
             };
             self.clamp_right_scroll();
             self.resync_diff_cursor();
@@ -268,7 +259,7 @@ impl App {
         };
         match load(repo, key, self.diff_opts()) {
             Ok(result) => self.diff_view_from_query(key, result),
-            Err(error) => DiffView::Note(error),
+            Err(error) => DiffView::Note(error.to_string()),
         }
     }
 

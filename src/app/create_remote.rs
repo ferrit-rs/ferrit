@@ -18,7 +18,7 @@ use super::{
 };
 use crate::domain::git::error::GitError;
 use crate::domain::git::host::{
-    self, CreateRequest, GhProgram, GhStatus, Visibility, parse_target, sanitize_name,
+    self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
     ssh_remote_url, validate_description,
 };
 use crate::domain::git::ssh_config::read_github_aliases;
@@ -100,10 +100,10 @@ impl Form {
     }
 
     /// The draft, if what is typed would be accepted; else the reason.
-    fn validate(&self) -> Result<CreateDraft, String> {
+    fn validate(&self) -> Result<CreateDraft, HostError> {
         let draft = self.draft();
-        parse_target(&draft.target).map_err(|e| e.to_string())?;
-        validate_description(&draft.description).map_err(|e| e.to_string())?;
+        parse_target(&draft.target)?;
+        validate_description(&draft.description)?;
         Ok(draft)
     }
 
@@ -431,7 +431,7 @@ impl App {
                     Ok(_) => self.popup = Some(Popup::CreateRemote(Step::Confirm(form))),
                     Err(reason) => {
                         self.popup = Some(Popup::CreateRemote(Step::Form(Form {
-                            error: Some(reason),
+                            error: Some(reason.to_string()),
                             ..form
                         })));
                     },

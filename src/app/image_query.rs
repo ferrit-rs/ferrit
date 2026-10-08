@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
 use super::{
-    App, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker, thread,
+    App, AppError, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker,
+    thread,
 };
 
 /// Image worker result, applied only if selection and generation still match.
@@ -13,23 +14,51 @@ use super::{
 pub struct ImageCompletion {
     pub(crate) path: PathBuf,
     pub(crate) generation: u64,
-    pub(crate) result: Result<::image::DynamicImage, String>,
+    pub(crate) result: Result<::image::DynamicImage, AppError>,
 }
 
-pub(crate) fn load(repo_path: &Path, image_path: &Path) -> Result<::image::DynamicImage, String> {
-    let repo = git::Repo::open(repo_path).map_err(|error| error.to_string())?;
+/// Why a file preview could not show an image.
+#[derive(Debug, thiserror::Error)]
+pub enum ImageError {
+    #[error(transparent)]
+    Open(#[from] git::error::GitError),
+    #[error("[image] {}  ({source})", .path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: git::error::GitError,
+    },
+    #[error("[image] {}  (no bytes)", .path.display())]
+    Empty { path: PathBuf },
+    #[error("[image] {}  ({bytes} bytes)  decode failed: {source}", .path.display())]
+    Decode {
+        path: PathBuf,
+        bytes: usize,
+        #[source]
+        source: ::image::ImageError,
+    },
+}
+
+pub(crate) fn load(
+    repo_path: &Path,
+    image_path: &Path,
+) -> Result<::image::DynamicImage, ImageError> {
+    let repo = git::Repo::open(repo_path)?;
     let bytes = repo
         .blob_bytes(image_path, git::blob::Rev::Workdir)
-        .map_err(|error| format!("[image] {}  ({error})", image_path.display()))?;
+        .map_err(|source| ImageError::Read {
+            path: image_path.to_path_buf(),
+            source,
+        })?;
     if bytes.is_empty() {
-        return Err(format!("[image] {}  (no bytes)", image_path.display()));
+        return Err(ImageError::Empty {
+            path: image_path.to_path_buf(),
+        });
     }
-    ::image::load_from_memory(&bytes).map_err(|error| {
-        format!(
-            "[image] {}  ({} bytes)  decode failed: {error}",
-            image_path.display(),
-            bytes.len()
-        )
+    ::image::load_from_memory(&bytes).map_err(|source| ImageError::Decode {
+        path: image_path.to_path_buf(),
+        bytes: bytes.len(),
+        source,
     })
 }
 
@@ -119,8 +148,8 @@ impl App {
         self.image_query.in_flight = true;
         thread::spawn(move || {
             let result = run_worker(WorkerKind::ImagePreview, || load(&repo_path, &path))
-                .map_err(|error| error.to_string())
-                .and_then(|result| result);
+                .map_err(AppError::from)
+                .and_then(|result| result.map_err(AppError::from));
             let _ = sender.send(AppEvent::ImageDone(ImageCompletion {
                 path,
                 generation,
@@ -136,7 +165,7 @@ impl App {
         {
             self.preview = match completion.result {
                 Ok(image) => Preview::Image(Box::new(self.picker.new_resize_protocol(image))),
-                Err(error) => Preview::Note(error),
+                Err(error) => Preview::Note(error.to_string()),
             };
             self.update_diff();
         }

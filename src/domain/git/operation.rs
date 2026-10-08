@@ -99,7 +99,7 @@ pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome>
     let out = exec::output(&mut cmd)
         .map_err(|e| GitError::OperationFailed(format!("cannot run git: {e}")))?;
 
-    settle(repo, &out).map_err(GitError::OperationFailed)
+    settle(repo, &out, GitError::OperationFailed)
 }
 
 /// Where the repository stands after a subprocess that may have started or
@@ -110,11 +110,13 @@ pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome>
 /// operation is in progress. Any other failure is the refusal text, even if an
 /// operation is still in progress (a rejecting hook, a `--continue` over an
 /// unresolved file): the caller shows it, and the Status badge and `m` menu
-/// are how the user leaves that state.
+/// are how the user leaves that state. `refuse` wraps that text in the error
+/// variant of the operation that ran.
 pub(super) fn settle(
     repo: &Repository,
     out: &std::process::Output,
-) -> Result<OperationOutcome, String> {
+    refuse: fn(String) -> GitError,
+) -> GitResult<OperationOutcome> {
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -133,7 +135,7 @@ pub(super) fn settle(
     if text.contains("CONFLICT (") && current(repo).is_some() {
         return Ok(OperationOutcome::Stopped { conflicted: true });
     }
-    Err(text.trim().to_owned())
+    Err(refuse(text.trim().to_owned()))
 }
 
 fn flag(step: Step) -> &'static str {

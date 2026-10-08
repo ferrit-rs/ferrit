@@ -289,7 +289,7 @@ impl App {
         };
         self.settings.save = match Config::save_sections(&path, &self.config, &[section]) {
             Ok(()) => SaveState::Saved,
-            Err(error) => SaveState::Failed(error),
+            Err(error) => SaveState::Failed(error.to_string()),
         };
     }
 

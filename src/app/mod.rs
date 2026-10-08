@@ -946,7 +946,7 @@ impl App {
             .config_file
             .as_deref()
             .map_or_else(String::new, |f| format!(" {}", f.display()));
-        self.report_error(AppError::Config {
+        self.report_error(AppError::ConfigIssues {
             location,
             issues: issues.to_vec(),
         });
