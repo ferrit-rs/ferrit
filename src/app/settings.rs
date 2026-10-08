@@ -423,15 +423,16 @@ impl App {
                 self.settings_scroll = self.settings_scroll.saturating_add(WHEEL_ROWS);
             },
             MouseEventKind::Down(MouseButton::Left) => {
-                let grid = self.settings_hits.color_grid;
+                let grid = self.hits.settings.color_grid;
                 if grid.contains(point) {
                     let metrics = color_picker::grid_metrics(self.theme.picker_display);
                     let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
-                    let row = self.settings_hits.color_grid_first_row
+                    let row = self.hits.settings.color_grid_first_row
                         + usize::from(ev.row.saturating_sub(grid.y));
                     self.select_theme_picker_cell(column, row);
                 } else if let Some(&(_, row, click)) = self
-                    .settings_hits
+                    .hits
+                    .settings
                     .parts
                     .iter()
                     .find(|(area, ..)| area.contains(point))

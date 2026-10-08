@@ -544,7 +544,6 @@ pub struct App {
     /// read at startup: the theme being edited lives in `theme_config`.
     config: config::Config,
     keymap: keymap::Keymap,
-    settings_hits: settings::SettingsHits,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     snapshot: git::Snapshot,
@@ -570,15 +569,10 @@ pub struct App {
 
     /// The right column: image preview, diff, scroll and line cursor.
     right: right_pane::RightPane,
-    /// Click target for the configured Git author in the bottom info panel.
-    author_click_area: Rect,
-    /// Click target for the visible Dashboard trigger beside the author.
-    dashboard_click_area: Rect,
+    /// Where the last frame put the clickable things.
+    hits: hit_areas::HitAreas,
     /// The colours everything is drawn with (`[theme]` in `config.toml`).
     palette: Palette,
-    /// Where the keybar was drawn and what each part of it runs when clicked.
-    keybar_area: Rect,
-    keybar_hits: Vec<hints::KeybarHit>,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
     /// The side sheet's drawer: one for every sheet (`app::sheet`).
@@ -590,19 +584,6 @@ pub struct App {
     pub(crate) commit_overlay: OverlayState,
     /// Persistent bottom-right error notification, dismissed by clicking `x`.
     pub(crate) toast: Option<Toast>,
-    /// Each left pane's bordered rect from the last frame, for routing a
-    /// click to the pane it landed in. `Rect::ZERO` before the first draw.
-    left_areas: EnumMap<Pane, Rect>,
-    /// `ListState::offset` for each left pane, copied back by
-    /// `ui::draw_left_column` after `render_stateful_widget` moves it to
-    /// keep the selection on screen. Lets a click in a scrolled list map to
-    /// the right row. Only valid post-render; 0 before the first draw.
-    list_offset: EnumMap<Pane, usize>,
-    /// Per left pane, the selected row a wheel scroll left behind: while the
-    /// selection is still that row, the view stays where the wheel put it,
-    /// even with the selection off screen (lazygit). Any other selection
-    /// re-attaches the view to it, so no key or click has to clear this.
-    view_detached_at: EnumMap<Pane, Option<usize>>,
     /// Rows an action just created (the new branch, the new `HEAD`) that the
     /// selection moves to once a refresh lists them, as lazygit does. Kept
     /// until found, so a refresh already in flight when the action ran, which
@@ -653,6 +634,7 @@ pub struct App {
 }
 
 pub mod help;
+pub mod hit_areas;
 mod modal;
 pub mod right_pane;
 pub mod theme_editor;
@@ -735,7 +717,6 @@ impl App {
             keymap,
             config_file: None,
             color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
-            settings_hits: settings::SettingsHits::default(),
             snapshot: git::Snapshot::default(),
             collapsed_dirs: HashSet::new(),
             branch_drill: None,
@@ -743,19 +724,13 @@ impl App {
             commit_drill: None,
             last_error: None,
             watch_error: None,
-            author_click_area: Rect::ZERO,
-            dashboard_click_area: Rect::ZERO,
+            hits: hit_areas::HitAreas::default(),
             palette,
-            keybar_area: Rect::ZERO,
-            keybar_hits: Vec::new(),
             mouse_pointer: MousePointer::default(),
             sheet_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
             sheet: sheet::Sheet::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
-            left_areas: EnumMap::default(),
-            list_offset: EnumMap::default(),
-            view_detached_at: EnumMap::default(),
             select_when_listed: Vec::new(),
             new_branch_title: String::new(),
             right_focused: false,
@@ -1425,12 +1400,12 @@ impl App {
 
     /// Store the configured Git author's clickable cells for mouse routing.
     pub fn set_author_click_area(&mut self, area: Rect) {
-        self.author_click_area = area;
+        self.hits.author = area;
     }
 
     /// Store the visible Dashboard trigger cells for mouse routing.
     pub fn set_dashboard_click_area(&mut self, area: Rect) {
-        self.dashboard_click_area = area;
+        self.hits.dashboard = area;
     }
 
     /// Tell the app what the terminal can show (`ColorDepth::detect`).
@@ -1451,14 +1426,14 @@ impl App {
     /// The keybar's rect and click targets, written by `ui::draw_keybar`
     /// each frame.
     pub fn set_keybar_hits(&mut self, area: Rect, hits: Vec<hints::KeybarHit>) {
-        self.keybar_area = area;
-        self.keybar_hits = hits;
+        self.hits.keybar = area;
+        self.hits.keybar_hits = hits;
     }
 
     /// A left pane's bordered rect, written by `ui::draw_left_column` each
     /// frame so a click can be routed to the pane it landed in.
     pub fn set_left_area(&mut self, pane: Pane, area: Rect) {
-        self.left_areas[pane] = area;
+        self.hits.left[pane] = area;
     }
 
     /// Whether the right pane was last clicked, for `ui::draw_right_pane`'s
@@ -1470,32 +1445,32 @@ impl App {
     /// A left pane's list scroll offset, read by `ui::draw_left_column`
     /// before it builds that pane's `ListState`.
     pub fn list_offset(&self, pane: Pane) -> usize {
-        self.list_offset[pane]
+        self.hits.list_offset[pane]
     }
 
     /// A left pane's list scroll offset, written by `ui::draw_left_column`
     /// after `render_stateful_widget` so a click in a scrolled list maps to
     /// the right row.
     pub fn set_list_offset(&mut self, pane: Pane, offset: usize) {
-        self.list_offset[pane] = offset;
+        self.hits.list_offset[pane] = offset;
     }
 
     /// Whether a wheel scroll left `pane`'s view away from its selection. Read
     /// by `ui::draw_left_column`; forgets a detachment the selection has left.
     pub fn view_detached(&mut self, pane: Pane) -> bool {
         let selected = self.selection[pane];
-        if self.view_detached_at[pane] != Some(selected) {
-            self.view_detached_at[pane] = None;
+        if self.hits.view_detached_at[pane] != Some(selected) {
+            self.hits.view_detached_at[pane] = None;
         }
-        self.view_detached_at[pane].is_some()
+        self.hits.view_detached_at[pane].is_some()
     }
 
     /// Scroll `pane`'s list by `rows` (negative is up) and keep its selection
     /// where it is, which may leave it off screen. `draw_left_column` clamps
     /// the offset to the list's length on the next frame.
     pub(super) fn scroll_list(&mut self, pane: Pane, rows: isize) {
-        self.view_detached_at[pane] = Some(self.selection[pane]);
-        self.list_offset[pane] = self.list_offset[pane].saturating_add_signed(rows);
+        self.hits.view_detached_at[pane] = Some(self.selection[pane]);
+        self.hits.list_offset[pane] = self.hits.list_offset[pane].saturating_add_signed(rows);
     }
 
     /// Feed one key to the handler. Integration-test seam; the running app

@@ -174,7 +174,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
         .border_style(Style::new().fg(accent))
         .render(frame, area)
     else {
-        app.settings_hits = SettingsHits::default();
+        app.hits.settings = SettingsHits::default();
         return;
     };
     let [content, foot] =
@@ -280,7 +280,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
                 .push((Rect::new(body.x, y, body.width, 1), row, Click::Row));
         }
     }
-    app.settings_hits = hits;
+    app.hits.settings = hits;
 
     frame.render_widget(
         Paragraph::new(lines).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),

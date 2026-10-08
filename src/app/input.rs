@@ -113,12 +113,11 @@ impl App {
         }
         if matches!(ev.kind, MouseEventKind::Moved) {
             let over_author = self.sheet_overlay.is_closed()
-                && self
-                    .author_click_area
-                    .contains(Position::new(ev.column, ev.row));
+                && self.hits.author.contains(Position::new(ev.column, ev.row));
             let over_dashboard = self.sheet_overlay.is_closed()
                 && self
-                    .dashboard_click_area
+                    .hits
+                    .dashboard
                     .contains(Position::new(ev.column, ev.row));
             self.mouse_pointer.request(over_author || over_dashboard);
             return;
@@ -156,9 +155,10 @@ impl App {
             return;
         }
 
-        if !self.modal.is_some() && self.keybar_area.contains(Position::new(ev.column, ev.row)) {
-            let column = ev.column - self.keybar_area.x;
+        if !self.modal.is_some() && self.hits.keybar.contains(Position::new(ev.column, ev.row)) {
+            let column = ev.column - self.hits.keybar.x;
             let clicked = self
+                .hits
                 .keybar_hits
                 .iter()
                 .find(|hit| (hit.start..hit.end).contains(&column))
@@ -170,17 +170,15 @@ impl App {
             return;
         }
 
-        if self
-            .author_click_area
-            .contains(Position::new(ev.column, ev.row))
-        {
+        if self.hits.author.contains(Position::new(ev.column, ev.row)) {
             self.mouse_pointer.request(false);
             self.open_sheet(Sheet::Settings);
             return;
         }
 
         if self
-            .dashboard_click_area
+            .hits
+            .dashboard
             .contains(Position::new(ev.column, ev.row))
         {
             self.mouse_pointer.request(false);
@@ -211,7 +209,7 @@ impl App {
         let point = Position::new(col, row);
         PANES
             .into_iter()
-            .find(|&pane| self.left_areas[pane].contains(point))
+            .find(|&pane| self.hits.left[pane].contains(point))
     }
 
     /// Focus `pane`, then move its cursor to `screen_row` if that row maps
@@ -229,9 +227,9 @@ impl App {
     /// Screen row -> model index for a left pane. `None` for the border /
     /// title row, or a click past the last entry.
     pub(super) fn click_row(&self, pane: Pane, screen_row: u16) -> Option<usize> {
-        let area = self.left_areas[pane];
+        let area = self.hits.left[pane];
         let inner_row = screen_row.checked_sub(area.y.saturating_add(1))?;
-        let idx = self.list_offset[pane].saturating_add(usize::from(inner_row));
+        let idx = self.hits.list_offset[pane].saturating_add(usize::from(inner_row));
         (idx < self.row_count(pane)).then_some(idx)
     }
 

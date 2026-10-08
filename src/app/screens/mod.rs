@@ -151,7 +151,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     draw_keybar(frame, keybar, app);
 
     if app.sheet_overlay.is_closed() {
-        app.settings_hits = crate::app::settings::SettingsHits::default();
+        app.hits.settings = crate::app::settings::SettingsHits::default();
     } else {
         match app.sheet {
             Sheet::Settings => settings::draw(frame, area, app, &palette),
