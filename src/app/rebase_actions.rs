@@ -20,11 +20,14 @@ impl App {
         {
             return None;
         }
-        if self.operation.is_some() {
+        if self.snapshot.operation.is_some() {
             self.report_notice("finish or abort the operation in progress first (m)");
             return None;
         }
-        self.commits.get(self.selected(Pane::Commits)).cloned()
+        self.snapshot
+            .commits
+            .get(self.selected(Pane::Commits))
+            .cloned()
     }
 
     /// `w` on Commits: reword the selected commit. `HEAD` keeps phase 7's
@@ -70,7 +73,7 @@ impl App {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
-        let below = self.commits.get(self.selected(Pane::Commits) + 1);
+        let below = self.snapshot.commits.get(self.selected(Pane::Commits) + 1);
         if fixup {
             self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Fixup);
         } else if let Some(below) = below {
@@ -135,7 +138,7 @@ impl App {
             return;
         };
         let selected = self.selected(Pane::Commits);
-        if !has_foldable_fixup(&self.commits, selected) {
+        if !has_foldable_fixup(&self.snapshot.commits, selected) {
             self.report_notice("no fixup! or squash! commit above this one to fold");
             return;
         }

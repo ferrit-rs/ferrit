@@ -191,14 +191,14 @@ impl App {
                 let rows = self.files_tree_rows();
                 match rows.get(self.selected(Pane::Files))? {
                     FileRow::File { index, .. } => Some(RightKey::File {
-                        path: self.files.get(*index)?.path.clone(),
+                        path: self.snapshot.files.get(*index)?.path.clone(),
                     }),
                     // A directory row shows the diff of everything under it (`git diff --
                     // <dir>`), as lazygit does; the root row, an empty path, is every file.
                     FileRow::Dir { path, .. } => Some(RightKey::File { path: path.clone() }),
                 }
             },
-            // Drilled: the selection indexes the file tree, not `self.commits`
+            // Drilled: the selection indexes the file tree, not `self.snapshot.commits`
             // (`commit_tree_rows`), so the diff stays keyed on the drilled
             // commit's own hash regardless of which file row is highlighted.
             Pane::Commits => {
@@ -207,7 +207,7 @@ impl App {
                         full_hash: drill.hash.clone(),
                     })
                 } else {
-                    let entry = self.commits.get(self.selected(Pane::Commits))?;
+                    let entry = self.snapshot.commits.get(self.selected(Pane::Commits))?;
                     Some(RightKey::Commit {
                         full_hash: entry.full_hash.clone(),
                     })
@@ -223,14 +223,14 @@ impl App {
                         full_hash: entry.full_hash.clone(),
                     })
                 } else {
-                    let entry = self.branches.get(self.selected(Pane::Branches))?;
+                    let entry = self.snapshot.branches.get(self.selected(Pane::Branches))?;
                     Some(RightKey::BranchLog {
                         branch: entry.name.clone(),
                     })
                 }
             },
             Pane::Stash => {
-                let entry = self.stashes.get(self.selected(Pane::Stash))?;
+                let entry = self.snapshot.stashes.get(self.selected(Pane::Stash))?;
                 Some(RightKey::Stash {
                     oid: entry.oid.clone(),
                     header: format!("stash@{{{}}}: {}", entry.index, entry.message),
@@ -265,6 +265,7 @@ impl App {
             (RightKey::Commit { full_hash }, DiffQueryResult::Commit(diff)) => {
                 let drill_commits = self.branch_drill.iter().flat_map(|d| d.commits.iter());
                 match self
+                    .snapshot
                     .commits
                     .iter()
                     .chain(drill_commits)
@@ -281,7 +282,7 @@ impl App {
                 })
             },
             (RightKey::Stash { oid, .. }, DiffQueryResult::Stash(diff)) => {
-                match self.stashes.iter().find(|entry| &entry.oid == oid) {
+                match self.snapshot.stashes.iter().find(|entry| &entry.oid == oid) {
                     Some(entry) => DiffView::Stash(entry.clone(), diff),
                     None => DiffView::Note("stash entry no longer exists".into()),
                 }

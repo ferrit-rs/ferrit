@@ -160,12 +160,16 @@ impl App {
     /// and counts, the stash count. When it moves, the cache is dropped.
     fn refs_fingerprint(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
-        self.header.branch.hash(&mut hasher);
-        self.commits.first().map(|c| &c.full_hash).hash(&mut hasher);
-        for branch in &self.branches {
+        self.snapshot.header.branch.hash(&mut hasher);
+        self.snapshot
+            .commits
+            .first()
+            .map(|c| &c.full_hash)
+            .hash(&mut hasher);
+        for branch in &self.snapshot.branches {
             (&branch.name, branch.tip_time, branch.ahead, branch.behind).hash(&mut hasher);
         }
-        self.stashes.len().hash(&mut hasher);
+        self.snapshot.stashes.len().hash(&mut hasher);
         hasher.finish()
     }
 

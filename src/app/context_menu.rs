@@ -90,7 +90,7 @@ impl App {
             Pane::Branches
                 if self.branch_drill.is_none() && self.branches_tab == BranchesTab::Local =>
             {
-                match self.branches.get(index) {
+                match self.snapshot.branches.get(index) {
                     Some(branch) => (
                         branch.name.clone(),
                         vec![
@@ -101,16 +101,18 @@ impl App {
                     None => (String::new(), Vec::new()),
                 }
             },
-            Pane::Commits if self.commit_drill.is_none() => match self.commits.get(index) {
-                Some(commit) => (
-                    commit.short_hash.clone(),
-                    vec![item(
-                        "New branch from this commit",
-                        'b',
-                        MenuAction::BranchFromCommit,
-                    )],
-                ),
-                None => (String::new(), Vec::new()),
+            Pane::Commits if self.commit_drill.is_none() => {
+                match self.snapshot.commits.get(index) {
+                    Some(commit) => (
+                        commit.short_hash.clone(),
+                        vec![item(
+                            "New branch from this commit",
+                            'b',
+                            MenuAction::BranchFromCommit,
+                        )],
+                    ),
+                    None => (String::new(), Vec::new()),
+                }
             },
             Pane::Stash => {
                 let mut items = vec![item(
@@ -118,7 +120,7 @@ impl App {
                     'i',
                     MenuAction::StashKeepIndex,
                 )];
-                if self.stashes.get(index).is_some() {
+                if self.snapshot.stashes.get(index).is_some() {
                     items.push(item("Rename stash", 'r', MenuAction::RenameStash));
                 }
                 ("Stash".to_owned(), items)
@@ -126,7 +128,7 @@ impl App {
             _ => (String::new(), Vec::new()),
         };
         // A repository with no remote can be published: optional, any time.
-        let publishable = self.remotes.is_empty()
+        let publishable = self.snapshot.remotes.is_empty()
             && (self.focus == Pane::Status
                 || (self.focus == Pane::Branches && self.branch_drill.is_none()));
         if publishable {
@@ -158,7 +160,7 @@ impl App {
         let index = self.selected(self.focus);
         match action {
             MenuAction::RenameBranch => {
-                let Some(branch) = self.branches.get(index) else {
+                let Some(branch) = self.snapshot.branches.get(index) else {
                     return;
                 };
                 let from = branch.name.clone();
@@ -174,7 +176,7 @@ impl App {
             MenuAction::SquashStaged => self.merge_selected_branch_with(MergeKind::Squash),
             MenuAction::SquashCommit => self.merge_selected_branch_with(MergeKind::SquashCommit),
             MenuAction::BranchFromCommit => {
-                let Some(commit) = self.commits.get(index) else {
+                let Some(commit) = self.snapshot.commits.get(index) else {
                     return;
                 };
                 let hash = commit.full_hash.clone();
@@ -182,7 +184,7 @@ impl App {
                 self.open_name(NameKind::BranchAt { hash }, title, TextInput::default());
             },
             MenuAction::StashKeepIndex => {
-                if self.files.is_empty() {
+                if self.snapshot.files.is_empty() {
                     self.report_error(git::error::GitError::NothingToStash);
                     return;
                 }
@@ -193,7 +195,7 @@ impl App {
                 );
             },
             MenuAction::RenameStash => {
-                let Some(entry) = self.stashes.get(index) else {
+                let Some(entry) = self.snapshot.stashes.get(index) else {
                     return;
                 };
                 let oid = entry.oid.clone();

@@ -35,7 +35,7 @@ impl App {
             return false;
         };
         let return_index = self.selected(Pane::Commits);
-        let Some(entry) = self.commits.get(return_index) else {
+        let Some(entry) = self.snapshot.commits.get(return_index) else {
             return false;
         };
         let hash = entry.full_hash.clone();

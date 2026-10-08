@@ -21,7 +21,7 @@ impl App {
     }
 
     /// `P`: push. Unlike `f`/`p`, push needs to know *before* running
-    /// whether the current branch has an upstream at all (`self.header
+    /// whether the current branch has an upstream at all (`self.snapshot.header
     /// .upstream`, already read by phase 2 for the ahead/behind count) —
     /// `Repo::push`'s own `NoUpstream` detection exists as a defensive
     /// fallback, not the primary path, because ferrit already knows the
@@ -31,20 +31,20 @@ impl App {
         if self.popup.is_some() {
             return;
         }
-        if self.header.upstream.is_some() {
-            if self.header.behind > 0 {
+        if self.snapshot.header.upstream.is_some() {
+            if self.snapshot.header.behind > 0 {
                 // Ahead and behind at once is what rewriting pushed commits
                 // leaves (`docs/PLAN_11_REBASE.md`): say so, not just "behind".
-                let message = if self.header.ahead > 0 {
+                let message = if self.snapshot.header.ahead > 0 {
                     format!(
                         "Branch has diverged from upstream (ahead {}, behind {}), as after \
                          rewriting pushed commits. Push with --force-with-lease?",
-                        self.header.ahead, self.header.behind
+                        self.snapshot.header.ahead, self.snapshot.header.behind
                     )
                 } else {
                     format!(
                         "Branch is behind upstream by {} commit(s). Push with --force-with-lease?",
-                        self.header.behind
+                        self.snapshot.header.behind
                     )
                 };
                 self.pending_confirm = Some(ConfirmPrompt {
@@ -84,7 +84,7 @@ impl App {
             .map_or("origin", |remote| remote.name.as_str());
         self.popup = Some(Popup::Upstream(TextInput::from_text(&format!(
             "{remote} {}",
-            self.header.branch
+            self.snapshot.header.branch
         ))));
     }
 

@@ -159,6 +159,7 @@ impl App {
         match &kind {
             git::commit::CommitKind::Normal
                 if !self
+                    .snapshot
                     .files
                     .iter()
                     .any(|f| f.staged != git::model::Change::None) =>
@@ -168,7 +169,7 @@ impl App {
                 return;
             },
             git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
-                if self.commits.is_empty() =>
+                if self.snapshot.commits.is_empty() =>
             {
                 self.report_error(AppError::NoCommitToAmend);
                 return;
@@ -270,7 +271,7 @@ impl App {
             match key.code {
                 KeyCode::Up => {
                     let idx = draft.history_index.map_or(0, |i| i.saturating_add(1));
-                    if let Some(entry) = self.commits.get(idx) {
+                    if let Some(entry) = self.snapshot.commits.get(idx) {
                         if draft.history_index.is_none() {
                             draft.saved_summary = draft.summary.text();
                         }
@@ -284,7 +285,7 @@ impl App {
                         if idx == 0 {
                             draft.history_index = None;
                             draft.summary = TextInput::from_text(&draft.saved_summary);
-                        } else if let Some(entry) = self.commits.get(idx - 1) {
+                        } else if let Some(entry) = self.snapshot.commits.get(idx - 1) {
                             draft.history_index = Some(idx - 1);
                             draft.summary = TextInput::from_text(&entry.summary);
                         }

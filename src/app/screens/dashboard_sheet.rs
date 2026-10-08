@@ -32,7 +32,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let view = dashboard::View {
         stats: app.dashboard().stats(),
         repo: &app.repo_name,
-        branch: &app.header.branch,
+        branch: &app.snapshot.header.branch,
         colors: ChartPalette {
             density: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
             ..ChartPalette::for_palette(&app.palette())

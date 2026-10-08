@@ -561,31 +561,24 @@ pub struct App {
     config: config::Config,
     keymap: keymap::Keymap,
     settings_hits: settings::SettingsHits,
-    header: git::model::StatusHeader,
-    files: Vec<git::model::FileEntry>,
+    /// What the last refresh read: header, files, branches, remotes, commits,
+    /// stashes and any operation stopped mid-way.
+    snapshot: git::Snapshot,
     /// Directories collapsed in the Files pane's tree view (`FileRow`,
     /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
     /// default; paths persist across `refresh()`, only `Enter` on a
     /// directory row changes this.
     collapsed_dirs: HashSet<PathBuf>,
-    branches: Vec<git::model::BranchEntry>,
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
     branch_drill: Option<BranchDrill>,
-    /// Configured remotes, feeding the Branches pane's Remotes tab.
-    /// `docs/PLAN_9_REMOTE.md`.
-    remotes: Vec<git::model::RemoteEntry>,
     /// Which of the Branches pane's own two tabs is showing.
     /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
     branches_tab: BranchesTab,
-    commits: Vec<git::model::CommitEntry>,
     /// `Some` while the Commits pane is drilled into one commit's own
     /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
     /// shows the commit list.
     commit_drill: Option<CommitDrill>,
-    stashes: Vec<git::model::StashEntry>,
-    /// A merge, rebase, cherry-pick or revert stopped mid-way (`Snapshot`).
-    operation: Option<git::model::Operation>,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
     last_error: Option<Arc<AppError>>,
     /// Optional worktree watcher failure; polling remains active as fallback.
@@ -805,17 +798,11 @@ impl App {
             config_file: None,
             color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
             settings_hits: settings::SettingsHits::default(),
-            header: git::model::StatusHeader::default(),
-            files: Vec::new(),
+            snapshot: git::Snapshot::default(),
             collapsed_dirs: HashSet::new(),
-            branches: Vec::new(),
             branch_drill: None,
-            remotes: Vec::new(),
             branches_tab: BranchesTab::default(),
-            commits: Vec::new(),
             commit_drill: None,
-            stashes: Vec::new(),
-            operation: None,
             last_error: None,
             watch_error: None,
             picker: Picker::halfblocks(),
@@ -984,12 +971,12 @@ impl App {
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
         let mut app = Self::base(None, config::Config::default());
-        app.header = mock::mock_header();
-        app.files = mock::mock_files();
-        app.branches = mock::mock_branches();
-        app.remotes = mock::mock_remotes();
-        app.commits = mock::mock_commits();
-        app.stashes = mock::mock_stashes();
+        app.snapshot.header = mock::mock_header();
+        app.snapshot.files = mock::mock_files();
+        app.snapshot.branches = mock::mock_branches();
+        app.snapshot.remotes = mock::mock_remotes();
+        app.snapshot.commits = mock::mock_commits();
+        app.snapshot.stashes = mock::mock_stashes();
         app.update_right_pane();
         app
     }
@@ -1139,13 +1126,7 @@ impl App {
             PANES.map(|pane| (pane, self.selection[pane], self.selection_key(pane)));
         match completion.snapshot {
             Ok(snap) => {
-                self.header = snap.header;
-                self.files = snap.files;
-                self.branches = snap.branches;
-                self.remotes = snap.remotes;
-                self.commits = snap.commits;
-                self.stashes = snap.stashes;
-                self.operation = snap.operation;
+                self.snapshot = snap;
                 self.last_error = None;
                 self.refresh_failure = None;
             },
@@ -1337,10 +1318,10 @@ impl App {
     /// Files pane rows, lazygit-style directory tree: single-child directory
     /// chains folded, a root ("/") first only when it has two or more
     /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
-    /// `self.files` and `self.collapsed_dirs` on every call; cheap at
+    /// `self.snapshot.files` and `self.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.files, &self.collapsed_dirs)
+        tree_rows(&self.snapshot.files, &self.collapsed_dirs)
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
@@ -1732,12 +1713,12 @@ impl App {
             Pane::Branches => self
                 .branch_drill
                 .as_ref()
-                .map_or(self.branches.len(), |drill| drill.commits.len()),
+                .map_or(self.snapshot.branches.len(), |drill| drill.commits.len()),
             Pane::Commits => match &self.commit_drill {
                 Some(_) => self.commit_tree_rows().len(),
-                None => self.commits.len(),
+                None => self.snapshot.commits.len(),
             },
-            Pane::Stash => self.stashes.len(),
+            Pane::Stash => self.snapshot.stashes.len(),
         }
     }
 
@@ -1746,13 +1727,14 @@ impl App {
             Pane::Status => None,
             Pane::Files => selection_key_for_file_rows(
                 &self.files_tree_rows(),
-                &self.files,
+                &self.snapshot.files,
                 self.selected(pane),
             ),
             Pane::Branches if self.branches_tab == BranchesTab::Remotes => None,
             Pane::Branches => self.branch_drill.as_ref().map_or_else(
                 || {
-                    self.branches
+                    self.snapshot
+                        .branches
                         .get(self.selected(pane))
                         .map(|entry| SelectionKey::Branch(entry.name.clone()))
                 },
@@ -1765,7 +1747,8 @@ impl App {
             ),
             Pane::Commits => self.commit_drill.as_ref().map_or_else(
                 || {
-                    self.commits
+                    self.snapshot
+                        .commits
                         .get(self.selected(pane))
                         .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
                 },
@@ -1778,6 +1761,7 @@ impl App {
                 },
             ),
             Pane::Stash => self
+                .snapshot
                 .stashes
                 .get(self.selected(pane))
                 .map(|entry| SelectionKey::Stash(entry.oid.clone())),
@@ -1787,11 +1771,13 @@ impl App {
     fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
         match (pane, key) {
             (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                find_file_row_key(&self.files_tree_rows(), &self.files, key)
+                find_file_row_key(&self.files_tree_rows(), &self.snapshot.files, key)
             },
-            (Pane::Branches, SelectionKey::Branch(name)) if self.branch_drill.is_none() => {
-                self.branches.iter().position(|entry| entry.name == *name)
-            },
+            (Pane::Branches, SelectionKey::Branch(name)) if self.branch_drill.is_none() => self
+                .snapshot
+                .branches
+                .iter()
+                .position(|entry| entry.name == *name),
             (Pane::Branches, SelectionKey::Commit(hash)) => self
                 .branch_drill
                 .as_ref()?
@@ -1799,6 +1785,7 @@ impl App {
                 .iter()
                 .position(|entry| entry.full_hash == *hash),
             (Pane::Commits, SelectionKey::Commit(hash)) if self.commit_drill.is_none() => self
+                .snapshot
                 .commits
                 .iter()
                 .position(|entry| entry.full_hash == *hash),
@@ -1806,9 +1793,11 @@ impl App {
                 let drill = self.commit_drill.as_ref()?;
                 find_file_row_key(&self.commit_tree_rows(), &drill.files, key)
             },
-            (Pane::Stash, SelectionKey::Stash(oid)) => {
-                self.stashes.iter().position(|entry| entry.oid == *oid)
-            },
+            (Pane::Stash, SelectionKey::Stash(oid)) => self
+                .snapshot
+                .stashes
+                .iter()
+                .position(|entry| entry.oid == *oid),
             _ => None,
         }
     }
@@ -1826,7 +1815,7 @@ impl App {
         let mut out = if let Some(err) = &self.last_error {
             vec![theme::error_line(&self.palette, &format!("error: {err}"))]
         } else {
-            let h = &self.header;
+            let h = &self.snapshot.header;
             let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
             if h.ahead > 0 {
                 let _ = write!(line, " \u{2191}{}", h.ahead);
@@ -1846,7 +1835,7 @@ impl App {
             }
             lines
         };
-        if let Some(operation) = self.operation {
+        if let Some(operation) = self.snapshot.operation {
             // Right under the first line, error or header, so it is the
             // first thing read while git waits on the user.
             out.insert(
@@ -1890,19 +1879,21 @@ impl App {
                 .collect();
         }
         if self.branches_tab == BranchesTab::Remotes {
-            if self.remotes.is_empty() {
+            if self.snapshot.remotes.is_empty() {
                 return vec![Line::raw("no remotes configured")];
             }
             return self
+                .snapshot
                 .remotes
                 .iter()
                 .map(|entry| theme::remote_line(&self.palette, entry))
                 .collect();
         }
-        if self.branches.is_empty() {
+        if self.snapshot.branches.is_empty() {
             return vec![Line::raw("no local branches")];
         }
-        self.branches
+        self.snapshot
+            .branches
             .iter()
             .map(|branch| {
                 let operation = branch
@@ -1976,10 +1967,11 @@ impl App {
                 })
                 .collect();
         }
-        if self.commits.is_empty() {
+        if self.snapshot.commits.is_empty() {
             return vec![Line::raw("no commits yet")];
         }
-        self.commits
+        self.snapshot
+            .commits
             .iter()
             .map(|entry| theme::commit_line(&self.palette, entry))
             .collect()
@@ -1997,10 +1989,11 @@ impl App {
 
     /// Stash pane rows, or the empty-state line.
     pub fn stash_lines(&self) -> Vec<Line<'static>> {
-        if self.stashes.is_empty() {
+        if self.snapshot.stashes.is_empty() {
             return vec![Line::raw("(no stash entries)")];
         }
-        self.stashes
+        self.snapshot
+            .stashes
             .iter()
             .map(|entry| theme::stash_line(&self.palette, entry))
             .collect()
@@ -2009,10 +2002,11 @@ impl App {
     /// Porcelain-style `XY path` text for one Files tree row, or an empty
     /// string for a directory row. Debug/probe helper; keyed by the same
     /// row index `file_lines`/`row_count` use, not a flat index into
-    /// `self.files`.
+    /// `self.snapshot.files`.
     pub fn file_display(&self, i: usize) -> String {
         match self.files_tree_rows().get(i) {
             Some(&FileRow::File { index, .. }) => self
+                .snapshot
                 .files
                 .get(index)
                 .map(git::model::FileEntry::display)
@@ -2025,7 +2019,7 @@ impl App {
     /// or lazygit's directory tree once any changed file sits below the
     /// repo root (`files_tree_rows`).
     pub fn file_lines(&self) -> Vec<Line<'static>> {
-        if self.files.is_empty() {
+        if self.snapshot.files.is_empty() {
             return vec![Line::raw("working tree clean")];
         }
         self.files_tree_rows()
@@ -2041,9 +2035,10 @@ impl App {
                     name,
                     *depth,
                     *expanded,
-                    dir_stage_state(&self.files, path),
+                    dir_stage_state(&self.snapshot.files, path),
                 )),
                 FileRow::File { index, depth } => self
+                    .snapshot
                     .files
                     .get(*index)
                     .map(|entry| theme::file_line(&self.palette, entry, *depth)),

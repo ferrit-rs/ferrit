@@ -81,7 +81,7 @@ impl App {
     /// `m`: the menu for the merge, rebase, cherry-pick or revert git is
     /// stopped in. Inert when there is none.
     pub(super) fn open_operation_menu(&mut self) {
-        let Some(operation) = self.operation else {
+        let Some(operation) = self.snapshot.operation else {
             return;
         };
         if self.popup.is_some() || self.pending_confirm.is_some() {
@@ -146,7 +146,7 @@ impl App {
             | MenuAction::TakeTheirs => self.run_context_action(action),
             // Throws away the resolution work so far: ask first.
             MenuAction::Abort => {
-                let noun = self.operation.map_or("operation", operation_noun);
+                let noun = self.snapshot.operation.map_or("operation", operation_noun);
                 self.pending_confirm = Some(ConfirmPrompt {
                     message: format!("abort the {noun}? Work done in it so far is lost."),
                     action: ConfirmAction::AbortOperation,

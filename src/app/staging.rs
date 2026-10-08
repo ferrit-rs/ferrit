@@ -16,7 +16,7 @@ impl App {
         let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
             return None;
         };
-        self.files.get(*index)
+        self.snapshot.files.get(*index)
     }
 
     /// The `Diff` the cursor currently lives in (`Mode::Diff`'s active
@@ -280,6 +280,7 @@ impl App {
     /// path) is every file. Conflicted files that still hold markers block it.
     fn stage_directory(&mut self, directory: &Path) {
         let under: Vec<&git::model::FileEntry> = self
+            .snapshot
             .files
             .iter()
             .filter(|f| directory.as_os_str().is_empty() || f.path.starts_with(directory))
@@ -327,7 +328,8 @@ impl App {
 
     /// Conflicted paths that still hold markers, in Files order.
     fn unresolved_conflicts(&self) -> Vec<PathBuf> {
-        self.files
+        self.snapshot
+            .files
             .iter()
             .filter(|f| {
                 f.staged == git::model::Change::Conflicted
@@ -361,12 +363,14 @@ impl App {
             return;
         }
         let dir = if self
+            .snapshot
             .files
             .iter()
             .any(|f| f.worktree != git::model::Change::None)
         {
             ApplyDir::Forward
         } else if self
+            .snapshot
             .files
             .iter()
             .any(|f| f.staged != git::model::Change::None)
@@ -452,6 +456,7 @@ impl App {
         match prompt.action {
             ConfirmAction::DiscardFile(path) => {
                 let untracked = self
+                    .snapshot
                     .files
                     .iter()
                     .find(|f| f.path == path)

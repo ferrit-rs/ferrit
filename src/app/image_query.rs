@@ -77,7 +77,7 @@ impl App {
             self.preview = Preview::None;
             return;
         };
-        let Some(entry) = self.files.get(*index) else {
+        let Some(entry) = self.snapshot.files.get(*index) else {
             self.invalidate_image_query();
             self.preview = Preview::None;
             return;

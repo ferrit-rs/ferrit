@@ -15,7 +15,7 @@ impl App {
         if self.focus != Pane::Stash || self.mode != Mode::Nav || self.popup.is_some() {
             return None;
         }
-        self.stashes.get(self.selected(Pane::Stash))
+        self.snapshot.stashes.get(self.selected(Pane::Stash))
     }
 
     /// `s` (Nav, Files focused): open the stash message popup. A clean tree
@@ -24,7 +24,7 @@ impl App {
         if self.focus != Pane::Files || self.mode != Mode::Nav || self.popup.is_some() {
             return;
         }
-        if self.files.is_empty() {
+        if self.snapshot.files.is_empty() {
             self.report_error(git::error::GitError::NothingToStash);
             return;
         }

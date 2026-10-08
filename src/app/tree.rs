@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::domain::git;
 
 /// One visible row of the Files pane's directory tree (lazygit style).
-/// `App::files_tree_rows` builds these fresh from `self.files` and
+/// `App::files_tree_rows` builds these fresh from `self.snapshot.files` and
 /// `self.collapsed_dirs` on every call — cheap at working-tree sizes, same
 /// "no cache" choice `branch_lines`/`commit_lines` already make.
 pub(super) enum FileRow {

@@ -1,7 +1,19 @@
 # Plan: phase 22, break up `App`
 
-**Status: planned.** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (C1 `HelpState`, C2 `ThemeEditor`, C3 snapshot done).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
+
+What differs from the sketch below, and why:
+
+- **No `RepoSnapshot` type.** `git::Snapshot` already has the seven fields (header, files,
+  branches, remotes, commits, stashes, operation), so `App.snapshot: git::Snapshot` replaces
+  them, and a refresh is `self.snapshot = snap`. The two drill-downs and `collapsed_dirs`
+  are navigation state, not repository data; they stay on `App` for a later `Drill` step.
+- **No `RgbChannel` / `PaletteIndex` newtypes yet.** `ThemeEditor` keeps `usize` and hides
+  the arithmetic in `next_rgb_channel` and `move_palette`; a newtype would add noise now.
+- `HelpState` exposes `view_parts()` so drawing can borrow the overlay mutably and the query
+  immutably at once.
+- Count: `App` went from about 100 fields to 65.
 
 ## Goal
 

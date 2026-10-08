@@ -287,7 +287,7 @@ impl App {
         if self.popup.is_some() || self.pending_confirm.is_some() || self.repo.is_none() {
             return;
         }
-        if !self.remotes.is_empty() {
+        if !self.snapshot.remotes.is_empty() {
             self.popup = Some(Popup::Note(
                 "this repository already has a remote".to_owned(),
             ));
@@ -400,7 +400,7 @@ impl App {
                     });
                 lines.push(format!(
                     "then: add remote `origin`{over}, push {}",
-                    self.header.branch
+                    self.snapshot.header.branch
                 ));
                 CreateRemoteView::Confirm(ConfirmView {
                     title: format!("Create {}", draft.target),
@@ -592,11 +592,11 @@ impl App {
             }
             created = format!("{created} origin is {remote}.");
         }
-        if self.header.detached {
+        if self.snapshot.header.detached {
             self.status_note = Some(format!("{created} HEAD is detached: nothing to push."));
         } else {
             // The push's own progress takes the status line from here.
-            let branch = self.header.branch.clone();
+            let branch = self.snapshot.header.branch.clone();
             self.push_with_upstream("origin".to_owned(), branch);
             // Only a push that really started is the one to explain if it fails.
             self.create_remote.pushing_after = self.remote_busy.is_some();

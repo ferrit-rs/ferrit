@@ -42,7 +42,7 @@ impl App {
         }
         let Some(repo) = &self.repo else { return };
         let return_index = self.selected(Pane::Branches);
-        let Some(branch) = self.branches.get(return_index) else {
+        let Some(branch) = self.snapshot.branches.get(return_index) else {
             return;
         };
         let name = branch.name.clone();
@@ -80,7 +80,7 @@ impl App {
         {
             return;
         }
-        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
         let name = entry.name.clone();
@@ -92,7 +92,7 @@ impl App {
     /// The branch `n` starts from: the selected one (lazygit), or `None` when
     /// the list has no row (a detached `HEAD`), which falls back to `HEAD`.
     fn new_branch_base(&self) -> Option<String> {
-        let entry = self.branches.get(self.selected(Pane::Branches))?;
+        let entry = self.snapshot.branches.get(self.selected(Pane::Branches))?;
         Some(entry.name.clone())
     }
 
@@ -110,7 +110,7 @@ impl App {
             "New branch name (branch is off of '{}')",
             self.new_branch_base()
                 .as_deref()
-                .unwrap_or(&self.header.branch)
+                .unwrap_or(&self.snapshot.header.branch)
         );
         self.popup = Some(Popup::NewBranch(TextInput::default()));
     }
@@ -158,7 +158,7 @@ impl App {
         {
             return;
         }
-        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
         let name = entry.name.clone();
@@ -186,7 +186,7 @@ impl App {
         {
             return;
         }
-        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
         let name = entry.name.clone();
@@ -198,7 +198,8 @@ impl App {
     /// Every changed path currently reported as conflicted (staged or
     /// worktree side), for the merge-conflict note's message.
     pub(super) fn conflicted_paths(&self) -> Vec<String> {
-        self.files
+        self.snapshot
+            .files
             .iter()
             .filter(|f| {
                 f.staged == git::model::Change::Conflicted
@@ -221,7 +222,7 @@ impl App {
         {
             return;
         }
-        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
         if entry.is_head {
@@ -277,7 +278,7 @@ impl App {
         {
             return;
         }
-        let Some(entry) = self.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
             return;
         };
         let name = entry.name.clone();

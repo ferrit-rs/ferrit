@@ -831,7 +831,7 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Bar::GitConfig
     } else if app.full_screen() == FullScreen::Welcome {
         Bar::Welcome
-    } else if app.operation.is_some() {
+    } else if app.snapshot.operation.is_some() {
         Bar::Operation
     } else if app.right_focused() {
         Bar::RightPane
