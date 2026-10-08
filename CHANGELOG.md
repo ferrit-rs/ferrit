@@ -7,19 +7,31 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Added
+
+- Architecture overview, four decision records and a documentation index under `docs/`.
+
 ## [0.10.0] - 2026-10-06
+
+### Added
+
+- The Infos bar now shows an explicit `📊 Dashboard` trigger on its bottom row;
+  clicking it opens the dashboard sheet while the existing user click keeps
+  opening settings.
+
+### Changed
 
 - The `?` help now uses a centered `tui_overlay` with a dimmed backdrop and a
   content-sized height, scrolls reliably above the keybar, and searches command
   keys and descriptions with `/` in a separate, visibly focused search panel.
   Indexed diff colours expand on truecolor frames.
-- The Infos bar now shows an explicit `📊 Dashboard` trigger on its bottom row;
-  clicking it opens the dashboard sheet while the existing user click keeps
-  opening settings.
-- The Infos panel keeps command-log rows visible above the bottom Dashboard
-  trigger.
 - The crate package excludes demo-only video and GIF assets, keeping the
   published archive small without changing the application.
+
+### Fixed
+
+- The Infos panel keeps command-log rows visible above the bottom Dashboard
+  trigger.
 
 ## [0.9.0] - 2026-10-04
 
