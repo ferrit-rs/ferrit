@@ -74,7 +74,7 @@ impl App {
     /// the first restored file selected, like lazygit; a conflict or an error
     /// leaves the focus on Stash.
     pub(super) fn restore_stash(&mut self, oid: &str, pop: bool) {
-        let first_file = match &self.diff {
+        let first_file = match &self.right.diff {
             DiffView::Stash(entry, diff) if entry.oid == oid => diff
                 .files
                 .first()

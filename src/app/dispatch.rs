@@ -39,9 +39,9 @@ impl App {
     }
 
     fn run_scroll(&mut self, action: Action) {
-        let half = isize::try_from((self.right_viewport / 2).max(1)).unwrap_or(isize::MAX);
+        let half = isize::try_from((self.right.viewport / 2).max(1)).unwrap_or(isize::MAX);
         let page =
-            isize::try_from(self.right_viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
+            isize::try_from(self.right.viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
         match action {
             Action::ScrollHalfDown => self.scroll_right(half),
             Action::ScrollHalfUp => self.scroll_right(-half),

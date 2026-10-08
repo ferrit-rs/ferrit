@@ -202,7 +202,7 @@ impl App {
                 self.toggle_files_dir();
             }
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
-        } else if self.right_area.contains(Position::new(ev.column, ev.row)) {
+        } else if self.right.area.contains(Position::new(ev.column, ev.row)) {
             self.right_focused = true;
         }
         // else: command log / keybar / gap. no-op.
@@ -241,7 +241,7 @@ impl App {
     /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
     /// over the main view"); over a left pane it scrolls that pane's list.
     pub(super) fn wheel(&mut self, ev: MouseEvent, step: isize) {
-        let a = self.right_area;
+        let a = self.right.area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
         if over_right && self.right_is_diff() {
             self.scroll_right(step * isize::from(self.config.ui.wheel_step));

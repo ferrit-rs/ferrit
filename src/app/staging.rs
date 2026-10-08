@@ -22,10 +22,10 @@ impl App {
     /// The `Diff` the cursor currently lives in (`Mode::Diff`'s active
     /// side), or `None` off the Files pane / without a real Files split.
     pub(super) fn cursor_diff(&self) -> Option<&git::diff::Diff> {
-        let DiffView::Files(files) = &self.diff else {
+        let DiffView::Files(files) = &self.right.diff else {
             return None;
         };
-        Some(match self.cursor.side {
+        Some(match self.right.cursor.side {
             DiffSide::Worktree => &files.unstaged,
             DiffSide::Staged => &files.staged,
         })
@@ -35,11 +35,11 @@ impl App {
     /// screen, the same "a jump always lands visibly" rule phase 3's `]` /
     /// `[` already follows.
     pub(super) fn ensure_cursor_visible(&mut self) {
-        let viewport = self.right_viewport.max(1);
-        if self.cursor.line < self.right_scroll {
-            self.right_scroll = self.cursor.line;
-        } else if self.cursor.line >= self.right_scroll + viewport {
-            self.right_scroll = self.cursor.line + 1 - viewport;
+        let viewport = self.right.viewport.max(1);
+        if self.right.cursor.line < self.right.scroll {
+            self.right.scroll = self.right.cursor.line;
+        } else if self.right.cursor.line >= self.right.scroll + viewport {
+            self.right.scroll = self.right.cursor.line + 1 - viewport;
         }
         self.clamp_right_scroll();
     }
@@ -56,7 +56,7 @@ impl App {
         let Some(entry) = self.selected_file() else {
             return;
         };
-        let DiffView::Files(files) = &self.diff else {
+        let DiffView::Files(files) = &self.right.diff else {
             return;
         };
         // Same direction rule as the file-level toggle: worktree changes
@@ -80,7 +80,7 @@ impl App {
         };
 
         self.mode = Mode::Diff;
-        self.cursor = DiffCursor {
+        self.right.cursor = DiffCursor {
             side,
             line,
             anchor: None,
@@ -102,7 +102,7 @@ impl App {
             return;
         };
         let lines = selectable_lines(diff);
-        let Some(pos) = lines.iter().position(|&l| l == self.cursor.line) else {
+        let Some(pos) = lines.iter().position(|&l| l == self.right.cursor.line) else {
             return;
         };
         let next = if dir > 0 {
@@ -118,19 +118,19 @@ impl App {
         // every key, not just a stage) reads the stale id, decides the old
         // hunk "lost" this line, and snaps the cursor straight back to it.
         let hunk_id = hunk_id_at(diff, line);
-        self.cursor.line = line;
+        self.right.cursor.line = line;
         if let Some(id) = hunk_id {
-            self.cursor.hunk_id = id;
+            self.right.cursor.hunk_id = id;
         }
         self.ensure_cursor_visible();
     }
 
     /// `V` in `Mode::Diff`: start or clear a line V-selection.
     pub(super) fn toggle_diff_anchor(&mut self) {
-        self.cursor.anchor = if self.cursor.anchor.is_some() {
+        self.right.cursor.anchor = if self.right.cursor.anchor.is_some() {
             None
         } else {
-            Some(self.cursor.line)
+            Some(self.right.cursor.line)
         };
     }
 
@@ -146,7 +146,7 @@ impl App {
             .iter()
             .filter_map(|hl| hl.selectable.first().copied())
             .collect();
-        let cur = self.cursor.line;
+        let cur = self.right.cursor.line;
         let target = if dir > 0 {
             starts.iter().find(|&&l| l > cur).copied()
         } else {
@@ -154,9 +154,9 @@ impl App {
         };
         if let Some(line) = target {
             let hunk_id = hunk_id_at(diff, line);
-            self.cursor.line = line;
+            self.right.cursor.line = line;
             if let Some(id) = hunk_id {
-                self.cursor.hunk_id = id;
+                self.right.cursor.hunk_id = id;
             }
             self.ensure_cursor_visible();
         }
@@ -174,12 +174,12 @@ impl App {
         let hunks = hunk_lines_for(diff);
         let hl = hunks
             .iter()
-            .find(|hl| hl.lines.contains(&self.cursor.line))?;
+            .find(|hl| hl.lines.contains(&self.right.cursor.line))?;
         let hunk = file.hunks.get(hl.hunk_index)?;
 
-        if let Some(anchor) = self.cursor.anchor {
-            let lo = anchor.min(self.cursor.line);
-            let hi = anchor.max(self.cursor.line);
+        if let Some(anchor) = self.right.cursor.anchor {
+            let lo = anchor.min(self.right.cursor.line);
+            let hi = anchor.max(self.right.cursor.line);
             let lines: Vec<usize> = hl
                 .selectable
                 .iter()
@@ -346,12 +346,12 @@ impl App {
         let Some(granule) = self.current_granule() else {
             return;
         };
-        let dir = match self.cursor.side {
+        let dir = match self.right.cursor.side {
             DiffSide::Worktree => ApplyDir::Forward,
             DiffSide::Staged => ApplyDir::Reverse,
         };
         let result = self.apply_granule(&granule, dir, ApplyTarget::Index);
-        self.cursor.anchor = None;
+        self.right.cursor.anchor = None;
         self.finish_apply(result);
     }
 
@@ -417,7 +417,7 @@ impl App {
                     action: ConfirmAction::DiscardFile(entry.path.clone()),
                 });
             },
-            Mode::Diff if self.cursor.side == DiffSide::Worktree => {
+            Mode::Diff if self.right.cursor.side == DiffSide::Worktree => {
                 let Some(granule) = self.current_granule() else {
                     return;
                 };
@@ -465,12 +465,12 @@ impl App {
                     Some(repo) => repo.discard_file(&path, untracked),
                     None => return,
                 };
-                self.cursor.anchor = None;
+                self.right.cursor.anchor = None;
                 self.finish_apply(result);
             },
             ConfirmAction::DiscardGranule(granule) => {
                 let result = self.apply_granule(&granule, ApplyDir::Reverse, ApplyTarget::Worktree);
-                self.cursor.anchor = None;
+                self.right.cursor.anchor = None;
                 self.finish_apply(result);
             },
             ConfirmAction::DeleteBranch { name, force } => {
@@ -523,10 +523,11 @@ impl App {
             return None;
         }
         let range = self
+            .right
             .cursor
             .anchor
-            .map(|a| a.min(self.cursor.line)..a.max(self.cursor.line) + 1);
-        Some((self.cursor.side, self.cursor.line, range))
+            .map(|a| a.min(self.right.cursor.line)..a.max(self.right.cursor.line) + 1);
+        Some((self.right.cursor.side, self.right.cursor.line, range))
     }
 
     /// Right-pane title suffix while `Mode::Diff` is up: `hunk 1/3` or
@@ -540,11 +541,11 @@ impl App {
         let total = hunks.len();
         let current = hunks
             .iter()
-            .position(|hl| hl.lines.contains(&self.cursor.line))?;
-        Some(match self.cursor.anchor {
+            .position(|hl| hl.lines.contains(&self.right.cursor.line))?;
+        Some(match self.right.cursor.anchor {
             Some(anchor) => {
-                let lo = anchor.min(self.cursor.line) + 1;
-                let hi = anchor.max(self.cursor.line) + 1;
+                let lo = anchor.min(self.right.cursor.line) + 1;
+                let hi = anchor.max(self.right.cursor.line) + 1;
                 if lo == hi {
                     format!("line {lo}")
                 } else {

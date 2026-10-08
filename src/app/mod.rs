@@ -38,7 +38,6 @@ use ratatui::crossterm::event::{
 };
 use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Text};
-use ratatui_image::picker::Picker;
 
 use crate::app::events::{AppEvent, Events};
 use crate::app::screens as ui;
@@ -584,31 +583,8 @@ pub struct App {
     /// Optional worktree watcher failure; polling remains active as fallback.
     watch_error: Option<Arc<AppError>>,
 
-    /// Terminal graphics backend for the image preview. Starts on half-blocks
-    /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
-    /// iterm2 when the real terminal supports one.
-    picker: Picker,
-    /// Right-pane image preview for the current selection, rebuilt on nav.
-    preview: Preview,
-    /// Right-pane diff for the current selection, behind any image preview.
-    /// Rebuilt on nav and on background `Refresh`.
-    diff: DiffView,
-    /// What `diff` currently describes. `None` when no diff applies.
-    right_key: Option<RightKey>,
-    /// Cached styled diff. Scroll changes only Paragraph offset, so it must
-    /// not rerun syntax highlighting or rebuild every line.
-    rendered_diff: Option<RenderedDiff>,
-    /// First visible line of the right-pane diff. Kept across a `Refresh` of
-    /// an unchanged selection; reset to 0 when the selection changes.
-    right_scroll: usize,
-    /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
-    /// each frame. Drives the viewport-aware scroll clamp and the page steps.
-    /// 0 before the first draw: the clamp is then permissive by one screen and
-    /// the next frame corrects it.
-    right_viewport: usize,
-    /// Whole right-pane rect from the last frame, for routing the mouse wheel
-    /// to the diff (over the right column) or the selection (over the left).
-    right_area: Rect,
+    /// The right column: image preview, diff, scroll and line cursor.
+    right: right_pane::RightPane,
     /// Click target for the configured Git author in the bottom info panel.
     author_click_area: Rect,
     /// Click target for the visible Dashboard trigger beside the author.
@@ -657,8 +633,6 @@ pub struct App {
     /// Whether keys go to the left panes or to the Files diff cursor
     /// (`docs/PLAN_6_STAGING.md`).
     mode: Mode,
-    /// The diff cursor, meaningful only while `mode == Mode::Diff`.
-    cursor: DiffCursor,
     /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
     pending_confirm: Option<ConfirmPrompt>,
     /// A commit popup or dismissible note; owns all input while `Some`
@@ -719,6 +693,7 @@ pub struct App {
 }
 
 pub mod help;
+pub mod right_pane;
 pub mod theme_editor;
 mod tree;
 mod welcome;
@@ -794,6 +769,7 @@ impl App {
             settings_scroll: 0,
             theme: theme_editor::ThemeEditor::new(theme_config),
             config,
+            right: right_pane::RightPane::new(),
             keymap,
             config_file: None,
             color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
@@ -805,14 +781,6 @@ impl App {
             commit_drill: None,
             last_error: None,
             watch_error: None,
-            picker: Picker::halfblocks(),
-            preview: Preview::None,
-            diff: DiffView::None,
-            right_key: None,
-            rendered_diff: None,
-            right_scroll: 0,
-            right_viewport: 0,
-            right_area: Rect::ZERO,
             author_click_area: Rect::ZERO,
             dashboard_click_area: Rect::ZERO,
             palette,
@@ -830,7 +798,6 @@ impl App {
             new_branch_title: String::new(),
             right_focused: false,
             mode: Mode::default(),
-            cursor: DiffCursor::default(),
             pending_confirm: None,
             popup: None,
             commit_draft: None,
@@ -994,7 +961,7 @@ impl App {
             if let Some(line) = found.debug_line() {
                 self.report_notice(line);
             }
-            self.picker = found.picker;
+            self.right.picker = found.picker;
             self.invalidate_image_query();
             self.update_right_pane();
         }
@@ -1015,7 +982,7 @@ impl App {
         };
         let mut fresh = Self::open_with(path, load)?;
         fresh.event_sender = self.event_sender.take();
-        fresh.picker = self.picker.clone();
+        fresh.right.picker = self.right.picker.clone();
         fresh.create_remote.carry_program_from(&self.create_remote);
         fresh.watch_request = fresh.watch_root();
         *self = fresh;
@@ -1250,11 +1217,11 @@ impl App {
         let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Commits)) else {
             return;
         };
-        let DiffView::Commit(_, diff) = &self.diff else {
+        let DiffView::Commit(_, diff) = &self.right.diff else {
             return;
         };
         if let Some(&line) = diff.file_lines().get(*index) {
-            self.right_scroll = line;
+            self.right.scroll = line;
             self.clamp_right_scroll();
         }
     }
@@ -1276,11 +1243,11 @@ impl App {
         if self.mode != Mode::Diff {
             return;
         }
-        let DiffView::Files(files) = &self.diff else {
+        let DiffView::Files(files) = &self.right.diff else {
             self.mode = Mode::Nav;
             return;
         };
-        let diff = match self.cursor.side {
+        let diff = match self.right.cursor.side {
             DiffSide::Worktree => &files.unstaged,
             DiffSide::Staged => &files.staged,
         };
@@ -1288,16 +1255,17 @@ impl App {
 
         if let Some(hl) = hunks
             .iter()
-            .find(|hl| hunk_content_id(diff, hl.hunk_index) == self.cursor.hunk_id)
+            .find(|hl| hunk_content_id(diff, hl.hunk_index) == self.right.cursor.hunk_id)
         {
-            if hl.selectable.contains(&self.cursor.line) {
-                self.cursor.anchor = self.cursor.anchor.filter(|a| hl.lines.contains(a));
+            if hl.selectable.contains(&self.right.cursor.line) {
+                self.right.cursor.anchor =
+                    self.right.cursor.anchor.filter(|a| hl.lines.contains(a));
                 self.ensure_cursor_visible();
                 return;
             }
             if let Some(&line) = hl.selectable.first() {
-                self.cursor.line = line;
-                self.cursor.anchor = None;
+                self.right.cursor.line = line;
+                self.right.cursor.anchor = None;
                 self.ensure_cursor_visible();
                 return;
             }
@@ -1306,9 +1274,9 @@ impl App {
         if let Some(hl) = hunks.iter().find(|hl| !hl.selectable.is_empty())
             && let Some(&line) = hl.selectable.first()
         {
-            self.cursor.line = line;
-            self.cursor.anchor = None;
-            self.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
+            self.right.cursor.line = line;
+            self.right.cursor.anchor = None;
+            self.right.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
             self.ensure_cursor_visible();
         } else {
             self.mode = Mode::Nav;
@@ -1335,7 +1303,7 @@ impl App {
 
     /// Line count of the current diff text, 0 for `None` / `Note`.
     fn diff_line_count(&self) -> usize {
-        match &self.diff {
+        match &self.right.diff {
             // Both columns share one scroll; the taller sets how far it goes.
             DiffView::Files(f) => f
                 .unstaged
@@ -1354,12 +1322,12 @@ impl App {
     /// "line count minus one screen" until the first draw sets a real height.
     fn max_right_scroll(&self) -> usize {
         self.diff_line_count()
-            .saturating_sub(self.right_viewport.max(1))
+            .saturating_sub(self.right.viewport.max(1))
     }
 
     /// Clamp `right_scroll` into `0..=max_right_scroll()`.
     fn clamp_right_scroll(&mut self) {
-        self.right_scroll = self.right_scroll.min(self.max_right_scroll());
+        self.right.scroll = self.right.scroll.min(self.max_right_scroll());
     }
 
     /// Move the right-pane viewport by `delta` lines, clamped so it stops with
@@ -1367,12 +1335,13 @@ impl App {
     /// snap to the top / bottom.
     fn scroll_right(&mut self, delta: isize) {
         let mag = delta.unsigned_abs();
-        self.right_scroll = if delta >= 0 {
-            self.right_scroll
+        self.right.scroll = if delta >= 0 {
+            self.right
+                .scroll
                 .saturating_add(mag)
                 .min(self.max_right_scroll())
         } else {
-            self.right_scroll.saturating_sub(mag)
+            self.right.scroll.saturating_sub(mag)
         };
     }
 
@@ -1382,7 +1351,7 @@ impl App {
     /// left pane's own selection instead (moving the wrong thing).
     fn right_is_diff(&self) -> bool {
         matches!(
-            self.diff,
+            self.right.diff,
             DiffView::Files(_)
                 | DiffView::Commit(..)
                 | DiffView::Stash(..)
@@ -1395,27 +1364,27 @@ impl App {
     /// a no-op on the Files split, which has two diffs and no single anchor
     /// list to jump through.
     fn jump_diff_anchor(&mut self, dir: isize) {
-        let anchors = match &self.diff {
+        let anchors = match &self.right.diff {
             DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.file_lines(),
             DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
                 return;
             },
         };
-        let cur = self.right_scroll;
+        let cur = self.right.scroll;
         let target = if dir > 0 {
             anchors.iter().find(|&&l| l > cur).copied()
         } else {
             anchors.iter().rev().find(|&&l| l < cur).copied()
         };
         if let Some(line) = target {
-            self.right_scroll = line;
+            self.right.scroll = line;
             self.clamp_right_scroll();
         }
     }
 
     /// Current right-pane diff, for `ui::draw_right_pane`.
     pub fn diff_view(&self) -> &DiffView {
-        &self.diff
+        &self.right.diff
     }
 
     /// Configured Git author name, shown in the Info panel header when set.
@@ -1443,9 +1412,9 @@ impl App {
         focus: Option<&Range<usize>>,
         width: usize,
     ) -> Option<(Text<'static>, usize, git::diff::DiffStat)> {
-        let key = &self.right_key;
-        let cache = &mut self.rendered_diff;
-        match &self.diff {
+        let key = &self.right.key;
+        let cache = &mut self.right.rendered;
+        match &self.right.diff {
             DiffView::Commit(_, diff) | DiffView::Stash(_, diff) => {
                 let cache_hit = cache.as_ref().is_some_and(|cached| {
                     cached.key.as_ref() == key.as_ref()
@@ -1478,26 +1447,26 @@ impl App {
 
     /// First visible line of the right-pane diff.
     pub fn right_scroll(&self) -> usize {
-        self.right_scroll
+        self.right.scroll
     }
 
     /// Set the right-pane scroll. Test and example helper.
     pub fn set_right_scroll(&mut self, line: usize) {
-        self.right_scroll = line;
+        self.right.scroll = line;
         self.clamp_right_scroll();
     }
 
     /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
     /// each frame so the scroll clamp and page steps track the real size.
     pub fn set_right_viewport(&mut self, rows: usize) {
-        self.right_viewport = rows;
+        self.right.viewport = rows;
         self.clamp_right_scroll();
     }
 
     /// Whole right-pane rect, written by `ui::draw_right_pane` each frame so a
     /// mouse-wheel event can be routed by its column.
     pub fn set_right_area(&mut self, area: Rect) {
-        self.right_area = area;
+        self.right.area = area;
     }
 
     /// Store the configured Git author's clickable cells for mouse routing.
@@ -1675,18 +1644,18 @@ impl App {
     /// pixels of the old frame outlive a normal buffer diff and need a full
     /// `terminal.clear()`.
     fn preview_is_image(&self) -> bool {
-        matches!(self.preview, Preview::Image(_))
+        matches!(self.right.preview, Preview::Image(_))
     }
 
     /// The right-pane preview for the current selection.
     pub fn preview(&self) -> &Preview {
-        &self.preview
+        &self.right.preview
     }
 
     /// Mutable preview, for `ui::draw`: `StatefulImage` resizes and re-encodes
     /// the protocol in place at render time (the ratatui-image example pattern).
     pub fn preview_mut(&mut self) -> &mut Preview {
-        &mut self.preview
+        &mut self.right.preview
     }
 
     /// Focus `pane` and move its cursor to `index`, rebuilding the preview.
