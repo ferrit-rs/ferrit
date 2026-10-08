@@ -67,24 +67,8 @@ impl App {
             Action::CreateRemote => self.open_create_remote(),
             Action::OperationMenu => self.open_operation_menu(),
             Action::ContextMenu => self.open_context_menu(),
-            Action::Back => {
-                self.right_focused = false;
-                if let Some(drill) = self.branch_drill.take() {
-                    self.selection[Pane::Branches] = drill.return_index;
-                }
-                if let Some(drill) = self.commit_drill.take() {
-                    self.selection[Pane::Commits] = drill.return_index;
-                }
-            },
-            Action::Enter => {
-                self.enter_branch_log();
-                // Opening a commit must not also toggle its first row.
-                if !self.enter_commit_files() {
-                    self.toggle_files_dir();
-                    self.toggle_commit_dir();
-                    self.enter_diff_mode();
-                }
-            },
+            Action::Back => self.go_back(),
+            Action::Enter => self.enter_selected(),
             Action::EnterDiff => self.enter_diff_mode(),
             Action::Refresh => self.request_refresh(),
             Action::Fetch => self.trigger_remote_op(events::RemoteOp::Fetch),
@@ -93,18 +77,9 @@ impl App {
             Action::Commit => self.open_commit(git::commit::CommitKind::Normal),
             Action::Amend => self.open_commit(git::commit::CommitKind::Amend),
             Action::RewordHead => self.open_commit(git::commit::CommitKind::Reword),
-            Action::Focus(pane) => {
-                self.right_focused = false;
-                self.focus = pane;
-            },
-            Action::NextPane => {
-                self.right_focused = false;
-                self.focus = self.pane_offset(1);
-            },
-            Action::PrevPane => {
-                self.right_focused = false;
-                self.focus = self.pane_offset(PANES.len() - 1);
-            },
+            Action::Focus(pane) => self.focus_pane(pane),
+            Action::NextPane => self.focus_pane(self.pane_offset(1)),
+            Action::PrevPane => self.focus_pane(self.pane_offset(PANES.len() - 1)),
             Action::ToggleBranchesTab => self.toggle_branches_tab(),
             Action::SelectDown => self.select_down(),
             Action::SelectUp => self.select_up(),
@@ -146,6 +121,35 @@ impl App {
             Action::PopStash => self.restore_stash_prompt(true),
             Action::DropStash => self.drop_stash_prompt(),
         }
+    }
+
+    /// `Esc` on a pane: back out of a drilled branch or commit, restoring the
+    /// cursor it was opened from.
+    fn go_back(&mut self) {
+        self.right_focused = false;
+        if let Some(drill) = self.branch_drill.take() {
+            self.selection[Pane::Branches] = drill.return_index;
+        }
+        if let Some(drill) = self.commit_drill.take() {
+            self.selection[Pane::Commits] = drill.return_index;
+        }
+    }
+
+    /// `Enter` on a row: open a branch's log or a commit's files, else toggle
+    /// a directory, else enter the diff.
+    fn enter_selected(&mut self) {
+        self.enter_branch_log();
+        // Opening a commit must not also toggle its first row.
+        if !self.enter_commit_files() {
+            self.toggle_files_dir();
+            self.toggle_commit_dir();
+            self.enter_diff_mode();
+        }
+    }
+
+    fn focus_pane(&mut self, pane: Pane) {
+        self.right_focused = false;
+        self.focus = pane;
     }
 
     pub(super) fn open_help(&mut self) {

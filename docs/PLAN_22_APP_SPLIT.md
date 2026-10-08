@@ -1,6 +1,6 @@
 # Plan: phase 22, break up `App`
 
-**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane` and `Modal` done).** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
 
 What differs from the sketch below, and why:
@@ -20,7 +20,15 @@ What differs from the sketch below, and why:
   `app/modal.rs` has `enum Modal { None, Popup, Confirm }` and `App.modal` replaces `popup` and
   `pending_confirm`. The full-screen view and the sheet stay separate layers. Its methods live on
   `Modal` (not on `App`) so a caller can hold the popup mutably and read other fields of `App`.
-- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 72 now. The "about 100" in the first sketch was an over-estimate.
+- **`Workers` and `HitAreas`** took ten and eight fields (the event channel, the refresh, diff
+  and image single-flight state, the one network operation; the pane rects, list offsets,
+  click targets and keybar hits). `dispatch::run_action` was already a router but for five
+  arms (`Back`, `Enter`, `Focus`, `NextPane`, `PrevPane`), which are now `go_back`,
+  `enter_selected` and `focus_pane`.
+- **Not done: step 6, a `ViewState` for drawing.** `screens::draw` still takes `&mut App`.
+  `HitAreas` is what a draw function writes, so it can now be passed on its own, but the
+  sheets and popups still read half of `App`. Left for a later phase.
+- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 47 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
 
 ## Goal
 
@@ -203,3 +211,13 @@ Action::Help => self.help.open(self.hints.row_count()),   // one line per arm
 
 Phase 23 (`PLAN_23_TEST_SUPPORT.md`) cleans the test suite and narrows the public API, now
 that the types it exposes are small and named.
+
+## What is left on `App` (47 fields)
+
+Navigation and selection (`focus`, `selection`, `mode`, `right_focused`, the two drills,
+`collapsed_dirs`, `branches_tab`, `select_when_listed`), identity (`profile`,
+`selected_author`, `git_user_name`, `repo_name`), configuration (`config`, `keymap`,
+`config_file`, `color_depth`, `palette`), and the full-screen and sheet layers
+(`full_screen`, `dashboard`, `git_config`, `welcome_*`, `settings*`, `sheet*`,
+`create_remote`). The next cuts, in order of cohesion: `Nav` (focus, selection, mode, drills),
+`Identity`, then a `Screens` group for the full-screen views.
