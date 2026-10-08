@@ -56,7 +56,7 @@ returns the hook's output as `RebaseFailed`; the badge and `m` are the way out.
 "a merge in progress". The menu is generic and the four command lines are one
 each, so rebase, cherry-pick and revert ship with it, and their `--continue`,
 `--skip` and `--abort` are tested here (R1 had promised the cherry-pick and
-revert rows would be tested; they are, in `tests/git_rebase.rs`). The outcome
+revert rows would be tested; they are, in `tests/git_rebase/`). The outcome
 type is `OperationOutcome { Done, Stopped { conflicted } }` in
 `domain/git/operation.rs`, not `RebaseOutcome` in `rebase.rs`, because a merge
 continue is not a rebase; R3 reuses it. `Repo::operation_step(step)` takes no
@@ -387,7 +387,7 @@ pattern to reuse if that shows up in practice. Deferred, named below.
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
-`tests/git_rebase.rs` (backend, temp repos like `tests/git_stash.rs`):
+`tests/git_rebase/` (backend, temp repos like `tests/git_stash.rs`):
 
 - `build_todo` for each `RebaseEdit`, root commit, and squash / fixup into
   the parent (pure, no repo)
@@ -435,21 +435,21 @@ swap.
   and `tests/app_conflict.rs` (6) green; disabling the guard makes the two
   regression tests fail, so they do guard the bug. Shipped alone.
 - ✅ **R1** state read: `Operation` (`model.rs`), `operation.rs`,
-  `Snapshot.operation`, the Status badge. `tests/git_rebase.rs` (9) and
+  `Snapshot.operation`, the Status badge. `tests/git_rebase/` (9) and
   `tests/app_operation.rs` (6) green; mutating the progress file names, the
   revert mapping, the badge position or the refresh assignment fails them.
   The keybar `Menu: m` hint moved to R2 (see the note at the top): showing it
   before `m` does anything would advertise a dead key.
 - ✅ **R2** `Popup::Menu` primitive (`src/app/menu.rs`, `SelectList` inside a
   `Dialog`) and the `m` menu. Covers all four operations, not only a merge
-  (see the note at the top). `tests/git_rebase.rs` (18) and
+  (see the note at the top). `tests/git_rebase/` (18) and
   `tests/app_menu.rs` (14) green; each of these fails a test when broken: the
   skip flag, the `CONFLICT (` check, the abort confirm, a merge row for skip.
   Closes phase 8's dangling note: the conflicted-merge popup now points at
   `m`.
 - ✅ **R3** `rebase.rs`: `build_todo`, `rebase_edit`, `autosquash`,
   `commit_message`, `GitError::RebaseFailed`, and `operation::settle` shared
-  with `step`. 24 new cases in `tests/git_rebase.rs` (38 in the file); each of
+  with `step`. 24 new cases in `tests/git_rebase/` (38 in the file); each of
   these fails a test when broken: the squash anchor, the reword exec line, the
   merge-commit guard, the idle guard, keeping the scratch file while stopped.
   No UI yet (R4).
@@ -467,7 +467,7 @@ swap.
   green, `CHANGELOG.md` lines, `PLAN_0` and `PLAN_7` C3 flipped. Every row of
   the edge-case table has a test:
   - conflict during a rewrite, `edit` stop, unresolved continue, skip onto a
-    new conflict, abort: `tests/git_rebase.rs` (`step-*`, `rw-drop`,
+    new conflict, abort: `tests/git_rebase/` (`step-*`, `rw-drop`,
     `rw-edit`) and `tests/app_menu.rs`;
   - a rejecting hook: `a_rejecting_hook_leaves_the_rebase_stopped_...`;
   - detached HEAD: `a_detached_head_can_be_rewritten`;
@@ -507,7 +507,7 @@ swap.
   message and leaves the repository in a state `m` can leave.
 - `w` on the Commits pane follows the selection (changelog entry).
 - `src/domain/git/` still has no `ratatui` import.
-- `cargo clippy --all-targets` clean; `tests/git_rebase.rs`,
+- `cargo clippy --all-targets` clean; `tests/git_rebase/`,
   `tests/app_rebase.rs`, `tests/render.rs` and all earlier test files pass.
 
 ## After phase 11

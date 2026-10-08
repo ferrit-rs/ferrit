@@ -3,7 +3,7 @@
 **Status: built (D0 to D5).** `D` opens it (a full-screen view when this phase was built; a sheet over the dimmed panes since phase 19, `PLAN_19_DASHBOARD_SHEET.md`). lazygit has no equivalent, so this
 phase is not compared with it (`/compare-lazygit` does not apply): it is checked
 with the replay harness (`test/scripts/150-dashboard.script`) and frame tests
-(`tests/dashboard_screen/`, `tests/app_dashboard.rs`, `tests/git_stats.rs`).
+(`tests/dashboard_screen/`, `tests/app_dashboard.rs`, `tests/git_stats/`).
 Not done, left for a later slice: the `[theme.colors] chart1..chart6` and
 `[dashboard] charts` / `hot_files_ignore` config keys (the charts mode is chosen
 from the locale and `TERM`, the ignore list is built in), and the real-image donut
@@ -428,7 +428,7 @@ same mechanism as `Bar::Help`).
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
-- `tests/git_stats.rs`: builds fixtures with several authors, dates
+- `tests/git_stats/`: builds fixtures with several authors, dates
   (`GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`) and conventional prefixes, and asserts
   totals, weekly buckets, kinds, author grouping with a `.mailmap`, the caps
   (`sampled`), branch health, and the empty / shallow / detached cases.
