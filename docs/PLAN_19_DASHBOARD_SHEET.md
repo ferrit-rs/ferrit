@@ -100,7 +100,7 @@ the layout that exists today for narrow windows. (The settings sheet stays at 75
 
 ## Self-testing (see `PLAN_SELF_TESTING.md`)
 
-- `tests/dashboard_screen.rs` (44 frame tests) and `tests/app_dashboard.rs` (11): they
+- `tests/dashboard_screen/` (44 frame tests) and `tests/app_dashboard.rs` (11): they
   open the dashboard with `D` and read the frame. They need two changes: let the slide
   finish (`advance_clock`) before reading, and a terminal wide enough for what they
   assert (two columns need 123 cells now, not 110). Their assertions on the content do

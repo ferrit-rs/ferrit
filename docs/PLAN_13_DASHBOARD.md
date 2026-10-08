@@ -3,7 +3,7 @@
 **Status: built (D0 to D5).** `D` opens it (a full-screen view when this phase was built; a sheet over the dimmed panes since phase 19, `PLAN_19_DASHBOARD_SHEET.md`). lazygit has no equivalent, so this
 phase is not compared with it (`/compare-lazygit` does not apply): it is checked
 with the replay harness (`test/scripts/150-dashboard.script`) and frame tests
-(`tests/dashboard_screen.rs`, `tests/app_dashboard.rs`, `tests/git_stats.rs`).
+(`tests/dashboard_screen/`, `tests/app_dashboard.rs`, `tests/git_stats.rs`).
 Not done, left for a later slice: the `[theme.colors] chart1..chart6` and
 `[dashboard] charts` / `hot_files_ignore` config keys (the charts mode is chosen
 from the locale and `TERM`, the ignore list is built in), and the real-image donut

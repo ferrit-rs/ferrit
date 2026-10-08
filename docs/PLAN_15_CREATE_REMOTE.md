@@ -260,7 +260,7 @@ conventions as the other popups and key-bar questions, but for the public case).
   `--add-readme`, `--gitignore` and `--license` are never passed, the name /
   owner / description validation, the timeout and cancel paths, and the
   signed-out and missing-`gh` states.
-- `tests/app_create_remote.rs`: `G` opens it from any pane and says so when there is
+- `tests/app_create_remote/`: `G` opens it from any pane and says so when there is
   a remote, and is a letter inside the form; the `x` entry shows only with no
   remote at all;
   the check runs off the UI thread; each step's keys; public needs `y` and
@@ -282,7 +282,7 @@ conventions as the other popups and key-bar questions, but for the public case).
 - **R1** ✅ `Repo::create_repo` with timeout and cancel, tests; `gh_status` goes
   through the same timeout (the child-process runner of `remote.rs` is shared).
 - **R2** ✅ `create_remote.rs` state, `RemoteOp::Create`, `AppEvent::RemoteCreated`,
-  busy label, the draft kept across the operation (`tests/app_create_remote.rs`).
+  busy label, the draft kept across the operation (`tests/app_create_remote/`).
 - **R3** ✅ the popups (checking, form, confirm with the Enter-does-not-confirm
   public case) and the `x` menu entry (`tests/create_remote_screen.rs`).
 - **R4** ✅ push through `push_with_upstream`, the partial-failure notes.
