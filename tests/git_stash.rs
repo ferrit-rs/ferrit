@@ -13,8 +13,11 @@
 //! `stash_drop` / `stash_diff`: throwaway fixture repos, then real `git`
 //! state. See `docs/PLAN_10_STASH.md` milestone S0.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use ferrit::domain::git::Repo;
@@ -22,31 +25,6 @@ use ferrit::domain::git::diff::DiffOpts;
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::stash::StashOutcome;
 use git2::{IndexAddOption, Repository, Signature};
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn configure_identity(dir: &Path) {
     for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {

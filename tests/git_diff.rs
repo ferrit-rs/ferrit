@@ -14,38 +14,16 @@
 //! output comes back parsed. Needs `git` on `PATH` (the same assumption lazygit
 //! makes).
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use ferrit::domain::git::Repo;
 use ferrit::domain::git::diff::{DiffOpts, DiffSide};
 use ferrit::domain::git::error::GitError;
 use git2::{IndexAddOption, Repository, Signature};
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn commit_all(repo: &Repository, message: &str) -> git2::Oid {
     let mut index = repo.index().unwrap();

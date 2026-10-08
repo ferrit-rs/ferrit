@@ -14,8 +14,10 @@
 //! but keeps the scroll, and moving to another file resets the scroll to the
 //! top. See `docs/PLAN_3_DIFF_VIEW.md` milestone D3.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ferrit::app::{App, DiffView, Pane};
 use git2::{IndexAddOption, Repository, Signature};
@@ -23,31 +25,6 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn commit_all(repo: &Repository, message: &str) {
     let mut index = repo.index().unwrap();

@@ -13,6 +13,9 @@
 //! fallback, saving merges instead of rewriting, and nothing reads the real
 //! config directory except `Config::load`.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,31 +30,6 @@ use ratatui::crossterm::event::{
 };
 use ratatui::layout::Rect;
 use ratatui::style::Color;
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn configure_identity(dir: &Path) {
     for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {

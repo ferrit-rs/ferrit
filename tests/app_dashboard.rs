@@ -10,8 +10,11 @@
 //! D2): no drawing yet, so these tests read `App::dashboard()` and drive the
 //! events by hand, the way `tests/app_remote.rs` does for the remote operations.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -26,31 +29,6 @@ use ratatui::crossterm::event::{
 
 fn key(c: char) -> KeyEvent {
     KeyEvent::from(KeyCode::Char(c))
-}
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
 }
 
 fn git(dir: &Path, args: &[&str]) {

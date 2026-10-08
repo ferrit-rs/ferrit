@@ -10,9 +10,12 @@
 //! Mechanism 1 from `docs/PLAN_SELF_TESTING.md`: render `ui::draw` into a
 //! `TestBackend` and assert on frame text. No terminal, no timing.
 
+mod common;
+
+use common::TempDir;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc;
 
 use ferrit::app::events::RemoteOp;
@@ -30,31 +33,6 @@ fn frame(app: &mut App, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal.draw(|f| ui::draw(f, app)).unwrap();
     terminal.backend().to_string()
-}
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
 }
 
 /// Rows in the left column (x < 40 at width 120) that carry the blue selection

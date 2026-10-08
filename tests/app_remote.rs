@@ -17,8 +17,11 @@
 //! S2 tests drive the same channel through the real `f`/`p`/`P` keys
 //! (`feed_key`) instead of calling `start_remote_op` directly.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -31,31 +34,6 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn char_key(c: char) -> KeyEvent {
     KeyEvent::from(KeyCode::Char(c))
-}
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
 }
 
 fn configure_identity(dir: &Path) {

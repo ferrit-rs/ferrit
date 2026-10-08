@@ -11,39 +11,17 @@
 //! the right pane alone. Found by comparing a flow with lazygit
 //! (`test/flows/ui-mouse.flow`); see `docs/PLAN_4_SCROLL_BEHAVIOR.md`.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use ferrit::app::{App, Pane, screens};
 use git2::{Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 /// A repository with `count` commits, `c00` first and `c{count-1}` at the top.
 fn repo_with_commits(tag: &str, count: usize) -> (TempDir, App) {

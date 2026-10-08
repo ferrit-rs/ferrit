@@ -14,38 +14,15 @@
 //! cursor's hunk or a V-selection, `d` discards after a confirm, and the
 //! cursor tracks the same hunk across the refresh a stage triggers.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ferrit::app::{App, DiffView, Pane};
 use ferrit::domain::git::diff::DiffSide;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(tag: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!("ferrit-{tag}-{}-{nanos}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn commit_all(repo: &Repository, message: &str) {
     let mut index = repo.index().unwrap();
