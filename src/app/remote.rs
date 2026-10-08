@@ -28,7 +28,7 @@ impl App {
     /// answer without asking git. No upstream: honor `push.default=current`,
     /// otherwise open LazyGit-style editable `<remote> <branch>` prompt.
     pub(super) fn push_current_branch(&mut self) {
-        if self.popup.is_some() {
+        if self.modal.popup().is_some() {
             return;
         }
         if self.snapshot.header.upstream.is_some() {
@@ -47,7 +47,7 @@ impl App {
                         self.snapshot.header.behind
                     )
                 };
-                self.pending_confirm = Some(ConfirmPrompt {
+                self.modal.ask(ConfirmPrompt {
                     message,
                     action: ConfirmAction::ForcePush,
                 });
@@ -82,10 +82,11 @@ impl App {
             .find(|remote| remote.name == "origin")
             .or_else(|| remotes.first())
             .map_or("origin", |remote| remote.name.as_str());
-        self.popup = Some(Popup::Upstream(TextInput::from_text(&format!(
-            "{remote} {}",
-            self.snapshot.header.branch
-        ))));
+        self.modal
+            .open_popup(Popup::Upstream(TextInput::from_text(&format!(
+                "{remote} {}",
+                self.snapshot.header.branch
+            ))));
     }
 
     pub(super) fn submit_upstream(&mut self, value: &str) {
@@ -94,7 +95,7 @@ impl App {
             self.report_error(AppError::BadUpstream);
             return;
         };
-        self.popup = None;
+        self.modal.close_popup();
         self.push_with_upstream(remote.to_owned(), branch.to_owned());
     }
 

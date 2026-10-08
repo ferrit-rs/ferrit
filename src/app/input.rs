@@ -28,7 +28,7 @@ impl App {
         // A popup (commit message box, or a dismissible note) owns all
         // input while it is up, same idea as the help overlay below but
         // richer (`docs/PLAN_7_COMMIT.md`).
-        if self.popup.is_some() {
+        if self.modal.popup().is_some() {
             self.popup_key(key);
             return;
         }
@@ -36,11 +36,11 @@ impl App {
         // A key-bar confirmation swallows every key but its own answer (Enter
         // or `y` confirms, so Enter never reaches the pane), same as the
         // help overlay below.
-        if self.pending_confirm.is_some() {
+        if self.modal.confirm().is_some() {
             match key.code {
                 KeyCode::Enter | KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.run_confirm(),
                 KeyCode::Char(KEY_CONFIRM_NO | 'N') | KeyCode::Esc => {
-                    self.pending_confirm = None;
+                    self.modal.cancel_confirm();
                 },
                 _ => {},
             }
@@ -156,10 +156,7 @@ impl App {
             return;
         }
 
-        if self.popup.is_none()
-            && self.pending_confirm.is_none()
-            && self.keybar_area.contains(Position::new(ev.column, ev.row))
-        {
+        if !self.modal.is_some() && self.keybar_area.contains(Position::new(ev.column, ev.row)) {
             let column = ev.column - self.keybar_area.x;
             let clicked = self
                 .keybar_hits

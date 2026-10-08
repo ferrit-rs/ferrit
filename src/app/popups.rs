@@ -40,7 +40,7 @@ enum PopupKind {
 impl App {
     /// Read active popup as one enum for the renderer.
     pub fn popup_view(&mut self) -> Option<PopupView<'_>> {
-        let kind = match self.popup.as_ref()? {
+        let kind = match self.modal.popup()? {
             Popup::Commit(_) => PopupKind::Commit,
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
             Popup::NewBranch(_) => PopupKind::NewBranch,
@@ -74,13 +74,13 @@ impl App {
     /// keybar prompt (`ui::draw_keybar`), or `None` when nothing is
     /// pending.
     pub fn confirm_message(&self) -> Option<&str> {
-        self.pending_confirm.as_ref().map(|p| p.message.as_str())
+        self.modal.confirm().map(|p| p.message.as_str())
     }
 
     /// The new-branch popup's render data, reusing `ui::draw_commit_popup`'s
     /// shape (`docs/PLAN_8_BRANCHES.md`), or `None` when it is not up.
     pub fn new_branch_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::NewBranch(buf)) = &self.popup else {
+        let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
             return None;
         };
         Some(CommitPopupView {
@@ -99,7 +99,7 @@ impl App {
 
     /// The stash popup's render data, same shape as the new-branch one.
     pub fn stash_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Stash(buf)) = &self.popup else {
+        let Some(Popup::Stash(buf)) = self.modal.popup() else {
             return None;
         };
         Some(CommitPopupView {
@@ -118,7 +118,7 @@ impl App {
 
     /// A name popup's render data, same shape as the new-branch one.
     pub fn name_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Name(target, input)) = &self.popup else {
+        let Some(Popup::Name(target, input)) = self.modal.popup() else {
             return None;
         };
         Some(CommitPopupView {
@@ -137,7 +137,7 @@ impl App {
 
     /// The `@` viewer's render data: the whole ring, reads included.
     pub fn command_log_popup(&self) -> Option<CommandLogView> {
-        let Some(Popup::CommandLog { from_bottom }) = &self.popup else {
+        let Some(Popup::CommandLog { from_bottom }) = self.modal.popup() else {
             return None;
         };
         Some(CommandLogView {
@@ -148,7 +148,7 @@ impl App {
 
     /// The menu's render data: each row is `label (shortcut)`.
     pub fn menu_popup(&self) -> Option<MenuView> {
-        let Some(Popup::Menu(menu)) = &self.popup else {
+        let Some(Popup::Menu(menu)) = self.modal.popup() else {
             return None;
         };
         Some(MenuView {
@@ -165,29 +165,29 @@ impl App {
 
     /// `@`: open the command log viewer, scrolled to the newest entry.
     pub(super) fn open_command_log(&mut self) {
-        if self.popup.is_none() {
-            self.popup = Some(Popup::CommandLog { from_bottom: 0 });
+        if self.modal.popup().is_none() {
+            self.modal.open_popup(Popup::CommandLog { from_bottom: 0 });
         }
     }
 
     /// A dismissible note's message (`ui::draw_note_popup`), or `None` when
     /// none is up.
     pub fn note_popup(&self) -> Option<&str> {
-        match &self.popup {
+        match self.modal.popup() {
             Some(Popup::Note(msg)) => Some(msg),
             _ => None,
         }
     }
 
     pub fn upstream_value(&self) -> Option<String> {
-        match &self.popup {
+        match self.modal.popup() {
             Some(Popup::Upstream(input)) => Some(input.text()),
             _ => None,
         }
     }
 
     pub fn upstream_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Upstream(input)) = &self.popup else {
+        let Some(Popup::Upstream(input)) = self.modal.popup() else {
             return None;
         };
         Some(CommitPopupView {
@@ -207,23 +207,23 @@ impl App {
     /// Every key while a non-commit popup is up. Commit editor routes to
     /// `app::commit`, which owns its separate summary/body key model.
     pub(super) fn popup_key(&mut self, key: KeyEvent) {
-        if matches!(self.popup, Some(Popup::Commit(_))) {
+        if matches!(self.modal.popup(), Some(Popup::Commit(_))) {
             self.commit_popup_key(key);
             return;
         }
-        if matches!(self.popup, Some(Popup::CommitAllConfirm)) {
+        if matches!(self.modal.popup(), Some(Popup::CommitAllConfirm)) {
             self.commit_all_confirm_key(key);
             return;
         }
-        if matches!(self.popup, Some(Popup::Askpass(_))) {
+        if matches!(self.modal.popup(), Some(Popup::Askpass(_))) {
             self.askpass_key(key);
             return;
         }
-        if matches!(self.popup, Some(Popup::Menu(_))) {
+        if matches!(self.modal.popup(), Some(Popup::Menu(_))) {
             self.menu_key(key);
             return;
         }
-        if matches!(self.popup, Some(Popup::CreateRemote(_))) {
+        if matches!(self.modal.popup(), Some(Popup::CreateRemote(_))) {
             self.create_remote_key(key);
             return;
         }
@@ -233,7 +233,7 @@ impl App {
         let mut submit_name_now = false;
         let mut submit_upstream = None;
 
-        match &mut self.popup {
+        match self.modal.popup_mut() {
             None => return,
             Some(Popup::Note(_)) => {
                 if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
@@ -283,7 +283,7 @@ impl App {
         }
 
         if dismiss {
-            self.popup = None;
+            self.modal.close_popup();
         }
         if create_branch_now {
             self.do_create_branch();

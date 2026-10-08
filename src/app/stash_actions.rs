@@ -12,7 +12,7 @@ impl App {
     /// The selected stash entry's oid, only while Stash is focused, in
     /// `Mode::Nav` and no popup is up.
     fn selected_stash(&self) -> Option<&git::model::StashEntry> {
-        if self.focus != Pane::Stash || self.mode != Mode::Nav || self.popup.is_some() {
+        if self.focus != Pane::Stash || self.mode != Mode::Nav || self.modal.popup().is_some() {
             return None;
         }
         self.snapshot.stashes.get(self.selected(Pane::Stash))
@@ -21,14 +21,14 @@ impl App {
     /// `s` (Nav, Files focused): open the stash message popup. A clean tree
     /// opens nothing and says so.
     pub(super) fn open_stash_popup(&mut self) {
-        if self.focus != Pane::Files || self.mode != Mode::Nav || self.popup.is_some() {
+        if self.focus != Pane::Files || self.mode != Mode::Nav || self.modal.popup().is_some() {
             return;
         }
         if self.snapshot.files.is_empty() {
             self.report_error(git::error::GitError::NothingToStash);
             return;
         }
-        self.popup = Some(Popup::Stash(TextInput::default()));
+        self.modal.open_popup(Popup::Stash(TextInput::default()));
     }
 
     /// `Enter` in the stash popup: `git stash push --include-untracked`.
@@ -36,18 +36,18 @@ impl App {
     /// popup and the typed message so the user can retry (the phase 8
     /// new-branch rule).
     pub(super) fn do_stash_push(&mut self) {
-        let Some(Popup::Stash(buf)) = &self.popup else {
+        let Some(Popup::Stash(buf)) = self.modal.popup() else {
             return;
         };
         let message = buf.text();
         let Some(repo) = &self.repo else { return };
         match repo.stash_push(message.trim()) {
             Ok(()) => {
-                self.popup = None;
+                self.modal.close_popup();
                 self.request_refresh();
             },
             Err(e @ git::error::GitError::NothingToStash) => {
-                self.popup = None;
+                self.modal.close_popup();
                 self.report_error(e);
             },
             Err(e) => self.report_error(e),
@@ -64,7 +64,7 @@ impl App {
         let verb = if pop { "pop" } else { "apply" };
         let message = format!("{verb} stash@{{{}}}: {}?", entry.index, entry.message);
         let oid = entry.oid.clone();
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message,
             action: ConfirmAction::RestoreStash { oid, pop },
         });
@@ -98,7 +98,7 @@ impl App {
         match result {
             Ok(StashOutcome::Done) => {},
             Ok(StashOutcome::Conflicted) => {
-                self.popup = Some(Popup::Note(
+                self.modal.open_popup(Popup::Note(
                     "stash applied with conflicts. The stash was kept. Resolve the conflicts \
                      in Files."
                         .to_owned(),
@@ -116,7 +116,7 @@ impl App {
         };
         let message = format!("drop stash@{{{}}}: {}?", entry.index, entry.message);
         let oid = entry.oid.clone();
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message,
             action: ConfirmAction::DropStash { oid },
         });

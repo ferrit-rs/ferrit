@@ -84,10 +84,10 @@ impl App {
         let Some(operation) = self.snapshot.operation else {
             return;
         };
-        if self.popup.is_some() || self.pending_confirm.is_some() {
+        if self.modal.is_some() {
             return;
         }
-        self.popup = Some(Popup::Menu(MenuState {
+        self.modal.open_popup(Popup::Menu(MenuState {
             title: operation.label(),
             items: operation_items(operation),
             selected: 0,
@@ -97,13 +97,13 @@ impl App {
     /// Every key while a menu is up: `j` / `k` move, `Enter` or a row's own
     /// letter runs it, `Esc` closes.
     pub(super) fn menu_key(&mut self, key: KeyEvent) {
-        let Some(Popup::Menu(menu)) = &mut self.popup else {
+        let Some(Popup::Menu(menu)) = self.modal.popup_mut() else {
             return;
         };
         let last = menu.items.len().saturating_sub(1);
         let chosen = match key.code {
             KeyCode::Esc => {
-                self.popup = None;
+                self.modal.close_popup();
                 return;
             },
             KeyCode::Char('j') | KeyCode::Down => {
@@ -123,7 +123,7 @@ impl App {
             _ => None,
         };
         if let Some(action) = chosen {
-            self.popup = None;
+            self.modal.close_popup();
             self.run_menu_action(action);
         }
     }
@@ -147,7 +147,7 @@ impl App {
             // Throws away the resolution work so far: ask first.
             MenuAction::Abort => {
                 let noun = self.snapshot.operation.map_or("operation", operation_noun);
-                self.pending_confirm = Some(ConfirmPrompt {
+                self.modal.ask(ConfirmPrompt {
                     message: format!("abort the {noun}? Work done in it so far is lost."),
                     action: ConfirmAction::AbortOperation,
                 });
@@ -169,13 +169,13 @@ impl App {
         match result {
             Ok(OperationOutcome::Done) => {},
             Ok(OperationOutcome::Stopped { conflicted: true }) => {
-                self.popup = Some(Popup::Note(
+                self.modal.open_popup(Popup::Note(
                     "stopped on a conflict. Resolve it in Files, then press m and Continue."
                         .to_owned(),
                 ));
             },
             Ok(OperationOutcome::Stopped { conflicted: false }) => {
-                self.popup = Some(Popup::Note(
+                self.modal.open_popup(Popup::Note(
                     "stopped for you to edit. Make your change, then press m and Continue."
                         .to_owned(),
                 ));

@@ -67,7 +67,7 @@ impl App {
     /// `x` or a right-click: the menu for the selected row, or a note that it
     /// has nothing extra. Inert while a popup or a confirm is up.
     pub(super) fn open_context_menu(&mut self) {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.repo.is_none() {
+        if self.modal.is_some() || self.repo.is_none() {
             return;
         }
         let index = self.selected(self.focus);
@@ -147,7 +147,7 @@ impl App {
         } else {
             title
         };
-        self.popup = Some(Popup::Menu(MenuState {
+        self.modal.open_popup(Popup::Menu(MenuState {
             title,
             items,
             selected: 0,
@@ -224,14 +224,15 @@ impl App {
     }
 
     pub(super) fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
-        self.popup = Some(Popup::Name(NameTarget { kind, title }, input));
+        self.modal
+            .open_popup(Popup::Name(NameTarget { kind, title }, input));
     }
 
     /// `Enter` in a name popup. Success closes it and refreshes; a refusal
     /// (a taken name, an empty message) keeps the popup and the text for a
     /// retry, the same rule as the new-branch popup.
     pub(super) fn submit_name(&mut self) {
-        let Some(Popup::Name(target, input)) = &self.popup else {
+        let Some(Popup::Name(target, input)) = self.modal.popup() else {
             return;
         };
         let kind = target.kind.clone();
@@ -239,7 +240,7 @@ impl App {
         if matches!(kind, NameKind::ConfigKey | NameKind::ConfigValue(_)) {
             // A value keeps its spaces; a refusal keeps the popup for a retry.
             if self.submit_git_config_name(&kind, &text) {
-                self.popup = None;
+                self.modal.close_popup();
             }
             return;
         }
@@ -247,7 +248,7 @@ impl App {
         let Some(repo) = &mut self.repo else { return };
         let result = match &kind {
             NameKind::RenameBranch { from } if name == from => {
-                self.popup = None;
+                self.modal.close_popup();
                 return;
             },
             NameKind::RenameBranch { from } => repo.rename_branch(from, name),
@@ -263,11 +264,11 @@ impl App {
         };
         match result {
             Ok(()) => {
-                self.popup = None;
+                self.modal.close_popup();
                 self.request_refresh();
             },
             Err(e @ git::error::GitError::NothingToStash) => {
-                self.popup = None;
+                self.modal.close_popup();
                 self.report_error(e);
             },
             Err(e) => self.report_error(e),
@@ -278,7 +279,7 @@ impl App {
     /// open its menu. Off any row it does nothing. (A left click also toggles a
     /// directory; this one must not.)
     pub(super) fn right_click(&mut self, column: u16, row: u16) {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.help.open {
+        if self.modal.is_some() || self.help.open {
             return;
         }
         let Some(pane) = self.pane_at(column, row) else {

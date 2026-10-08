@@ -109,7 +109,7 @@ impl App {
                 replacing,
                 values,
             });
-            self.popup = Some(Popup::Menu(MenuState {
+            self.modal.open_popup(Popup::Menu(MenuState {
                 title,
                 items,
                 selected,
@@ -214,7 +214,7 @@ impl App {
             String::new()
         };
         let value = (!row.entry.value.is_empty()).then(|| row.entry.value.clone());
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message: format!("unset {key} = {shown} in {}{file}?", scope_name(scope)),
             action: ConfirmAction::ConfigUnset(ConfigOp::Unset { key, value }),
         });
@@ -236,7 +236,7 @@ impl App {
         if self.git_config.scope != WriteScope::Global || self.git_config.global_confirmed {
             return false;
         }
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message: format!(
                 "write to {}? Asked once this session.",
                 self.global_file_label()

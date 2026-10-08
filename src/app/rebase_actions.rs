@@ -14,8 +14,7 @@ impl App {
         if self.focus != Pane::Commits
             || self.mode != Mode::Nav
             || self.commit_drill.is_some()
-            || self.popup.is_some()
-            || self.pending_confirm.is_some()
+            || self.modal.is_some()
             || self.repo.is_none()
         {
             return None;
@@ -57,7 +56,7 @@ impl App {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message: format!("drop {} {}?", entry.short_hash, entry.summary),
             action: ConfirmAction::DropCommit {
                 hash: entry.full_hash,
@@ -77,7 +76,7 @@ impl App {
         if fixup {
             self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Fixup);
         } else if let Some(below) = below {
-            self.pending_confirm = Some(ConfirmPrompt {
+            self.modal.ask(ConfirmPrompt {
                 message: format!(
                     "squash {} {} into {} {}?",
                     entry.short_hash, entry.summary, below.short_hash, below.summary

@@ -59,11 +59,11 @@ impl App {
     pub fn commit_popup(&mut self) -> Option<CommitPopupView<'_>> {
         let author = self.author_line();
         let Self {
-            popup,
+            modal,
             commit_overlay,
             ..
         } = self;
-        let Some(Popup::Commit(draft)) = popup else {
+        let Some(Popup::Commit(draft)) = modal.popup() else {
             return None;
         };
         let author = draft.reword.is_none().then_some(author);
@@ -150,7 +150,7 @@ impl App {
     /// `c` / `A` / `w`: open the commit editor. Amend / Reword pre-fill
     /// `HEAD`'s message; a plain commit restores a cancelled draft.
     pub(super) fn open_commit(&mut self, kind: git::commit::CommitKind) {
-        if self.popup.is_some() {
+        if self.modal.popup().is_some() {
             return;
         }
         if self.repo.is_none() {
@@ -164,7 +164,7 @@ impl App {
                     .iter()
                     .any(|f| f.staged != git::model::Change::None) =>
             {
-                self.popup = Some(Popup::CommitAllConfirm);
+                self.modal.open_popup(Popup::CommitAllConfirm);
                 self.commit_overlay.open();
                 return;
             },
@@ -199,7 +199,7 @@ impl App {
     /// amend), pre-filled with its message.
     pub(super) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
         self.open_commit_editor(git::commit::CommitKind::Reword, Some(message.to_owned()));
-        if let Some(Popup::Commit(draft)) = &mut self.popup {
+        if let Some(Popup::Commit(draft)) = self.modal.popup_mut() {
             draft.reword = Some(RewordTarget { hash, title });
         }
     }
@@ -219,7 +219,7 @@ impl App {
         if let Some(prefill) = prefill {
             draft.set_message(&prefill);
         }
-        self.popup = Some(Popup::Commit(draft));
+        self.modal.open_popup(Popup::Commit(draft));
         self.commit_overlay.open();
     }
 
@@ -233,14 +233,14 @@ impl App {
                     .map(|repo| repo.stage_all(ApplyDir::Forward));
                 match result {
                     Some(Ok(())) => {
-                        self.popup = None;
+                        self.modal.close_popup();
                         self.commit_overlay.close();
                         self.request_refresh();
                         let prefill = self.new_commit_prefill();
                         self.open_commit_editor(git::commit::CommitKind::Normal, prefill);
                     },
                     Some(Err(error)) => {
-                        self.popup = None;
+                        self.modal.close_popup();
                         self.commit_overlay.close();
                         self.report_error(error);
                     },
@@ -248,7 +248,7 @@ impl App {
                 }
             },
             KeyCode::Char('n') | KeyCode::Esc => {
-                self.popup = None;
+                self.modal.close_popup();
                 self.commit_overlay.close();
             },
             _ => {},
@@ -257,7 +257,7 @@ impl App {
 
     /// Route lazygit-style commit-editor keys while the editor owns input.
     pub(super) fn commit_popup_key(&mut self, key: KeyEvent) {
-        let Some(Popup::Commit(draft)) = &mut self.popup else {
+        let Some(Popup::Commit(draft)) = self.modal.popup_mut() else {
             return;
         };
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
@@ -336,12 +336,12 @@ impl App {
         if cancel {
             // A reword of an older commit is not a half-written new commit:
             // its text must not come back as the next `c`'s draft.
-            if let Some(Popup::Commit(draft)) = &self.popup
+            if let Some(Popup::Commit(draft)) = self.modal.popup()
                 && draft.reword.is_none()
             {
                 self.commit_draft = Some(draft.message());
             }
-            self.popup = None;
+            self.modal.close_popup();
             self.commit_overlay.close();
         } else if commit {
             self.do_commit();
@@ -350,7 +350,7 @@ impl App {
 
     /// Submit current editor content with `git commit`.
     pub(super) fn do_commit(&mut self) {
-        let Some(Popup::Commit(draft)) = &self.popup else {
+        let Some(Popup::Commit(draft)) = self.modal.popup() else {
             return;
         };
         let message = draft.message();
@@ -369,7 +369,7 @@ impl App {
                 self.report_error(error);
                 return;
             }
-            self.popup = None;
+            self.modal.close_popup();
             self.commit_overlay.close();
             self.finish_operation(result);
             return;
@@ -391,7 +391,7 @@ impl App {
         match result {
             Ok(head) => {
                 self.commit_draft = None;
-                self.popup = None;
+                self.modal.close_popup();
                 self.commit_overlay.close();
                 // The commit just made tops the list, and is the row selected
                 // once it shows up (lazygit).

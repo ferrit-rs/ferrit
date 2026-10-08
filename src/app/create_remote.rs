@@ -284,24 +284,25 @@ impl App {
     /// network operation runs.
     #[doc(hidden)]
     pub fn open_create_remote(&mut self) {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.repo.is_none() {
+        if self.modal.is_some() || self.repo.is_none() {
             return;
         }
         if !self.snapshot.remotes.is_empty() {
-            self.popup = Some(Popup::Note(
+            self.modal.open_popup(Popup::Note(
                 "this repository already has a remote".to_owned(),
             ));
             return;
         }
         if self.remote_busy.is_some() {
-            self.popup = Some(Popup::Note(
+            self.modal.open_popup(Popup::Note(
                 "another network operation is running".to_owned(),
             ));
             return;
         }
         self.create_remote.generation += 1;
         let generation = self.create_remote.generation;
-        self.popup = Some(Popup::CreateRemote(Step::Checking { generation }));
+        self.modal
+            .open_popup(Popup::CreateRemote(Step::Checking { generation }));
         let gh = self.create_remote.gh.clone();
         let Some(sender) = self.event_sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): ask now.
@@ -320,13 +321,13 @@ impl App {
     /// counts; `gh` ready opens the form, anything else says what to do.
     pub(super) fn on_gh_checked(&mut self, generation: u64, status: GhStatus) {
         let waiting = matches!(
-            self.popup,
-            Some(Popup::CreateRemote(Step::Checking { generation: g })) if g == generation
+            self.modal.popup(),
+            Some(Popup::CreateRemote(Step::Checking { generation: g })) if *g == generation
         );
         if !waiting {
             return;
         }
-        self.popup = Some(match status {
+        self.modal.open_popup(match status {
             GhStatus::Ready => {
                 let draft = self
                     .create_remote
@@ -349,11 +350,12 @@ impl App {
         let Some(draft) = &self.create_remote.draft else {
             return;
         };
-        if self.popup.is_none() {
-            self.popup = Some(Popup::CreateRemote(Step::Form(Form::from_draft(
-                draft,
-                Some(error),
-            ))));
+        if self.modal.popup().is_none() {
+            self.modal
+                .open_popup(Popup::CreateRemote(Step::Form(Form::from_draft(
+                    draft,
+                    Some(error),
+                ))));
         }
     }
 
@@ -365,7 +367,7 @@ impl App {
 
     /// What the renderer draws, or `None` when this popup is not up.
     pub fn create_remote_view(&self) -> Option<CreateRemoteView<'_>> {
-        let Some(Popup::CreateRemote(step)) = &self.popup else {
+        let Some(Popup::CreateRemote(step)) = self.modal.popup() else {
             return None;
         };
         Some(match step {
@@ -417,20 +419,22 @@ impl App {
 
     /// Every key while the popup is up.
     pub(super) fn create_remote_key(&mut self, key: KeyEvent) {
-        let Some(Popup::CreateRemote(step)) = &mut self.popup else {
+        let Some(Popup::CreateRemote(step)) = self.modal.popup_mut() else {
             return;
         };
         match step.key(key) {
             Action::None => {},
             Action::Close => self.close_create_remote(),
             Action::Continue => {
-                let Some(Popup::CreateRemote(Step::Form(form))) = self.popup.take() else {
+                let Some(Popup::CreateRemote(Step::Form(form))) = self.modal.take_popup() else {
                     return;
                 };
                 match form.validate() {
-                    Ok(_) => self.popup = Some(Popup::CreateRemote(Step::Confirm(form))),
+                    Ok(_) => self
+                        .modal
+                        .open_popup(Popup::CreateRemote(Step::Confirm(form))),
                     Err(reason) => {
-                        self.popup = Some(Popup::CreateRemote(Step::Form(Form {
+                        self.modal.open_popup(Popup::CreateRemote(Step::Form(Form {
                             error: Some(reason.to_string()),
                             ..form
                         })));
@@ -438,12 +442,12 @@ impl App {
                 }
             },
             Action::Back => {
-                if let Some(Popup::CreateRemote(Step::Confirm(form))) = self.popup.take() {
-                    self.popup = Some(Popup::CreateRemote(Step::Form(form)));
+                if let Some(Popup::CreateRemote(Step::Confirm(form))) = self.modal.take_popup() {
+                    self.modal.open_popup(Popup::CreateRemote(Step::Form(form)));
                 }
             },
             Action::Create => {
-                let Some(Popup::CreateRemote(Step::Confirm(form))) = self.popup.take() else {
+                let Some(Popup::CreateRemote(Step::Confirm(form))) = self.modal.take_popup() else {
                     return;
                 };
                 let Some(sender) = self.event_sender.clone() else {
@@ -457,12 +461,13 @@ impl App {
     /// `Esc`: nothing was created. The typed fields are kept for next time; a
     /// check still running is abandoned.
     fn close_create_remote(&mut self) {
-        match self.popup.take() {
+        match self.modal.take_popup() {
             Some(Popup::CreateRemote(Step::Form(form) | Step::Confirm(form))) => {
                 self.create_remote.draft = Some(form.draft());
             },
             Some(Popup::CreateRemote(Step::Checking { .. })) => self.create_remote.generation += 1,
-            other => self.popup = other,
+            Some(other) => self.modal.open_popup(other),
+            None => {},
         }
     }
 

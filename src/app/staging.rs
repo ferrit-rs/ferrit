@@ -412,7 +412,7 @@ impl App {
                 if entry.worktree == git::model::Change::None {
                     return;
                 }
-                self.pending_confirm = Some(ConfirmPrompt {
+                self.modal.ask(ConfirmPrompt {
                     message: format!("discard all changes in {}?", entry.path.display()),
                     action: ConfirmAction::DiscardFile(entry.path.clone()),
                 });
@@ -434,7 +434,7 @@ impl App {
                         )
                     },
                 };
-                self.pending_confirm = Some(ConfirmPrompt {
+                self.modal.ask(ConfirmPrompt {
                     message: format!("discard {what} in {}?", entry.path.display()),
                     action: ConfirmAction::DiscardGranule(granule),
                 });
@@ -450,7 +450,7 @@ impl App {
     /// rather than reporting the refusal and stopping — `git branch -d`
     /// is offering a choice, not failing outright.
     pub(super) fn run_confirm(&mut self) {
-        let Some(prompt) = self.pending_confirm.take() else {
+        let Some(prompt) = self.modal.take_confirm() else {
             return;
         };
         match prompt.action {
@@ -478,7 +478,7 @@ impl App {
                 match repo.delete_branch(&name, force) {
                     Ok(()) => self.request_refresh(),
                     Err(git::error::GitError::BranchNotMerged(_)) if !force => {
-                        self.pending_confirm = Some(ConfirmPrompt {
+                        self.modal.ask(ConfirmPrompt {
                             message: format!(
                                 "'{name}' is not fully merged. Force delete? This may lose \
                                  commits with no other reference to them."

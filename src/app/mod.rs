@@ -633,11 +633,10 @@ pub struct App {
     /// Whether keys go to the left panes or to the Files diff cursor
     /// (`docs/PLAN_6_STAGING.md`).
     mode: Mode,
-    /// A discard or branch-delete confirmation waiting on `y` / `n` / `Esc`.
-    pending_confirm: Option<ConfirmPrompt>,
-    /// A commit popup or dismissible note; owns all input while `Some`
-    /// (`docs/PLAN_7_COMMIT.md`).
-    popup: Option<Popup>,
+    /// What owns the keys on top of the panes: a popup (commit box, menu,
+    /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
+    /// `y` / `n` / `Esc`. One at a time, hence one value.
+    modal: modal::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
@@ -693,6 +692,7 @@ pub struct App {
 }
 
 pub mod help;
+mod modal;
 pub mod right_pane;
 pub mod theme_editor;
 mod tree;
@@ -798,8 +798,7 @@ impl App {
             new_branch_title: String::new(),
             right_focused: false,
             mode: Mode::default(),
-            pending_confirm: None,
-            popup: None,
+            modal: modal::Modal::default(),
             commit_draft: None,
             remote_busy: None,
             remote_busy_started: None,
@@ -2185,7 +2184,7 @@ impl App {
     /// Close the error toast now (`Esc`), unless something else owns the key:
     /// a popup, a question or the help. `true` when there was one to close.
     pub(super) fn dismiss_toast(&mut self) -> bool {
-        if self.popup.is_some() || self.pending_confirm.is_some() || self.help_is_open() {
+        if self.modal.is_some() || self.help_is_open() {
             return false;
         }
         match &mut self.toast {

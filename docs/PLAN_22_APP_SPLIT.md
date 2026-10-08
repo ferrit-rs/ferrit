@@ -1,6 +1,6 @@
 # Plan: phase 22, break up `App`
 
-**Status: in progress (C1 `HelpState`, C2 `ThemeEditor`, C3 snapshot done).** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane` and `Modal` done).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
 
 What differs from the sketch below, and why:
@@ -13,6 +13,13 @@ What differs from the sketch below, and why:
   the arithmetic in `next_rgb_channel` and `move_palette`; a newtype would add noise now.
 - `HelpState` exposes `view_parts()` so drawing can borrow the overlay mutably and the query
   immutably at once.
+- **`Modal`, not one `Overlay` of five layers.** The characterization tests
+  (`tests/app_overlay.rs`) showed the layers are not exclusive: a key-bar question sits over the
+  welcome screen (`i` asks before `git init`) and over the git config editor, and `Esc` goes to a
+  popup before the toast. What is exclusive is a popup against a question, so
+  `app/modal.rs` has `enum Modal { None, Popup, Confirm }` and `App.modal` replaces `popup` and
+  `pending_confirm`. The full-screen view and the sheet stay separate layers. Its methods live on
+  `Modal` (not on `App`) so a caller can hold the popup mutably and read other fields of `App`.
 - Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 72 now. The "about 100" in the first sketch was an over-estimate.
 
 ## Goal

@@ -56,7 +56,7 @@ impl App {
         } else {
             format!("run git init in {}?", dir.display())
         };
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message,
             action: ConfirmAction::InitRepo(dir),
         });

@@ -27,11 +27,11 @@ impl App {
     /// up: overwriting a half-typed commit message would lose it, so that
     /// question is cancelled and the operation fails instead.
     pub(super) fn on_askpass(&mut self, prompt: String, reply: mpsc::Sender<Option<String>>) {
-        if self.popup.is_some() {
+        if self.modal.popup().is_some() {
             let _ = reply.send(None);
             return;
         }
-        self.popup = Some(Popup::Askpass(AskpassPrompt {
+        self.modal.open_popup(Popup::Askpass(AskpassPrompt {
             secret: askpass::is_secret(&prompt),
             prompt,
             typed: TextInput::default(),
@@ -43,7 +43,7 @@ impl App {
     /// Enter answers, Esc cancels (git then reports the failed login);
     /// anything else edits the answer.
     pub(super) fn askpass_key(&mut self, key: KeyEvent) {
-        let Some(Popup::Askpass(ask)) = &mut self.popup else {
+        let Some(Popup::Askpass(ask)) = self.modal.popup_mut() else {
             return;
         };
         match key.code {
@@ -60,11 +60,11 @@ impl App {
                 return;
             },
         }
-        self.popup = None;
+        self.modal.close_popup();
     }
 
     pub fn askpass_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Askpass(ask)) = &self.popup else {
+        let Some(Popup::Askpass(ask)) = self.modal.popup() else {
             return None;
         };
         Some(CommitPopupView {

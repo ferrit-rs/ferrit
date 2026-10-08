@@ -100,7 +100,7 @@ impl App {
     /// the selected branch once submitted.
     pub(super) fn open_new_branch_popup(&mut self) {
         if self.focus != Pane::Branches
-            || self.popup.is_some()
+            || self.modal.popup().is_some()
             || self.branch_drill.is_some()
             || self.branches_tab == BranchesTab::Remotes
         {
@@ -112,7 +112,8 @@ impl App {
                 .as_deref()
                 .unwrap_or(&self.snapshot.header.branch)
         );
-        self.popup = Some(Popup::NewBranch(TextInput::default()));
+        self.modal
+            .open_popup(Popup::NewBranch(TextInput::default()));
     }
 
     /// `Enter` in the new-branch popup: `git checkout -b <name>` from
@@ -121,7 +122,7 @@ impl App {
     /// text so the user can fix it and retry — the message surfaces in
     /// the Status pane rather than a second popup layered on this one.
     pub(super) fn do_create_branch(&mut self) {
-        let Some(Popup::NewBranch(buf)) = &self.popup else {
+        let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
             return;
         };
         let name = buf.text();
@@ -133,7 +134,7 @@ impl App {
         };
         match result {
             Ok(()) => {
-                self.popup = None;
+                self.modal.close_popup();
                 // The new branch is the checked-out one: select it, not the
                 // row the cursor was on (lazygit).
                 if self.branch_drill.is_none() && self.branches_tab == BranchesTab::Local {
@@ -168,7 +169,7 @@ impl App {
             self.finish_branch_action(result);
             return;
         }
-        self.pending_confirm = Some(ConfirmPrompt {
+        self.modal.ask(ConfirmPrompt {
             message: format!("delete branch {name}?"),
             action: ConfirmAction::DeleteBranch { name, force: false },
         });
@@ -217,8 +218,7 @@ impl App {
         if self.focus != Pane::Branches
             || self.branch_drill.is_some()
             || self.branches_tab == BranchesTab::Remotes
-            || self.popup.is_some()
-            || self.pending_confirm.is_some()
+            || self.modal.is_some()
         {
             return;
         }
@@ -235,7 +235,7 @@ impl App {
             action,
             hint,
         };
-        self.popup = Some(Popup::Menu(MenuState {
+        self.modal.open_popup(Popup::Menu(MenuState {
             title: "Merge".to_owned(),
             items: vec![
                 item(
@@ -298,7 +298,7 @@ impl App {
             Ok(git::branch::MergeOutcome::Merged) => {},
             Ok(git::branch::MergeOutcome::Conflicted) => {
                 let files = self.conflicted_paths().join(", ");
-                self.popup = Some(Popup::Note(format!(
+                self.modal.open_popup(Popup::Note(format!(
                     "merge conflict in {files}. Fix the files and stage them with <space>, \
                      then press m and choose Continue, or Abort."
                 )));
