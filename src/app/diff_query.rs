@@ -12,6 +12,7 @@ use super::{
 use crate::domain::git;
 use crate::domain::git::diff::{DiffOpts, DiffSide};
 use crate::domain::git::error::GitError;
+use crate::domain::git::port::GitPort;
 
 #[derive(Default)]
 pub(super) struct DiffQueryState {
@@ -51,7 +52,7 @@ pub struct DiffCompletion {
 }
 
 pub(crate) fn load(
-    repo: &git::Repo,
+    repo: &dyn GitPort,
     key: &RightKey,
     opts: DiffOpts,
 ) -> Result<DiffQueryResult, GitError> {
@@ -127,11 +128,7 @@ impl App {
             self.diff = self.build_diff(&key);
             return;
         };
-        let Some(path) = self
-            .repo
-            .as_ref()
-            .map(|repo| repo.reopen_path().to_path_buf())
-        else {
+        let Some(path) = self.repo.as_ref().map(|repo| repo.path().to_path_buf()) else {
             self.diff = DiffView::None;
             return;
         };
@@ -185,9 +182,7 @@ impl App {
             && self.right_key.as_ref() == Some(&next_key)
             && let (Some(sender), Some(path)) = (
                 self.event_sender.clone(),
-                self.repo
-                    .as_ref()
-                    .map(|repo| repo.reopen_path().to_path_buf()),
+                self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
             )
         {
             self.start_diff_query(sender, path, next_key, next_generation);
@@ -257,7 +252,7 @@ impl App {
         let Some(repo) = &self.repo else {
             return DiffView::None;
         };
-        match load(repo, key, self.diff_opts()) {
+        match load(repo.as_ref(), key, self.diff_opts()) {
             Ok(result) => self.diff_view_from_query(key, result),
             Err(error) => DiffView::Note(error.to_string()),
         }

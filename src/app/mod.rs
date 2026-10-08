@@ -48,6 +48,7 @@ use crate::domain::git;
 use crate::domain::git::apply::{ApplyDir, ApplyTarget};
 use crate::domain::git::diff::{DiffOpts, DiffSide};
 use crate::domain::git::error::GitResult;
+use crate::domain::git::port::GitPort;
 use crate::domain::image::detect;
 use crate::domain::image::preview::{self, Preview};
 
@@ -547,7 +548,7 @@ pub struct App {
     should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
-    repo: Option<git::Repo>,
+    repo: Option<Box<dyn GitPort>>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     repo_name: String,
     /// Git author name from the repository's effective config.
@@ -774,14 +775,14 @@ use diff_query::{DiffQueryState, RightKey};
 use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
 
 impl App {
-    fn base(repo: Option<git::Repo>, config: config::Config) -> Self {
+    fn base(repo: Option<Box<dyn GitPort>>, config: config::Config) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
         let keymap = keymap::Keymap::from_overrides(&config.keys).0;
         let repo_name = repo
             .as_ref()
-            .map_or_else(|| "ferrit".to_owned(), git::Repo::name);
-        let git_user_name = repo.as_ref().and_then(git::Repo::user_name);
+            .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
+        let git_user_name = repo.as_ref().and_then(|repo| repo.user_name());
         let (global_identities, repository_identity, effective_identity, identity_source) =
             repo.as_ref().map_or_else(
                 || {
@@ -792,7 +793,7 @@ impl App {
                         crate::domain::profile::settings::IdentitySource::Unset,
                     )
                 },
-                git::Repo::identity_settings,
+                |repo| repo.identity_settings(),
             );
         let profile = Profile::new(Settings {
             global_identities,
@@ -911,7 +912,7 @@ impl App {
             file,
             issues,
         } = load;
-        let mut app = Self::base(Some(git::Repo::open(path)?), config);
+        let mut app = Self::base(Some(Box::new(git::Repo::open(path)?)), config);
         app.config_file = file;
         app.refresh();
         app.report_config_issues(&issues);
@@ -1073,7 +1074,7 @@ impl App {
         let commit = self.commit_drill.as_ref().map(|drill| drill.hash.clone());
         let opts = self.diff_opts();
         let Some(repo) = &mut self.repo else { return };
-        let completion = Self::load_refresh(repo, branch, commit, opts);
+        let completion = Self::load_refresh(repo.as_mut(), branch, commit, opts);
         self.apply_refresh_result(completion);
     }
 
@@ -1088,11 +1089,7 @@ impl App {
             self.refresh_query.pending = true;
             return;
         }
-        let Some(path) = self
-            .repo
-            .as_ref()
-            .map(|repo| repo.reopen_path().to_path_buf())
-        else {
+        let Some(path) = self.repo.as_ref().map(|repo| repo.path().to_path_buf()) else {
             return;
         };
         let branch = self.branch_drill.as_ref().map(|drill| drill.branch.clone());
@@ -1123,7 +1120,7 @@ impl App {
     }
 
     fn load_refresh(
-        repo: &mut git::Repo,
+        repo: &mut dyn GitPort,
         branch: Option<String>,
         commit: Option<String>,
         opts: DiffOpts,
@@ -2086,7 +2083,7 @@ impl App {
     fn watch_root(&self) -> Option<PathBuf> {
         self.repo
             .as_ref()
-            .and_then(git::Repo::workdir)
+            .and_then(|repo| repo.workdir())
             .map(Path::to_path_buf)
     }
 

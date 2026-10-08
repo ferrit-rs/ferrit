@@ -94,9 +94,7 @@ impl App {
         self.image_query.path = Some(path.clone());
         if let (Some(sender), Some(repo_path)) = (
             self.event_sender.clone(),
-            self.repo
-                .as_ref()
-                .map(|repo| repo.reopen_path().to_path_buf()),
+            self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
         ) {
             self.preview = Preview::Note("loading image...".into());
             self.queue_image_query(sender, repo_path, path, generation);
@@ -174,9 +172,7 @@ impl App {
             && self.image_query.path.as_ref() == Some(&path)
             && let (Some(sender), Some(repo_path)) = (
                 self.event_sender.clone(),
-                self.repo
-                    .as_ref()
-                    .map(|repo| repo.reopen_path().to_path_buf()),
+                self.repo.as_ref().map(|repo| repo.path().to_path_buf()),
             )
         {
             self.start_image_query(sender, repo_path, path, generation);

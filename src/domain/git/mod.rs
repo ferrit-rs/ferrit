@@ -25,6 +25,7 @@ mod init;
 pub mod log;
 pub mod model;
 pub mod operation;
+pub mod port;
 pub mod rebase;
 pub mod refs;
 pub mod remote;
