@@ -13,7 +13,7 @@ What differs from the sketch below, and why:
   the arithmetic in `next_rgb_channel` and `move_palette`; a newtype would add noise now.
 - `HelpState` exposes `view_parts()` so drawing can borrow the overlay mutably and the query
   immutably at once.
-- Count: `App` went from about 100 fields to 65.
+- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 72 now. The "about 100" in the first sketch was an over-estimate.
 
 ## Goal
 
