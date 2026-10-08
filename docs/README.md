@@ -13,6 +13,7 @@ is the index.
 | [2](adr/0002-replay-scripts-as-integration-tests.md) | A replay harness for end-to-end behaviour |
 | [3](adr/0003-paint-the-whole-screen.md) | Ferrit paints its whole screen |
 | [4](adr/0004-strict-lints-as-policy.md) | A strict lint policy, enforced in CI |
+| [5](adr/0005-a-port-in-front-of-git.md) | A port in front of git |
 
 ## Plans by theme
 

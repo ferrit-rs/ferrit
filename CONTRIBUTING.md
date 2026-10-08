@@ -23,7 +23,9 @@ cargo run
 
 Source responsibilities are separated by area:
 
-- `src/domain/`: Git models and backend, profile, and image logic.
+- `src/domain/`: Git models, the `GitPort` traits and their adapters, profile, and image logic.
+  `app/` goes through `GitPort`; a test that only needs app logic can use `FakeGit` and
+  `App::with_git` instead of building a repository.
 - `src/app/`: Ferrit state, events, screens, keymap, and terminal lifecycle.
 - `src/components/`: reusable UI primitives and isolated `tui_overlay` code.
 
@@ -52,6 +54,11 @@ cargo machete
 cargo deny check
 cargo nextest run --all-features
 ```
+
+CI also builds on the minimum Rust version declared in `Cargo.toml` (`rust-version`),
+runs the tests on macOS, and reports coverage. Test helpers shared by the integration
+tests (`TempDir`, `git`, `commit_all`, `configure_identity`) live in `tests/common`;
+use them instead of writing another copy.
 
 If `cargo-nextest` is unavailable, `cargo test --all-features` is a useful
 fallback. For behavior changes, run a replay script too:

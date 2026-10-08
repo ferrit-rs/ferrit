@@ -13,7 +13,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
-- Architecture overview, four decision records and a documentation index under `docs/`.
+- Architecture overview, five decision records and a documentation index under `docs/`.
 
 ## [0.10.0] - 2026-10-06
 

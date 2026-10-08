@@ -163,10 +163,13 @@ cargo run
 ## Architecture
 
 One crate, three layers: `app/` (state, events, screens), `domain/` (git and the
-model the UI reads) and `components/` (reusable widgets). Reads go through `git2`,
-changes through the `git` subprocess so hooks and signing behave as in your shell.
-Slow work runs in worker threads and comes back on one event channel. Behaviour is
-tested end to end by replay scripts that press keys on a deterministic repository.
+model the UI reads) and `components/` (reusable widgets). The app talks to git
+through a trait (`GitPort`), implemented by `git2` for reads and the `git`
+subprocess for changes, so hooks and signing behave as in your shell, and by an
+in-memory fake for tests. Errors are typed all the way to the screen. Slow work
+runs in worker threads and comes back on one event channel. Behaviour is tested
+end to end by replay scripts that press keys on a deterministic repository, and
+the lints are strict (no `unwrap`, no `unsafe`, clippy pedantic as errors in CI).
 
 See [`docs/architecture.md`](docs/architecture.md), the decisions in
 [`docs/adr/`](docs/adr/) and the design history in [`docs/`](docs/README.md).

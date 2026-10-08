@@ -5,6 +5,16 @@
 - Releases: bump `Cargo.toml`, date the `CHANGELOG.md` section, commit `chore: release ferrit X.Y.Z`, then run `scripts/release.sh` (a dry run) and `scripts/release.sh --execute` to publish the crate and tag it. Never `cargo publish` or tag by hand.
 - If you change something related to `PLAN_N`, make sure to also change the content of the file.
 
+## Tests
+
+- Integration tests share their helpers through `tests/common/mod.rs` (`TempDir`, `git`,
+  `commit_all`, `configure_identity`). Reuse them; do not paste another copy.
+- A test about app logic, not about git, uses `FakeGit` and `App::with_git`. A test about
+  git itself uses a real temporary repository. New `FakeGit` behaviour comes with a
+  scenario in `tests/fake_git_contract.rs` that also runs on `Repo`.
+- A test file that grows past about 700 lines becomes a folder (`main.rs`, `support.rs`,
+  one module per behaviour), like `tests/git_rebase/`.
+
 ## Before writing code
 
 Adapted from [ponytail](https://github.com/dietrichgebert/ponytail).
