@@ -17,7 +17,8 @@ use std::time::Duration;
 
 use ferrit::app::App;
 use ferrit::app::error::AppError;
-use ferrit::app::events::{AppEvent, RemoteOp};
+use ferrit::app::events::AppEvent;
+use ferrit::git::remote::RemoteOp;
 use ferrit::interface::components::ui::toast::Toast;
 use ferrit::interface::screens as ui;
 use ratatui::Terminal;

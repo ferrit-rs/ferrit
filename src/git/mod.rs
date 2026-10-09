@@ -36,6 +36,7 @@ pub mod port;
 pub(crate) mod process;
 pub mod profile;
 pub mod rebase;
+pub mod remote;
 pub mod repo;
 pub mod ssh_config;
 pub mod staging;

@@ -7,13 +7,13 @@
 use crate::app::events::AppEvent;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use super::events::RemoteOp;
 use crate::app::error::AppError;
+use crate::git::remote::RemoteOp;
 use crate::interface::panes::diff_query::DiffQueryState;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
@@ -116,10 +116,51 @@ impl Workers {
     /// Ask the network operation in flight to stop, and wait for it.
     pub(crate) fn stop_remote(&mut self) {
         if let Some(worker) = self.remote_worker.take() {
-            self.remote_cancel
-                .store(true, std::sync::atomic::Ordering::Release);
+            self.remote_cancel.store(true, Ordering::Release);
             let _ = worker.join();
             self.remote_busy = None;
         }
+    }
+}
+
+impl Workers {
+    /// A network operation starts: note which, and when, and clear the cancel flag.
+    pub(crate) fn begin_remote(&mut self, op: RemoteOp) {
+        self.remote_busy = Some(op);
+        self.remote_started = Some(Instant::now());
+        self.remote_cancel.store(false, Ordering::Release);
+    }
+
+    /// The network operation is over: wait for its thread and clear the busy flag.
+    pub(crate) fn end_remote(&mut self) {
+        self.remote_busy = None;
+        self.remote_started = None;
+        if let Some(worker) = self.remote_worker.take() {
+            let _ = worker.join();
+        }
+    }
+
+    /// A short label for the Status pane while a fetch/pull/push is in
+    /// flight, or `None`. Not a progress bar: ferrit has no way to know the
+    /// percentages without parsing git's `--progress` stream.
+    pub(crate) fn remote_busy_label(&self) -> Option<&'static str> {
+        self.remote_busy.map(RemoteOp::busy_label)
+    }
+
+    /// LazyGit-style label, with a small animation, attached to the
+    /// checked-out branch row while a network operation runs.
+    pub(crate) fn remote_branch_status(&self) -> Option<String> {
+        let label = self.remote_busy?.branch_label();
+        let elapsed = self.remote_started?.elapsed().as_millis();
+        let frame = [
+            "\u{25cf}\u{2219}\u{2219}",
+            "\u{2219}\u{25cf}\u{2219}",
+            "\u{2219}\u{2219}\u{25cf}",
+            "\u{2219}\u{25cf}\u{2219}",
+        ]
+        .get(usize::try_from(elapsed / 120).unwrap_or(usize::MAX) % 4)
+        .copied()
+        .unwrap_or("\u{25cf}\u{2219}\u{2219}");
+        Some(format!("{label} {frame}"))
     }
 }

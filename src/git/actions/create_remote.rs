@@ -12,10 +12,10 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
+use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
-use crate::app::{App, events};
 use crate::git::error::GitError;
 use crate::git::host::{
     self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
@@ -516,7 +516,7 @@ impl App {
         let author = self.authorship.author_arg();
         self.create_remote.draft = Some(draft);
         self.create_remote.error = None;
-        self.workers.remote_busy = Some(events::RemoteOp::Create);
+        self.workers.remote_busy = Some(crate::git::remote::RemoteOp::Create);
         self.workers.remote_started = Some(Instant::now());
         self.status_note = None;
         self.workers.remote_cancel.store(false, Ordering::Release);

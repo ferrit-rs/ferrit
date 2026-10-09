@@ -46,7 +46,7 @@ pub enum AppEvent {
     /// The dashboard statistics worker answered (`app::dashboard`).
     StatsDone(crate::interface::sheets::dashboard::StatsCompletion),
     RemoteDone {
-        op: RemoteOp,
+        op: crate::git::remote::RemoteOp,
         message: Result<String, AppError>,
     },
     /// `gh repo create` finished: the repository's web URL, or why not
@@ -58,20 +58,6 @@ pub enum AppEvent {
         generation: u64,
         status: crate::git::host::GhStatus,
     },
-}
-
-/// Which of the network operations finished. Distinct from
-/// `git::error::GitError`'s own per-operation variants: this is *which action ran*,
-/// not *why it failed* — `App::remote_busy_label` and the eventual result
-/// both need to know which of the three is in flight / just finished.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RemoteOp {
-    Fetch,
-    Pull,
-    Push,
-    /// `gh repo create` (`app::create_remote`): it has its own start, since it
-    /// takes a form's fields, but it shares the slot with the other three.
-    Create,
 }
 
 /// Debounce window for filesystem bursts. `git` touches a dozen files per

@@ -19,8 +19,8 @@ use std::path::Path;
 use std::sync::mpsc;
 
 use ferrit::app::App;
-use ferrit::app::events::RemoteOp;
 use ferrit::app::mock;
+use ferrit::git::remote::RemoteOp;
 use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens as ui;
 use git2::{IndexAddOption, Repository, Signature};

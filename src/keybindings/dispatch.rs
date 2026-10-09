@@ -5,8 +5,9 @@
 
 use ratatui::crossterm::event::KeyEvent;
 
-use crate::app::{App, events};
+use crate::app::App;
 use crate::git;
+use crate::git::remote::RemoteOp;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::{PANES, Pane};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
@@ -74,8 +75,8 @@ impl App {
             Action::Enter => self.enter_selected(),
             Action::EnterDiff => self.enter_diff_mode(),
             Action::Refresh => self.request_refresh(),
-            Action::Fetch => self.trigger_remote_op(events::RemoteOp::Fetch),
-            Action::Pull => self.trigger_remote_op(events::RemoteOp::Pull),
+            Action::Fetch => self.trigger_remote_op(RemoteOp::Fetch),
+            Action::Pull => self.trigger_remote_op(RemoteOp::Pull),
             Action::Push => self.push_current_branch(),
             Action::Commit => self.open_commit(git::commit::CommitKind::Normal),
             Action::Amend => self.open_commit(git::commit::CommitKind::Amend),

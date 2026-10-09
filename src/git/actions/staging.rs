@@ -4,12 +4,13 @@
 
 use std::ops::Range;
 
+use crate::app::App;
 use crate::app::error::AppError;
-use crate::app::{App, events};
 use crate::git;
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::model::Change;
+use crate::git::remote::RemoteRequest;
 use crate::git::staging::{self, Plan, Refusal};
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
@@ -200,13 +201,7 @@ impl App {
             ConfirmAction::ConfigUnset(op) => self.confirm_git_config_unset(&op),
             ConfirmAction::ForcePush => {
                 if let Some(sender) = self.workers.sender.clone() {
-                    self.start_remote_op_with_force(
-                        events::RemoteOp::Push,
-                        None,
-                        None,
-                        true,
-                        sender,
-                    );
+                    self.start_remote(RemoteRequest::force_push(), sender);
                 }
             },
         }

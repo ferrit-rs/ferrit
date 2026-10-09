@@ -730,7 +730,7 @@ impl App {
 
     pub fn branch_lines(&self) -> Vec<Line<'static>> {
         self.rows()
-            .branch_lines(self.remote_branch_status().as_deref())
+            .branch_lines(self.workers.remote_branch_status().as_deref())
     }
 
     pub fn branches_title(&self) -> String {

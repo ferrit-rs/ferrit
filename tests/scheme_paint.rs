@@ -137,7 +137,7 @@ fn it_covers_what_clear_wipes_a_popup_the_help_the_toast_and_the_drawer() {
         press(&mut app, KeyCode::Esc);
         // The error toast.
         app.on_remote_done(
-            ferrit::app::events::RemoteOp::Fetch,
+            ferrit::git::remote::RemoteOp::Fetch,
             Err(GitError::FetchFailed("boom".to_owned()).into()),
         );
         for _ in 0..40 {
