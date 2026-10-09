@@ -4,7 +4,7 @@ use crate::tui::components::panes::Pane;
 use crate::tui::draw::{FullScreen, Landed, RenderState};
 use crate::tui::keymap::{Action, Context, KeyBinding, Keymap};
 use crate::tui::scene::Scene;
-use crate::tui::widgets::key_bar::KeyBar;
+use crate::tui::widgets::chrome::KeyBar;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthStr;

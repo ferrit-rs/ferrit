@@ -14,10 +14,10 @@ use crate::git::stats::series::{Bucket, Granularity};
 use crate::git::stats::share::{fold, shares};
 use crate::tui::components::dashboard::text::{axis_date, figure, figure_columns, plural};
 use crate::tui::components::dashboard::{Ctx, note};
-use crate::tui::widgets::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
-use crate::tui::widgets::donut::{self, Donut, Slice};
-use crate::tui::widgets::heatmap::{self, HeatMap};
-use crate::tui::widgets::share_bar::stacked_bar;
+use crate::tui::widgets::charts::stacked_bar;
+use crate::tui::widgets::charts::{ChartMode, OTHERS, kind_slot, slot_marker};
+use crate::tui::widgets::charts::{Donut, Slice};
+use crate::tui::widgets::charts::{HeatMap, fits, legend as heatmap_legend, weeks_shown};
 
 const DAY: i64 = 86_400;
 /// Columns and rows the ring is drawn in: 32 x 32 dots, so it looks round.
@@ -260,7 +260,7 @@ pub(crate) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
         .collect();
     let ring_w = RING_WIDTH.min(area.width.saturating_sub(2 + LEGEND_MIN));
     let ring = Rect::new(area.x, area.y, ring_w, RING_HEIGHT.min(area.height));
-    if ctx.view.mode == ChartMode::Braille && donut::fits(ring) {
+    if ctx.view.mode == ChartMode::Braille && fits(ring) {
         let slices: Vec<Slice> = pieces
             .iter()
             .map(|p| Slice {
@@ -294,7 +294,7 @@ pub(crate) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
 
 /// `26 weeks`, the dim words after the section title.
 pub(crate) fn heat_unit(width: u16) -> String {
-    format!("{} weeks", heatmap::weeks_shown(width))
+    format!("{} weeks", weeks_shown(width))
 }
 
 pub(crate) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
@@ -332,6 +332,6 @@ pub(crate) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
             area.width.saturating_sub(4),
             1,
         );
-        Paragraph::new(heatmap::legend(ctx.colors().heat, density, ctx.dim())).render(legend, buf);
+        Paragraph::new(heatmap_legend(ctx.colors().heat, density, ctx.dim())).render(legend, buf);
     }
 }

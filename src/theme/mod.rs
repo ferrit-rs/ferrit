@@ -6,5 +6,4 @@
 pub(crate) mod color_picker;
 pub mod palette;
 pub mod scheme;
-pub(crate) mod style;
 pub mod theme_config;

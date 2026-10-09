@@ -11,20 +11,20 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use super::Snapshot;
 use crate::git::apply::{ApplyDir, ApplyTarget};
-use crate::git::blob::Rev;
 use crate::git::branch::MergeOutcome;
 use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::config::{ConfigView, ValueKind, WriteScope};
+use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
 use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{BranchEntry, Change, CommitEntry, FileEntry, PushState, RemoteEntry};
-use crate::git::operation::{OperationOutcome, Step};
 use crate::git::port::{
     GitBranches, GitConfig, GitHistory, GitIndex, GitPort, GitRead, GitRemote, GitStash,
 };
 use crate::git::rebase::RebaseEdit;
+use crate::git::rebase::{OperationOutcome, Step};
 use crate::git::stash::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 

@@ -7,8 +7,8 @@ use std::process::Command;
 
 use ferrit::git::error::GitError;
 use ferrit::git::model::Operation;
-use ferrit::git::operation::{OperationOutcome, Step};
 use ferrit::git::rebase::RebaseEdit;
+use ferrit::git::rebase::{OperationOutcome, Step};
 use ferrit::git::repo::Repo;
 use git2::Repository;
 

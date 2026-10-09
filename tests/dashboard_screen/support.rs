@@ -9,7 +9,7 @@ use ferrit::git::stats::{
 };
 use ferrit::theme::palette::Palette;
 use ferrit::tui::components::dashboard::{self, Chrome, View};
-use ferrit::tui::widgets::chart_palette::{ChartMode, ChartPalette};
+use ferrit::tui::widgets::charts::{ChartMode, ChartPalette};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

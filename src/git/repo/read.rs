@@ -6,12 +6,12 @@
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
 //! The `git2` and subprocess half of `crate::git::diff`: the types are there.
-//! The `git2` and subprocess half of `crate::git::blob`: the types are there.
+//! The `git2` and subprocess half of `crate::git::diff`: the types are there.
 //! Local branches: which one is HEAD, its upstream, ahead/behind.
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
 
-use crate::git::blob::Rev;
+use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
 use crate::git::exec;

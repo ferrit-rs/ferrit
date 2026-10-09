@@ -6,8 +6,8 @@ use crate::git::Snapshot;
 use crate::git::commit::CommitKind;
 use crate::git::error::GitResult;
 use crate::git::model::CommitEntry;
-use crate::git::operation::OperationOutcome;
 use crate::git::port::GitPort;
+use crate::git::rebase::OperationOutcome;
 use crate::git::staging;
 use crate::theme::palette::Palette;
 use crate::tui::App;
@@ -133,7 +133,7 @@ pub(crate) enum Event {
     /// Run a network operation in the background.
     StartRemote(crate::git::remote::RemoteRequest),
     /// Carry on a merge, rebase, cherry-pick or revert, or abort it.
-    OperationStep(crate::git::operation::Step),
+    OperationStep(crate::git::rebase::Step),
     /// The first global git config write was confirmed: go on with the edit.
     ResumeGitConfigEdit(crate::git::config_edit::GlobalResume),
     /// `git init` in this folder.
@@ -346,7 +346,7 @@ impl App {
 impl App {
     /// Run one step of the merge, rebase, cherry-pick or revert and say where
     /// git stopped.
-    pub(crate) fn apply_operation_step(&mut self, step: crate::git::operation::Step) {
+    pub(crate) fn apply_operation_step(&mut self, step: crate::git::rebase::Step) {
         let Some(repo) = &self.repo else { return };
         let result = repo.operation_step(step);
         self.finish_operation(result);

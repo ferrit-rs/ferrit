@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::support::{assert_rebase_failed, edit, hash_of, history, operation, step, subjects};
 use ferrit::git::error::GitError;
 use ferrit::git::model::Operation;
-use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::rebase::{OperationOutcome, Step};
 use ferrit::git::rebase::{RebaseEdit, build_todo};
 use ferrit::git::repo::Repo;
 use git2::Repository;

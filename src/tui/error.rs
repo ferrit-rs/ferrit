@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::config::error::ConfigError;
+use crate::config::ConfigError;
 use crate::git::error::GitError;
 use crate::tui::components::diff::ImageError;
 use crate::tui::workers::WorkerError;

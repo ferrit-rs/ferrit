@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ferrit::git::blob::Rev;
+use ferrit::git::diff::Rev;
 use ferrit::git::error::GitError;
 use ferrit::git::model::Change;
 use ferrit::git::repo::Repo;

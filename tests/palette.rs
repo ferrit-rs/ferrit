@@ -17,7 +17,7 @@ use ferrit::tui::App;
 use ferrit::tui::components::panes::Pane;
 use ferrit::tui::mock::{mock_commits, mock_files};
 use ferrit::tui::row_lines;
-use ferrit::tui::widgets::key_bar::KeyBar;
+use ferrit::tui::widgets::chrome::KeyBar;
 use ratatui::style::Color;
 
 /// A palette where every colour is different from `Palette::DARK`'s and from

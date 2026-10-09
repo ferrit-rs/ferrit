@@ -10,8 +10,8 @@
 
 use super::error::GitResult;
 use super::model::{Change, FileEntry};
-use super::operation::OperationOutcome;
 use super::port::GitPort;
+use super::rebase::OperationOutcome;
 use super::rebase::RebaseEdit;
 
 /// What kind of commit to make.

@@ -10,11 +10,10 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::read`.
 
+use self::parse::FileMeta;
 use std::io::Write as _;
 use std::path::Path;
 use std::process::{Command, Stdio};
-
-use self::parse::FileMeta;
 
 pub mod parse;
 
@@ -243,4 +242,13 @@ pub(crate) fn line_of(text: &str, byte: usize) -> usize {
 /// future caller that already holds diff output.
 pub fn parse_diff(text: &str) -> Diff {
     Diff::new(text.to_owned())
+}
+
+/// Which version of a path's bytes to read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rev {
+    /// The file as it currently sits in the working directory.
+    Workdir,
+    /// The blob recorded in HEAD's tree.
+    Head,
 }

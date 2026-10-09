@@ -2,9 +2,9 @@
 
 use crate::git::host::{CreateDraft, HostError, Visibility, parse_target, validate_description};
 use crate::theme::palette::Palette;
-use crate::tui::widgets::dialog::Dialog;
-use crate::tui::widgets::key_bar::KeyBar;
-use crate::tui::widgets::panel::Panel;
+use crate::tui::widgets::chrome::Dialog;
+use crate::tui::widgets::chrome::KeyBar;
+use crate::tui::widgets::chrome::Panel;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
 use color_eyre::Result;
 use ratatui::Frame;

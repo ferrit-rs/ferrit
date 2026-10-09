@@ -16,15 +16,12 @@
 
 pub mod apply;
 pub mod askpass;
-pub(crate) mod authorship;
-pub mod blob;
 pub mod branch;
 pub mod command_log;
 pub mod commit;
 pub mod config;
 pub mod config_edit;
 pub mod config_keys;
-pub mod create_remote;
 pub mod diff;
 pub mod error;
 pub(crate) mod exec;
@@ -34,10 +31,8 @@ pub mod host;
 pub mod identity;
 pub mod image;
 pub mod model;
-pub mod operation;
 pub mod port;
 pub(crate) mod process;
-pub mod profile;
 pub mod rebase;
 pub mod remote;
 pub mod repo;

@@ -10,8 +10,8 @@ use ratatui::text::Line;
 use crate::config::Config;
 use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::Snapshot;
-use crate::git::create_remote::CreateRemote;
 use crate::git::diff::DiffSide;
+use crate::git::host::CreateRemote;
 use crate::git::port::GitPort;
 use crate::theme::palette::Palette;
 use crate::tui::App;
@@ -46,7 +46,7 @@ pub(crate) struct Scene<'a> {
     pub(crate) full_screens: &'a crate::tui::draw::FullScreens,
     pub(crate) modal: &'a Modal,
     pub(crate) hits: &'a crate::tui::components::panes::HitAreas,
-    pub(crate) authorship: &'a crate::git::authorship::Authorship,
+    pub(crate) authorship: &'a crate::git::identity::Authorship,
     pub(crate) workers: &'a Workers,
     pub(crate) repo: &'a Option<Box<dyn GitPort>>,
     pub(crate) repo_name: &'a str,

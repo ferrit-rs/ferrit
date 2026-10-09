@@ -24,17 +24,17 @@ use git2::Repository;
 
 use crate::git::Snapshot;
 use crate::git::apply::{ApplyDir, ApplyTarget};
-use crate::git::blob::Rev;
 use crate::git::branch::MergeOutcome;
 use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::config::{ConfigView, ValueKind, WriteScope};
+use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
 use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{self, CommitEntry, RemoteEntry};
-use crate::git::operation::{OperationOutcome, Step};
 use crate::git::rebase::RebaseEdit;
+use crate::git::rebase::{OperationOutcome, Step};
 use crate::git::stash::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 

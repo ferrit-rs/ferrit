@@ -13,8 +13,8 @@ use crate::tui::components::welcome::welcome_lines;
 use crate::tui::draw::{Landed, RenderState, RenderedDiff};
 use crate::tui::error::AppError;
 use crate::tui::scene::Scene;
-use crate::tui::widgets::panel::Panel;
-use crate::tui::widgets::scroll_bar::ScrollBar;
+use crate::tui::widgets::chrome::Panel;
+use crate::tui::widgets::chrome::ScrollBar;
 use crate::tui::widgets::text_input::TextInput;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
 use crate::tui::{mock, row_lines};
@@ -793,7 +793,7 @@ pub(crate) fn load_image(
 ) -> Result<::image::DynamicImage, ImageError> {
     let repo = repo?;
     let bytes = repo
-        .blob_bytes(image_path, git::blob::Rev::Workdir)
+        .blob_bytes(image_path, git::diff::Rev::Workdir)
         .map_err(|source| ImageError::Read {
             path: image_path.to_path_buf(),
             source,

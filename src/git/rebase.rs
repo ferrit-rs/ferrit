@@ -16,9 +16,8 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::history`.
 
-use std::path::Path;
-
 use super::model::CommitEntry;
+use std::path::Path;
 
 /// What to do with the selected commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,4 +97,36 @@ pub fn has_foldable_fixup(commits: &[CommitEntry], selected: usize) -> bool {
             .skip(index + 1)
             .any(|candidate| candidate.summary == target)
     })
+}
+
+/// What the user asks of a stopped operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    /// Carry on after the user resolved what stopped it.
+    Continue,
+    /// Not available for a merge: git has no `merge --skip`.
+    Skip,
+    /// Give up and return to where the operation started.
+    Abort,
+}
+
+/// Where the repository is after a step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationOutcome {
+    /// No operation in progress any more.
+    Done,
+    /// Git stopped again and waits for the user: on a conflict, or, for a
+    /// rebase, at an `edit` step.
+    Stopped {
+        /// The index has unresolved conflicts.
+        conflicted: bool,
+    },
+}
+
+pub(crate) fn flag(step: Step) -> &'static str {
+    match step {
+        Step::Continue => "--continue",
+        Step::Skip => "--skip",
+        Step::Abort => "--abort",
+    }
 }

@@ -16,19 +16,15 @@
 //! - Nothing in the library reads the real config directory on its own: only
 //!   `Config::load`, which the binary calls, and `tests/config.rs` checks that.
 
+use crate::theme::theme_config::ThemeConfig;
+use directories::ProjectDirs;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use directories::ProjectDirs;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-
-pub mod error;
 pub mod settings;
-
-use crate::theme::theme_config::ThemeConfig;
-use error::ConfigError;
 
 const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file when it saves a\n\
                            # setting: unknown sections are kept, comments are not.\n\n";
@@ -404,4 +400,27 @@ fn collect_unknown(file: &toml::Table, known: &toml::Table, prefix: &str, out: &
             _ => {},
         }
     }
+}
+
+/// Why `config.toml` could not be saved.
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    /// The file exists but is not TOML; it is left untouched.
+    #[error("{} is not valid TOML, fix it first (not overwritten): {source}", .path.display())]
+    NotToml {
+        path: PathBuf,
+        #[source]
+        source: toml::de::Error,
+    },
+    #[error("cannot read {}: {source}", .path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error(transparent)]
+    Serialize(#[from] toml::ser::Error),
+    /// Creating the directory, writing the staging file or renaming it failed.
+    #[error(transparent)]
+    Write(#[from] std::io::Error),
 }

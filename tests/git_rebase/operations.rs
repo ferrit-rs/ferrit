@@ -8,7 +8,7 @@ use crate::support::{
     try_git,
 };
 use ferrit::git::model::Operation;
-use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::rebase::{OperationOutcome, Step};
 use ferrit::git::repo::Repo;
 
 #[test]

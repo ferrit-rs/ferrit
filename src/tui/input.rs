@@ -9,7 +9,7 @@ use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
 use crate::tui::components::popups::Popup;
 use crate::tui::components::{
-    askpass, branches, commits, files, menu, panes, popups, remote, stash, welcome,
+    branches, commits, files, menu, panes, popups, remote as askpass, remote, stash, welcome,
 };
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;

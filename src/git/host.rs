@@ -9,13 +9,13 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::remotes`.
 
-use crate::git::process::{REMOTE_TIMEOUT, run_child};
-use std::ffi::{OsStr, OsString};
-use std::path::Path;
-use std::time::Duration;
-
 use crate::git::error::GitError;
 use crate::git::exec;
+use crate::git::process::{REMOTE_TIMEOUT, run_child};
+use crate::git::ssh_config::read_github_aliases;
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// Longest repository name GitHub takes.
 pub(crate) const NAME_MAX: usize = 100;
@@ -349,5 +349,44 @@ impl CreateDraft {
             visibility: Visibility::Private,
             description: String::new(),
         }
+    }
+}
+
+/// The creation's own state on `App`.
+#[derive(Debug, Default)]
+pub struct CreateRemote {
+    /// The last draft, until a creation succeeds.
+    pub draft: Option<CreateDraft>,
+    /// Why the last creation was refused, for the form to show.
+    pub error: Option<String>,
+    /// The web URL of the repository just created.
+    pub web_url: Option<String>,
+    pub(crate) gh: GhProgram,
+    /// Bumped each time the check starts or is abandoned.
+    pub(crate) generation: u64,
+    /// The push in flight is the one that follows a creation.
+    pub(crate) pushing_after: bool,
+    /// The ssh config the host aliases are read from; `None` is
+    /// `~/.ssh/config`. A test points it elsewhere.
+    pub(crate) ssh_config: Option<PathBuf>,
+    /// The SSH host chosen when the creation started (the user's own alias, or
+    /// none), used once `gh` has made the repository.
+    pub(crate) ssh_host: String,
+}
+
+impl CreateRemote {
+    /// Keep the `gh` program a test or the replay injected when the app is
+    /// rebuilt on a new repository (`App::attach_repository`).
+    pub(crate) fn carry_program_from(&mut self, previous: &Self) {
+        self.gh = previous.gh.clone();
+        self.ssh_config.clone_from(&previous.ssh_config);
+    }
+
+    /// The GitHub aliases of the ssh config, in the order it lists them.
+    pub(crate) fn ssh_aliases(&self) -> Vec<String> {
+        let path = self.ssh_config.clone().or_else(|| {
+            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/config"))
+        });
+        path.map_or_else(Vec::new, |path| read_github_aliases(&path))
     }
 }

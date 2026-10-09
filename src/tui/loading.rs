@@ -277,7 +277,7 @@ impl App {
             self.queue_image_query(sender, path, generation);
         } else {
             let bytes = match &self.repo {
-                Some(repo) => match repo.blob_bytes(&path, git::blob::Rev::Workdir) {
+                Some(repo) => match repo.blob_bytes(&path, git::diff::Rev::Workdir) {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         self.render.preview =

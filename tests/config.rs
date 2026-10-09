@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::config::error::ConfigError;
+use ferrit::config::ConfigError;
 use ferrit::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::theme::theme_config::{Preset, ThemeConfig};
 use ferrit::tui::App;

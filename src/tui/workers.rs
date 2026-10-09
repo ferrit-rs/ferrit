@@ -1,11 +1,11 @@
 //! The background work in flight and the result of a refresh.
 
 use crate::git;
-use crate::git::authorship::Authorship;
 use crate::git::diff::DiffOpts;
 use crate::git::error::GitError;
+use crate::git::identity::Authorship;
+use crate::git::identity::Profile;
 use crate::git::port::GitPort;
-use crate::git::profile::Profile;
 use crate::git::remote::RemoteOp;
 use crate::git::remote::{self as remote_ops, RemoteRequest};
 use crate::tui::App;
