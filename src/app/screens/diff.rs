@@ -9,12 +9,12 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 
-use crate::app::theme;
+use crate::app::row_lines;
 use crate::app::{App, DiffView};
-use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git;
+use crate::theme::palette::Palette;
 
 pub(super) fn draw_files_columns(
     frame: &mut Frame<'_>,
@@ -103,12 +103,12 @@ pub(super) fn draw_single_file_diff(
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
     frame.render_widget(
-        Paragraph::new(theme::stat_line(&palette, diff.stat())),
+        Paragraph::new(row_lines::stat_line(&palette, diff.stat())),
         stat_row,
     );
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || theme::render_diff(&palette, &diff, None, diff_area.width as usize),
-        |formatted| theme::render_delta(&formatted, diff_area.width as usize),
+        || row_lines::render_diff(&palette, &diff, None, diff_area.width as usize),
+        |formatted| row_lines::render_delta(&formatted, diff_area.width as usize),
     );
     overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, &palette);
     let total = text.lines.len();
@@ -149,7 +149,7 @@ fn diff_column_title(base: &str, active: bool, hint: Option<&str>) -> String {
 /// `cursor`, when this column is the `Mode::Diff` cursor's own side, is
 /// `(cursor line, V-select range)` — both indices into `diff`'s own lines,
 /// applied as a post-render overlay (`overlay_diff_cursor`) so it works the
-/// same whether the body came from `theme::render_diff` or from delta.
+/// same whether the body came from `row_lines::render_diff` or from delta.
 fn draw_diff_column(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -172,13 +172,13 @@ fn draw_diff_column(
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
     frame.render_widget(
-        Paragraph::new(theme::stat_line(palette, diff.stat())),
+        Paragraph::new(row_lines::stat_line(palette, diff.stat())),
         stat_row,
     );
 
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || theme::render_diff(palette, diff, None, diff_area.width as usize),
-        |formatted| theme::render_delta(&formatted, diff_area.width as usize),
+        || row_lines::render_diff(palette, diff, None, diff_area.width as usize),
+        |formatted| row_lines::render_delta(&formatted, diff_area.width as usize),
     );
     overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, palette);
     let total = text.lines.len();
@@ -193,7 +193,7 @@ fn draw_diff_column(
 /// Paint the `Mode::Diff` cursor onto an already-rendered diff body: a
 /// full-width reversed bar on the cursor line, and the palette's selection colour
 /// background across a V-selection. Applied after rendering, not woven into
-/// `theme::render_diff`, so it works identically over that native path and
+/// `row_lines::render_diff`, so it works identically over that native path and
 /// over delta's ANSI-derived one.
 fn overlay_diff_cursor(
     text: &mut Text<'static>,

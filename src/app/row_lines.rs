@@ -13,13 +13,13 @@ use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
 use super::tree::StageState;
-use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
 use crate::domain::git::model::FileEntry;
 use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
 use crate::domain::git::model::{Change, CommitRefKind, PushState};
 use crate::domain::git::model::{RemoteEntry, StatusHeader};
+use crate::theme::palette::Palette;
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[

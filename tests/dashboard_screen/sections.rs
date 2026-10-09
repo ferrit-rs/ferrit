@@ -2,9 +2,9 @@
 
 use crate::support::{author, branch, buffer, col_of, is_braille, render, stats, text, view};
 use ferrit::components::ui::chart_palette::{ChartMode, ChartPalette};
-use ferrit::components::ui::palette::Palette;
 use ferrit::domain::git::stats::KindStat;
 use ferrit::domain::git::stats::kind::Kind;
+use ferrit::theme::palette::Palette;
 use ratatui::style::Color;
 
 #[test]

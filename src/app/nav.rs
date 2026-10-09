@@ -8,9 +8,9 @@ use std::path::PathBuf;
 
 use enum_map::EnumMap;
 
-use crate::components::ui::palette::Palette;
 use crate::domain::git::Snapshot;
 use crate::domain::git::model::{CommitEntry, FileEntry};
+use crate::theme::palette::Palette;
 
 use super::pane_rows::PaneRows;
 use super::refresh::Shared;

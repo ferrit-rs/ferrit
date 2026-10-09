@@ -11,10 +11,10 @@ use ratatui_image::picker::Picker;
 
 use super::diff_query::RightKey;
 use super::render_state::RenderedDiff;
-use super::{DiffCursor, DiffView, hunk_content_id, hunk_lines_for, theme};
-use crate::components::ui::palette::Palette;
+use super::{DiffCursor, DiffView, hunk_content_id, hunk_lines_for, row_lines};
 use crate::domain::git;
 use crate::domain::git::diff::DiffSide;
+use crate::theme::palette::Palette;
 
 pub(crate) struct RightPane {
     /// Terminal graphics backend for the image preview. Starts on half-blocks
@@ -80,7 +80,11 @@ impl RightPane {
                 .count()
                 .max(f.staged.text.lines().count()),
             DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.text.lines().count(),
-            DiffView::BranchLog(log) => log.commits.iter().map(theme::branch_log_block_lines).sum(),
+            DiffView::BranchLog(log) => log
+                .commits
+                .iter()
+                .map(row_lines::branch_log_block_lines)
+                .sum(),
             DiffView::None | DiffView::Note(_) => 0,
         }
     }
@@ -233,8 +237,8 @@ impl RightPane {
                 });
                 if !cache_hit {
                     let text = diff.delta_output(width).map_or_else(
-                        || theme::render_diff(palette, diff, focus, width),
-                        |formatted| theme::render_delta(&formatted, width),
+                        || row_lines::render_diff(palette, diff, focus, width),
+                        |formatted| row_lines::render_delta(&formatted, width),
                     );
                     *cache = Some(RenderedDiff {
                         key: key.clone(),

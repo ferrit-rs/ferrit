@@ -8,10 +8,10 @@ use ratatui::text::Line;
 use super::nav::Nav;
 use super::{
     BranchesTab, FileRow, Pane, SelectionKey, StageState, dir_stage_state, drill_tree_rows,
-    find_file_row_key, selection_key_for_file_rows, theme, tree_rows,
+    find_file_row_key, row_lines, selection_key_for_file_rows, tree_rows,
 };
-use crate::components::ui::palette::Palette;
 use crate::domain::git::{self, Snapshot};
+use crate::theme::palette::Palette;
 
 pub(super) struct PaneRows<'a> {
     pub(super) nav: &'a Nav,
@@ -161,7 +161,7 @@ impl PaneRows<'_> {
                     name,
                     depth,
                     expanded,
-                } => Some(theme::dir_line(
+                } => Some(row_lines::dir_line(
                     self.palette,
                     name,
                     *depth,
@@ -172,7 +172,7 @@ impl PaneRows<'_> {
                     .snapshot
                     .files
                     .get(*index)
-                    .map(|entry| theme::file_line(self.palette, entry, *depth)),
+                    .map(|entry| row_lines::file_line(self.palette, entry, *depth)),
             })
             .collect()
     }
@@ -212,7 +212,7 @@ impl PaneRows<'_> {
             return drill
                 .commits
                 .iter()
-                .map(|entry| theme::commit_line(self.palette, entry))
+                .map(|entry| row_lines::commit_line(self.palette, entry))
                 .collect();
         }
         if self.nav.branches_tab == BranchesTab::Remotes {
@@ -223,7 +223,7 @@ impl PaneRows<'_> {
                 .snapshot
                 .remotes
                 .iter()
-                .map(|entry| theme::remote_line(self.palette, entry))
+                .map(|entry| row_lines::remote_line(self.palette, entry))
                 .collect();
         }
         if self.snapshot.branches.is_empty() {
@@ -234,7 +234,7 @@ impl PaneRows<'_> {
             .iter()
             .map(|branch| {
                 let status = if branch.is_head { head_status } else { None };
-                theme::branch_line_with_status(self.palette, branch, status)
+                row_lines::branch_line_with_status(self.palette, branch, status)
             })
             .collect()
     }
@@ -263,7 +263,7 @@ impl PaneRows<'_> {
                         depth,
                         expanded,
                         ..
-                    } => Some(theme::dir_line(
+                    } => Some(row_lines::dir_line(
                         self.palette,
                         name,
                         *depth,
@@ -273,7 +273,7 @@ impl PaneRows<'_> {
                     FileRow::File { index, depth } => drill
                         .files
                         .get(*index)
-                        .map(|entry| theme::file_line(self.palette, entry, *depth)),
+                        .map(|entry| row_lines::file_line(self.palette, entry, *depth)),
                 })
                 .collect();
         }
@@ -283,7 +283,7 @@ impl PaneRows<'_> {
         self.snapshot
             .commits
             .iter()
-            .map(|entry| theme::commit_line(self.palette, entry))
+            .map(|entry| row_lines::commit_line(self.palette, entry))
             .collect()
     }
 
@@ -305,7 +305,7 @@ impl PaneRows<'_> {
         self.snapshot
             .stashes
             .iter()
-            .map(|entry| theme::stash_line(self.palette, entry))
+            .map(|entry| row_lines::stash_line(self.palette, entry))
             .collect()
     }
 }

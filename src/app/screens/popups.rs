@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
 use crate::app::hints::{self, HelpLine};
-use crate::app::theme;
+use crate::app::row_lines;
 use crate::app::{CommandLogView, CommitPopupView, MenuView};
 use crate::components::tui_overlay::anchor::Anchor;
 use crate::components::tui_overlay::backdrop::Backdrop;
@@ -17,12 +17,12 @@ use crate::components::tui_overlay::slide::Slide;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::dialog::Dialog;
 use crate::components::ui::key_bar::KeyBar;
-use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
 use crate::components::ui::text_input::TextInput;
 use crate::domain::git::host::Visibility;
+use crate::theme::palette::Palette;
 
 /// The help screen: one line per binding of the focused pane and of the global
 /// context, scrolled to `scroll`. Returns how many lines fit, so the scroll
@@ -224,7 +224,7 @@ pub(super) fn draw_commit(
         let description_style = if view.summary_focused { idle } else { focused };
         let summary_block = Panel::new()
             .title(Line::styled(" Summary ", summary_style))
-            .bottom_title(theme::subject_counter(
+            .bottom_title(row_lines::subject_counter(
                 palette,
                 view.input.text().chars().count(),
             ))
@@ -413,7 +413,7 @@ pub(super) fn draw_command_log_view(
     let all: Vec<Line<'static>> = view
         .records
         .iter()
-        .flat_map(|record| theme::command_lines(palette, record))
+        .flat_map(|record| row_lines::command_lines(palette, record))
         .collect();
     let total = all.len();
     let end = total.saturating_sub(view.from_bottom.min(total.saturating_sub(rows)));

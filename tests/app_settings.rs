@@ -15,7 +15,7 @@ use std::process::Command;
 use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
-use ferrit::app::theme_config::{Preset, SchemeChoice};
+use ferrit::theme::config::{Preset, SchemeChoice};
 
 struct Fixture {
     dir: PathBuf,

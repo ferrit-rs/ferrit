@@ -14,7 +14,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::components::ui::cut::cut_middle;
 use crate::components::ui::dialog::Dialog;
-use crate::components::ui::palette::Palette;
+use crate::theme::palette::Palette;
 
 /// The dialog is never wider than this.
 const WIDTH: u16 = 64;

@@ -284,9 +284,9 @@ fn space_on_a_directory_stages_and_unstages_everything_under_it() {
 /// is looked up by its unique message rather than read off a frame other tests write to.
 #[test]
 fn a_commit_shows_git_s_own_answer_under_the_command() {
-    use ferrit::app::theme;
-    use ferrit::components::ui::palette::Palette;
+    use ferrit::app::row_lines;
     use ferrit::domain::git::command_log;
+    use ferrit::theme::palette::Palette;
 
     let repo = Repo::new("commit-output");
     repo.commit("a.txt", "one\n", "init");
@@ -317,7 +317,7 @@ fn a_commit_shows_git_s_own_answer_under_the_command() {
         record.output
     );
 
-    let lines = theme::command_lines(&Palette::DARK, &record);
+    let lines = row_lines::command_lines(&Palette::DARK, &record);
     assert_eq!(
         lines.len(),
         1 + record.output.len(),

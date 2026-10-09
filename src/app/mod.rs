@@ -10,10 +10,9 @@ pub mod events;
 pub mod hints;
 pub mod keymap;
 pub mod mock;
+pub mod row_lines;
 pub mod screens;
 pub mod terminal;
-pub mod theme;
-pub mod theme_config;
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -22,8 +21,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::components::ui::mouse_pointer::MousePointer;
-use crate::components::ui::palette::Palette;
 use crate::components::ui::toast::Toast;
+use crate::theme::palette::Palette;
 use color_eyre::Result;
 use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -73,7 +72,7 @@ pub struct App {
     repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
     authorship: authorship::Authorship,
-    pub theme: theme_editor::ThemeEditor,
+    pub theme: crate::theme::editor::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     snapshot: git::Snapshot,
@@ -133,7 +132,6 @@ pub mod refresh;
 mod render_state;
 pub(crate) mod right_pane;
 pub mod selection;
-pub mod theme_editor;
 mod tree;
 pub mod views;
 mod welcome;
@@ -203,7 +201,7 @@ impl App {
             repo,
             repo_name,
             authorship,
-            theme: theme_editor::ThemeEditor::new(theme_config),
+            theme: crate::theme::editor::ThemeEditor::new(theme_config),
             right: right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
@@ -570,7 +568,7 @@ impl App {
     }
 
     /// Tell the app what the terminal can show (`ColorDepth::detect`).
-    pub fn set_color_depth(&mut self, depth: crate::components::ui::scheme::ColorDepth) {
+    pub fn set_color_depth(&mut self, depth: crate::theme::scheme::ColorDepth) {
         self.prefs.color_depth = depth;
     }
 
@@ -802,16 +800,16 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![theme::error_line(
+            vec![row_lines::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = theme::status_header(&self.repo_name, h);
-            let mut lines = vec![theme::status_line(&self.prefs.palette, &line)];
+            let line = row_lines::status_header(&self.repo_name, h);
+            let mut lines = vec![row_lines::status_line(&self.prefs.palette, &line)];
             if h.conflicts > 0 {
-                lines.push(theme::error_line(
+                lines.push(row_lines::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -823,15 +821,15 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                theme::operation_line(&self.prefs.palette, &operation.label()),
+                row_lines::operation_line(&self.prefs.palette, &operation.label()),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(theme::busy_line(&self.prefs.palette, label));
+            out.push(row_lines::busy_line(&self.prefs.palette, label));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(theme::status_line(&self.prefs.palette, note));
+            out.push(row_lines::status_line(&self.prefs.palette, note));
         }
         out
     }

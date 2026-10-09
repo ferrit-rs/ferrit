@@ -13,7 +13,7 @@ use crate::components::tui_overlay::backdrop::Backdrop;
 use crate::components::tui_overlay::overlay::Overlay;
 use crate::components::tui_overlay::slide::Slide;
 use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::palette::Palette;
+use crate::theme::palette::Palette;
 
 const ANIMATION_TIME: Duration = Duration::from_millis(160);
 

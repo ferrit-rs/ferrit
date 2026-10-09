@@ -178,7 +178,7 @@ fn recent_returns_the_newest_entries_oldest_first() {
 /// log would silently miss it.
 #[test]
 fn a_command_that_never_completed_reads_as_an_error_line() {
-    use ferrit::components::ui::palette::Palette;
+    use ferrit::theme::palette::Palette;
     let record = CommandRecord {
         argv: "git zz-never-completed".to_owned(),
         kind: CommandKind::Write,
@@ -186,7 +186,7 @@ fn a_command_that_never_completed_reads_as_an_error_line() {
         took: std::time::Duration::ZERO,
         output: Vec::new(),
     };
-    let line = ferrit::app::theme::command_line(&Palette::DARK, &record);
+    let line = ferrit::app::row_lines::command_line(&Palette::DARK, &record);
     let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
     assert!(text.ends_with("(not completed)"), "{text}");
     assert!(

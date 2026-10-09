@@ -6,13 +6,13 @@ use std::collections::BTreeMap;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use crate::components::ui::palette::Palette;
-use crate::components::ui::scheme::Scheme;
+use crate::theme::palette::Palette;
+use crate::theme::scheme::Scheme;
 
-pub(super) const RGB_RED_CHANNEL: usize = 0;
-pub(super) const RGB_GREEN_CHANNEL: usize = 1;
-pub(super) const RGB_BLUE_CHANNEL: usize = 2;
-pub(super) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
+pub(crate) const RGB_RED_CHANNEL: usize = 0;
+pub(crate) const RGB_GREEN_CHANNEL: usize = 1;
+pub(crate) const RGB_BLUE_CHANNEL: usize = 2;
+pub(crate) const RGB_CHANNEL_COUNT: usize = RGB_BLUE_CHANNEL + 1;
 
 /// What the profile drawer's theme section is doing. The swatch picker and
 /// the RGB editor never run together, so one mode replaces two flags that

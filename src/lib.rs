@@ -10,3 +10,4 @@ pub mod infra;
 /// built with the `test-util` feature.
 #[cfg(feature = "test-util")]
 pub mod replay;
+pub mod theme;

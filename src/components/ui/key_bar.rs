@@ -3,18 +3,18 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 
-use super::palette::Palette;
+use crate::theme::palette::Palette;
 
 /// Ferrit's shared key hints and inline confirmation prompt renderer.
 pub struct KeyBar(Line<'static>);
 
 impl KeyBar {
     pub fn hints(raw: &str, palette: &Palette) -> Self {
-        Self(crate::components::ui::style::keybar_line(raw, palette))
+        Self(crate::theme::style::keybar_line(raw, palette))
     }
 
     pub fn confirm(message: &str, palette: &Palette) -> Self {
-        Self(crate::components::ui::style::confirm_line(message, palette))
+        Self(crate::theme::style::confirm_line(message, palette))
     }
 
     pub fn line(self) -> Line<'static> {

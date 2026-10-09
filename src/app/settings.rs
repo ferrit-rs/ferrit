@@ -8,9 +8,9 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, Mous
 use ratatui::layout::{Position, Rect};
 
 use super::config::{Config, Section};
-use super::theme_config::{Preset, SchemeChoice, ThemeMode};
 use super::{App, KeyModifiers};
-use crate::components::ui::color_picker::{self, PaletteDirection};
+use crate::theme::color_picker::{self, PaletteDirection};
+use crate::theme::config::{Preset, SchemeChoice, ThemeMode};
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;

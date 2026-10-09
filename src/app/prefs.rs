@@ -7,9 +7,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use super::{config, keymap};
-use crate::components::ui::palette::Palette;
-use crate::components::ui::scheme::ColorDepth;
 use crate::domain::git::diff::DiffOpts;
+use crate::theme::palette::Palette;
+use crate::theme::scheme::ColorDepth;
 
 pub(super) struct Prefs {
     /// Everything loaded from `config.toml`. Its `theme` is only the value read

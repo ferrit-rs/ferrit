@@ -14,10 +14,10 @@ use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::mock::{mock_commits, mock_files};
 use ferrit::app::pane::Pane;
-use ferrit::app::theme;
+use ferrit::app::row_lines;
 use ferrit::components::ui::key_bar::KeyBar;
-use ferrit::components::ui::palette::Palette;
 use ferrit::domain::git::diff::parse_diff;
+use ferrit::theme::palette::Palette;
 use ratatui::style::Color;
 
 /// A palette where every colour is different from `Palette::DARK`'s and from
@@ -51,7 +51,7 @@ fn the_default_palette_is_the_dark_one() {
 #[test]
 fn a_commit_row_takes_its_hash_and_author_colours_from_the_palette() {
     let p = loud();
-    let line = theme::commit_line(&p, &mock_commits()[0]);
+    let line = row_lines::commit_line(&p, &mock_commits()[0]);
     let colours: Vec<_> = line.spans.iter().filter_map(|s| s.style.fg).collect();
     assert_eq!(colours, [p.hash, p.author, p.hash]);
 }
@@ -65,7 +65,7 @@ fn a_file_row_takes_its_status_colour_from_the_palette() {
             .iter()
             .find(|f| f.display().starts_with(code))
             .unwrap_or_else(|| panic!("a mock file with status {code}"));
-        theme::file_line(&p, entry, 0).spans[2].style.fg
+        row_lines::file_line(&p, entry, 0).spans[2].style.fg
     };
     // The unstaged letter is red, whatever the letter (lazygit).
     assert_eq!(colour_of(" M"), Some(p.del));
@@ -74,12 +74,12 @@ fn a_file_row_takes_its_status_colour_from_the_palette() {
 #[test]
 fn the_selection_bar_and_the_counter_use_the_palette() {
     let p = loud();
-    let style = theme::selection_style(&p, true);
+    let style = row_lines::selection_style(&p, true);
     assert_eq!(
         (style.bg, style.fg),
         (Some(p.selection), Some(p.selection_fg))
     );
-    assert_eq!(theme::counter_line(&p, 1, 4).style.fg, Some(p.idle));
+    assert_eq!(row_lines::counter_line(&p, 1, 4).style.fg, Some(p.idle));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn a_diff_uses_the_light_tints_and_a_light_syntax_theme_on_a_light_base() {
     let text = "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n@@ -1,2 +1,2 @@\n fn main() {}\n-let old = 1;\n+let new = 2;\n";
     let diff = parse_diff(text);
     let backgrounds = |p: &Palette| -> Vec<Option<Color>> {
-        let rendered = theme::render_diff(p, &diff, None, 40);
+        let rendered = row_lines::render_diff(p, &diff, None, 40);
         rendered
             .lines
             .iter()
@@ -183,7 +183,7 @@ fn a_diff_uses_the_light_tints_and_a_light_syntax_theme_on_a_light_base() {
     assert!(!light.contains(&Some(Palette::DARK.add_line_bg)));
 
     let code_colours = |p: &Palette| -> Vec<Option<Color>> {
-        let rendered = theme::render_diff(p, &diff, None, 40);
+        let rendered = row_lines::render_diff(p, &diff, None, 40);
         // The context line `fn main() {}` is tokenized by syntect.
         rendered.lines[4].spans.iter().map(|s| s.style.fg).collect()
     };
@@ -250,7 +250,7 @@ fn every_named_colour_is_reachable() {
 #[test]
 fn the_subject_counter_turns_to_the_warning_colour_past_the_limit() {
     let p = loud();
-    let at = |length| theme::subject_counter(&p, length);
+    let at = |length| row_lines::subject_counter(&p, length);
     assert_eq!(at(50).style.fg, Some(p.idle));
     assert_eq!(at(51).style.fg, Some(p.warn));
     assert_eq!(at(7).spans[0].content, " 7/50 ");

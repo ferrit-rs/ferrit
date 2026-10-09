@@ -17,15 +17,15 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::hints::{self, Bar};
 use crate::app::sheet::Sheet;
 use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
-use crate::app::{mock, theme};
+use crate::app::{mock, row_lines};
 use crate::components::ui::chart_palette::charts_mode_from_env;
 use crate::components::ui::key_bar::KeyBar;
-use crate::components::ui::palette::Palette;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git::command_log;
 use crate::domain::image::preview::Preview;
+use crate::theme::palette::Palette;
 
 pub mod dashboard;
 mod dashboard_sheet;
@@ -366,18 +366,18 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area:
 
         let mut panel = Panel::new().title(title).border_style(border);
         if let Some((cur, total)) = app.counter(pane) {
-            panel = panel.bottom_title(theme::counter_line(palette, cur, total));
+            panel = panel.bottom_title(row_lines::counter_line(palette, cur, total));
         }
         let block = panel.block();
 
         let row_ct = app.row_count(pane);
         let mut lines = pane_lines(app, pane);
-        let mut highlight = theme::selection_style(palette, focused);
+        let mut highlight = row_lines::selection_style(palette, focused);
         if pane == Pane::Files && focused {
             // Files rows carry a staging colour that the bar must not repaint.
             highlight.fg = None;
             if let Some(line) = lines.get_mut(app.selected(pane)) {
-                theme::keep_colours_on_selection(palette, line);
+                row_lines::keep_colours_on_selection(palette, line);
             }
         }
         let detached = app.view_detached(pane);
@@ -664,7 +664,7 @@ fn draw_right_pane(
 
     // Branches focused, not drilled in: the selected branch's own commits,
     // shown passively (lazygit's live branch -> log preview, no Enter
-    // needed) as multi-line `git log`-style blocks (`theme::branch_log_block`)
+    // needed) as multi-line `git log`-style blocks (`row_lines::branch_log_block`)
     // rather than the compact one-line rows the Commits pane uses — there is
     // a whole pane's width to spend here. No gutter/stat/hunk-jump, that
     // treatment is for an actual diff once Enter drills into a specific
@@ -678,7 +678,7 @@ fn draw_right_pane(
         } else {
             log.commits
                 .iter()
-                .flat_map(|commit| theme::branch_log_block(palette, commit))
+                .flat_map(|commit| row_lines::branch_log_block(palette, commit))
                 .collect()
         };
         let total = lines.len();
@@ -737,7 +737,7 @@ fn draw_right_pane(
     };
 
     let text: Text<'_> = match app.nav.focus {
-        Pane::Files | Pane::Commits => theme::diff_lines(palette, body, None),
+        Pane::Files | Pane::Commits => row_lines::diff_lines(palette, body, None),
         _ => body.into(),
     };
 
@@ -749,7 +749,7 @@ fn draw_right_pane(
 /// Unstaged Changes beside Staged Changes, in place of the single right
 /// pane every other selection uses (`draw_right_pane`). Deliberately
 /// simplified against that path: each side renders directly through
-/// `theme::render_diff` / `render_delta`, bypassing `App::rendered_diff`'s
+/// `row_lines::render_diff` / `render_delta`, bypassing `App::rendered_diff`'s
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
@@ -784,7 +784,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area:
     let lines: Vec<Line<'static>> = if app.is_mock() {
         mock::COMMAND_LOG
             .iter()
-            .map(|command| theme::log_line(palette, command))
+            .map(|command| row_lines::log_line(palette, command))
             .collect()
     } else {
         let mut lines = command_log_lines(app);
@@ -845,7 +845,7 @@ fn command_log_rows(app: &App, screen_height: u16) -> u16 {
     let newest = command_log::recent(1, app.prefs.config.log.show_reads)
         .last()
         .map_or(0, |record| {
-            theme::command_lines(&app.palette(), record).len()
+            row_lines::command_lines(&app.palette(), record).len()
         });
     let wanted = u16::try_from(newest).unwrap_or(u16::MAX).max(2);
     wanted.min((screen_height / 3).saturating_sub(3).max(2))
@@ -855,7 +855,7 @@ fn command_log_rows(app: &App, screen_height: u16) -> u16 {
 fn command_log_lines(app: &App) -> Vec<Line<'static>> {
     command_log::recent(2, app.prefs.config.log.show_reads)
         .iter()
-        .flat_map(|record| theme::command_lines(&app.palette(), record))
+        .flat_map(|record| row_lines::command_lines(&app.palette(), record))
         .collect()
 }
 

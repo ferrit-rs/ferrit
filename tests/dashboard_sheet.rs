@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::{App, screens as ui};
-use ferrit::components::ui::scheme::Scheme;
+use ferrit::theme::scheme::Scheme;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

@@ -16,10 +16,10 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::git_config::ConfigRow;
 use crate::components::ui::cut::cut_end;
-use crate::components::ui::palette::Palette;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git::config::{Scope, WriteScope, display_value};
+use crate::theme::palette::Palette;
 
 /// Full markers from this width.
 pub(crate) const WIDE: u16 = 100;

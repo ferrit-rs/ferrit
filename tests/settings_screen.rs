@@ -205,7 +205,7 @@ fn a_click_on_a_radio_a_checkbox_and_an_arrow_sets_that_value() {
     click(&mut app, x, y);
     assert_eq!(
         Config::load_from(&fx.file()).config.theme.preset,
-        ferrit::app::theme_config::Preset::Purple
+        ferrit::theme::config::Preset::Purple
     );
 
     let (x, y) = find(&mut app, "Context lines");
@@ -351,7 +351,7 @@ fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
     );
     assert_eq!(
         Config::load_from(&fx.file()).config.theme.scheme,
-        Some(ferrit::app::theme_config::SchemeChoice::Terminal)
+        Some(ferrit::theme::config::SchemeChoice::Terminal)
     );
 
     let (x, y) = find(&mut app, "( ) Light");
@@ -390,12 +390,12 @@ fn choosing_light_repaints_the_whole_screen_live_and_dark_is_there_from_the_star
             .collect::<Vec<_>>()
     };
     let dark = backgrounds(&mut app);
-    assert!(dark.contains(&ferrit::components::ui::scheme::Scheme::DARK.background));
+    assert!(dark.contains(&ferrit::theme::scheme::Scheme::DARK.background));
     press(&mut app, KeyCode::Right);
     let light = backgrounds(&mut app);
-    assert!(light.contains(&ferrit::components::ui::scheme::Scheme::LIGHT.background));
+    assert!(light.contains(&ferrit::theme::scheme::Scheme::LIGHT.background));
     assert!(
-        !light.contains(&ferrit::components::ui::scheme::Scheme::DARK.background),
+        !light.contains(&ferrit::theme::scheme::Scheme::DARK.background),
         "nothing of the dark one is left"
     );
 }
@@ -405,7 +405,7 @@ fn the_footer_says_when_the_colours_are_approximated() {
     let fx = Fixture::new("sheet-256");
     let mut app = fx.app_with_sheet();
     assert!(!shown(&mut app).contains("256 colours"));
-    app.set_color_depth(ferrit::components::ui::scheme::ColorDepth::Indexed);
+    app.set_color_depth(ferrit::theme::scheme::ColorDepth::Indexed);
     assert!(shown(&mut app).contains("256 colours: approximated"));
 }
 

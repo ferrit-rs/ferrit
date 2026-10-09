@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod error;
 
-use super::theme_config::ThemeConfig;
+use crate::theme::config::ThemeConfig;
 use error::ConfigError;
 
 const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file when it saves a\n\

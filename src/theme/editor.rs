@@ -5,10 +5,10 @@
 
 use ratatui::style::Color;
 
-use super::theme_config::{
+use crate::theme::color_picker::{self, ColorPickerDisplay, PaletteDirection};
+use crate::theme::config::{
     RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, ThemeConfig, ThemeMode,
 };
-use crate::components::ui::color_picker::{self, ColorPickerDisplay, PaletteDirection};
 
 pub struct ThemeEditor {
     /// The theme as chosen: what the screen is painted with.
@@ -22,7 +22,7 @@ pub struct ThemeEditor {
 }
 
 impl ThemeEditor {
-    pub(super) fn new(config: ThemeConfig) -> Self {
+    pub(crate) fn new(config: ThemeConfig) -> Self {
         let picker_display = ColorPickerDisplay::default();
         Self {
             palette_selected: color_picker::nearest_index(config.color(), picker_display),
@@ -34,7 +34,7 @@ impl ThemeEditor {
     }
 
     /// Put the highlight on the swatch nearest the current accent.
-    pub(super) fn sync_picker_selection(&mut self) {
+    pub(crate) fn sync_picker_selection(&mut self) {
         self.palette_selected =
             color_picker::nearest_index(self.config.color(), self.picker_display);
     }
@@ -49,19 +49,19 @@ impl ThemeEditor {
     }
 
     /// Move the highlight and take that swatch as the accent.
-    pub(super) fn move_palette(&mut self, direction: PaletteDirection) -> bool {
+    pub(crate) fn move_palette(&mut self, direction: PaletteDirection) -> bool {
         self.palette_selected =
             color_picker::move_selection(self.palette_selected, direction, self.picker_display);
         self.apply_picker_selection()
     }
 
     /// Enter on the picker: take the highlighted swatch.
-    pub(super) fn pick_selected(&mut self) -> bool {
+    pub(crate) fn pick_selected(&mut self) -> bool {
         self.apply_picker_selection()
     }
 
     /// A click on a swatch.
-    pub(super) fn select_cell(&mut self, column: usize, row: usize) -> bool {
+    pub(crate) fn select_cell(&mut self, column: usize, row: usize) -> bool {
         let Some(selected) = color_picker::selection_at(self.picker_display, column, row) else {
             return false;
         };
@@ -71,7 +71,7 @@ impl ThemeEditor {
     }
 
     /// Palette grid or spectrum.
-    pub(super) fn toggle_picker_display(&mut self) {
+    pub(crate) fn toggle_picker_display(&mut self) {
         self.picker_display = match self.picker_display {
             ColorPickerDisplay::Palette => ColorPickerDisplay::Spectrum,
             ColorPickerDisplay::Spectrum => ColorPickerDisplay::Palette,
@@ -79,12 +79,12 @@ impl ThemeEditor {
         self.sync_picker_selection();
     }
 
-    pub(super) fn next_rgb_channel(&mut self) {
+    pub(crate) fn next_rgb_channel(&mut self) {
         self.rgb_channel = (self.rgb_channel + 1) % RGB_CHANNEL_COUNT;
     }
 
     /// Move the edited channel of the accent by `delta`, clamped to a byte.
-    pub(super) fn adjust_rgb(&mut self, delta: i16) {
+    pub(crate) fn adjust_rgb(&mut self, delta: i16) {
         let (mut r, mut g, mut b) = color_picker::rgb(self.config.color());
         let channel = match self.rgb_channel {
             RGB_RED_CHANNEL => &mut r,

@@ -108,7 +108,7 @@ fn main() -> Result<ExitCode> {
     app.detect_graphics();
     // The painted theme is RGB: a terminal without 24-bit colour gets the nearest
     // of its 256 (`docs/PLAN_18_THEMES.md`).
-    app.set_color_depth(ferrit::components::ui::scheme::ColorDepth::detect(
+    app.set_color_depth(ferrit::theme::scheme::ColorDepth::detect(
         std::env::var("COLORTERM").ok().as_deref(),
     ));
 
