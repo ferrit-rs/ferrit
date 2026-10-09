@@ -27,9 +27,10 @@ screenshot tools are slow and unstable.
 
 - Behaviour is tested the way a user sees it, with the same code path as the binary
   (`ferrit --replay` runs the same runner).
-- The harness and the fixtures live in the library (`#[doc(hidden)] pub mod replay`),
-  which widens the public surface. `docs/PLAN_23_TEST_SUPPORT.md` moves it behind a
-  `test-support` feature.
+- The harness and the fixtures live in the library, behind the `test-util` feature
+  (`pub mod replay`), so a normal build neither ships them nor exposes them. The
+  integration tests enable the feature through a dev-dependency on the crate itself; by
+  hand, `cargo run --features test-util -- --replay SCRIPT`.
 - Scripts are a second test language to learn; the cost is one page of directives.
 
 ## Alternatives considered

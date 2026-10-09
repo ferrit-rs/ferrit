@@ -23,17 +23,24 @@ struct Cli {
     #[arg(long)]
     config_path: bool,
 
-    // Test-only harness flags (`ferrit::replay::cli`), hidden from `--help`.
+    // Test-only harness flags (`ferrit::replay::cli`), hidden from `--help` and
+    // only there when built with `--features test-util`.
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "SCRIPT")]
     replay: Option<PathBuf>,
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "NAME")]
     fixture: Option<String>,
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "DIR")]
     into: Option<PathBuf>,
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "DIR")]
     dump_frames: Option<PathBuf>,
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "WxH")]
     size: Option<String>,
+    #[cfg(feature = "test-util")]
     #[arg(long, hide = true, value_name = "SCRIPT")]
     tape: Option<PathBuf>,
 }
@@ -47,6 +54,7 @@ fn main() -> Result<ExitCode> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
+    #[cfg(feature = "test-util")]
     let harness = ferrit::replay::cli::Args {
         replay: cli.replay,
         fixture: cli.fixture,
@@ -55,6 +63,7 @@ fn main() -> Result<ExitCode> {
         size: cli.size,
         tape: cli.tape,
     };
+    #[cfg(feature = "test-util")]
     if harness.any() {
         let printed = ferrit::replay::cli::run(&harness)
             .map_err(|message| color_eyre::eyre::eyre!(message))?;

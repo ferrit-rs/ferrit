@@ -7,6 +7,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Changed
+
+- The hidden test flags (`--replay`, `--fixture`, `--into`, `--dump-frames`, `--size`, `--tape`), the replay harness behind them and the in-memory `FakeGit` are no longer built into a normal `cargo install ferrit`: they are behind a `test-util` feature, which the integration tests turn on (`cargo run --features test-util -- --replay SCRIPT` by hand).
+
 ### Fixed
 
 - The declared minimum Rust version is now 1.90 (`Cargo.toml` `rust-version`, `clippy.toml`, the README). It said 1.86, which could not build: `ratatui-image` pulls in `quantette` (needs 1.90) and `wide` (needs 1.89), and the code uses `let` chains. CI now builds on that version.

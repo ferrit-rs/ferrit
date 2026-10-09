@@ -36,7 +36,16 @@ thiserror = "2"
 unicode-segmentation = "1.13"
 unicode-width = "0.2"
 
+[features]
+# The test seams: the replay harness (`--replay`, `--fixture` and the other
+# hidden flags) and the in-memory `FakeGit`. Off in a normal build, so a
+# `cargo install ferrit` does not ship them. The integration tests turn it on
+# through the dev-dependency below; to use the flags by hand, build with
+# `--features test-util`.
+test-util = []
+
 [dev-dependencies]
+ferrit = { path = ".", features = ["test-util"] }
 proptest = "1"
 
 # See also clippy.toml and rust-toolchain.toml.

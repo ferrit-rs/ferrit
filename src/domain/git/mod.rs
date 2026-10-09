@@ -20,6 +20,7 @@ pub mod config_keys;
 pub mod diff;
 pub mod error;
 pub(crate) mod exec;
+#[cfg(feature = "test-util")]
 pub mod fake;
 pub mod host;
 pub mod model;

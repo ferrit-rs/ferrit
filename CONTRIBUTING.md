@@ -65,7 +65,7 @@ If `cargo-nextest` is unavailable, `cargo test --all-features` is a useful
 fallback. For behavior changes, run a replay script too:
 
 ```bash
-cargo run -- --replay test/scripts/40-stage.script --dump-frames /tmp/ferrit-frames
+cargo run --features test-util -- --replay test/scripts/40-stage.script --dump-frames /tmp/ferrit-frames
 ```
 
 ## Commit requirements

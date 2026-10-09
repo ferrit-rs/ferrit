@@ -16,8 +16,8 @@ What differs from the sketch below, and why:
   exists. `Result<Box<RepoStats>, String>` in the dashboard became `AppError` on the way.
 - **`FakeGit` and `App::with_git`** exist (`src/domain/git/fake.rs`). It models stage,
   unstage, discard, commit, checkout, create and delete branch; everything else returns
-  `GitError::OperationFailed("FakeGit does not implement ...")`. It is not gated behind a
-  feature yet: `PLAN_23_TEST_SUPPORT.md` moves it behind `test-support`.
+  `GitError::OperationFailed("FakeGit does not implement ...")`. It is built only with the
+  `test-util` feature (`PLAN_23_TEST_SUPPORT.md`).
 - **The contract suite found a real gap**: on a repository with no commit yet, `Repo`
   cannot unstage (`could not resolve HEAD`), while the fake can. The scenario starts from
   one commit; the gap is recorded in the test, not fixed here.
@@ -171,7 +171,7 @@ pub trait GitPort: GitRead + GitIndex + GitHistory + GitBranches
 // src/infra/git/mod.rs
 impl GitIndex for Repo { /* today's bodies, moved */ }
 
-// tests: src/app/fake_git.rs (cfg(test) or feature "test-support")
+// tests: src/app/fake_git.rs (cfg(test) or feature "test-util")
 let git = FakeGit::new().with_file("a.rs", Unstaged).fail_next(GitOp::Commit, GitError::NothingStaged);
 let mut app = App::with_git(Box::new(git));
 ```

@@ -14,7 +14,9 @@ in `tests/replay.rs`, and the harness itself is tested in
   `tests/replay.rs` and `ferrit --replay` both call. The hidden flags
   (`--replay`, `--fixture`, `--into`, `--dump-frames`, `--size`, `--tape`) are
   refused in a release build unless `FERRIT_TEST` is set, and do not appear in
-  `--help`.
+  `--help`. Since `PLAN_23_TEST_SUPPORT.md` they are not even compiled in unless the
+  `test-util` feature is on (`cargo run --features test-util -- --replay ...`);
+  the integration tests turn it on through a dev-dependency.
 - **No `insta`.** The sketch's `snapshot` asserted a region against a
   committed `.snap`. Not adopted: a new dependency for one feature, and full
   frames are not stable anyway (the Branches pane prints each branch's age,
@@ -54,8 +56,8 @@ in `tests/replay.rs`, and the harness itself is tested in
 ```
 cargo test --test replay                      # every script; the gate
 cargo test --test replay_harness              # the machinery itself
-cargo run -- --replay test/scripts/40-stage.script --dump-frames /tmp/frames
-cargo run -- --fixture canonical --into /tmp/fx   # a fixture to poke at
+cargo run --features test-util -- --replay test/scripts/40-stage.script --dump-frames /tmp/frames
+cargo run --features test-util -- --fixture canonical --into /tmp/fx   # a fixture to poke at
 test/gen-tapes.sh                             # tapes for vhs, in test/tapes
 ```
 

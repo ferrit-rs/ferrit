@@ -31,9 +31,22 @@ What differs from the sketch below, and why:
   dev-dependency only; every crate it pulls in is MIT or Apache-2.0, which `deny.toml` allows.
   `tests/proptest_diff.proptest-regressions` keeps the minimal failing cases from that check,
   which proptest replays on every run.
-- **Not done:** the `test-support` feature, `pub(crate)` for the library, and
-  `#![warn(missing_docs)]` on `domain`. Narrowing the API touches every `use ferrit::...` in
-  the tests, so it is its own step.
+- **The `test-util` feature is in** (it was going to be `test-support`; clippy's
+  `redundant_feature_names` refuses that suffix). It gates `ferrit::replay` (the harness behind
+  `--replay` and `--fixture`, 1,300 lines) and `domain::git::fake::FakeGit`, and the hidden
+  flags of `main.rs`. The integration tests turn it on through
+  `[dev-dependencies] ferrit = { path = ".", features = ["test-util"] }`, so a plain
+  `cargo test` works; `cargo publish --dry-run` packages and builds without it, and a default
+  `cargo build` rejects `--replay` (checked). By hand: `cargo run --features test-util -- --replay SCRIPT`.
+  The CI tape job and `.dev-tools/flow-compare.sh` build with it.
+- **`app::mock` stays public and un-gated:** the production repo-free path reads its sample
+  text (`mock::RIGHT_DIFF`, `COMMAND_LOG`) and image bytes, so gating it would change behaviour.
+- **Not done:** `pub(crate)` for most of the library and `#![warn(missing_docs)]` on `domain`
+  (212 items without a doc today). Most modules are public because a type of theirs appears in
+  a public signature (`App.help`, `App.theme`, the `*Completion` events), and `unnameable_types`
+  is a warning here; making them private is a design change of `App`'s public surface, not a
+  visibility sweep. Measured: 194 of the missing docs are in `domain/git`, 48 of them in
+  `model.rs`.
 
 ## Goal
 
@@ -49,7 +62,7 @@ tests/app_stage.rs    │ each has its own    tests/app_commit.rs   use common::
 ...36 files           ┘ struct TempDir      tests/app_stage.rs    use common::*;
 (10-line #![allow] header x 59)             tests/proptest_diff.rs  generated hunks round-trip
 lib.rs: pub mod app, components, domain,    lib.rs: pub mod app (curated); components, domain
-        replay (doc hidden)                         pub(crate); replay, mock behind "test-support"
+        replay (doc hidden)                         pub(crate); replay, mock behind "test-util"
 ```
 
 ## The gap this fixes
@@ -107,9 +120,9 @@ lib.rs: pub mod app, components, domain,    lib.rs: pub mod app (curated); compo
      `tests/` do not use them; what tests need is re-exported through the one place that
      should (see the `pub_use = "deny"` lint: use `pub mod` paths, not `pub use`).
    - `#![warn(missing_docs)]` on `domain`.
-   - `app::mock` and `replay` move behind a `test-support` cargo feature
-     (`#[cfg(any(test, feature = "test-support"))]`); integration tests enable it through
-     `[dev-dependencies] ferrit = { path = ".", features = ["test-support"] }`. A normal
+   - `app::mock` and `replay` move behind a `test-util` cargo feature
+     (`#[cfg(any(test, feature = "test-util"))]`); integration tests enable it through
+     `[dev-dependencies] ferrit = { path = ".", features = ["test-util"] }`. A normal
      `cargo install ferrit` no longer builds them.
 
 ## What it has to resolve
@@ -172,7 +185,7 @@ let mut app = App::from_path(repo.path());
 - **C2, proptest** for `diff_parse` and `apply_patch`.
 - **C3, split** the four big files.
 - **C4, fake-backed tests** for `app_branch`, `app_stash`, `app_remote`.
-- **C5, API.** `test-support` feature, `pub(crate)` pass, `missing_docs` on `domain`;
+- **C5, API.** `test-util` feature, `pub(crate)` pass, `missing_docs` on `domain`;
   `cargo publish --dry-run` clean via `scripts/release.sh` (dry run).
 - **C6, close.** clippy clean, docs build with `-D warnings`, all prior C green.
 
@@ -181,7 +194,7 @@ let mut app = App::from_path(repo.path());
 - [ ] `grep -l "struct TempDir" tests/*.rs` returns nothing.
 - [ ] No test file over 800 lines.
 - [ ] `proptest_diff.rs` runs in CI; `proptest-regressions/` is committed.
-- [ ] `cargo build --release` without `test-support` does not compile `mock` or `replay`.
+- [ ] `cargo build --release` without `test-util` does not compile `mock` or `replay`.
 - [ ] `cargo doc --document-private-items --no-deps` with `-D warnings` passes.
 - [ ] `scripts/release.sh` dry run succeeds.
 - [ ] Test count is not lower than before the phase (`cargo nextest list | wc -l`).

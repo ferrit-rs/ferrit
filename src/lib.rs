@@ -6,5 +6,7 @@ pub mod app;
 pub mod components;
 pub mod domain;
 pub mod infra;
-#[doc(hidden)]
+/// The scripted test harness behind `--replay` and `--fixture`. Test seam, only
+/// built with the `test-util` feature.
+#[cfg(feature = "test-util")]
 pub mod replay;

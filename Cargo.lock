@@ -872,6 +872,7 @@ dependencies = [
  "color-eyre",
  "directories",
  "enum-map",
+ "ferrit",
  "git2",
  "image",
  "notify-debouncer-full",

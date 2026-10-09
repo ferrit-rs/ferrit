@@ -50,7 +50,7 @@ fixture="$(awk '$1 == "fixture" { print $2 }' "$flow")"
 [ -n "$fixture$repo_src" ] || { echo "$flow: no fixture or repo line" >&2; exit 1; }
 [ -z "$repo_src" ] || repo_src="$(cd "$root" && cd "$repo_src" && pwd)"
 
-cargo build --quiet --manifest-path "$root/Cargo.toml"
+cargo build --quiet --features test-util --manifest-path "$root/Cargo.toml"
 # The run about to be replaced is kept as before/ (screenshots only): the report
 # shows it next to the new one for every fix. Only a run of the same flow, and only
 # when the previous one had screenshots; before/ of before/ is not kept.

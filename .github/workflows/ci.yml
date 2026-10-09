@@ -153,7 +153,7 @@ jobs:
           cache: true
 
       - name: Build a debug binary, the harness flags are test-only
-        run: cargo build
+        run: cargo build --features test-util
 
       - name: Generate tapes from test/scripts
         run: |
