@@ -12,11 +12,12 @@ use crate::tui::components::panes::Pane;
 use crate::tui::components::welcome::welcome_lines;
 use crate::tui::draw::{Landed, RenderState, RenderedDiff};
 use crate::tui::error::AppError;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::panel::Panel;
 use crate::tui::widgets::scroll_bar::ScrollBar;
 use crate::tui::widgets::text_input::TextInput;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
-use crate::tui::{App, mock, row_lines};
+use crate::tui::{mock, row_lines};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -811,7 +812,7 @@ pub(crate) fn load_image(
 
 pub(crate) fn draw_files_columns(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     landed: &mut Landed,
     area: Rect,
 ) {
@@ -862,7 +863,7 @@ pub(crate) fn draw_files_columns(
 /// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
 pub(crate) fn draw_single_file_diff(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     landed: &mut Landed,
     area: Rect,
 ) {
@@ -1022,7 +1023,7 @@ fn pad_line(line: &mut Line<'static>, width: usize) {
 
 pub(crate) fn draw_right_pane(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     render: &mut RenderState,
     landed: &mut Landed,
     area: Rect,

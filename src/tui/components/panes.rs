@@ -11,10 +11,11 @@ use crate::tui::components::settings::SettingsHits;
 use crate::tui::draw::Landed;
 use crate::tui::event::Env;
 use crate::tui::event::Event;
+use crate::tui::row_lines;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::pane_list::PaneList;
 use crate::tui::widgets::panel::Panel;
 use crate::tui::workers::Shared;
-use crate::tui::{App, row_lines};
 use enum_map::{Enum, EnumMap};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -1028,7 +1029,7 @@ pub(crate) fn toggle_commit_dir(env: &Env<'_>) -> Vec<Event> {
 
 /// Colour each pane's rows by what they mean. Status and Files come from the
 /// live snapshot on `App`; the rest are still mock.
-fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
+fn pane_lines(app: &Scene<'_>, pane: Pane) -> Vec<Line<'static>> {
     match pane {
         Pane::Status => app.status_lines(),
         Pane::Files => app.file_lines(),
@@ -1038,7 +1039,12 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     }
 }
 
-pub(crate) fn draw_left_column(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) {
+pub(crate) fn draw_left_column(
+    frame: &mut Frame<'_>,
+    app: &Scene<'_>,
+    landed: &mut Landed,
+    area: Rect,
+) {
     let palette = &app.palette();
     // Status only ever shows 1 line, or 2 when there's a conflict to report
     // (`App::status_lines`): sized to that instead of a flat 4, so a short

@@ -121,12 +121,6 @@ impl App {
         }
     }
 
-    /// The repository has no commit yet, asked of git itself: the app's own list
-    /// of commits can be a refresh behind, right after a first commit.
-    pub(crate) fn repo_has_no_commit(&self) -> bool {
-        self.repo.as_ref().is_some_and(|repo| !repo.has_commits())
-    }
-
     /// Every key while the popup is up.
     pub(crate) fn create_remote_key(&mut self, key: KeyEvent) {
         let Some(Popup::CreateRemote(step)) = self.modal.popup_mut() else {

@@ -322,16 +322,9 @@ impl App {
 }
 
 impl App {
-    /// The contexts a key is looked up in, most specific first: the diff
-    /// cursor while it is up, then the focused pane, then everything.
+    /// The contexts a key is looked up in, most specific first.
     pub(crate) fn key_contexts(&self) -> Vec<Context> {
-        let mut contexts = Vec::with_capacity(3);
-        if self.nav.mode == Mode::Diff {
-            contexts.push(Context::Diff);
-        }
-        contexts.extend(Context::for_pane(self.nav.focus));
-        contexts.push(Context::Global);
-        contexts
+        self.scene().key_contexts()
     }
 
     /// Run the key's action, if it has one. Scrolling the right pane skips

@@ -144,3 +144,29 @@ fn no_component_writes_an_impl_app() {
         "impl App in components: {offenders:?}"
     );
 }
+
+/// Drawing reads a `Scene` (references to the state, `tui/scene.rs`), never
+/// `App`: only the entry points of `tui/draw.rs` name it.
+#[test]
+fn only_the_draw_entry_points_name_app_among_the_drawing_code() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tui");
+    let offenders: Vec<String> = rust_files(&root.join("components"))
+        .into_iter()
+        .chain(rust_files(&root.join("widgets")))
+        .chain([root.join("row_lines.rs")])
+        .filter(|path| {
+            fs::read_to_string(path).unwrap().lines().any(|line| {
+                let line = line.trim_start();
+                !line.starts_with("//")
+                    && (line.contains(": &App")
+                        || line.contains("<App>")
+                        || line.contains("tui::App"))
+            })
+        })
+        .map(|path| path.strip_prefix(&root).unwrap().display().to_string())
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "App named in drawing code: {offenders:?}"
+    );
+}

@@ -4,12 +4,12 @@ use crate::config::settings::SettingsSheet;
 use crate::git::Snapshot;
 use crate::git::port::GitPort;
 use crate::git::stats::{NUMSTAT_CAP, RepoStats, StatsOptions, WALK_CAP, Window};
-use crate::tui::App;
 use crate::tui::components::dashboard::text::{date, thousands, window_label};
 use crate::tui::draw::{Landed, RenderState, unix_now};
 use crate::tui::error::AppError;
 use crate::tui::event::Event;
 use crate::tui::events::AppEvent;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::chart_palette::{ChartMode, ChartPalette, charts_mode_from_env};
 use crate::tui::widgets::drawer::Drawer;
 use crate::tui::widgets::panel::Panel;
@@ -846,7 +846,7 @@ const MAX_PERCENT: u16 = 95;
 pub(crate) fn draw_sheet(
     frame: &mut Frame<'_>,
     area: Rect,
-    app: &App,
+    app: &Scene<'_>,
     render: &mut RenderState,
     landed: &mut Landed,
 ) {
@@ -862,7 +862,7 @@ pub(crate) fn draw_sheet(
     };
     let view = View {
         stats: app.dashboard().stats(),
-        repo: &app.repo_name,
+        repo: app.repo_name,
         branch: &app.snapshot.header.branch,
         colors: ChartPalette {
             density: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),

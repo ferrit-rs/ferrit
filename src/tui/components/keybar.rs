@@ -1,9 +1,9 @@
 //! The key bar and the help lines built from the keymap.
 
-use crate::tui::App;
 use crate::tui::components::panes::Pane;
 use crate::tui::draw::{FullScreen, Landed, RenderState};
 use crate::tui::keymap::{Action, Context, KeyBinding, Keymap};
+use crate::tui::scene::Scene;
 use crate::tui::widgets::key_bar::KeyBar;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -493,7 +493,7 @@ const FIXED_KEYS: &[(&str, &str)] = &[
 pub(crate) fn draw_keybar(
     frame: &mut Frame<'_>,
     area: Rect,
-    app: &App,
+    app: &Scene<'_>,
     render: &RenderState,
     landed: &mut Landed,
 ) {

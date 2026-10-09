@@ -13,10 +13,10 @@ use crate::theme::theme_config::{
     Preset, RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, SchemeChoice, ThemeConfig,
     ThemeMode,
 };
-use crate::tui::App;
 use crate::tui::draw::RenderedDiff;
 use crate::tui::draw::{Landed, RenderState};
 use crate::tui::event::Event;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::drawer::Drawer;
 use crate::tui::widgets::scroll_bar::ScrollBar;
 use crate::tui::widgets::separator::Separator;
@@ -509,7 +509,7 @@ impl RowLine {
 }
 
 /// The row's line: the marker, the label and the value with its click parts.
-fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> RowLine {
+fn row_line(app: &Scene<'_>, row: SettingsRow, selected: bool, palette: &Palette) -> RowLine {
     let accent = app.theme.config.color();
     let mut line = RowLine {
         row,
@@ -580,7 +580,7 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
     line
 }
 
-fn footer(app: &App, palette: &Palette) -> Line<'static> {
+fn footer(app: &Scene<'_>, palette: &Palette) -> Line<'static> {
     let idle = Style::new().fg(palette.idle);
     let path = app.prefs.file.as_ref().map(|p| p.display().to_string());
     let line = match (&app.settings().save, path) {
@@ -604,7 +604,7 @@ fn footer(app: &App, palette: &Palette) -> Line<'static> {
     Line::styled(line, idle)
 }
 
-fn hint(app: &App) -> &'static str {
+fn hint(app: &Scene<'_>) -> &'static str {
     match app.theme.mode {
         ThemeMode::Idle => {
             "\u{2191}\u{2193} row \u{b7} \u{2190}\u{2192} or Space change \u{b7} Enter picker (Accent) \u{b7} Esc close"
@@ -621,7 +621,7 @@ fn hint(app: &App) -> &'static str {
 pub(crate) fn draw(
     frame: &mut Frame<'_>,
     area: Rect,
-    app: &App,
+    app: &Scene<'_>,
     palette: &Palette,
     render: &mut RenderState,
     landed: &mut Landed,

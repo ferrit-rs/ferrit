@@ -1,13 +1,13 @@
 //! The welcome screen for a folder without a repository.
 
 use crate::theme::palette::Palette;
-use crate::tui::App;
 use crate::tui::components::keybar::draw_keybar;
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt};
 use crate::tui::draw::TAGLINE_PROMISE;
 use crate::tui::draw::TAGLINE_WHAT;
 use crate::tui::draw::{Landed, RenderState};
 use crate::tui::event::Event;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::cut::cut_middle;
 use crate::tui::widgets::dialog::Dialog;
 use ratatui::Frame;
@@ -200,7 +200,7 @@ pub(crate) fn welcome_lines(
 /// The welcome screen above its key bar; returns the key bar's area.
 pub(crate) fn draw_welcome(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     render: &RenderState,
     landed: &mut Landed,
     area: Rect,

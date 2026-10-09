@@ -4,9 +4,10 @@ use crate::git::command_log;
 use crate::theme::palette::Palette;
 use crate::tui::components::diff::CommandLogView;
 use crate::tui::draw::Landed;
+use crate::tui::scene::Scene;
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::panel::Panel;
-use crate::tui::{App, mock, row_lines};
+use crate::tui::{mock, row_lines};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -69,7 +70,12 @@ pub(crate) fn draw_command_log_view(
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
-pub(crate) fn draw_command_log(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) {
+pub(crate) fn draw_command_log(
+    frame: &mut Frame<'_>,
+    app: &Scene<'_>,
+    landed: &mut Landed,
+    area: Rect,
+) {
     let palette = &app.palette();
     let git_user_name = app.git_user_name().map(str::to_owned);
     let [heading, panel_area] =
@@ -154,7 +160,7 @@ pub(crate) fn draw_command_log(frame: &mut Frame<'_>, app: &App, landed: &mut La
 /// Inner rows of the Infos box: the two it always has, grown to hold the newest
 /// command and every line git answered with (`MAX_OUTPUT_LINES` at most), but never
 /// more than a third of the screen so the panes above keep their room.
-pub(crate) fn command_log_rows(app: &App, screen_height: u16) -> u16 {
+pub(crate) fn command_log_rows(app: &Scene<'_>, screen_height: u16) -> u16 {
     if app.is_mock() {
         return 2;
     }
@@ -168,7 +174,7 @@ pub(crate) fn command_log_rows(app: &App, screen_height: u16) -> u16 {
 }
 
 /// The two newest commands' lines, each command followed by git's answer.
-fn command_log_lines(app: &App) -> Vec<Line<'static>> {
+fn command_log_lines(app: &Scene<'_>) -> Vec<Line<'static>> {
     command_log::recent(2, app.prefs.config.log.show_reads)
         .iter()
         .flat_map(|record| row_lines::command_lines(&app.palette(), record))

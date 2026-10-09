@@ -15,7 +15,6 @@ use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
 use crate::tui::components::popups::Popup;
 use crate::tui::components::settings::Settings;
-use crate::tui::widgets::tui_overlay::state::OverlayState;
 pub mod events;
 pub mod mock;
 
@@ -126,6 +125,7 @@ pub mod loading;
 pub mod prefs;
 pub mod publish;
 pub mod row_lines;
+pub mod scene;
 pub mod terminal;
 pub mod view;
 pub mod widgets;
@@ -793,39 +793,7 @@ impl App {
     /// Status pane: lazygit's one-liner `ferrit -> main ↑2`, plus a conflict
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
-        let mut out = if let Some(err) = &self.last_error {
-            vec![row_lines::error_line(
-                &self.prefs.palette,
-                &format!("error: {err}"),
-            )]
-        } else {
-            let h = &self.snapshot.header;
-            let line = row_lines::status_header(&self.repo_name, h);
-            let mut lines = vec![row_lines::status_line(&self.prefs.palette, &line)];
-            if h.conflicts > 0 {
-                lines.push(row_lines::error_line(
-                    &self.prefs.palette,
-                    &format!("\u{2717} {} merge conflict(s)", h.conflicts),
-                ));
-            }
-            lines
-        };
-        if let Some(operation) = self.snapshot.operation {
-            // Right under the first line, error or header, so it is the
-            // first thing read while git waits on the user.
-            out.insert(
-                out.len().min(1),
-                row_lines::operation_line(&self.prefs.palette, &operation.label()),
-            );
-        }
-        if let Some(label) = self.remote_busy_label() {
-            out.push(row_lines::busy_line(&self.prefs.palette, label));
-        } else if self.last_error.is_none()
-            && let Some(note) = &self.status_note
-        {
-            out.push(row_lines::status_line(&self.prefs.palette, note));
-        }
-        out
+        self.scene().status_lines()
     }
 
     /// Keep persistent Status text while moving typed error into transient toast.
@@ -1007,18 +975,7 @@ fn watcher_error(events: &Events) -> Option<Arc<AppError>> {
 impl App {
     /// The commit popup as data, without any animation state.
     pub fn commit_popup(&self) -> Option<CommitPopupView<'_>> {
-        self.commit_popup_with(None)
-    }
-
-    /// The commit popup for drawing: `overlay` is its animation.
-    pub(crate) fn commit_popup_with<'a>(
-        &'a self,
-        overlay: Option<&'a mut OverlayState>,
-    ) -> Option<CommitPopupView<'a>> {
-        let Some(Popup::Commit(draft)) = self.modal.popup() else {
-            return None;
-        };
-        Some(draft.view(self.authorship.line(), overlay))
+        self.scene().commit_popup()
     }
 
     /// Replace the identities git knows globally. Integration-test seam: the

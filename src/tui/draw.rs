@@ -24,6 +24,7 @@ use crate::tui::components::popups::draw_note;
 use crate::tui::components::settings::SettingsHits;
 use crate::tui::components::welcome::draw_welcome;
 use crate::tui::components::{dashboard, git_config, settings};
+use crate::tui::scene::Scene;
 use crate::tui::widgets::toast::Toast;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
 use ratatui::Frame;
@@ -54,12 +55,20 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     // reads of them goes through `render`, never through `app`.
     let mut render = std::mem::take(&mut app.render);
     let mut landed = Landed::default();
-    draw_into(frame, app, &mut render, &mut landed);
+    {
+        let scene = app.scene();
+        draw_into(frame, &scene, &mut render, &mut landed);
+    }
     app.render = render;
     app.land(landed);
 }
 
-fn draw_into(frame: &mut Frame<'_>, app: &App, render: &mut RenderState, landed: &mut Landed) {
+fn draw_into(
+    frame: &mut Frame<'_>,
+    app: &Scene<'_>,
+    render: &mut RenderState,
+    landed: &mut Landed,
+) {
     let area = frame.area();
     let palette = app.palette();
 
@@ -128,7 +137,7 @@ fn draw_into(frame: &mut Frame<'_>, app: &App, render: &mut RenderState, landed:
 /// The five panes, the command log and the key bar; returns the key bar's area.
 fn draw_panes(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     render: &mut RenderState,
     landed: &mut Landed,
     area: Rect,
@@ -192,7 +201,7 @@ fn draw_panes(
 /// The git config screen above its key bar; returns the key bar's area.
 fn draw_git_config(
     frame: &mut Frame<'_>,
-    app: &App,
+    app: &Scene<'_>,
     render: &RenderState,
     landed: &mut Landed,
     area: Rect,
