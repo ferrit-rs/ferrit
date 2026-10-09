@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::draw;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

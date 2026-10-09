@@ -2,7 +2,7 @@
 
 use crate::git::command_log;
 use crate::theme::palette::Palette;
-use crate::tui::components::diff::CommandLogView;
+use crate::tui::components::diff::views::CommandLogView;
 use crate::tui::draw::Landed;
 use crate::tui::scene::Scene;
 use crate::tui::widgets::chrome::Dialog;

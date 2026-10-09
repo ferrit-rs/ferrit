@@ -17,12 +17,14 @@ use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::create_remote::{Consequences, CreateRemoteView};
 use crate::tui::components::dashboard::{Dashboard, Sheet};
-use crate::tui::components::diff::{
-    CommandLogView, CommitPopupView, DiffView, MenuView, Mode, PopupView, RightPane,
+use crate::tui::components::diff::right_pane::{Mode, RightPane};
+use crate::tui::components::diff::views::{
+    CommandLogView, CommitPopupView, DiffView, MenuView, PopupView,
 };
 use crate::tui::components::help::HelpState;
 use crate::tui::components::keybar::{HelpLine, help_lines};
-use crate::tui::components::panes::{Nav, Pane, PaneRows};
+use crate::tui::components::panes::nav::{Nav, Pane};
+use crate::tui::components::panes::rows::PaneRows;
 use crate::tui::components::popups::{Modal, Popup, PopupKind};
 use crate::tui::components::settings;
 use crate::tui::draw::FullScreen;
@@ -45,7 +47,7 @@ pub(crate) struct Scene<'a> {
     pub(crate) help: &'a HelpState,
     pub(crate) full_screens: &'a crate::tui::draw::FullScreens,
     pub(crate) modal: &'a Modal,
-    pub(crate) hits: &'a crate::tui::components::panes::HitAreas,
+    pub(crate) hits: &'a crate::tui::components::panes::hit_areas::HitAreas,
     pub(crate) authorship: &'a crate::git::identity::Authorship,
     pub(crate) workers: &'a Workers,
     pub(crate) repo: &'a Option<Box<dyn GitPort>>,
@@ -517,7 +519,9 @@ impl<'a> Scene<'a> {
     }
 
     /// The git config screen's state, for the screen that draws it and for tests.
-    pub(crate) fn git_config(self) -> &'a crate::tui::components::git_config::GitConfigScreen {
+    pub(crate) fn git_config(
+        self,
+    ) -> &'a crate::tui::components::git_config::screen::GitConfigScreen {
         &self.full_screens.git_config
     }
 

@@ -9,7 +9,7 @@ use crate::git::diff::DiffSide;
 use crate::git::host::CreateRemote;
 use crate::tui::App;
 use crate::tui::components::create_remote::CreateRemoteView;
-use crate::tui::components::diff::{CommandLogView, CommitPopupView, MenuView, PopupView};
+use crate::tui::components::diff::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
 
 impl App {
     pub fn diff_cursor(&self) -> Option<(DiffSide, usize, Option<Range<usize>>)> {
@@ -92,7 +92,7 @@ impl App {
         self.scene().number_value(row)
     }
 
-    pub fn git_config(&self) -> &crate::tui::components::git_config::GitConfigScreen {
+    pub fn git_config(&self) -> &crate::tui::components::git_config::screen::GitConfigScreen {
         self.scene().git_config()
     }
 

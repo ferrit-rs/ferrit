@@ -4,12 +4,12 @@ use crate::git;
 use crate::git::remote::RemoteOp;
 use crate::tui::App;
 use crate::tui::components::dashboard::Sheet;
-use crate::tui::components::diff::Mode;
+use crate::tui::components::diff::right_pane::Mode;
 use crate::tui::components::keybar::filter_help_lines;
-use crate::tui::components::panes::{PANES, Pane};
+use crate::tui::components::panes::nav::{PANES, Pane};
 use crate::tui::components::popups::Popup;
 use crate::tui::components::{
-    branches, commits, files, menu, panes, popups, remote as askpass, remote, stash, welcome,
+    branches, commits, files, menu, popups, remote as askpass, remote, stash, welcome,
 };
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
@@ -245,7 +245,7 @@ impl App {
             // Enter — the whole row is the target, not just its arrow
             // glyph, same as it already is for plain selection.
             if landed && pane == Pane::Files {
-                let events = panes::toggle_files_dir(&self.env());
+                let events = crate::tui::components::panes::keys::toggle_files_dir(&self.env());
                 self.apply(events);
             }
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
@@ -447,11 +447,16 @@ impl App {
         self.apply(branches::enter_log(&self.env()));
         // Opening a commit must not also toggle its first row.
         let opts = self.prefs.diff_opts();
-        let (drilled, events) = panes::enter_commit_files(&self.env(), opts);
+        let (drilled, events) =
+            crate::tui::components::panes::keys::enter_commit_files(&self.env(), opts);
         self.apply(events);
         if !drilled {
-            self.apply(panes::toggle_files_dir(&self.env()));
-            self.apply(panes::toggle_commit_dir(&self.env()));
+            self.apply(crate::tui::components::panes::keys::toggle_files_dir(
+                &self.env(),
+            ));
+            self.apply(crate::tui::components::panes::keys::toggle_commit_dir(
+                &self.env(),
+            ));
             self.apply(files::enter_diff(&self.env()));
         }
     }

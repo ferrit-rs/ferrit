@@ -6,7 +6,7 @@ use crate::git::error::GitError;
 use crate::git::model::CommitEntry;
 use crate::git::port::GitPort;
 use crate::git::rebase::RebaseEdit;
-use crate::tui::components::panes::Pane;
+use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::event::{Env, Event};
 

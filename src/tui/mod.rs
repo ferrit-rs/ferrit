@@ -8,8 +8,8 @@
 use crate::config::settings::SettingsRow;
 use crate::git::commit::CommitKind;
 use crate::tui::components::commit_editor;
-use crate::tui::components::diff::CommitPopupView;
-use crate::tui::components::git_config::GitConfig;
+use crate::tui::components::diff::views::CommitPopupView;
+use crate::tui::components::git_config::keys::GitConfig;
 use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
 use crate::tui::components::popups::Popup;
@@ -56,7 +56,7 @@ pub struct App {
     /// The views that replace the panes: git config, welcome.
     pub(crate) full_screens: draw::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
-    pub nav: components::panes::Nav,
+    pub nav: components::panes::nav::Nav,
     /// Whether the help overlay is up.
     pub help: components::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
@@ -80,9 +80,9 @@ pub struct App {
     pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: components::diff::RightPane,
+    pub(crate) right: components::diff::right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: components::panes::HitAreas,
+    pub(crate) hits: components::panes::hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
@@ -137,11 +137,11 @@ mod tests;
 
 use crate::tui::workers::RefreshCompletion;
 use crate::tui::workers::{WorkerKind, run_worker};
-use components::diff::DiffView;
-use components::diff::Mode;
-use components::panes::Pane;
-use components::panes::PaneRows;
-use components::panes::{FileRow, drill_tree_rows};
+use components::diff::right_pane::Mode;
+use components::diff::views::DiffView;
+use components::panes::nav::Pane;
+use components::panes::rows::PaneRows;
+use components::panes::tree::{FileRow, drill_tree_rows};
 use draw::FullScreen;
 
 use crate::tui::draw::Landed;
@@ -186,18 +186,18 @@ impl App {
             prefs: prefs::Prefs::new(config, keymap, palette),
             sheets: components::dashboard::Sheets::default(),
             full_screens: draw::FullScreens::default(),
-            nav: components::panes::Nav::default(),
+            nav: components::panes::nav::Nav::default(),
             help: components::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship,
             theme: components::settings::ThemeEditor::new(theme_config),
-            right: components::diff::RightPane::new(),
+            right: components::diff::right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
-            hits: components::panes::HitAreas::default(),
+            hits: components::panes::hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
             render: draw::RenderState::default(),
             new_branch_title: String::new(),

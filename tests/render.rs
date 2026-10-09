@@ -20,7 +20,7 @@ use std::sync::mpsc;
 
 use ferrit::git::remote::RemoteOp;
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::draw as ui;
 use ferrit::tui::mock;
 use git2::{IndexAddOption, Repository, Signature};

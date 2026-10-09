@@ -12,10 +12,12 @@ use crate::git::staging;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::dashboard::{Dashboard, Sheet, StatsCompletion, StatsCtx};
-use crate::tui::components::diff::{Mode, RightPane};
+use crate::tui::components::diff::right_pane::{Mode, RightPane};
 use crate::tui::components::menu::{self, NameKind};
-use crate::tui::components::panes::{Nav, PaneRows};
-use crate::tui::components::panes::{Pane, SelectionKey};
+use crate::tui::components::panes::nav::Nav;
+use crate::tui::components::panes::nav::Pane;
+use crate::tui::components::panes::rows::PaneRows;
+use crate::tui::components::panes::tree::SelectionKey;
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::components::popups::Popup;
 use crate::tui::components::{branches, remote, stash};
@@ -91,7 +93,7 @@ pub(crate) enum Event {
     /// Collapse or expand a directory row of a drilled commit's tree.
     ToggleCommitDir(std::path::PathBuf),
     /// Replace the Commits list with one commit's changed files.
-    DrillIntoCommit(crate::tui::components::panes::CommitDrill),
+    DrillIntoCommit(crate::tui::components::panes::drills::CommitDrill),
     /// Back from the dashboard to the panes, telling its computation to stop.
     CloseDashboard,
     /// Open the help screen.

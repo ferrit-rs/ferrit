@@ -19,7 +19,7 @@ use std::fs;
 use std::process::Command;
 
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;

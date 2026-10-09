@@ -8,7 +8,7 @@
 )]
 //! Throwaway: render one frame to stdout so a layout change is eyeballable.
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::draw as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

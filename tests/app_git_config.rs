@@ -16,7 +16,7 @@ use std::process::Command;
 
 use ferrit::git::config::{Scope, WriteScope};
 use ferrit::tui::App;
-use ferrit::tui::components::diff::PopupView;
+use ferrit::tui::components::diff::views::PopupView;
 use ferrit::tui::draw::FullScreen;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

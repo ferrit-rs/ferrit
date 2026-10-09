@@ -1,6 +1,6 @@
 //! The key bar and the help lines built from the keymap.
 
-use crate::tui::components::panes::Pane;
+use crate::tui::components::panes::nav::Pane;
 use crate::tui::draw::{FullScreen, Landed, RenderState};
 use crate::tui::keymap::{Action, Context, KeyBinding, Keymap};
 use crate::tui::scene::Scene;

@@ -28,9 +28,9 @@ pub enum AppEvent {
     /// the event boundary carries only owned, sendable application data.
     RefreshDone(Box<crate::tui::RefreshCompletion>),
     /// Selected diff read finished. Generation and key reject stale results.
-    DiffDone(crate::tui::components::diff::DiffCompletion),
+    DiffDone(crate::tui::components::diff::queries::DiffCompletion),
     /// Selected image blob read/decode finished. Stale generations are dropped.
-    ImageDone(crate::tui::components::diff::ImageCompletion),
+    ImageDone(crate::tui::components::diff::queries::ImageCompletion),
     /// A background `fetch`/`pull`/`push` finished. `message` is already a
     /// user-facing string (`Ok` success line or `Err` failure text) — this
     /// module stays git-agnostic, so the spawned thread converts a

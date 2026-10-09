@@ -7,7 +7,7 @@ use crate::git::model::{
     StatusHeader,
 };
 use crate::theme::palette::Palette;
-use crate::tui::components::panes::StageState;
+use crate::tui::components::panes::tree::StageState;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use std::fmt::Write as _;

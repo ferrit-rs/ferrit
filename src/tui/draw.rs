@@ -9,17 +9,18 @@ use crate::tui::components::commit_editor::draw_commit;
 use crate::tui::components::commit_editor::draw_commit_all_confirm;
 use crate::tui::components::create_remote::draw_create_remote;
 use crate::tui::components::dashboard::Sheet;
-use crate::tui::components::diff::draw_files_columns;
-use crate::tui::components::diff::draw_right_pane;
-use crate::tui::components::diff::draw_single_file_diff;
-use crate::tui::components::diff::{DiffView, PopupView, RightKey};
+use crate::tui::components::diff::draw::draw_files_columns;
+use crate::tui::components::diff::draw::draw_right_pane;
+use crate::tui::components::diff::draw::draw_single_file_diff;
+use crate::tui::components::diff::queries::RightKey;
+use crate::tui::components::diff::views::{DiffView, PopupView};
 use crate::tui::components::help::HelpView;
 use crate::tui::components::help::draw_help;
 use crate::tui::components::keybar::KeybarHit;
 use crate::tui::components::keybar::draw_keybar;
 use crate::tui::components::menu::draw_menu;
-use crate::tui::components::panes::Pane;
-use crate::tui::components::panes::draw_left_column;
+use crate::tui::components::panes::draw::draw_left_column;
+use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::popups::draw_note;
 use crate::tui::components::settings::SettingsHits;
 use crate::tui::components::welcome::draw_welcome;
@@ -208,7 +209,7 @@ fn draw_git_config(
 ) -> Rect {
     let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
     let screen = app.git_config();
-    let view = git_config::View {
+    let view = git_config::draw::View {
         rows: &screen.rows,
         selected: screen.selected,
         offset: screen.offset(),
@@ -219,7 +220,7 @@ fn draw_git_config(
         note: screen.note.as_deref(),
         palette: app.palette(),
     };
-    let offset = git_config::draw(frame, page, &view);
+    let offset = git_config::draw::draw(frame, page, &view);
     landed.git_config_offset = Some(offset);
     draw_keybar(frame, keybar, app, render, landed);
     keybar
@@ -384,7 +385,7 @@ impl RenderState {
 pub(crate) struct FullScreens {
     /// The view showing, if any.
     pub(crate) active: FullScreen,
-    pub(crate) git_config: git_config::GitConfigScreen,
+    pub(crate) git_config: git_config::screen::GitConfigScreen,
     /// The folder the welcome screen is about; `None` once there is a repository.
     pub(crate) welcome_dir: Option<PathBuf>,
     /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.

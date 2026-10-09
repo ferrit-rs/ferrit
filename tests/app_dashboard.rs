@@ -22,7 +22,7 @@ use std::time::Duration;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::git::stats::Window;
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::events::AppEvent;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,

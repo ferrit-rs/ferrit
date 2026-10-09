@@ -18,7 +18,7 @@ use std::fs;
 use std::path::Path;
 
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::draw;
 use git2::{Repository, Signature};
 use ratatui::Terminal;

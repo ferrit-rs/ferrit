@@ -4,7 +4,7 @@
 //! in for a real frame. See `docs/PLAN_5_CLICK_BEHAVIOR.md` milestone C1.
 
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };

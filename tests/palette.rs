@@ -14,7 +14,7 @@ use ferrit::config::Config;
 use ferrit::git::diff::parse_diff;
 use ferrit::theme::palette::Palette;
 use ferrit::tui::App;
-use ferrit::tui::components::panes::Pane;
+use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::mock::{mock_commits, mock_files};
 use ferrit::tui::row_lines;
 use ferrit::tui::widgets::chrome::KeyBar;

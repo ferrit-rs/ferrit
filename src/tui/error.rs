@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::config::ConfigError;
 use crate::git::error::GitError;
-use crate::tui::components::diff::ImageError;
+use crate::tui::components::diff::queries::ImageError;
 use crate::tui::workers::WorkerError;
 
 /// Errors surfaced by app actions. Every variant says what went wrong; there is

@@ -12,7 +12,7 @@ use ferrit::git::host::CreateDraft;
 use ferrit::git::host::{GhProgram, Visibility};
 use ferrit::tui::App;
 use ferrit::tui::components::create_remote::{CreateRemoteView, Field};
-use ferrit::tui::components::diff::PopupView;
+use ferrit::tui::components::diff::views::PopupView;
 use ferrit::tui::events::AppEvent;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
