@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::infra::git::Repo;
+use ferrit::git::repo::Repo;
 use git2::Repository;
 
 /// `main` and `side` both rewrite `f`, then `side` is merged into `main`:
@@ -152,7 +152,7 @@ fn taking_a_side_of_a_path_git_does_not_know_fails_and_a_merged_file_is_untouche
     let repo = Repo::open(dir.path()).unwrap();
     let err = repo.take_side(Path::new("no-such-file"), true).unwrap_err();
     assert!(
-        matches!(err, ferrit::domain::git::error::GitError::ApplyFailed(_)),
+        matches!(err, ferrit::git::error::GitError::ApplyFailed(_)),
         "got {err:?}"
     );
 

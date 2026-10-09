@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use ferrit::domain::git::askpass;
+use ferrit::git::askpass;
 
 /// The whole path: a running ferrit answers, and ferrit started the way ssh
 /// starts an askpass program (prompt as argument) prints that answer. One

@@ -3,7 +3,7 @@
 use super::create_remote;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::text_input::TextInput;
-use crate::domain::git;
+use crate::git;
 
 /// What the right pane shows behind the image preview. A second cached,
 /// rebuilt-on-nav value alongside `preview`, not a replacement: an image

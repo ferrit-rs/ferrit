@@ -1,7 +1,7 @@
 //! Calendar and other branches.
 
 use crate::support::{RICHARD, TempDir, ago, commit, git, init, project, stats_at};
-use ferrit::domain::git::stats::Window;
+use ferrit::git::stats::Window;
 
 #[test]
 fn the_daily_counts_cover_26_weeks_whatever_the_window() {

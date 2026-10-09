@@ -7,8 +7,8 @@
 use super::context_menu::NameKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, ConfirmAction, ConfirmPrompt, KeyCode, KeyEvent, Popup, TextInput};
-use crate::domain::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
-use crate::domain::git::config_keys::{KeyType, lookup};
+use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
+use crate::git::config_keys::{KeyType, lookup};
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
 

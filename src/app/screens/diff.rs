@@ -13,7 +13,7 @@ use crate::app::row_lines;
 use crate::app::{App, DiffView};
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::domain::git;
+use crate::git;
 use crate::theme::palette::Palette;
 
 pub(super) fn draw_files_columns(

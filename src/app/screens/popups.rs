@@ -20,7 +20,7 @@ use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
 use crate::components::ui::text_input::TextInput;
-use crate::domain::git::host::Visibility;
+use crate::git::host::Visibility;
 use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 

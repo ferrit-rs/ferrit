@@ -113,7 +113,7 @@ impl App {
     pub fn set_global_identities(&mut self, identities: Vec<(String, String)>) {
         self.authorship.profile.settings.global_identities = identities
             .into_iter()
-            .map(|(name, email)| crate::domain::profile::settings::Identity {
+            .map(|(name, email)| git::profile::settings::Identity {
                 name,
                 email: Some(email),
             })

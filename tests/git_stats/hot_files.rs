@@ -1,7 +1,7 @@
 //! Hot files.
 
 use crate::support::{RICHARD, TempDir, ago, commit, git, init, project, stats_at};
-use ferrit::domain::git::stats::Window;
+use ferrit::git::stats::Window;
 
 #[test]
 fn hot_files_rank_by_commits_touching_them_and_hide_lockfiles_and_changelogs() {

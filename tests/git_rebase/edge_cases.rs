@@ -8,10 +8,10 @@ use crate::support::{
     edit, hash_of, history, independent_history, poison_editors, pushed_history, step, subjects,
     try_git,
 };
-use ferrit::domain::git::model::Operation;
-use ferrit::domain::git::operation::{OperationOutcome, Step};
-use ferrit::domain::git::rebase::RebaseEdit;
-use ferrit::infra::git::Repo;
+use ferrit::git::model::Operation;
+use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::rebase::RebaseEdit;
+use ferrit::git::repo::Repo;
 
 #[test]
 fn a_detached_head_can_be_rewritten() {

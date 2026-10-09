@@ -7,9 +7,9 @@ use crate::support::{
     assert_failed_with, conflicted_merge, history, interactive_rebase, operation, resolve, step,
     try_git,
 };
-use ferrit::domain::git::model::Operation;
-use ferrit::domain::git::operation::{OperationOutcome, Step};
-use ferrit::infra::git::Repo;
+use ferrit::git::model::Operation;
+use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::repo::Repo;
 
 #[test]
 fn a_clean_repository_has_no_operation() {

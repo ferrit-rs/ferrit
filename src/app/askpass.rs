@@ -1,10 +1,10 @@
 //! The credential popup: a passphrase, password or host-key question that
 //! ssh or git asked during a fetch, pull or push, answered here instead of
-//! on the terminal the TUI owns (`domain::git::askpass`,
+//! on the terminal the TUI owns (`git::askpass`,
 //! `docs/PLAN_9_REMOTE.md`, "Credentials").
 
 use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, TextInput, TextInputMode, mpsc};
-use crate::domain::git::askpass;
+use crate::git::askpass;
 
 /// One pending question and where its answer goes. `typed` holds the real
 /// text; `shown` is what the popup draws, dots when the answer is secret.

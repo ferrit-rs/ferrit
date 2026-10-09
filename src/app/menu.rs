@@ -7,7 +7,7 @@
 use super::{
     App, ConfirmAction, ConfirmPrompt, GitResult, KeyCode, KeyEvent, Popup, git, operation_noun,
 };
-use crate::domain::git::operation::{OperationOutcome, Step};
+use crate::git::operation::{OperationOutcome, Step};
 
 /// What choosing a menu row does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

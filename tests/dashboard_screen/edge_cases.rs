@@ -1,10 +1,10 @@
 //! Edge cases.
 
 use crate::support::{DAY, NOW, author, render, stats, view};
-use ferrit::domain::git::stats::kind::Kind;
-use ferrit::domain::git::stats::series::{Bucket, Granularity};
-use ferrit::domain::git::stats::share::Share;
-use ferrit::domain::git::stats::{FileStat, HotFiles, KindStat, Lines, Totals, Window};
+use ferrit::git::stats::kind::Kind;
+use ferrit::git::stats::series::{Bucket, Granularity};
+use ferrit::git::stats::share::Share;
+use ferrit::git::stats::{FileStat, HotFiles, KindStat, Lines, Totals, Window};
 
 #[test]
 fn while_computing_the_screen_says_so() {

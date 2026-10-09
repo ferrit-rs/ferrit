@@ -12,8 +12,8 @@ use ratatui_image::picker::Picker;
 use super::diff_query::RightKey;
 use super::render_state::RenderedDiff;
 use super::{DiffCursor, DiffView, hunk_content_id, hunk_lines_for, row_lines};
-use crate::domain::git;
-use crate::domain::git::diff::DiffSide;
+use crate::git;
+use crate::git::diff::DiffSide;
 use crate::theme::palette::Palette;
 
 pub(crate) struct RightPane {

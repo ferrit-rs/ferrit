@@ -27,7 +27,7 @@ use std::time::Duration;
 
 use ferrit::app::App;
 use ferrit::app::events::{AppEvent, RemoteOp};
-use ferrit::domain::git::error::GitError;
+use ferrit::git::error::GitError;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

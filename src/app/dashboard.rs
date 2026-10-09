@@ -17,8 +17,8 @@ use super::sheet::Sheet;
 use super::{
     App, AppError, AppEvent, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, run_worker,
 };
-use crate::domain::git::port::GitPort;
-use crate::domain::git::stats::{RepoStats, StatsOptions, Window};
+use crate::git::port::GitPort;
+use crate::git::stats::{RepoStats, StatsOptions, Window};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 
 /// The windows `t` cycles through, shortest first.

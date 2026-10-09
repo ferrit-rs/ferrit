@@ -12,13 +12,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::domain::git::apply::ApplyDir;
-use ferrit::domain::git::commit::{CommitKind, CommitOpts};
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::fake::FakeGit;
-use ferrit::domain::git::model::Change;
-use ferrit::domain::git::port::GitPort;
-use ferrit::infra::git::Repo;
+use ferrit::git::apply::ApplyDir;
+use ferrit::git::commit::{CommitKind, CommitOpts};
+use ferrit::git::error::GitError;
+use ferrit::git::fake::FakeGit;
+use ferrit::git::model::Change;
+use ferrit::git::port::GitPort;
+use ferrit::git::repo::Repo;
 
 struct TempDir(PathBuf);
 

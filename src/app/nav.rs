@@ -8,8 +8,8 @@ use std::path::PathBuf;
 
 use enum_map::EnumMap;
 
-use crate::domain::git::Snapshot;
-use crate::domain::git::model::{CommitEntry, FileEntry};
+use crate::git::Snapshot;
+use crate::git::model::{CommitEntry, FileEntry};
 use crate::theme::palette::Palette;
 
 use super::pane_rows::PaneRows;

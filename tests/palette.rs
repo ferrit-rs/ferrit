@@ -16,7 +16,7 @@ use ferrit::app::pane::Pane;
 use ferrit::app::row_lines;
 use ferrit::components::ui::key_bar::KeyBar;
 use ferrit::config::Config;
-use ferrit::domain::git::diff::parse_diff;
+use ferrit::git::diff::parse_diff;
 use ferrit::theme::palette::Palette;
 use ratatui::style::Color;
 

@@ -25,7 +25,7 @@ use self::text::{date, thousands, window_label};
 use crate::components::ui::chart_palette::{ChartMode, ChartPalette};
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::domain::git::stats::{NUMSTAT_CAP, RepoStats, WALK_CAP};
+use crate::git::stats::{NUMSTAT_CAP, RepoStats, WALK_CAP};
 
 /// Two columns from this width.
 pub const WIDE: u16 = 110;

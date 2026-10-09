@@ -36,8 +36,9 @@ first "yes":
 Adding a new dependency, a new module, or an abstraction with a single caller
 needs a reason stated in the commit message.
 
-Keep distinct logic in separate files or modules. Group domain logic by feature
-under `src/domain/` (Git types and traits, profile, image) and `src/infra/git/` (the `git2` and subprocess adapter); put
+Keep distinct logic in separate files or modules. Group logic by domain:
+`src/git/` (Git types and traits, profile, image, and `git/repo`, the `git2` and subprocess
+adapter), `src/keybindings/`, `src/config/` and `src/theme/`; put
 Ferrit-specific state, events, screens, and terminal lifecycle under `src/app/`;
 keep reusable UI primitives and isolated `tui_overlay` code under
 `src/components/`. Avoid mixing those responsibilities in one file.

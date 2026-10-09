@@ -48,7 +48,7 @@ struct Cli {
 fn main() -> Result<ExitCode> {
     // ssh or git running ferrit as its askpass helper: answer and leave,
     // before clap sees the prompt as an argument.
-    if let Some(code) = ferrit::domain::git::askpass::run_helper(std::env::args().skip(1)) {
+    if let Some(code) = ferrit::git::askpass::run_helper(std::env::args().skip(1)) {
         return Ok(code);
     }
     color_eyre::install()?;

@@ -56,7 +56,7 @@ pub enum AppEvent {
     /// tells which popup asked (`app::create_remote`).
     GhChecked {
         generation: u64,
-        status: crate::domain::git::host::GhStatus,
+        status: crate::git::host::GhStatus,
     },
 }
 

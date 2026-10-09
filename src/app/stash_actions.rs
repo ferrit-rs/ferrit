@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use super::{
     App, ConfirmAction, ConfirmPrompt, DiffView, Mode, Pane, Popup, SelectionKey, TextInput, git,
 };
-use crate::domain::git::stash::StashOutcome;
+use crate::git::stash::StashOutcome;
 
 impl App {
     /// The selected stash entry's oid, only while Stash is focused, in

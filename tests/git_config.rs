@@ -7,10 +7,10 @@
 //! `git config --list --show-origin --show-scope -z` output.
 //! See `docs/PLAN_14_GIT_CONFIG.md` milestone G0.
 
-use ferrit::domain::git::config::{
+use ferrit::git::config::{
     Origin, Scope, ValueKind, WriteScope, display_value, is_secret_key, parse,
 };
-use ferrit::infra::git::Repo;
+use ferrit::git::repo::Repo;
 
 const SAMPLE: &str = "system\0file:/etc/gitconfig\0core.autocrlf\ninput\0\
 global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0\
@@ -152,7 +152,7 @@ fn repo_writes_local_config_through_git_and_reads_it_back() {
 
 #[test]
 fn known_keys_are_real_git_keys_and_their_values_are_accepted_by_git() {
-    use ferrit::domain::git::config_keys::{KNOWN_KEYS, KeyType, lookup};
+    use ferrit::git::config_keys::{KNOWN_KEYS, KeyType, lookup};
 
     let out = std::process::Command::new("git")
         .args(["help", "-c"])
@@ -257,7 +257,7 @@ global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0",
 
 #[test]
 fn secrets_are_hidden_on_screen_and_in_the_command_log() {
-    use ferrit::domain::git::command_log::recent;
+    use ferrit::git::command_log::recent;
 
     assert!(is_secret_key("http.proxyPassword"));
     assert!(is_secret_key("credential.https://x.example.token"));
@@ -314,10 +314,7 @@ fn secrets_are_hidden_on_screen_and_in_the_command_log() {
         .find(|r| r.argv.contains("--show-origin"))
         .unwrap();
     assert!(listing.output.is_empty());
-    assert_eq!(
-        listing.kind,
-        ferrit::domain::git::command_log::CommandKind::Read
-    );
+    assert_eq!(listing.kind, ferrit::git::command_log::CommandKind::Read);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

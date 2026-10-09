@@ -9,10 +9,10 @@ use super::{
     run_worker,
 };
 
-use crate::domain::git;
-use crate::domain::git::diff::{DiffOpts, DiffSide};
-use crate::domain::git::error::GitError;
-use crate::domain::git::port::GitPort;
+use crate::git;
+use crate::git::diff::{DiffOpts, DiffSide};
+use crate::git::error::GitError;
+use crate::git::port::GitPort;
 
 #[derive(Default)]
 pub(super) struct DiffQueryState {

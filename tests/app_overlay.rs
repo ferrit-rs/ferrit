@@ -19,9 +19,9 @@ use ferrit::app::App;
 use ferrit::app::full_screens::FullScreen;
 use ferrit::app::pane::Pane;
 use ferrit::config::ConfigLoad;
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::fake::FakeGit;
-use ferrit::domain::git::model::Change;
+use ferrit::git::error::GitError;
+use ferrit::git::fake::FakeGit;
+use ferrit::git::model::Change;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn press(app: &mut App, code: KeyCode) {

@@ -4,9 +4,7 @@
 //! so git stays the owner of the file format.
 
 use super::{App, AppError, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
-use crate::domain::git::config::{
-    ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value,
-};
+use crate::git::config::{ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 
 /// Rows `PgUp` / `PgDn` move.

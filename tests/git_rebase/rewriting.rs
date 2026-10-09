@@ -5,11 +5,11 @@ use std::fs;
 use std::path::Path;
 
 use crate::support::{assert_rebase_failed, edit, hash_of, history, operation, step, subjects};
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::model::Operation;
-use ferrit::domain::git::operation::{OperationOutcome, Step};
-use ferrit::domain::git::rebase::{RebaseEdit, build_todo};
-use ferrit::infra::git::Repo;
+use ferrit::git::error::GitError;
+use ferrit::git::model::Operation;
+use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::rebase::{RebaseEdit, build_todo};
+use ferrit::git::repo::Repo;
 use git2::Repository;
 
 #[test]

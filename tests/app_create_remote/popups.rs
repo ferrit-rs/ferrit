@@ -8,7 +8,7 @@ use crate::support::{
 };
 use ferrit::app::create_remote::Field;
 use ferrit::app::events::AppEvent;
-use ferrit::domain::git::host::{GhProgram, Visibility};
+use ferrit::git::host::{GhProgram, Visibility};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 #[test]

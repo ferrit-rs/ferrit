@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::domain::git;
+use crate::git;
 
 /// One visible row of the Files pane's directory tree (lazygit style).
 /// `App::files_tree_rows` builds these fresh from `self.snapshot.files` and

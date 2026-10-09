@@ -3,9 +3,9 @@
 use std::sync::atomic::AtomicBool;
 
 use crate::support::{NOW, TempDir, git, init, project, stats_at};
-use ferrit::domain::git::command_log;
-use ferrit::domain::git::stats::{StatsOptions, Window};
-use ferrit::infra::git::Repo;
+use ferrit::git::command_log;
+use ferrit::git::repo::Repo;
+use ferrit::git::stats::{StatsOptions, Window};
 
 #[test]
 fn lines_are_summed_in_total_and_per_author() {

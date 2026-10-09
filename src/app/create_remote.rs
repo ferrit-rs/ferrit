@@ -16,12 +16,12 @@ use super::{
     App, AppError, AppEvent, KeyCode, KeyEvent, Popup, Result, TextInput, TextInputMode,
     WorkerKind, events, mpsc, run_worker, thread,
 };
-use crate::domain::git::error::GitError;
-use crate::domain::git::host::{
+use crate::git::error::GitError;
+use crate::git::host::{
     self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
     ssh_remote_url, validate_description,
 };
-use crate::domain::git::ssh_config::read_github_aliases;
+use crate::git::ssh_config::read_github_aliases;
 
 /// What the form holds, and all the user chooses: the name, the visibility and
 /// the description. Kept on the app while `gh` runs, so a refusal can reopen the

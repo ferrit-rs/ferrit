@@ -5,11 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::model::Operation;
-use ferrit::domain::git::operation::{OperationOutcome, Step};
-use ferrit::domain::git::rebase::RebaseEdit;
-use ferrit::infra::git::Repo;
+use ferrit::git::error::GitError;
+use ferrit::git::model::Operation;
+use ferrit::git::operation::{OperationOutcome, Step};
+use ferrit::git::rebase::RebaseEdit;
+use ferrit::git::repo::Repo;
 use git2::Repository;
 
 /// Run git, allowing failure (a conflict exits non-zero by design), with the

@@ -85,7 +85,7 @@ fn the_rewrite_of_origin_is_in_the_command_log() {
     app.start_create_remote(draft("acme/tool"), tx);
     wait_for_created(&mut app, &rx);
     wait_for_push(&mut app, &rx);
-    let logged = ferrit::domain::git::command_log::recent(usize::MAX, true)
+    let logged = ferrit::git::command_log::recent(usize::MAX, true)
         .iter()
         .any(|r| {
             r.argv

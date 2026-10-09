@@ -14,9 +14,9 @@
 use std::fmt::Write as _;
 use std::ops::Range;
 
-use ferrit::domain::git::apply::transform_body;
-use ferrit::domain::git::diff::parse::{FileMeta, FileStatus};
-use ferrit::domain::git::diff::parse_diff;
+use ferrit::git::apply::transform_body;
+use ferrit::git::diff::parse::{FileMeta, FileStatus};
+use ferrit::git::diff::parse_diff;
 use proptest::prelude::*;
 
 // ------------------------------------------------------------- the hunk body

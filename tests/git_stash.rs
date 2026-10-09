@@ -18,10 +18,10 @@ mod common;
 use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 
-use ferrit::domain::git::diff::DiffOpts;
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::stash::StashOutcome;
-use ferrit::infra::git::Repo;
+use ferrit::git::diff::DiffOpts;
+use ferrit::git::error::GitError;
+use ferrit::git::repo::Repo;
+use ferrit::git::stash::StashOutcome;
 use git2::Repository;
 
 /// One commit with `a.txt`.

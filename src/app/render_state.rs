@@ -5,7 +5,7 @@
 //! them. They are kept apart so drawing can read `&App` and take only these as
 //! `&mut` (`docs/PLAN_24_DRAW_VIEW.md`).
 
-use crate::domain::image::preview::Preview;
+use crate::git::image::preview::Preview;
 use ratatui::text::Text;
 use std::ops::Range;
 use std::time::Duration;

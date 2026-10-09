@@ -13,9 +13,9 @@ use super::text::{MIN_WHOLE, compact, figure, figure_columns, plural, relative_t
 use super::{Ctx, note};
 use crate::components::ui::cut::{cut_end, cut_middle};
 use crate::components::ui::share_bar::{percent_label, single_bar, stacked_bar};
-use crate::domain::git::stats::HotFiles;
-use crate::domain::git::stats::branches::BranchHealth;
-use crate::domain::git::stats::share::{Share, fold, shares};
+use crate::git::stats::HotFiles;
+use crate::git::stats::branches::BranchHealth;
+use crate::git::stats::share::{Share, fold, shares};
 
 /// Branch rows drawn before "+N more".
 pub(super) const BRANCH_ROWS: usize = 8;

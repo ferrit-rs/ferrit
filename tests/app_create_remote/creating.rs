@@ -5,7 +5,7 @@ use std::sync::mpsc;
 
 use crate::support::{Project, draft, wait_for_created, wait_for_push};
 use ferrit::app::events::RemoteOp;
-use ferrit::domain::git::host::Visibility;
+use ferrit::git::host::Visibility;
 
 #[test]
 fn a_creation_is_busy_then_reports_the_url_pushes_and_refreshes() {

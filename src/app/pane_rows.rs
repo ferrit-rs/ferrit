@@ -10,7 +10,7 @@ use super::{
     BranchesTab, FileRow, Pane, SelectionKey, StageState, dir_stage_state, drill_tree_rows,
     find_file_row_key, row_lines, selection_key_for_file_rows, tree_rows,
 };
-use crate::domain::git::{self, Snapshot};
+use crate::git::{self, Snapshot};
 use crate::theme::palette::Palette;
 
 pub(super) struct PaneRows<'a> {

@@ -3,11 +3,11 @@
 use super::authorship::Authorship;
 use super::error::AppError;
 use super::tree::commit_drill_files;
-use crate::domain::git;
-use crate::domain::git::diff::DiffOpts;
-use crate::domain::git::error::GitError;
-use crate::domain::git::port::GitPort;
-use crate::domain::profile::Profile;
+use crate::git;
+use crate::git::diff::DiffOpts;
+use crate::git::error::GitError;
+use crate::git::port::GitPort;
+use crate::git::profile::Profile;
 use color_eyre::Result;
 use std::sync::Arc;
 

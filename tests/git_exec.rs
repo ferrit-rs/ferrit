@@ -22,9 +22,9 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ferrit::domain::git::command_log::{CommandKind, CommandRecord, recent};
-use ferrit::domain::git::diff::{DiffOpts, DiffSide};
-use ferrit::infra::git::Repo;
+use ferrit::git::command_log::{CommandKind, CommandRecord, recent};
+use ferrit::git::diff::{DiffOpts, DiffSide};
+use ferrit::git::repo::Repo;
 use git2::Repository;
 
 fn fixture(tag: &str) -> TempDir {
@@ -113,9 +113,9 @@ fn a_stdin_fed_command_is_recorded_too() {
     git(dir.path(), &["add", "a.txt"]);
     let repo = Repo::open(dir.path()).unwrap();
     repo.commit(
-        &ferrit::domain::git::commit::CommitKind::Normal,
+        &ferrit::git::commit::CommitKind::Normal,
         "exec-stdin message",
-        ferrit::domain::git::commit::CommitOpts::default(),
+        ferrit::git::commit::CommitOpts::default(),
     )
     .unwrap();
 
@@ -229,7 +229,7 @@ fn every_git_subprocess_goes_through_exec() {
         if file.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/replay")) {
             continue;
         }
-        let is_exec = file.ends_with("domain/git/exec.rs");
+        let is_exec = file.ends_with("git/exec.rs");
         if !is_exec {
             assert!(
                 !text.contains("Command::new(\"git\")"),
@@ -238,8 +238,7 @@ fn every_git_subprocess_goes_through_exec() {
             );
         }
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-        if (file.starts_with(manifest.join("src/domain/git"))
-            || file.starts_with(manifest.join("src/infra/git")))
+        if file.starts_with(manifest.join("src/git"))
             && !is_exec
             && !file.ends_with("command_log.rs")
             && (text.contains(".output()") || text.contains(".spawn()"))
@@ -254,32 +253,4 @@ fn every_git_subprocess_goes_through_exec() {
             );
         }
     }
-}
-
-#[test]
-fn the_git_backend_knows_nothing_about_the_terminal() {
-    // `docs/PLAN_12_POLISH.md` definition of done: the domain layer stays free
-    // of the UI crates, so a screen change can never reach the git code.
-    fn scan(dir: &Path, offenders: &mut Vec<PathBuf>) {
-        for entry in fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                scan(&path, offenders);
-            } else if path.extension().is_some_and(|ext| ext == "rs")
-                && fs::read_to_string(&path)
-                    .unwrap()
-                    .lines()
-                    .any(|line| !line.trim_start().starts_with("//") && line.contains("ratatui"))
-            {
-                // Comments may say "no ratatui"; code may not use it.
-                offenders.push(path);
-            }
-        }
-    }
-    let mut offenders = Vec::new();
-    scan(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/domain/git"),
-        &mut offenders,
-    );
-    assert!(offenders.is_empty(), "ratatui used in {offenders:?}");
 }

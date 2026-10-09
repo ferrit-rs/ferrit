@@ -7,8 +7,8 @@ use super::{
     App, AppError, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker,
     thread,
 };
-use crate::domain::git::error::GitResult;
-use crate::domain::git::port::GitPort;
+use crate::git::error::GitResult;
+use crate::git::port::GitPort;
 
 /// Image worker result, applied only if selection and generation still match.
 #[doc(hidden)]

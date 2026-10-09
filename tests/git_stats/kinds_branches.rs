@@ -1,8 +1,8 @@
 //! Kinds branches and work state.
 
 use crate::support::{ago, git, project, stats_at};
-use ferrit::domain::git::stats::Window;
-use ferrit::domain::git::stats::kind::Kind;
+use ferrit::git::stats::Window;
+use ferrit::git::stats::kind::Kind;
 
 #[test]
 fn kinds_come_from_the_prefix_and_leave_merges_out() {

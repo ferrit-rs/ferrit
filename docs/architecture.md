@@ -1,67 +1,72 @@
 # Architecture
 
 Ferrit is one crate with a thin binary (`src/main.rs`, a `clap` wrapper) over a library
-(`src/lib.rs`). The library has four parts: `app`, `components`, `domain` and `infra`.
+(`src/lib.rs`). `src/` is organised by domain, one folder for each thing ferrit knows
+about, plus `app`, which is what puts them together.
 
 ```
             main.rs  (clap, terminal setup)
                │
                ▼
-┌─────────────────────────────┐        ┌────────────────────────────┐
-│ app/                        │ uses   │ components/                │
-│  App state, events, keys,   │───────►│  reusable ratatui widgets  │
-│  screens, popups, config    │        │  and tui_overlay           │
-└──────────────┬──────────────┘        │  (know nothing of git)     │
-               │ uses                  └────────────────────────────┘
-               ▼
-┌─────────────────────────────┐        ┌────────────────────────────┐
-│ domain/                     │        │ infra/git/                 │
-│  git/   model, GitPort      │◄───────│  Repo : GitPort            │
-│         traits, FakeGit     │        │  git2 (reads)              │
-│  profile/  identities       │        │  `git` subprocess (writes) │
-│  image/    format detection │        └────────────────────────────┘
-└─────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ app/   App, the run loop, events, popups, the panes      │
+│        (orchestration: what reads several domains)       │
+└───┬───────────┬──────────────┬──────────────┬────────────┘
+    │ uses      │              │              │
+    ▼           ▼              ▼              ▼
+┌────────┐ ┌────────────┐ ┌──────────┐ ┌──────────────────┐
+│ git/   │ │ keybindings│ │ config/  │ │ theme/           │
+│ model, │ │ keymap,    │ │ config.  │ │ palette, scheme, │
+│ port,  │ │ key bar,   │ │ toml,    │ │ [theme], picker, │
+│ fake,  │ │ help       │ │ prefs,   │ │ editor state     │
+│ repo/  │ └────────────┘ │ settings │ └──────────────────┘
+│ (git2) │                └──────────┘
+└────────┘      components/  reusable ratatui widgets (know nothing of git)
 ```
 
-The dependency rule is `app -> domain <- infra`: `infra` implements the traits that
-`domain` defines, and `app` never names it except to build the app.
+The domains do not know `app`. Inside `git`, the model and the `GitPort` traits are the
+domain and `git/repo` is the adapter that implements them, so `app` never names `Repo`
+except to build the app.
 
 Rules that hold today, and that the tests and lints keep:
 
-- `domain/` does not name `git2`, and `domain/git` imports no `ratatui` and no `crossterm`.
-  Rows handed to the UI are owned model types (`domain/git/model.rs`). `tests/layering.rs`
-  checks it on the sources, along with `app/` reaching `infra` only in `App::open` and
-  `git init`.
-- `components/` knows nothing about git or `App`.
-- `app/` reaches git only through the `GitPort` traits (`domain/git/port.rs`). The real
-  adapter is `Repo`; tests can use `FakeGit` (`domain/git/fake.rs`). `app/` names the
-  concrete `Repo` in one place, `App::open`, and for `git init`, which runs before any
-  repository exists. A contract suite (`tests/fake_git_contract.rs`) runs the same
-  scenarios on both so the fake cannot drift.
+- Only `git/repo` names `git2`, and nothing in `git` imports `ratatui` or `crossterm`
+  (`git/image` draws the preview and is the exception for `ratatui_image`). Rows handed to
+  the UI are owned model types (`git/model.rs`). `tests/layering.rs` checks it on the
+  sources, along with `app/` reaching `git/repo` only in `App::open` and `git init`, and
+  `git` never reaching into `app`.
+- `components/` knows nothing about git or `App`; `theme/` knows nothing of what is drawn
+  with it.
+- `app/` reaches git only through the `GitPort` traits (`git/port.rs`). The real adapter is
+  `Repo`; tests can use `FakeGit` (`git/fake.rs`). `app/` names the concrete `Repo` in one
+  place, `App::open`, and for `git init`, which runs before any repository exists. A
+  contract suite (`tests/fake_git_contract.rs`) runs the same scenarios on both so the fake
+  cannot drift.
 - Errors keep their type up to the screen: `GitError`, `ConfigError`, `ImageError` and
-  `AppError` (`thiserror`), with no `Result<_, String>` in `app/` or `domain/`. The only
+  `AppError` (`thiserror`), with no `Result<_, String>` in `app/` or `git/`. The only
   `String`s are in view state that is already text (a diff note, a settings footer).
-- Every `git` process is built in one function (`domain/git/exec.rs`), so the command
-  log sees every command (`tests/git_exec.rs`).
+- Every `git` process is built in one function (`git/exec.rs`), so the command log sees
+  every command (`tests/git_exec.rs`).
 - No `unsafe`, no `unwrap`/`expect`/`panic` outside tests (`Cargo.toml` `[lints]`).
 
 Known gaps, each with a plan:
 - The code that only runs a subprocess (`exec`, `process`, `askpass`, `ssh_config`, and `gh`
-  in `host`) is still in `domain/git`; it names no `git2`, but it is infrastructure, and
-  `app/` calls some of it directly (`PLAN_21_GIT_PORT.md`, C4).
-- `domain/image` still imports `ratatui_image` for the preview protocol.
+  in `host`) is still beside the model in `git/`; it names no `git2`, but it is
+  infrastructure, and `app/` calls some of it directly (`PLAN_21_GIT_PORT.md`, C4).
+- `git/image` still imports `ratatui_image` for the preview protocol.
 - `App` is smaller (87 fields to 26) but not small: the create-remote flow and what the user
   is told are still loose on it. Drawing reads `&App`: a frame returns what it learned as a
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
+- The `interface` domain (`components`, the screens, the panes, the popups) and the
+  `*_actions` of `app` are not moved yet; they still sit in `app/` and `components/`.
 - The library still exposes more than a library would: the integration tests reach into
   most of `app` and `components`, and `App`'s public fields force their types to be
-  nameable. What nothing outside the crate used is `pub(crate)` (76 `pub mod` left, from 98);
-  the test seams that can be separated (`replay`, `FakeGit`) are behind the `test-util`
-  feature; `domain` is fully documented and checked by `missing_docs`. `app::mock` is neither
-  gated nor private, because the repo-free path of the production code reads its sample text
-  (`PLAN_23_TEST_SUPPORT.md`).
+  nameable. The test seams that can be separated (`replay`, `FakeGit`) are behind the
+  `test-util` feature; `git` is documented and checked by `missing_docs`. `app::mock` is
+  neither gated nor private, because the repo-free path of the production code reads its
+  sample text (`PLAN_23_TEST_SUPPORT.md`).
 
 ## One key press
 
@@ -75,7 +80,7 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
           dispatch::run_action ─► the feature module (staging, branch_actions, ...)
                  │ git call            │ slow call (diff, refresh, fetch)
                  ▼                     ▼
-          domain::git::Repo      worker thread ─► AppEvent::*Done ─► App::on_*_done
+          git::repo::Repo      worker thread ─► AppEvent::*Done ─► App::on_*_done
                  │
                  ▼
           App state changes ─► screens::draw(frame, &mut App) ─► paint pass ─► terminal
@@ -103,8 +108,8 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); the sheet itself is `app/settings.rs` |
 | `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config, the colour picker and the theme editor state |
 | `src/app/row_lines.rs` | the styled lines of git rows (a file, a commit, a branch), which move to the panes with the `interface` domain |
-| `src/domain/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git) |
-| `src/infra/git/` | the `git2` and subprocess adapter: `Repo`, and for each `domain/git/<x>.rs` the code that reads with `git2` or runs `git` |
+| `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `profile/` (commit identities) and `image/` (format detection, preview) |
+| `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, and for each `git/<x>.rs` the code that reads with `git2` or runs `git` |
 | `src/components/ui/` | widgets (donut, heat map, palette, toast, drawer, ...) |
 | `src/components/tui_overlay/` | vendored overlay code, with its upstream licence |
 | `src/replay/` | the scripted test harness (see ADR 2) |

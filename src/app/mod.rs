@@ -31,13 +31,13 @@ use crate::app::events::{AppEvent, Events};
 use crate::app::screens as ui;
 use crate::app::terminal::Tui;
 use crate::components::ui::text_input::{TextInput, TextInputMode};
-use crate::domain::git;
-use crate::domain::git::apply::{ApplyDir, ApplyTarget};
-use crate::domain::git::diff::DiffSide;
-use crate::domain::git::error::GitResult;
-use crate::domain::git::port::GitPort;
-use crate::domain::image::detect;
-use crate::domain::image::preview::{self, Preview};
+use crate::git;
+use crate::git::apply::{ApplyDir, ApplyTarget};
+use crate::git::diff::DiffSide;
+use crate::git::error::GitResult;
+use crate::git::image::detect;
+use crate::git::image::preview::{self, Preview};
+use crate::git::port::GitPort;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
 fn operation_noun(operation: git::model::Operation) -> &'static str {
@@ -225,7 +225,7 @@ impl App {
 
     /// The app on any git port, with the default configuration, after one
     /// snapshot. `open` is this with the real adapter; tests pass a
-    /// `domain::git::fake::FakeGit`.
+    /// `git::fake::FakeGit`.
     pub fn with_git(git: Box<dyn GitPort>) -> Self {
         let mut app = Self::base(Some(git), crate::config::Config::default());
         app.refresh();
@@ -240,7 +240,7 @@ impl App {
             file,
             issues,
         } = load;
-        let mut app = Self::base(Some(Box::new(crate::infra::git::Repo::open(path)?)), config);
+        let mut app = Self::base(Some(Box::new(git::repo::Repo::open(path)?)), config);
         app.prefs.file = file;
         app.refresh();
         app.report_config_issues(&issues);

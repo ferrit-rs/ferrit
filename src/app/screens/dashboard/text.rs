@@ -6,9 +6,9 @@ use ratatui::text::Span;
 use unicode_width::UnicodeWidthStr;
 
 use crate::components::ui::share_bar::{pad_label, percent_label};
-use crate::domain::git::stats::Window;
-use crate::domain::git::stats::series::{Granularity, civil_from_days};
-use crate::domain::git::stats::share::Share;
+use crate::git::stats::Window;
+use crate::git::stats::series::{Granularity, civil_from_days};
+use crate::git::stats::share::Share;
 
 const DAY: i64 = 86_400;
 /// A share of fewer items than this misleads: the screen shows counts.

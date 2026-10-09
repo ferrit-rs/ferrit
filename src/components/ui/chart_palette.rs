@@ -8,7 +8,7 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
-use crate::domain::git::stats::kind::Kind;
+use crate::git::stats::kind::Kind;
 use crate::theme::palette::Palette;
 
 /// Categorical slots: feat, fix, docs, test, refactor, then gray "others".

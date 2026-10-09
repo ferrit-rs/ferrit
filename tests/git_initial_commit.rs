@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::infra::git::Repo;
+use ferrit::git::repo::Repo;
 
 struct TempDir(PathBuf);
 
@@ -76,7 +76,7 @@ fn an_empty_repository_gets_one_commit_holding_an_empty_readme() {
     );
     assert_eq!(
         dir.git(&["log", "-1", "--format=%B"]).trim_end(),
-        ferrit::domain::git::commit::INITIAL_MESSAGE.trim_end(),
+        ferrit::git::commit::INITIAL_MESSAGE.trim_end(),
         "always the same message"
     );
     assert_eq!(
@@ -151,7 +151,7 @@ fn the_chosen_author_signs_it_and_the_log_shows_the_commit() {
         "Chosen One <chosen@example.com>"
     );
 
-    let logged = ferrit::domain::git::command_log::recent(usize::MAX, true)
+    let logged = ferrit::git::command_log::recent(usize::MAX, true)
         .iter()
         .any(|r| r.argv.contains("--only -- README.md") && r.exit == Some(0));
     assert!(logged, "the commit is in the command log");

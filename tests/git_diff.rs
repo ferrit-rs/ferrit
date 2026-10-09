@@ -20,9 +20,9 @@ use common::TempDir;
 use std::fs;
 use std::path::Path;
 
-use ferrit::domain::git::diff::{DiffOpts, DiffSide};
-use ferrit::domain::git::error::GitError;
-use ferrit::infra::git::Repo;
+use ferrit::git::diff::{DiffOpts, DiffSide};
+use ferrit::git::error::GitError;
+use ferrit::git::repo::Repo;
 use git2::{IndexAddOption, Repository, Signature};
 
 fn commit_all(repo: &Repository, message: &str) -> git2::Oid {

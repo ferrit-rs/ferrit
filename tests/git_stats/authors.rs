@@ -4,7 +4,7 @@ use crate::support::{
     MAX_NEW, MAX_OLD, OLA, RICHARD, RICHARD_OLD, RICHARD_WORK, TempDir, ago, commit, init, project,
     stats_at,
 };
-use ferrit::domain::git::stats::Window;
+use ferrit::git::stats::Window;
 
 #[test]
 fn authors_are_grouped_through_mailmap_and_ranked() {

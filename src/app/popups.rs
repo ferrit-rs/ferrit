@@ -149,7 +149,7 @@ impl App {
             return None;
         };
         Some(CommandLogView {
-            records: crate::domain::git::command_log::recent(usize::MAX, true),
+            records: crate::git::command_log::recent(usize::MAX, true),
             from_bottom: *from_bottom,
         })
     }

@@ -1,7 +1,7 @@
 //! The line cursor of the diff, its keyboard mode and the hunks it moves through.
 
-use crate::domain::git;
-use crate::domain::git::diff::DiffSide;
+use crate::git;
+use crate::git::diff::DiffSide;
 use std::ops::Range;
 
 /// Where keystrokes go while a Files diff is up. `Nav` is phase 1..5

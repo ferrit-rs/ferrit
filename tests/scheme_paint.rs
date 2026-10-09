@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use ferrit::app::{App, screens as ui};
 use ferrit::config::{Config, ConfigLoad};
-use ferrit::domain::git::error::GitError;
+use ferrit::git::error::GitError;
 use ferrit::theme::config::{Base, SchemeChoice};
 use ferrit::theme::scheme::{ColorDepth, Scheme, contrast};
 use ratatui::Terminal;

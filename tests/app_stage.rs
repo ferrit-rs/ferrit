@@ -22,7 +22,7 @@ use std::fs;
 use ferrit::app::App;
 use ferrit::app::pane::Pane;
 use ferrit::app::views::DiffView;
-use ferrit::domain::git::diff::DiffSide;
+use ferrit::git::diff::DiffSide;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

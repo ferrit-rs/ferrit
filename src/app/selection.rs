@@ -1,7 +1,7 @@
 //! Which row of a pane is selected, and how to find it again after a refresh.
 
 use super::tree::FileRow;
-use crate::domain::git;
+use crate::git;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

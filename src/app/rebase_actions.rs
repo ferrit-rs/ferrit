@@ -3,7 +3,7 @@
 //! `docs/PLAN_11_REBASE.md` R4.
 
 use super::{App, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
-use crate::domain::git::rebase::RebaseEdit;
+use crate::git::rebase::RebaseEdit;
 
 impl App {
     /// The selected commit, when a rewrite key may act on it: Commits focused

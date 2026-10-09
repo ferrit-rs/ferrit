@@ -68,7 +68,7 @@ impl App {
     /// (a read-only folder) is git's message and the welcome screen stays.
     pub(super) fn init_here(&mut self, dir: &Path) {
         let made: Result<PathBuf, git::error::GitError> =
-            crate::infra::git::Repo::init(dir).map(|_| dir.to_path_buf());
+            git::repo::Repo::init(dir).map(|_| dir.to_path_buf());
         match made.and_then(|dir| self.attach_repository(&dir)) {
             Ok(()) => {},
             Err(error) => self.report_error(error),

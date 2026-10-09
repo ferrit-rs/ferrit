@@ -12,7 +12,7 @@
 //! - `tape`: turns a script into a `vhs` tape for human-facing screenshots.
 //!
 //! Test scaffolding, not application code: it is the one place outside
-//! `domain::git::exec` allowed to start `git` directly, because it builds and
+//! `git::exec` allowed to start `git` directly, because it builds and
 //! inspects repositories rather than operating one on the user's behalf.
 
 pub mod cli;

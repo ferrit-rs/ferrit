@@ -6,7 +6,7 @@ use crate::support::{
     Project, bare_refs, open_form, press, ready_app, status_text, wait_for_created, wait_for_push,
 };
 use ferrit::app::events::RemoteOp;
-use ferrit::domain::git::error::GitError;
+use ferrit::git::error::GitError;
 use ratatui::crossterm::event::KeyCode;
 
 #[test]

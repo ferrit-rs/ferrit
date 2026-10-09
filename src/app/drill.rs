@@ -1,6 +1,6 @@
 //! A branch or a commit opened in place.
 
-use crate::domain::git;
+use crate::git;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

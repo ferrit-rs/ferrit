@@ -22,9 +22,9 @@ use common::TempDir;
 use ferrit::app::pane::Pane;
 use ferrit::app::{App, screens as ui};
 use ferrit::config::ConfigLoad;
-use ferrit::domain::git::error::GitError;
-use ferrit::domain::git::fake::FakeGit;
-use ferrit::domain::git::model::Change;
+use ferrit::git::error::GitError;
+use ferrit::git::fake::FakeGit;
+use ferrit::git::model::Change;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

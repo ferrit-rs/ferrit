@@ -1,8 +1,8 @@
 //! Totals and buckets.
 
 use crate::support::{NOW, RICHARD, TempDir, ago, buckets, commit, init, project, stats_at};
-use ferrit::domain::git::stats::Window;
-use ferrit::domain::git::stats::series::Granularity;
+use ferrit::git::stats::Window;
+use ferrit::git::stats::series::Granularity;
 
 #[test]
 fn totals_count_the_window_and_the_whole_repository() {

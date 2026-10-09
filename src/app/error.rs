@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::app::WorkerError;
 use crate::app::image_query::ImageError;
 use crate::config::error::ConfigError;
-use crate::domain::git::error::GitError;
+use crate::git::error::GitError;
 
 /// Errors surfaced by app actions. Every variant says what went wrong; there is
 /// no catch-all that takes a `String`, so a failure keeps its type from where it

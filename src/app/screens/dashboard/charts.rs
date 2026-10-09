@@ -16,8 +16,8 @@ use crate::components::ui::chart_palette::{ChartMode, OTHERS, kind_slot, slot_ma
 use crate::components::ui::donut::{self, Donut, Slice};
 use crate::components::ui::heatmap::{self, HeatMap};
 use crate::components::ui::share_bar::stacked_bar;
-use crate::domain::git::stats::series::{Bucket, Granularity};
-use crate::domain::git::stats::share::{fold, shares};
+use crate::git::stats::series::{Bucket, Granularity};
+use crate::git::stats::share::{fold, shares};
 
 const DAY: i64 = 86_400;
 /// Columns and rows the ring is drawn in: 32 x 32 dots, so it looks round.

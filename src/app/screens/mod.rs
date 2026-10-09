@@ -22,8 +22,8 @@ use crate::components::ui::key_bar::KeyBar;
 use crate::components::ui::pane_list::PaneList;
 use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
-use crate::domain::git::command_log;
-use crate::domain::image::preview::Preview;
+use crate::git::command_log;
+use crate::git::image::preview::Preview;
 use crate::keybindings::hints::{self, Bar};
 use crate::theme::palette::Palette;
 

@@ -20,8 +20,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::Path;
 
-use ferrit::domain::git::error::GitError;
-use ferrit::infra::git::Repo;
+use ferrit::git::error::GitError;
+use ferrit::git::repo::Repo;
 use git2::Repository;
 
 /// `origin`, a normal (non-bare) repo with `receive.denyCurrentBranch =
