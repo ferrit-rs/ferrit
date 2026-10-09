@@ -6,7 +6,6 @@ use std::sync::atomic::AtomicBool;
 
 use crate::git::Snapshot;
 use crate::git::apply::{ApplyDir, ApplyTarget};
-use crate::git::branch::MergeOutcome;
 use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
@@ -17,7 +16,8 @@ use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{CommitEntry, RemoteEntry};
 use crate::git::rebase::RebaseEdit;
 use crate::git::rebase::{OperationOutcome, Step};
-use crate::git::stash::StashOutcome;
+use crate::git::refs::MergeOutcome;
+use crate::git::refs::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 
 use super::Repo;

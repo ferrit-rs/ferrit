@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::git::error::GitError;
 use crate::git::model::StashEntry;
 use crate::git::port::GitPort;
-use crate::git::stash::{self, StashOutcome};
+use crate::git::refs::{self, StashOutcome};
 use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::panes::tree::SelectionKey;
 use crate::tui::components::popups::{ConfirmPrompt, Popup};
@@ -66,7 +66,7 @@ pub(crate) fn restore(
     repo: &mut dyn GitPort,
     first_file: Option<PathBuf>,
 ) -> Vec<Event> {
-    let result = stash::restore(repo, oid, pop);
+    let result = refs::restore(repo, oid, pop);
     let mut events = Vec::new();
     if matches!(result, Ok(StashOutcome::Done)) {
         events.push(Event::Focus(Pane::Files));

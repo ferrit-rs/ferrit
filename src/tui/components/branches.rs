@@ -1,6 +1,6 @@
 //! The Branches pane: checkout, create, delete, fast-forward, merge.
 
-use crate::git::branch::{self, MergeKind, MergeOutcome};
+use crate::git::refs::{self, MergeKind, MergeOutcome};
 use crate::tui::components::menu::MenuState;
 use crate::tui::components::panes::nav::{BranchesTab, Pane};
 use crate::tui::components::panes::tree::SelectionKey;
@@ -161,7 +161,7 @@ pub(crate) fn merge_with(env: &Env<'_>, kind: MergeKind) -> Vec<Event> {
         return Vec::new();
     };
     let mut events = vec![Event::Refresh];
-    match branch::merge(repo, &name, kind) {
+    match refs::merge(repo, &name, kind) {
         Ok(MergeOutcome::Merged) => {},
         Ok(MergeOutcome::Conflicted) => events.push(Event::MergeConflicted),
         Err(e) => events.push(Event::Report(e.into())),

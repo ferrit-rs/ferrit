@@ -1,11 +1,11 @@
-//! The `git2` and subprocess half of `crate::git::stash`: the types are there.
+//! The `git2` and subprocess half of `crate::git::refs`: the types are there.
 
 use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
 use crate::git::exec;
 use crate::git::model::StashEntry;
+use crate::git::refs::StashOutcome;
 use crate::git::repo::read_error;
-use crate::git::stash::StashOutcome;
 use git2::Repository;
 use std::process::Output;
 

@@ -1,9 +1,9 @@
-//! The `git2` and subprocess half of `crate::git::branch`: the types are there.
+//! The `git2` and subprocess half of `crate::git::refs`: the types are there.
 
 use super::read::{stderr, workdir};
-use crate::git::branch::MergeOutcome;
 use crate::git::error::{GitError, GitResult};
 use crate::git::exec;
+use crate::git::refs::MergeOutcome;
 use crate::git::repo::read_error;
 use git2::{BranchType, Repository};
 use std::path::Path;

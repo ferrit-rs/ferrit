@@ -16,7 +16,6 @@
 
 pub mod apply;
 pub mod askpass;
-pub mod branch;
 pub mod command_log;
 pub mod commit;
 pub mod config;
@@ -34,11 +33,11 @@ pub mod model;
 pub mod port;
 pub(crate) mod process;
 pub mod rebase;
+pub mod refs;
 pub mod remote;
 pub mod repo;
 pub mod ssh_config;
 pub mod staging;
-pub mod stash;
 pub mod stats;
 
 use self::model::{BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader};

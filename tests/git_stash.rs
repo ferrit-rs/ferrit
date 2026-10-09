@@ -20,8 +20,8 @@ use std::fs;
 
 use ferrit::git::diff::DiffOpts;
 use ferrit::git::error::GitError;
+use ferrit::git::refs::StashOutcome;
 use ferrit::git::repo::Repo;
-use ferrit::git::stash::StashOutcome;
 use git2::Repository;
 
 /// One commit with `a.txt`.

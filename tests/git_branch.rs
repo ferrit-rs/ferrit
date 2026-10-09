@@ -20,8 +20,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::Path;
 
-use ferrit::git::branch::MergeOutcome;
 use ferrit::git::error::GitError;
+use ferrit::git::refs::MergeOutcome;
 use ferrit::git::repo::Repo;
 use git2::Repository;
 

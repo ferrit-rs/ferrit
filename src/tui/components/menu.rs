@@ -1,10 +1,10 @@
 //! The menus: the `m` menu, the context menu, and the name popups they open.
 
 use crate::git;
-use crate::git::branch::MergeKind;
 use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::rebase::Step;
+use crate::git::refs::MergeKind;
 use crate::theme::palette::Palette;
 use crate::tui::components::branches;
 use crate::tui::components::diff::right_pane::Mode;

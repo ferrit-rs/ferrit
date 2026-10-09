@@ -24,7 +24,6 @@ use git2::Repository;
 
 use crate::git::Snapshot;
 use crate::git::apply::{ApplyDir, ApplyTarget};
-use crate::git::branch::MergeOutcome;
 use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
@@ -35,7 +34,8 @@ use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{self, CommitEntry, RemoteEntry};
 use crate::git::rebase::RebaseEdit;
 use crate::git::rebase::{OperationOutcome, Step};
-use crate::git::stash::StashOutcome;
+use crate::git::refs::MergeOutcome;
+use crate::git::refs::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 
 /// A `git2` failure with the text git gave, kept as the `source` of
