@@ -882,6 +882,7 @@ dependencies = [
  "ratatui-image",
  "ratatui-widgets",
  "serde",
+ "strum",
  "syntect",
  "thiserror 2.0.20",
  "toml",

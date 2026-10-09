@@ -311,7 +311,7 @@ impl App {
             return;
         };
         thread::spawn(move || {
-            let status = run_worker(WorkerKind::RemoteOperation, || host::gh_status(&gh))
+            let status = run_worker(WorkerKind::Remote, || host::gh_status(&gh))
                 .unwrap_or(GhStatus::Missing);
             let _ = sender.send(AppEvent::GhChecked { generation, status });
         });
@@ -515,7 +515,7 @@ impl App {
         self.workers.remote_cancel.store(false, Ordering::Release);
         let cancel = Arc::clone(&self.workers.remote_cancel);
         self.workers.remote_worker = Some(thread::spawn(move || {
-            let result = run_worker(WorkerKind::RemoteOperation, || {
+            let result = run_worker(WorkerKind::Remote, || {
                 // The first commit comes first, and is local: if it fails
                 // nothing has been created anywhere. A repository that already
                 // has a commit is left as it is.

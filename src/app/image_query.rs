@@ -145,7 +145,7 @@ impl App {
         };
         self.workers.image.in_flight = true;
         thread::spawn(move || {
-            let result = run_worker(WorkerKind::ImagePreview, || load(handle, &path))
+            let result = run_worker(WorkerKind::Image, || load(handle, &path))
                 .map_err(AppError::from)
                 .and_then(|result| result.map_err(AppError::from));
             let _ = sender.send(AppEvent::ImageDone(ImageCompletion {

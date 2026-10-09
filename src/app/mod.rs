@@ -16,7 +16,7 @@ pub mod theme;
 pub mod theme_config;
 
 use std::collections::HashSet;
-use std::fmt::{self, Display, Write as _};
+use std::fmt::Write as _;
 use std::ops::Range;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
@@ -2109,41 +2109,24 @@ fn find_file_row_key(
     })
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Which background worker a panic came from; its lowercase name is how the
+/// message calls it.
+#[derive(Debug, Clone, Copy, strum::Display)]
+#[strum(serialize_all = "lowercase")]
 pub(super) enum WorkerKind {
     Refresh,
     Diff,
-    ImagePreview,
-    RemoteOperation,
+    Image,
+    Remote,
     Stats,
 }
 
-impl Display for WorkerKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
-            Self::Refresh => "refresh",
-            Self::Diff => "diff",
-            Self::ImagePreview => "image preview",
-            Self::RemoteOperation => "remote operation",
-            Self::Stats => "statistics",
-        };
-        f.write_str(label)
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("{worker} worker panicked: {detail}")]
 pub struct WorkerError {
     worker: WorkerKind,
     detail: String,
 }
-
-impl Display for WorkerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} worker panicked: {}", self.worker, self.detail)
-    }
-}
-
-impl std::error::Error for WorkerError {}
 
 /// The Status line for a filesystem watcher that could not start, if any.
 fn watcher_error(events: &Events) -> Option<Arc<AppError>> {

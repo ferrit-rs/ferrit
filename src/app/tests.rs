@@ -99,3 +99,15 @@ fn refresh_without_repo_is_a_noop() {
     app.refresh();
     assert_eq!(app.file_lines().len(), before);
 }
+
+#[test]
+fn a_panicking_worker_is_named_in_its_error() {
+    let error = run_worker(WorkerKind::Image, || panic!("boom")).unwrap_err();
+    assert_eq!(error.to_string(), "image worker panicked: boom");
+
+    let error = run_worker(WorkerKind::Remote, || std::panic::panic_any(7_u8)).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "remote worker panicked: non-string panic payload"
+    );
+}

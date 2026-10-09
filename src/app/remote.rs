@@ -179,7 +179,7 @@ impl App {
         self.workers.remote_cancel.store(false, Ordering::Release);
         let cancel = Arc::clone(&self.workers.remote_cancel);
         self.workers.remote_worker = Some(thread::spawn(move || {
-            let message = run_worker(WorkerKind::RemoteOperation, || match op {
+            let message = run_worker(WorkerKind::Remote, || match op {
                 events::RemoteOp::Fetch => repo.fetch_cancellable(None, &cancel),
                 events::RemoteOp::Pull => repo.pull_cancellable(&cancel),
                 events::RemoteOp::Push => repo.push_cancellable(
