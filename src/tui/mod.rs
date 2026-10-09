@@ -1076,3 +1076,14 @@ impl App {
         }
     }
 }
+
+impl App {
+    /// `git init` in `dir`, then open the repository it made.
+    pub(crate) fn init_here(&mut self, dir: &Path) {
+        let made = git::repo::Repo::init(dir).map(|_| dir.to_path_buf());
+        match made.and_then(|dir| self.attach_repository(&dir)) {
+            Ok(()) => {},
+            Err(error) => self.report_error(error),
+        }
+    }
+}

@@ -1,6 +1,5 @@
 //! The welcome screen for a folder without a repository.
 
-use crate::git;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::keybar::draw_keybar;
@@ -8,6 +7,7 @@ use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt};
 use crate::tui::draw::TAGLINE_PROMISE;
 use crate::tui::draw::TAGLINE_WHAT;
 use crate::tui::draw::{Landed, RenderState};
+use crate::tui::event::Event;
 use crate::tui::widgets::cut::cut_middle;
 use crate::tui::widgets::dialog::Dialog;
 use ratatui::Frame;
@@ -16,79 +16,48 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use unicode_width::UnicodeWidthStr;
 
 const WELCOME_ROWS: usize = 2;
 
-impl App {
-    /// The highlighted row: 0 is `git init`, 1 is quit.
-    pub fn welcome_selected(&self) -> usize {
-        self.full_screens.welcome_selected
-    }
-
-    /// The folder the welcome screen is about, while it is up.
-    pub fn welcome_dir(&self) -> Option<&Path> {
-        self.full_screens.welcome_dir.as_deref()
-    }
-
-    /// Every key on the welcome screen (after a pending question, which owns
-    /// input before it): the arrows or `j` / `k` move the highlight, `Enter`
-    /// runs the highlighted row, and its own letters run a row from anywhere,
-    /// `i` to ask about `git init` and `q` or `Esc` to leave. Nothing else does
-    /// anything, so no pane action can run without a repository.
-    pub(crate) fn welcome_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Down | KeyCode::Char('j') | KeyCode::End => {
-                self.full_screens.welcome_selected =
-                    (self.full_screens.welcome_selected + 1).min(WELCOME_ROWS - 1);
-            },
-            KeyCode::Up | KeyCode::Char('k') | KeyCode::Home => {
-                self.full_screens.welcome_selected =
-                    self.full_screens.welcome_selected.saturating_sub(1);
-            },
-            KeyCode::Enter if self.full_screens.welcome_selected == 0 => self.ask_init(),
-            KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-            KeyCode::Char('i') => self.ask_init(),
-            _ => {},
-        }
-    }
-
-    /// The question: it names the absolute folder, and says so when that folder
-    /// is the user's home directory, where a `git init` is the mistake this
-    /// question exists to catch.
-    fn ask_init(&mut self) {
-        let Some(dir) = self.full_screens.welcome_dir.clone() else {
-            return;
-        };
-        let home = std::env::var_os("HOME").is_some_and(|home| Path::new(&home) == dir);
-        let message = if home {
-            format!(
-                "run git init in {}? This is your home folder.",
-                dir.display()
-            )
-        } else {
-            format!("run git init in {}?", dir.display())
-        };
-        self.modal.ask(ConfirmPrompt {
-            message,
-            action: ConfirmAction::InitRepo(dir),
-        });
-    }
-
-    /// The yes: `git init`, then become an app on the new repository. A refusal
-    /// (a read-only folder) is git's message and the welcome screen stays.
-    pub(crate) fn init_here(&mut self, dir: &Path) {
-        let made: Result<PathBuf, git::error::GitError> =
-            git::repo::Repo::init(dir).map(|_| dir.to_path_buf());
-        match made.and_then(|dir| self.attach_repository(&dir)) {
-            Ok(()) => {},
-            Err(error) => self.report_error(error),
-        }
+/// `j` / `k` move the choice, `i` or Enter on the first row asks to `git init`,
+/// Enter on the second row, `q` and Esc quit.
+pub(crate) fn key(selected: usize, dir: Option<&Path>, key: KeyEvent) -> Vec<Event> {
+    match key.code {
+        KeyCode::Down | KeyCode::Char('j') | KeyCode::End => {
+            vec![Event::WelcomeSelected((selected + 1).min(WELCOME_ROWS - 1))]
+        },
+        KeyCode::Up | KeyCode::Char('k') | KeyCode::Home => {
+            vec![Event::WelcomeSelected(selected.saturating_sub(1))]
+        },
+        KeyCode::Enter if selected == 0 => ask_init(dir),
+        KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc => vec![Event::Quit],
+        KeyCode::Char('i') => ask_init(dir),
+        _ => Vec::new(),
     }
 }
 
-/// The dialog is never wider than this.
+/// Ask before `git init`; the home folder gets a louder question.
+fn ask_init(dir: Option<&Path>) -> Vec<Event> {
+    let Some(dir) = dir else {
+        return Vec::new();
+    };
+    let home = std::env::var_os("HOME").is_some_and(|home| Path::new(&home) == dir);
+    let message = if home {
+        format!(
+            "run git init in {}? This is your home folder.",
+            dir.display()
+        )
+    } else {
+        format!("run git init in {}?", dir.display())
+    };
+    vec![Event::Ask(ConfirmPrompt {
+        message,
+        action: ConfirmAction::InitRepo(dir.to_path_buf()),
+    })]
+}
+
 const WIDTH: u16 = 64;
 /// Rows of text inside the dialog.
 const ROWS: u16 = 6;

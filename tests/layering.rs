@@ -76,7 +76,7 @@ fn only_the_composition_root_and_git_init_name_the_adapter() {
     offenders.sort();
     assert_eq!(
         offenders,
-        ["tui/components/welcome.rs", "tui/mod.rs"],
+        ["tui/mod.rs"],
         "everything else goes through the GitPort traits"
     );
 }

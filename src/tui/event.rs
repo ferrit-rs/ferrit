@@ -77,6 +77,10 @@ pub(crate) enum Event {
     },
     /// Give the keys back to the panes.
     LeaveDiff,
+    /// The welcome screen's highlighted choice.
+    WelcomeSelected(usize),
+    /// Leave the program.
+    Quit,
     /// Forget the start of a V-selection.
     ClearAnchor,
     /// Apply or pop a stash entry (needs the repository for writing).
@@ -194,6 +198,8 @@ impl App {
                     }
                 },
                 Event::LeaveDiff => self.nav.mode = Mode::Nav,
+                Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
+                Event::Quit => self.should_quit = true,
                 Event::ClearAnchor => self.right.cursor.anchor = None,
                 Event::RestoreStash { oid, pop } => {
                     let first_file = self.right.diff.first_stash_file(&oid);

@@ -44,3 +44,15 @@ impl App {
         })
     }
 }
+
+impl App {
+    /// The welcome screen's highlighted choice.
+    pub fn welcome_selected(&self) -> usize {
+        self.full_screens.welcome_selected
+    }
+
+    /// The folder the welcome screen offers to `git init`.
+    pub fn welcome_dir(&self) -> Option<&std::path::Path> {
+        self.full_screens.welcome_dir.as_deref()
+    }
+}

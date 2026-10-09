@@ -7,7 +7,7 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
-use crate::tui::components::{branches, commits, files, popups, remote, stash};
+use crate::tui::components::{branches, commits, files, popups, remote, stash, welcome};
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
 use crate::tui::keymap::{Action, Context, KeyBinding};
@@ -68,7 +68,12 @@ impl App {
             return;
         }
         if self.full_screens.active == FullScreen::Welcome {
-            self.welcome_key(key);
+            let events = welcome::key(
+                self.full_screens.welcome_selected,
+                self.full_screens.welcome_dir.as_deref(),
+                key,
+            );
+            self.apply(events);
             return;
         }
 
