@@ -3,12 +3,18 @@
 //! the diff and handling its keys stay with the `App` methods in `diff_query`,
 //! `image_query` and `staging`; this is the state they read and write.
 
+use std::ops::Range;
+
 use ratatui::layout::Rect;
+use ratatui::text::Text;
 use ratatui_image::picker::Picker;
 
 use super::diff_query::RightKey;
-use super::theme;
-use super::{DiffCursor, DiffView};
+use super::render_state::RenderedDiff;
+use super::{DiffCursor, DiffView, hunk_content_id, hunk_lines_for, theme};
+use crate::components::ui::palette::Palette;
+use crate::domain::git;
+use crate::domain::git::diff::DiffSide;
 
 pub(crate) struct RightPane {
     /// Terminal graphics backend for the image preview. Starts on half-blocks
@@ -111,5 +117,140 @@ impl RightPane {
     pub(super) fn set_viewport(&mut self, rows: usize) {
         self.viewport = rows;
         self.clamp_scroll();
+    }
+}
+
+impl RightPane {
+    /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
+    /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
+    /// a no-op on the Files split, which has two diffs and no single anchor
+    /// list to jump through.
+    pub(super) fn jump_anchor(&mut self, dir: isize) {
+        let anchors = match &self.diff {
+            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.file_lines(),
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                return;
+            },
+        };
+        let cur = self.scroll;
+        let target = if dir > 0 {
+            anchors.iter().find(|&&l| l > cur).copied()
+        } else {
+            anchors.iter().rev().find(|&&l| l < cur).copied()
+        };
+        if let Some(line) = target {
+            self.scroll = line;
+            self.clamp_scroll();
+        }
+    }
+
+    /// Scroll the shared Files-split viewport so `cursor.line` stays on
+    /// screen, the same "a jump always lands visibly" rule phase 3's `]` /
+    /// `[` already follows.
+    pub(super) fn ensure_cursor_visible(&mut self) {
+        let viewport = self.viewport.max(1);
+        if self.cursor.line < self.scroll {
+            self.scroll = self.cursor.line;
+        } else if self.cursor.line >= self.scroll + viewport {
+            self.scroll = self.cursor.line + 1 - viewport;
+        }
+        self.clamp_scroll();
+    }
+
+    /// Called after *every* key while `Mode::Diff` is up (`update_diff` runs
+    /// on every keystroke, not just after a stage), so a plain `j`/`k` must
+    /// come through untouched: only re-find the cursor when the line it
+    /// names actually stopped being valid — the hunk it was on shrank out
+    /// from under it (a line-level stage) or moved off this side entirely
+    /// (a whole-hunk stage), `docs/PLAN_6_STAGING.md` "After the apply:
+    /// refresh, keep your place". A still-selectable line, hunk unchanged,
+    /// is left exactly where it was.
+    ///
+    /// Gone -> clamp to the nearest remaining hunk on the *same* side, or
+    /// drop to `Mode::Nav` once that side has no more changes to show at
+    /// all — even if the other side now does; switching sides on the user's
+    /// behalf would silently change what the next `<space>` does.
+    pub(super) fn resync_cursor(&mut self) -> bool {
+        let DiffView::Files(files) = &self.diff else {
+            return false;
+        };
+        let diff = match self.cursor.side {
+            DiffSide::Worktree => &files.unstaged,
+            DiffSide::Staged => &files.staged,
+        };
+        let hunks = hunk_lines_for(diff);
+
+        if let Some(hl) = hunks
+            .iter()
+            .find(|hl| hunk_content_id(diff, hl.hunk_index) == self.cursor.hunk_id)
+        {
+            if hl.selectable.contains(&self.cursor.line) {
+                self.cursor.anchor = self.cursor.anchor.filter(|a| hl.lines.contains(a));
+                self.ensure_cursor_visible();
+                return true;
+            }
+            if let Some(&line) = hl.selectable.first() {
+                self.cursor.line = line;
+                self.cursor.anchor = None;
+                self.ensure_cursor_visible();
+                return true;
+            }
+        }
+
+        if let Some(hl) = hunks.iter().find(|hl| !hl.selectable.is_empty())
+            && let Some(&line) = hl.selectable.first()
+        {
+            self.cursor.line = line;
+            self.cursor.anchor = None;
+            self.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
+            self.ensure_cursor_visible();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return cached styled diff. Cache invalidates on selection, diff text,
+    /// focus range, or pane width; pure scrolling reuses `Text`. Only a
+    /// commit diff goes through this cache: it is keyed for one `Diff` at a
+    /// time, and the Files split renders its two sides directly instead
+    /// (`ui::draw_files_columns`).
+    pub(super) fn rendered_diff(
+        &self,
+        palette: &Palette,
+        cache: &mut Option<RenderedDiff>,
+        focus: Option<&Range<usize>>,
+        width: usize,
+    ) -> Option<(Text<'static>, usize, git::diff::DiffStat)> {
+        let key = &self.key;
+        match &self.diff {
+            DiffView::Commit(_, diff) | DiffView::Stash(_, diff) => {
+                let cache_hit = cache.as_ref().is_some_and(|cached| {
+                    cached.key.as_ref() == key.as_ref()
+                        && cached.source == diff.text
+                        && cached.focus.as_ref() == focus
+                        && cached.width == width
+                });
+                if !cache_hit {
+                    let text = diff.delta_output(width).map_or_else(
+                        || theme::render_diff(palette, diff, focus, width),
+                        |formatted| theme::render_delta(&formatted, width),
+                    );
+                    *cache = Some(RenderedDiff {
+                        key: key.clone(),
+                        source: diff.text.clone(),
+                        focus: focus.cloned(),
+                        width,
+                        text,
+                    });
+                }
+                cache
+                    .as_ref()
+                    .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
+            },
+            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
+                None
+            },
+        }
     }
 }

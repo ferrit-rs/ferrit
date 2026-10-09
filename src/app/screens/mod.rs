@@ -621,7 +621,8 @@ fn draw_right_pane(
             let end = anchors.get(i + 1).copied().unwrap_or(raw_total);
             scroll..end
         });
-        let Some((text, total, _stat)) = app.rendered_diff(
+        let Some((text, total, _stat)) = app.right.rendered_diff(
+            &app.prefs.palette,
             &mut render.diff_cache,
             focus.as_ref(),
             diff_area.width as usize,

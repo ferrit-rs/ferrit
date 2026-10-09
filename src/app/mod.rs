@@ -32,7 +32,7 @@ use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Position, Rect};
-use ratatui::text::{Line, Text};
+use ratatui::text::Line;
 
 use crate::app::events::{AppEvent, Events};
 use crate::app::screens as ui;
@@ -180,7 +180,6 @@ use self::pane::{BranchesTab, PANES, Pane};
 use self::pane_rows::PaneRows;
 use self::popup::Popup;
 use self::refresh::RefreshCompletion;
-use self::render_state::RenderedDiff;
 use self::selection::{SelectionKey, find_file_row_key, selection_key_for_file_rows};
 use self::views::{
     BranchLog, CommandLogView, CommitPopupView, DiffView, FilesDiff, MenuView, PopupView,
@@ -513,13 +512,7 @@ impl App {
         if let Some(profile) = completion.profile {
             self.authorship.profile = profile;
         }
-        let old_selection: [(Pane, usize, Option<SelectionKey>); 5] = PANES.map(|pane| {
-            (
-                pane,
-                self.nav.selection[pane],
-                self.rows().selection_key(pane),
-            )
-        });
+        let old_selection = self.nav.remember(&self.snapshot, &self.prefs.palette);
         match completion.snapshot {
             Ok(snap) => {
                 self.snapshot = snap;
@@ -539,67 +532,14 @@ impl App {
             },
         }
 
-        // A drilled branch log (Enter on Branches) stays live across a
-        // background refresh instead of going stale; a branch that vanished
-        // (deleted, renamed) backs out of the drill-down instead of erroring
-        // the whole refresh.
-        if let Some((branch, result)) = completion.branch_log
-            && self
-                .nav
-                .branch_drill
-                .as_ref()
-                .is_some_and(|drill| drill.branch == branch)
-        {
-            match result {
-                Ok(commits) => {
-                    if let Some(drill) = &mut self.nav.branch_drill {
-                        drill.commits = commits;
-                    }
-                },
-                Err(_) => self.nav.branch_drill = None,
-            }
+        if let Some((branch, result)) = completion.branch_log {
+            self.nav.refresh_branch_log(&branch, result);
         }
-
-        // Same treatment for a drilled commit's file tree (Enter on
-        // Commits): re-read the file list so it reflects the diff as of
-        // this refresh; a commit that vanished (e.g. a reword/rebase that
-        // changed its hash) backs out rather than erroring the refresh.
-        if let Some((hash, result)) = completion.commit_files
-            && self
-                .nav
-                .commit_drill
-                .as_ref()
-                .is_some_and(|drill| drill.hash == hash)
-        {
-            match result {
-                Ok(files) => {
-                    if let Some(drill) = &mut self.nav.commit_drill {
-                        drill.files = files;
-                    }
-                },
-                Err(_) => self.nav.commit_drill = None,
-            }
+        if let Some((hash, result)) = completion.commit_files {
+            self.nav.refresh_commit_files(&hash, result);
         }
-
-        for (pane, old_index, key) in old_selection {
-            let last = self.row_count(pane).saturating_sub(1);
-            let new_index = key
-                .as_ref()
-                .and_then(|key| self.rows().find_selection_key(pane, key))
-                .unwrap_or(old_index);
-            self.nav.selection[pane] = new_index.min(last);
-        }
-        let mut waiting = std::mem::take(&mut self.nav.select_when_listed);
-        waiting.retain(
-            |(pane, key)| match self.rows().find_selection_key(*pane, key) {
-                Some(index) => {
-                    self.nav.selection[*pane] = index;
-                    false
-                },
-                None => true,
-            },
-        );
-        self.nav.select_when_listed = waiting;
+        self.nav
+            .restore(&self.snapshot, &self.prefs.palette, old_selection);
         self.workers.diff.refresh_requested = true;
         self.invalidate_image_query();
         self.update_right_pane();
@@ -654,83 +594,12 @@ impl App {
         }
     }
 
-    /// Called after *every* key while `Mode::Diff` is up (`update_diff` runs
-    /// on every keystroke, not just after a stage), so a plain `j`/`k` must
-    /// come through untouched: only re-find the cursor when the line it
-    /// names actually stopped being valid — the hunk it was on shrank out
-    /// from under it (a line-level stage) or moved off this side entirely
-    /// (a whole-hunk stage), `docs/PLAN_6_STAGING.md` "After the apply:
-    /// refresh, keep your place". A still-selectable line, hunk unchanged,
-    /// is left exactly where it was.
-    ///
-    /// Gone -> clamp to the nearest remaining hunk on the *same* side, or
-    /// drop to `Mode::Nav` once that side has no more changes to show at
-    /// all — even if the other side now does; switching sides on the user's
-    /// behalf would silently change what the next `<space>` does.
+    /// Called after *every* key while `Mode::Diff` is up: keeps the cursor
+    /// where it was, or drops to `Mode::Nav` once the right pane has no line
+    /// left to put it on (`RightPane::resync_cursor`).
     fn resync_diff_cursor(&mut self) {
-        if self.nav.mode != Mode::Diff {
-            return;
-        }
-        let DiffView::Files(files) = &self.right.diff else {
+        if self.nav.mode == Mode::Diff && !self.right.resync_cursor() {
             self.nav.mode = Mode::Nav;
-            return;
-        };
-        let diff = match self.right.cursor.side {
-            DiffSide::Worktree => &files.unstaged,
-            DiffSide::Staged => &files.staged,
-        };
-        let hunks = hunk_lines_for(diff);
-
-        if let Some(hl) = hunks
-            .iter()
-            .find(|hl| hunk_content_id(diff, hl.hunk_index) == self.right.cursor.hunk_id)
-        {
-            if hl.selectable.contains(&self.right.cursor.line) {
-                self.right.cursor.anchor =
-                    self.right.cursor.anchor.filter(|a| hl.lines.contains(a));
-                self.ensure_cursor_visible();
-                return;
-            }
-            if let Some(&line) = hl.selectable.first() {
-                self.right.cursor.line = line;
-                self.right.cursor.anchor = None;
-                self.ensure_cursor_visible();
-                return;
-            }
-        }
-
-        if let Some(hl) = hunks.iter().find(|hl| !hl.selectable.is_empty())
-            && let Some(&line) = hl.selectable.first()
-        {
-            self.right.cursor.line = line;
-            self.right.cursor.anchor = None;
-            self.right.cursor.hunk_id = hunk_content_id(diff, hl.hunk_index);
-            self.ensure_cursor_visible();
-        } else {
-            self.nav.mode = Mode::Nav;
-        }
-    }
-
-    /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
-    /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
-    /// a no-op on the Files split, which has two diffs and no single anchor
-    /// list to jump through.
-    fn jump_diff_anchor(&mut self, dir: isize) {
-        let anchors = match &self.right.diff {
-            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.file_lines(),
-            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
-                return;
-            },
-        };
-        let cur = self.right.scroll;
-        let target = if dir > 0 {
-            anchors.iter().find(|&&l| l > cur).copied()
-        } else {
-            anchors.iter().rev().find(|&&l| l < cur).copied()
-        };
-        if let Some(line) = target {
-            self.right.scroll = line;
-            self.right.clamp_scroll();
         }
     }
 
@@ -752,49 +621,6 @@ impl App {
 
     pub fn git_user_name(&self) -> Option<&str> {
         self.authorship.git_user_name.as_deref()
-    }
-
-    /// Return cached styled diff. Cache invalidates on selection, diff text,
-    /// focus range, or pane width; pure scrolling reuses `Text`. Only a
-    /// commit diff goes through this cache: it is keyed for one `Diff` at a
-    /// time, and the Files split renders its two sides directly instead
-    /// (`ui::draw_files_columns`).
-    pub(crate) fn rendered_diff(
-        &self,
-        cache: &mut Option<RenderedDiff>,
-        focus: Option<&Range<usize>>,
-        width: usize,
-    ) -> Option<(Text<'static>, usize, git::diff::DiffStat)> {
-        let key = &self.right.key;
-        match &self.right.diff {
-            DiffView::Commit(_, diff) | DiffView::Stash(_, diff) => {
-                let cache_hit = cache.as_ref().is_some_and(|cached| {
-                    cached.key.as_ref() == key.as_ref()
-                        && cached.source == diff.text
-                        && cached.focus.as_ref() == focus
-                        && cached.width == width
-                });
-                if !cache_hit {
-                    let text = diff.delta_output(width).map_or_else(
-                        || theme::render_diff(&self.prefs.palette, diff, focus, width),
-                        |formatted| theme::render_delta(&formatted, width),
-                    );
-                    *cache = Some(RenderedDiff {
-                        key: key.clone(),
-                        source: diff.text.clone(),
-                        focus: focus.cloned(),
-                        width,
-                        text,
-                    });
-                }
-                cache
-                    .as_ref()
-                    .map(|cached| (cached.text.clone(), cached.text.lines.len(), diff.stat()))
-            },
-            DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
-                None
-            },
-        }
     }
 
     /// First visible line of the right-pane diff.

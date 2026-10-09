@@ -31,19 +31,6 @@ impl App {
         })
     }
 
-    /// Scroll the shared Files-split viewport so `cursor.line` stays on
-    /// screen, the same "a jump always lands visibly" rule phase 3's `]` /
-    /// `[` already follows.
-    pub(super) fn ensure_cursor_visible(&mut self) {
-        let viewport = self.right.viewport.max(1);
-        if self.right.cursor.line < self.right.scroll {
-            self.right.scroll = self.right.cursor.line;
-        } else if self.right.cursor.line >= self.right.scroll + viewport {
-            self.right.scroll = self.right.cursor.line + 1 - viewport;
-        }
-        self.right.clamp_scroll();
-    }
-
     /// `Enter` / `l` on a Files-pane file row (`Mode::Nav`): focus the diff
     /// for staging within it. A no-op off the Files pane, on a directory
     /// row, already in `Mode::Diff`, or when neither side has a selectable
@@ -86,7 +73,7 @@ impl App {
             anchor: None,
             hunk_id: hunk_content_id(diff, hunk.hunk_index),
         };
-        self.ensure_cursor_visible();
+        self.right.ensure_cursor_visible();
     }
 
     /// `Esc` / `h` in `Mode::Diff`: back to `Mode::Nav`.
@@ -122,7 +109,7 @@ impl App {
         if let Some(id) = hunk_id {
             self.right.cursor.hunk_id = id;
         }
-        self.ensure_cursor_visible();
+        self.right.ensure_cursor_visible();
     }
 
     /// `V` in `Mode::Diff`: start or clear a line V-selection.
@@ -158,7 +145,7 @@ impl App {
             if let Some(id) = hunk_id {
                 self.right.cursor.hunk_id = id;
             }
-            self.ensure_cursor_visible();
+            self.right.ensure_cursor_visible();
         }
     }
 

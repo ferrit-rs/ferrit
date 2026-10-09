@@ -8,7 +8,13 @@ use std::path::PathBuf;
 
 use enum_map::EnumMap;
 
-use super::{BranchDrill, BranchesTab, CommitDrill, Mode, Pane, SelectionKey};
+use crate::components::ui::palette::Palette;
+use crate::domain::git::Snapshot;
+use crate::domain::git::model::{CommitEntry, FileEntry};
+
+use super::pane_rows::PaneRows;
+use super::refresh::Shared;
+use super::{BranchDrill, BranchesTab, CommitDrill, Mode, PANES, Pane, SelectionKey};
 
 #[derive(Default)]
 pub struct Nav {
@@ -73,5 +79,94 @@ impl Nav {
     pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
         self.select_when_listed.retain(|(p, _)| *p != pane);
         self.select_when_listed.push((pane, key));
+    }
+}
+
+/// What each pane had selected: its row index and the key of that row.
+pub(super) type Remembered = [(Pane, usize, Option<SelectionKey>); 5];
+
+impl Nav {
+    fn rows<'a>(&'a self, snapshot: &'a Snapshot, palette: &'a Palette) -> PaneRows<'a> {
+        PaneRows {
+            nav: self,
+            snapshot,
+            palette,
+        }
+    }
+
+    /// Note what is selected in every pane, to find it again after a refresh.
+    pub(super) fn remember(&self, snapshot: &Snapshot, palette: &Palette) -> Remembered {
+        let rows = self.rows(snapshot, palette);
+        PANES.map(|pane| (pane, self.selection[pane], rows.selection_key(pane)))
+    }
+
+    /// Put each pane's cursor back on the row it had (by key), or on the same
+    /// index when that row is gone, clamped to the new length. Rows an action
+    /// just created and is waiting for are selected once they are listed.
+    pub(super) fn restore(&mut self, snapshot: &Snapshot, palette: &Palette, old: Remembered) {
+        let rows = self.rows(snapshot, palette);
+        let moved = old.map(|(pane, old_index, key)| {
+            let last = rows.row_count(pane).saturating_sub(1);
+            let index = key
+                .as_ref()
+                .and_then(|key| rows.find_selection_key(pane, key))
+                .unwrap_or(old_index);
+            (pane, index.min(last))
+        });
+        let mut found = Vec::new();
+        let mut waiting = std::mem::take(&mut self.select_when_listed);
+        waiting.retain(|(pane, key)| {
+            let listed = self.rows(snapshot, palette).find_selection_key(*pane, key);
+            if let Some(index) = listed {
+                found.push((*pane, index));
+            }
+            listed.is_none()
+        });
+        self.select_when_listed = waiting;
+        for (pane, index) in moved.into_iter().chain(found) {
+            self.selection[pane] = index;
+        }
+    }
+
+    /// A drilled branch log stays live across a background refresh instead of
+    /// going stale; a branch that vanished (deleted, renamed) backs out of the
+    /// drill-down instead of erroring the whole refresh.
+    pub(super) fn refresh_branch_log(&mut self, branch: &str, result: Shared<Vec<CommitEntry>>) {
+        if self
+            .branch_drill
+            .as_ref()
+            .is_none_or(|drill| drill.branch != branch)
+        {
+            return;
+        }
+        match result {
+            Ok(commits) => {
+                if let Some(drill) = &mut self.branch_drill {
+                    drill.commits = commits;
+                }
+            },
+            Err(_) => self.branch_drill = None,
+        }
+    }
+
+    /// Same for a drilled commit's file tree: re-read so it reflects the diff
+    /// as of this refresh; a commit that vanished (a reword or rebase changed
+    /// its hash) backs out rather than erroring the refresh.
+    pub(super) fn refresh_commit_files(&mut self, hash: &str, result: Shared<Vec<FileEntry>>) {
+        if self
+            .commit_drill
+            .as_ref()
+            .is_none_or(|drill| drill.hash != hash)
+        {
+            return;
+        }
+        match result {
+            Ok(files) => {
+                if let Some(drill) = &mut self.commit_drill {
+                    drill.files = files;
+                }
+            },
+            Err(_) => self.commit_drill = None,
+        }
     }
 }

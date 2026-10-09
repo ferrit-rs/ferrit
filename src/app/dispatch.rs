@@ -51,8 +51,8 @@ impl App {
             Action::ScrollPageUp => self.right.scroll_by(-page),
             Action::ScrollBottom => self.right.scroll_by(isize::MAX),
             Action::ScrollTop => self.right.scroll_by(isize::MIN),
-            Action::NextHunk => self.jump_diff_anchor(1),
-            Action::PrevHunk => self.jump_diff_anchor(-1),
+            Action::NextHunk => self.right.jump_anchor(1),
+            Action::PrevHunk => self.right.jump_anchor(-1),
             _ => {},
         }
     }
