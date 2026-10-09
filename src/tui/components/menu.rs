@@ -5,6 +5,7 @@ use crate::git::branch::MergeKind;
 use crate::git::error::GitResult;
 use crate::git::operation::{OperationOutcome, Step};
 use crate::theme::palette::Palette;
+use crate::tui::components::branches;
 use crate::tui::components::diff::{MenuView, Mode};
 use crate::tui::components::panes::{BranchesTab, Pane};
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt, Popup};
@@ -236,10 +237,16 @@ impl App {
                     input,
                 );
             },
-            MenuAction::MergeNoFf => self.merge_selected_branch_with(MergeKind::NoFf),
-            MenuAction::MergeFf => self.merge_selected_branch_with(MergeKind::Regular),
-            MenuAction::SquashStaged => self.merge_selected_branch_with(MergeKind::Squash),
-            MenuAction::SquashCommit => self.merge_selected_branch_with(MergeKind::SquashCommit),
+            MenuAction::MergeNoFf => self.apply(branches::merge_with(&self.env(), MergeKind::NoFf)),
+            MenuAction::MergeFf => {
+                self.apply(branches::merge_with(&self.env(), MergeKind::Regular));
+            },
+            MenuAction::SquashStaged => {
+                self.apply(branches::merge_with(&self.env(), MergeKind::Squash));
+            },
+            MenuAction::SquashCommit => {
+                self.apply(branches::merge_with(&self.env(), MergeKind::SquashCommit));
+            },
             MenuAction::BranchFromCommit => {
                 let Some(commit) = self.snapshot.commits.get(index) else {
                     return;

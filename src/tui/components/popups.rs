@@ -6,6 +6,7 @@ use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::diff::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use crate::tui::components::menu;
+use crate::tui::components::{branches, stash};
 use crate::tui::components::{commit_editor, create_remote, remote};
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
@@ -273,11 +274,15 @@ impl App {
         if dismiss {
             self.modal.close_popup();
         }
-        if create_branch_now {
-            self.do_create_branch();
+        if create_branch_now && let Some(Popup::NewBranch(buf)) = self.modal.popup() {
+            let name = buf.text();
+            let events = branches::create(&name, &self.env());
+            self.apply(events);
         }
-        if stash_now {
-            self.do_stash_push();
+        if stash_now && let Some(Popup::Stash(buf)) = self.modal.popup() {
+            let message = buf.text();
+            let events = stash::push(&message, self.repo.as_deref());
+            self.apply(events);
         }
         if submit_name_now {
             self.submit_name();

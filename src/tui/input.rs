@@ -7,6 +7,7 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
+use crate::tui::components::{branches, commits, stash};
 use crate::tui::draw::FullScreen;
 use crate::tui::keymap::{Action, Context, KeyBinding};
 use ratatui::crossterm::event::{
@@ -363,7 +364,7 @@ impl App {
             Action::StageFile => self.stage_selected_file(),
             Action::StageAll => self.stage_all_files(),
             Action::Discard => self.discard_prompt(),
-            Action::StashPush => self.open_stash_popup(),
+            Action::StashPush => self.apply(stash::open_popup(&self.env())),
             Action::LeaveDiff => self.leave_diff_mode(),
             Action::CursorDown => self.right.move_cursor(1),
             Action::CursorUp => self.right.move_cursor(-1),
@@ -371,21 +372,21 @@ impl App {
             Action::CursorPrevHunk => self.right.jump_cursor_hunk(-1),
             Action::ToggleSelection => self.right.toggle_anchor(),
             Action::StageCursor => self.stage_diff_cursor(),
-            Action::Checkout => self.checkout_selected_branch(),
-            Action::NewBranch => self.open_new_branch_popup(),
-            Action::FastForward => self.fast_forward_selected_branch(),
-            Action::Merge => self.merge_selected_branch(),
-            Action::DeleteBranch => self.delete_branch_prompt(),
-            Action::RewordCommit => self.reword_selected_commit(),
-            Action::DropCommit => self.drop_commit_prompt(),
-            Action::Squash => self.fold_selected_commit(false),
-            Action::Fixup => self.fold_selected_commit(true),
-            Action::EditCommit => self.edit_selected_commit(),
-            Action::NewFixup => self.create_fixup_commit(),
-            Action::Autosquash => self.autosquash_from_selected(),
-            Action::ApplyStash => self.restore_stash_prompt(false),
-            Action::PopStash => self.restore_stash_prompt(true),
-            Action::DropStash => self.drop_stash_prompt(),
+            Action::Checkout => self.apply(branches::checkout(&self.env())),
+            Action::NewBranch => self.apply(branches::open_new_popup(&self.env())),
+            Action::FastForward => self.apply(branches::fast_forward(&self.env())),
+            Action::Merge => self.apply(branches::merge(&self.env())),
+            Action::DeleteBranch => self.apply(branches::delete_prompt(&self.env())),
+            Action::RewordCommit => self.apply(commits::reword(&self.env())),
+            Action::DropCommit => self.apply(commits::drop_prompt(&self.env())),
+            Action::Squash => self.apply(commits::fold(&self.env(), false)),
+            Action::Fixup => self.apply(commits::fold(&self.env(), true)),
+            Action::EditCommit => self.apply(commits::edit(&self.env())),
+            Action::NewFixup => self.apply(commits::new_fixup(&self.env())),
+            Action::Autosquash => self.apply(commits::autosquash(&self.env())),
+            Action::ApplyStash => self.apply(stash::restore_prompt(&self.env(), false)),
+            Action::PopStash => self.apply(stash::restore_prompt(&self.env(), true)),
+            Action::DropStash => self.apply(stash::drop_prompt(&self.env())),
         }
     }
 
@@ -404,7 +405,7 @@ impl App {
     /// `Enter` on a row: open a branch's log or a commit's files, else toggle
     /// a directory, else enter the diff.
     fn enter_selected(&mut self) {
-        self.enter_branch_log();
+        self.apply(branches::enter_log(&self.env()));
         // Opening a commit must not also toggle its first row.
         if !self.enter_commit_files() {
             self.toggle_files_dir();

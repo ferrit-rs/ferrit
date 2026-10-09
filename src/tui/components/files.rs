@@ -4,12 +4,14 @@ use crate::git;
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::model::Change;
+use crate::git::rebase::RebaseEdit;
 use crate::git::remote::RemoteRequest;
 use crate::git::staging::{self, Plan, Refusal};
 use crate::tui::App;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::panes::{FileRow, Pane};
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt};
+use crate::tui::components::{commits, stash};
 use crate::tui::error::AppError;
 use std::ops::Range;
 
@@ -183,11 +185,24 @@ impl App {
                     Err(e) => self.report_error(e),
                 }
             },
-            ConfirmAction::DropStash { oid } => self.drop_stash(&oid),
-            ConfirmAction::RestoreStash { oid, pop } => self.restore_stash(&oid, pop),
-            ConfirmAction::DropCommit { hash } => self.drop_commit(&hash),
+            ConfirmAction::DropStash { oid } => {
+                let Some(repo) = &mut self.repo else { return };
+                let events = stash::drop_entry(&oid, repo.as_mut());
+                self.apply(events);
+            },
+            ConfirmAction::RestoreStash { oid, pop } => {
+                let first_file = self.right.diff.first_stash_file(&oid);
+                let Some(repo) = &mut self.repo else { return };
+                let events = stash::restore(&oid, pop, repo.as_mut(), first_file);
+                self.apply(events);
+            },
+            ConfirmAction::DropCommit { hash } => {
+                let events = commits::rebase_edit(self.repo.as_deref(), &hash, &RebaseEdit::Drop);
+                self.apply(events);
+            },
             ConfirmAction::SquashCommit { hash } => {
-                self.run_rebase_edit(&hash, &git::rebase::RebaseEdit::Squash);
+                let events = commits::rebase_edit(self.repo.as_deref(), &hash, &RebaseEdit::Squash);
+                self.apply(events);
             },
             ConfirmAction::AbortOperation => {
                 self.apply_operation_step(git::operation::Step::Abort);

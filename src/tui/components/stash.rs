@@ -1,108 +1,102 @@
 //! The Stash pane: stash, apply, pop, drop.
 
-use crate::git;
+use std::path::PathBuf;
+
+use crate::git::error::GitError;
+use crate::git::model::StashEntry;
+use crate::git::port::GitPort;
 use crate::git::stash::{self, StashOutcome};
-use crate::tui::App;
 use crate::tui::components::panes::{Pane, SelectionKey};
 use crate::tui::components::popups::{ConfirmPrompt, Popup};
+use crate::tui::event::{Env, Event};
 use crate::tui::widgets::text_input::TextInput;
 
-impl App {
-    /// The selected stash entry, only while Stash is focused in `Mode::Nav`
-    /// and no popup is up.
-    fn selected_stash(&self) -> Option<&git::model::StashEntry> {
-        if !self.nav.on_stash() || self.modal.popup().is_some() {
-            return None;
-        }
-        self.rows().selected_stash()
+/// The selected stash entry, only while Stash is focused in `Mode::Nav` and no
+/// popup is up.
+fn selected<'a>(env: &Env<'a>) -> Option<&'a StashEntry> {
+    if !env.nav.on_stash() || env.popup_up {
+        return None;
     }
+    env.rows().selected_stash()
+}
 
-    /// `s` (Nav, Files focused): open the stash message popup. A clean tree
-    /// opens nothing and says so.
-    pub(crate) fn open_stash_popup(&mut self) {
-        if !self.nav.on_files() || self.modal.popup().is_some() {
-            return;
-        }
-        if self.snapshot.files.is_empty() {
-            self.report_error(git::error::GitError::NothingToStash);
-            return;
-        }
-        self.modal.open_popup(Popup::Stash(TextInput::default()));
+/// `s` (Nav, Files focused): open the stash message popup. A clean tree opens
+/// nothing and says so.
+pub(crate) fn open_popup(env: &Env<'_>) -> Vec<Event> {
+    if !env.nav.on_files() || env.popup_up {
+        return Vec::new();
     }
-
-    /// `Enter` in the stash popup: `git stash push --include-untracked`.
-    /// Success and "nothing to stash" close it; any other failure keeps the
-    /// popup and the typed message so the user can retry (the phase 8
-    /// new-branch rule).
-    pub(crate) fn do_stash_push(&mut self) {
-        let Some(Popup::Stash(buf)) = self.modal.popup() else {
-            return;
-        };
-        let message = buf.text();
-        let Some(repo) = &self.repo else { return };
-        match repo.stash_push(message.trim()) {
-            Ok(()) => {
-                self.modal.close_popup();
-                self.request_refresh();
-            },
-            Err(e @ git::error::GitError::NothingToStash) => {
-                self.modal.close_popup();
-                self.report_error(e);
-            },
-            Err(e) => self.report_error(e),
-        }
+    if env.snapshot.files.is_empty() {
+        return vec![Event::Report(GitError::NothingToStash.into())];
     }
+    vec![Event::OpenPopup(Popup::Stash(TextInput::default()))]
+}
 
-    /// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either.
-    pub(crate) fn restore_stash_prompt(&mut self, pop: bool) {
-        let Some(entry) = self.selected_stash() else {
-            return;
-        };
-        let prompt = ConfirmPrompt::restore_stash(entry, pop);
-        self.modal.ask(prompt);
+/// `Enter` in the stash popup: `git stash push --include-untracked`. Success
+/// and "nothing to stash" close it; any other failure keeps the popup and the
+/// typed message so the user can retry (the new-branch rule).
+pub(crate) fn push(message: &str, repo: Option<&dyn GitPort>) -> Vec<Event> {
+    let Some(repo) = repo else {
+        return Vec::new();
+    };
+    match repo.stash_push(message.trim()) {
+        Ok(()) => vec![Event::ClosePopup, Event::Refresh],
+        Err(e @ GitError::NothingToStash) => {
+            vec![Event::ClosePopup, Event::Report(e.into())]
+        },
+        Err(e) => vec![Event::Report(e.into())],
     }
+}
 
-    /// Confirmed apply or pop. A clean restore moves the focus to Files with
-    /// the first restored file selected, like lazygit; a conflict or an error
-    /// leaves the focus on Stash.
-    pub(crate) fn restore_stash(&mut self, oid: &str, pop: bool) {
-        let first_file = self.right.diff.first_stash_file(oid);
-        let Some(repo) = &mut self.repo else { return };
-        let result = stash::restore(repo.as_mut(), oid, pop);
-        if matches!(result, Ok(StashOutcome::Done)) {
-            self.nav.focus = Pane::Files;
-            if let Some(path) = first_file {
-                self.nav
-                    .select_when_listed(Pane::Files, SelectionKey::File(path));
-            }
-        }
-        self.request_refresh();
-        match result {
-            Ok(StashOutcome::Done) => {},
-            Ok(StashOutcome::Conflicted) => {
-                self.modal.open_popup(Popup::Note(
-                    "stash applied with conflicts. The stash was kept. Resolve the conflicts \
-                     in Files."
-                        .to_owned(),
-                ));
-            },
-            Err(e) => self.report_error(e),
+/// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either.
+pub(crate) fn restore_prompt(env: &Env<'_>, pop: bool) -> Vec<Event> {
+    selected(env)
+        .map(|entry| Event::Ask(ConfirmPrompt::restore_stash(entry, pop)))
+        .into_iter()
+        .collect()
+}
+
+/// Confirmed apply or pop. A clean restore moves the focus to Files with the
+/// first restored file selected, like lazygit; a conflict or an error leaves the
+/// focus on Stash.
+pub(crate) fn restore(
+    oid: &str,
+    pop: bool,
+    repo: &mut dyn GitPort,
+    first_file: Option<PathBuf>,
+) -> Vec<Event> {
+    let result = stash::restore(repo, oid, pop);
+    let mut events = Vec::new();
+    if matches!(result, Ok(StashOutcome::Done)) {
+        events.push(Event::Focus(Pane::Files));
+        if let Some(path) = first_file {
+            events.push(Event::SelectWhenListed(
+                Pane::Files,
+                SelectionKey::File(path),
+            ));
         }
     }
-
-    /// `d` on the Stash pane: ask before dropping.
-    pub(crate) fn drop_stash_prompt(&mut self) {
-        let Some(entry) = self.selected_stash() else {
-            return;
-        };
-        let prompt = ConfirmPrompt::drop_stash(entry);
-        self.modal.ask(prompt);
+    events.push(Event::Refresh);
+    match result {
+        Ok(StashOutcome::Done) => {},
+        Ok(StashOutcome::Conflicted) => events.push(Event::OpenPopup(Popup::Note(
+            "stash applied with conflicts. The stash was kept. Resolve the conflicts in Files."
+                .to_owned(),
+        ))),
+        Err(e) => events.push(Event::Report(e.into())),
     }
+    events
+}
 
-    /// Confirmed `d`: `git stash drop`, refreshing either way.
-    pub(crate) fn drop_stash(&mut self, oid: &str) {
-        let Some(repo) = &mut self.repo else { return };
-        let result = repo.stash_drop(oid);
-        self.finish_branch_action(result);
-    }
+/// `d` on the Stash pane: ask before dropping.
+pub(crate) fn drop_prompt(env: &Env<'_>) -> Vec<Event> {
+    selected(env)
+        .map(|entry| Event::Ask(ConfirmPrompt::drop_stash(entry)))
+        .into_iter()
+        .collect()
+}
+
+/// Confirmed `d`: `git stash drop`, refreshing either way.
+pub(crate) fn drop_entry(oid: &str, repo: &mut dyn GitPort) -> Vec<Event> {
+    vec![Event::FinishAction(repo.stash_drop(oid))]
 }
