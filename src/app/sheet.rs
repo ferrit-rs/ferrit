@@ -6,6 +6,7 @@
 
 use super::settings::SettingsSheet;
 use super::{App, dashboard};
+use crate::components::tui_overlay::state::OverlayState;
 
 /// The drawer and what it can hold. One drawer state means one animation and,
 /// by construction, one sheet at a time.
@@ -47,9 +48,13 @@ impl App {
     /// Whether the dashboard is up: sliding in or in, not on its way out.
     #[must_use]
     pub fn dashboard_is_open(&self) -> bool {
-        self.sheets.kind == Sheet::Dashboard
-            && !self.render.sheet.is_closed()
-            && !self.render.sheet.is_closing()
+        self.dashboard_open_in(&self.render.sheet)
+    }
+
+    /// `dashboard_is_open` for a drawer animation held elsewhere: drawing owns the
+    /// render state while it runs, so it asks with its own.
+    pub(super) fn dashboard_open_in(&self, drawer: &OverlayState) -> bool {
+        self.sheets.kind == Sheet::Dashboard && !drawer.is_closed() && !drawer.is_closing()
     }
 
     /// Whether a sheet is on screen or sliding.

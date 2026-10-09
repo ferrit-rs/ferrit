@@ -5,6 +5,7 @@ use super::{
     App, AppError, ApplyDir, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Pane, Popup,
     SelectionKey, TextInput, TextInputMode, git,
 };
+use crate::components::tui_overlay::state::OverlayState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CommitField {
@@ -55,12 +56,18 @@ impl CommitDraft {
 }
 
 impl App {
-    /// Commit popup view for rendering.
-    pub fn commit_popup(&mut self) -> Option<CommitPopupView<'_>> {
+    /// The commit popup as data, without any animation state.
+    pub fn commit_popup(&self) -> Option<CommitPopupView<'_>> {
+        self.commit_popup_with(None)
+    }
+
+    /// The commit popup for drawing: `overlay` is its animation.
+    pub(crate) fn commit_popup_with<'a>(
+        &'a self,
+        overlay: Option<&'a mut OverlayState>,
+    ) -> Option<CommitPopupView<'a>> {
         let author = self.author_line();
-        let Self { modal, render, .. } = self;
-        let commit_overlay = &mut render.commit;
-        let Some(Popup::Commit(draft)) = modal.popup() else {
+        let Some(Popup::Commit(draft)) = self.modal.popup() else {
             return None;
         };
         let author = draft.reword.is_none().then_some(author);
@@ -87,7 +94,7 @@ impl App {
             input: &draft.summary,
             description: Some(&draft.description),
             summary_focused: draft.focus == CommitField::Summary,
-            overlay_state: Some(commit_overlay),
+            overlay_state: overlay,
             lines: draft.summary.lines(),
             cursor: draft.summary.cursor(),
             // A rebase reword runs the amend itself: neither toggle applies.

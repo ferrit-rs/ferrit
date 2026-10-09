@@ -4,6 +4,7 @@
 
 use super::landed::Landed;
 use crate::app::App;
+use crate::app::render_state::RenderState;
 use crate::app::settings::{Click, Kind, SaveState, SettingsHits, SettingsRow};
 use crate::app::theme_config::{Preset, ThemeMode};
 use crate::components::ui::color_picker::{ColorPicker, grid_metrics, rgb};
@@ -170,13 +171,14 @@ fn hint(app: &App) -> &'static str {
 pub(super) fn draw(
     frame: &mut Frame<'_>,
     area: Rect,
-    app: &mut App,
+    app: &App,
     palette: &Palette,
+    render: &mut RenderState,
     landed: &mut Landed,
 ) {
     let accent = app.theme.config.color();
     let selected_row = app.settings().selected;
-    let Some(inner) = Drawer::new(&mut app.render.sheet, " Settings ")
+    let Some(inner) = Drawer::new(&mut render.sheet, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
         .render(frame, area)

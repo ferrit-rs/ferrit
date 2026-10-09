@@ -4,6 +4,7 @@
 //! margins) and at most 95 % of the terminal, so the panes stay in sight.
 
 use super::landed::Landed;
+use crate::app::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;
@@ -19,11 +20,17 @@ const MAX_PERCENT: u16 = 95;
 
 /// Draw the drawer and the page in it, over `area`. The page's scroll is clamped
 /// to what it can scroll.
-pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, landed: &mut Landed) {
+pub(super) fn draw(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    app: &App,
+    render: &mut RenderState,
+    landed: &mut Landed,
+) {
     let accent = app.theme.config.color();
     // The page plus the drawer's two border columns, no more.
     let width = (dashboard::MAX_WIDTH + 2).min(area.width.saturating_mul(MAX_PERCENT) / 100);
-    let Some(inner) = Drawer::new(&mut app.render.sheet, " Dashboard ")
+    let Some(inner) = Drawer::new(&mut render.sheet, " Dashboard ")
         .width(Constraint::Length(width))
         .border_style(Style::new().fg(accent))
         .render(frame, area)

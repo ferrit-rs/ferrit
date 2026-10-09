@@ -204,7 +204,7 @@ pub(crate) enum Shown {
     Menu(Vec<String>),
 }
 
-pub(crate) fn shown(app: &mut App) -> Shown {
+pub(crate) fn shown(app: &App) -> Shown {
     match app.popup_view() {
         None => Shown::Nothing,
         Some(PopupView::Note(message)) => Shown::Note(message.to_owned()),

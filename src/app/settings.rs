@@ -278,7 +278,7 @@ impl App {
         // The cached diff holds syntax colours, which follow the base only: an
         // accent change must not make every click re-highlight the diff.
         if palette.light != self.prefs.palette.light {
-            self.right.rendered = None;
+            self.render.diff_cache = None;
         }
         self.prefs.palette = palette;
         self.prefs.config.theme = self.theme.config.clone();

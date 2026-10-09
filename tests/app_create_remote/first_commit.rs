@@ -15,7 +15,7 @@ fn the_first_commit_the_remote_and_the_push_happen_in_one_go() {
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
     press(&mut app, KeyCode::Enter);
-    let Shown::Confirm { lines, .. } = shown(&mut app) else {
+    let Shown::Confirm { lines, .. } = shown(&app) else {
         panic!("the question")
     };
     assert_eq!(lines[1], "first: commit an empty README.md, made by Ferrit");
@@ -55,7 +55,7 @@ fn with_a_commit_already_there_no_first_commit_is_announced_or_made() {
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
     press(&mut app, KeyCode::Enter);
-    let Shown::Confirm { lines, .. } = shown(&mut app) else {
+    let Shown::Confirm { lines, .. } = shown(&app) else {
         panic!("the question")
     };
     assert!(lines.iter().all(|l| !l.starts_with("first:")), "{lines:?}");
@@ -78,7 +78,7 @@ fn a_failing_first_commit_stops_everything_before_anything_is_created() {
     press(&mut app, KeyCode::Enter);
     wait_for_created(&mut app, &rx);
 
-    let Shown::Form { error, .. } = shown(&mut app) else {
+    let Shown::Form { error, .. } = shown(&app) else {
         panic!("the form is back")
     };
     let error = error.unwrap();
@@ -107,7 +107,7 @@ fn a_refused_creation_keeps_the_commit_and_a_retry_does_not_make_a_second() {
 
     assert_eq!(project.commit_count(), "1", "the local commit stays");
     assert_eq!(project.remotes(), "");
-    let Shown::Form { error, .. } = shown(&mut app) else {
+    let Shown::Form { error, .. } = shown(&app) else {
         panic!("the form is back")
     };
     assert!(error.unwrap().contains("Name already exists"));

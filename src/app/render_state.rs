@@ -9,6 +9,9 @@ use std::time::Duration;
 
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::toast::Toast;
+use crate::domain::image::preview::Preview;
+
+use super::RenderedDiff;
 
 pub(super) struct RenderState {
     /// The help dialog.
@@ -19,6 +22,13 @@ pub(super) struct RenderState {
     pub(super) commit: OverlayState,
     /// The bottom-right error notification, dismissed by its `x`, `Esc` or a timeout.
     pub(super) toast: Option<Toast>,
+    /// The right pane's image: a live protocol that resizes and re-encodes itself
+    /// at render time, through `&mut`.
+    pub(super) preview: Preview,
+    /// The styled commit diff, kept so scrolling does not rerun syntax
+    /// highlighting. Keyed by the selection, the diff text, the focus range and
+    /// the pane width.
+    pub(super) diff_cache: Option<RenderedDiff>,
 }
 
 impl Default for RenderState {
@@ -28,6 +38,8 @@ impl Default for RenderState {
             sheet: OverlayState::new().with_duration(Duration::from_millis(200)),
             commit: OverlayState::new(),
             toast: None,
+            preview: Preview::None,
+            diff_cache: None,
         }
     }
 }

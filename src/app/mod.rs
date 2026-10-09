@@ -114,7 +114,9 @@ pub struct CommitPopupView<'a> {
 /// precedence in one `match` instead of chaining `if let` checks.
 pub enum PopupView<'a> {
     Commit(CommitPopupView<'a>),
-    CommitAllConfirm(&'a mut OverlayState),
+    /// The "stage everything?" question. Carries the backdrop's animation only when
+    /// the view is for drawing (`popup_view_with`).
+    CommitAllConfirm(Option<&'a mut OverlayState>),
     NewBranch(CommitPopupView<'a>),
     Stash(CommitPopupView<'a>),
     Name(CommitPopupView<'a>),
@@ -171,7 +173,7 @@ pub struct RefreshCompletion {
     pub(crate) commit_files: Option<(String, Shared<Vec<git::model::FileEntry>>)>,
 }
 
-struct RenderedDiff {
+pub(crate) struct RenderedDiff {
     key: Option<RightKey>,
     source: String,
     focus: Option<Range<usize>>,
@@ -1280,13 +1282,13 @@ impl App {
     /// commit diff goes through this cache: it is keyed for one `Diff` at a
     /// time, and the Files split renders its two sides directly instead
     /// (`ui::draw_files_columns`).
-    pub fn rendered_diff(
-        &mut self,
+    pub(crate) fn rendered_diff(
+        &self,
+        cache: &mut Option<RenderedDiff>,
         focus: Option<&Range<usize>>,
         width: usize,
     ) -> Option<(Text<'static>, usize, git::diff::DiffStat)> {
         let key = &self.right.key;
-        let cache = &mut self.right.rendered;
         match &self.right.diff {
             DiffView::Commit(_, diff) | DiffView::Stash(_, diff) => {
                 let cache_hit = cache.as_ref().is_some_and(|cached| {
@@ -1513,18 +1515,12 @@ impl App {
     /// pixels of the old frame outlive a normal buffer diff and need a full
     /// `terminal.clear()`.
     fn preview_is_image(&self) -> bool {
-        matches!(self.right.preview, Preview::Image(_))
+        matches!(self.render.preview, Preview::Image(_))
     }
 
     /// The right-pane preview for the current selection.
     pub fn preview(&self) -> &Preview {
-        &self.right.preview
-    }
-
-    /// Mutable preview, for `ui::draw`: `StatefulImage` resizes and re-encodes
-    /// the protocol in place at render time (the ratatui-image example pattern).
-    pub fn preview_mut(&mut self) -> &mut Preview {
-        &mut self.right.preview
+        &self.render.preview
     }
 
     /// Focus `pane` and move its cursor to `index`, rebuilding the preview.

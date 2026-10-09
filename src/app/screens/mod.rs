@@ -5,6 +5,7 @@
 //! Colours come from `theme`.
 
 use self::landed::Landed;
+use crate::app::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -48,20 +49,27 @@ pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
+    // The animations, the toast, the image protocol and the diff cache are
+    // `&mut` for the length of the frame and nothing else is: take them out of
+    // `App`, draw from `&App` with them, put them back, then land what the frame
+    // learned. While they are out, `app.render` is empty, so everything the frame
+    // reads of them goes through `render`, never through `app`.
+    let mut render = std::mem::take(&mut app.render);
     let mut landed = Landed::default();
-    draw_into(frame, app, &mut landed);
+    draw_into(frame, app, &mut render, &mut landed);
+    app.render = render;
     app.land(landed);
 }
 
-fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
+fn draw_into(frame: &mut Frame<'_>, app: &App, render: &mut RenderState, landed: &mut Landed) {
     let area = frame.area();
     let palette = app.palette();
 
-    let show_help = app.help_is_open();
+    let show_help = app.help.is_visible(&render.help);
     let keybar = match app.full_screen() {
-        FullScreen::GitConfig => draw_git_config(frame, app, landed, area),
-        FullScreen::Welcome => draw_welcome(frame, app, landed, area),
-        FullScreen::None => draw_panes(frame, app, landed, area),
+        FullScreen::GitConfig => draw_git_config(frame, app, render, landed, area),
+        FullScreen::Welcome => draw_welcome(frame, app, render, landed, area),
+        FullScreen::None => draw_panes(frame, app, render, landed, area),
     };
 
     if show_help {
@@ -73,7 +81,7 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
         };
         let accent = app.theme.config.color();
         let (scroll, query, searching) = app.help.view_parts();
-        let overlay_state = &mut app.render.help;
+        let overlay_state = &mut render.help;
         let rows = popups::draw_help(
             frame,
             above_bar,
@@ -90,7 +98,7 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
         landed.help_rows = Some(rows);
     }
     let accent = app.theme.config.color();
-    match app.popup_view() {
+    match app.popup_view_with(Some(&mut render.commit)) {
         Some(
             PopupView::Commit(mut view)
             | PopupView::NewBranch(mut view)
@@ -101,7 +109,7 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
         ) => {
             popups::draw_commit(frame, area, &mut view, accent, &palette);
         },
-        Some(PopupView::CommitAllConfirm(state)) => {
+        Some(PopupView::CommitAllConfirm(Some(state))) => {
             popups::draw_commit_all_confirm(frame, area, state, accent, &palette);
         },
         Some(PopupView::CreateRemote(view)) => {
@@ -112,15 +120,21 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
         Some(PopupView::CommandLog(view)) => {
             popups::draw_command_log_view(frame, area, &view, accent, &palette);
         },
-        None => {},
+        Some(PopupView::CommitAllConfirm(None)) | None => {},
     }
-    if let Some(toast) = &mut app.render.toast {
+    if let Some(toast) = &mut render.toast {
         toast.render(frame, area, &palette);
     }
 }
 
 /// The five panes, the command log and the key bar; returns the key bar's area.
-fn draw_panes(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: Rect) -> Rect {
+fn draw_panes(
+    frame: &mut Frame<'_>,
+    app: &App,
+    render: &mut RenderState,
+    landed: &mut Landed,
+    area: Rect,
+) -> Rect {
     let palette = app.palette();
     let log_rows = command_log_rows(app, area.height);
     let [content, log, keybar] = Layout::vertical([
@@ -154,23 +168,23 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: R
     } else if app.nav.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
         diff::draw_single_file_diff(frame, app, landed, right);
     } else {
-        draw_right_pane(frame, app, landed, right);
+        draw_right_pane(frame, app, render, landed, right);
     }
     draw_command_log(frame, app, landed, log);
-    draw_keybar(frame, keybar, app, landed);
+    draw_keybar(frame, keybar, app, render, landed);
 
-    if app.render.sheet.is_closed() {
+    if render.sheet.is_closed() {
         landed.settings_hits = Some(crate::app::settings::SettingsHits::default());
     } else {
         match app.sheets.kind {
-            Sheet::Settings => settings::draw(frame, area, app, &palette, landed),
+            Sheet::Settings => settings::draw(frame, area, app, &palette, render, landed),
             Sheet::Dashboard => {
                 // Above the key bar, which stays the dashboard's own.
                 let above = Rect {
                     height: area.height.saturating_sub(keybar.height),
                     ..area
                 };
-                dashboard_sheet::draw(frame, above, app, landed);
+                dashboard_sheet::draw(frame, above, app, render, landed);
             },
         }
     }
@@ -178,7 +192,13 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: R
 }
 
 /// The welcome screen above its key bar; returns the key bar's area.
-fn draw_welcome(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) -> Rect {
+fn draw_welcome(
+    frame: &mut Frame<'_>,
+    app: &App,
+    render: &RenderState,
+    landed: &mut Landed,
+    area: Rect,
+) -> Rect {
     let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
     if let Some(dir) = app.welcome_dir() {
         let view = welcome::View {
@@ -189,12 +209,18 @@ fn draw_welcome(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rec
         };
         welcome::draw(frame, page, &view);
     }
-    draw_keybar(frame, keybar, app, landed);
+    draw_keybar(frame, keybar, app, render, landed);
     keybar
 }
 
 /// The git config screen above its key bar; returns the key bar's area.
-fn draw_git_config(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) -> Rect {
+fn draw_git_config(
+    frame: &mut Frame<'_>,
+    app: &App,
+    render: &RenderState,
+    landed: &mut Landed,
+    area: Rect,
+) -> Rect {
     let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
     let screen = app.git_config();
     let view = git_config::View {
@@ -210,7 +236,7 @@ fn draw_git_config(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: 
     };
     let offset = git_config::draw(frame, page, &view);
     landed.git_config_offset = Some(offset);
-    draw_keybar(frame, keybar, app, landed);
+    draw_keybar(frame, keybar, app, render, landed);
     keybar
 }
 
@@ -501,7 +527,13 @@ fn welcome_lines(
     lines
 }
 
-fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: Rect) {
+fn draw_right_pane(
+    frame: &mut Frame<'_>,
+    app: &App,
+    render: &mut RenderState,
+    landed: &mut Landed,
+    area: Rect,
+) {
     let palette = &app.palette();
     // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
     // the diff, one over the left column moves the selection.
@@ -528,7 +560,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, ar
     let border = if app.right_focused() { focused } else { idle };
 
     // An image selection takes over the right pane; otherwise it is mock text.
-    match app.preview_mut() {
+    match &mut render.preview {
         Preview::Image(proto) => {
             // Same shape as `render_resized_image` in the ratatui-image demo:
             // draw the border, then hand `StatefulImage` the inner area and a
@@ -589,9 +621,11 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, ar
             let end = anchors.get(i + 1).copied().unwrap_or(raw_total);
             scroll..end
         });
-        let Some((text, total, _stat)) =
-            app.rendered_diff(focus.as_ref(), diff_area.width as usize)
-        else {
+        let Some((text, total, _stat)) = app.rendered_diff(
+            &mut render.diff_cache,
+            focus.as_ref(),
+            diff_area.width as usize,
+        ) else {
             return;
         };
         frame.render_widget(block, area);
@@ -831,11 +865,17 @@ fn command_log_lines(app: &App) -> Vec<Line<'static>> {
 /// sensitive: an operation stopped mid-way wins, then the focused pane's own
 /// keys (`d` means delete, discard or drop depending on the pane). The help
 /// screen wins over all of it: only its own keys work while it is up.
-fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App, landed: &mut Landed) {
+fn draw_keybar(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    app: &App,
+    render: &RenderState,
+    landed: &mut Landed,
+) {
     let palette = app.palette();
-    let bar = if app.help_is_open() {
+    let bar = if app.help.is_visible(&render.help) {
         Bar::Help
-    } else if app.dashboard_is_open() {
+    } else if app.dashboard_open_in(&render.sheet) {
         Bar::Dashboard
     } else if app.full_screen() == FullScreen::GitConfig {
         Bar::GitConfig

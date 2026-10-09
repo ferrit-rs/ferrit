@@ -13,7 +13,7 @@ fn g_opens_the_creation_from_any_pane_when_there_is_no_remote() {
         let mut app = project.app();
         app.feed_key(KeyEvent::from(KeyCode::Char(pane)));
         g(&mut app);
-        assert!(matches!(shown(&mut app), Shown::Form { .. }), "pane {pane}");
+        assert!(matches!(shown(&app), Shown::Form { .. }), "pane {pane}");
     }
     assert_eq!(project.remotes(), "");
 }
@@ -25,7 +25,7 @@ fn g_with_a_remote_says_so_and_checks_nothing() {
     let mut app = project.app();
     g(&mut app);
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Note("this repository already has a remote".to_owned())
     );
     assert!(project.calls().is_empty(), "gh was not even asked");
@@ -38,7 +38,7 @@ fn in_the_form_g_is_a_letter_and_while_busy_it_waits() {
     g(&mut app);
     clear_name(&mut app);
     g(&mut app);
-    let Shown::Form { name, .. } = shown(&mut app) else {
+    let Shown::Form { name, .. } = shown(&app) else {
         panic!("the form")
     };
     assert_eq!(name, "G", "typed into the name, not a second creation");
@@ -50,7 +50,7 @@ fn in_the_form_g_is_a_letter_and_while_busy_it_waits() {
     app.start_create_remote(draft("tool"), tx);
     g(&mut app);
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Note("another network operation is running".to_owned())
     );
     drop(rx);

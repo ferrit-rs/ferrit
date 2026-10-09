@@ -233,7 +233,7 @@ fn key_j() -> KeyEvent {
     key('j')
 }
 
-fn popup_text(app: &mut App) -> Option<(String, String)> {
+fn popup_text(app: &App) -> Option<(String, String)> {
     match app.popup_view()? {
         PopupView::Name(view) => Some((view.title.to_owned(), view.lines.join("\n"))),
         PopupView::Menu(view) => Some((view.title, view.rows.join("\n"))),
@@ -289,13 +289,13 @@ fn enter_on_an_enum_opens_the_allowed_values_and_a_row_sets_it() {
 
     select(&mut app, "pull.rebase", Scope::Local);
     press(&mut app, KeyCode::Enter);
-    let (title, rows) = popup_text(&mut app).unwrap();
+    let (title, rows) = popup_text(&app).unwrap();
     assert_eq!(title, "pull.rebase (local)");
     assert_eq!(rows.lines().count(), 4);
     assert!(rows.contains("interactive"));
     // The current value (`merges`) is the highlighted row; `1` picks `false`.
     app.feed_key(key('1'));
-    assert!(popup_text(&mut app).is_none());
+    assert!(popup_text(&app).is_none());
     assert_eq!(get(&fx, "--local", "pull.rebase"), ["false"]);
     assert_eq!(
         app.git_config().selected_row().unwrap().entry.key,
@@ -311,7 +311,7 @@ fn a_text_value_is_edited_in_a_popup_in_the_write_scope_only() {
 
     select(&mut app, "core.editor", Scope::Global);
     press(&mut app, KeyCode::Enter);
-    let (title, text) = popup_text(&mut app).unwrap();
+    let (title, text) = popup_text(&app).unwrap();
     assert_eq!(
         (title.as_str(), text.as_str()),
         ("core.editor (local)", "nvim")
@@ -321,7 +321,7 @@ fn a_text_value_is_edited_in_a_popup_in_the_write_scope_only() {
     }
     type_text(&mut app, "vim -u NONE");
     press(&mut app, KeyCode::Enter);
-    assert!(popup_text(&mut app).is_none());
+    assert!(popup_text(&app).is_none());
     assert_eq!(get(&fx, "--local", "core.editor"), ["vim -u NONE"]);
     assert_eq!(get(&fx, "--global", "core.editor"), ["nvim"]);
     let rows = &app.git_config().rows;
@@ -346,7 +346,7 @@ fn a_secret_value_is_replaced_without_ever_showing_the_old_one() {
 
     select(&mut app, "github.token", Scope::Global);
     press(&mut app, KeyCode::Enter);
-    let (title, text) = popup_text(&mut app).unwrap();
+    let (title, text) = popup_text(&app).unwrap();
     assert!(!title.contains("ghp_secret") && !text.contains("ghp_secret"));
     assert_eq!(text, "");
     type_text(&mut app, "ghp_new");
@@ -363,7 +363,7 @@ fn a_adds_a_key_and_a_second_value_when_the_key_is_already_set_there() {
     app.feed_key(key('a'));
     type_text(&mut app, "alias.co");
     press(&mut app, KeyCode::Enter);
-    let (title, _) = popup_text(&mut app).unwrap();
+    let (title, _) = popup_text(&app).unwrap();
     assert_eq!(title, "alias.co (local)");
     type_text(&mut app, "checkout -b");
     press(&mut app, KeyCode::Enter);
@@ -406,10 +406,7 @@ fn git_refusing_a_value_keeps_the_popup_and_changes_nothing() {
     press(&mut app, KeyCode::Enter);
     type_text(&mut app, "v");
     press(&mut app, KeyCode::Enter);
-    assert!(
-        popup_text(&mut app).is_some(),
-        "the popup stays for a retry"
-    );
+    assert!(popup_text(&app).is_some(), "the popup stays for a retry");
     assert!(
         app.git_config()
             .rows
@@ -432,7 +429,7 @@ fn an_include_line_is_read_only() {
 
     select(&mut app, "include.path", Scope::Local);
     press(&mut app, KeyCode::Enter);
-    assert!(popup_text(&mut app).is_none());
+    assert!(popup_text(&app).is_none());
     assert!(
         app.git_config()
             .note
@@ -556,9 +553,9 @@ fn a_global_edit_opens_its_popup_after_the_yes_and_keeps_what_is_typed() {
 
     select(&mut app, "core.editor", Scope::Global);
     press(&mut app, KeyCode::Enter);
-    assert!(popup_text(&mut app).is_none(), "the question comes first");
+    assert!(popup_text(&app).is_none(), "the question comes first");
     app.feed_key(key('y'));
-    let (title, text) = popup_text(&mut app).unwrap();
+    let (title, text) = popup_text(&app).unwrap();
     assert_eq!(
         (title.as_str(), text.as_str()),
         ("core.editor (global)", "nvim")
@@ -570,7 +567,7 @@ fn a_global_edit_opens_its_popup_after_the_yes_and_keeps_what_is_typed() {
     // `a` after the yes needs no second question.
     app.feed_key(key('a'));
     assert!(app.confirm_message().is_none());
-    assert!(popup_text(&mut app).is_some());
+    assert!(popup_text(&app).is_some());
 }
 
 #[test]

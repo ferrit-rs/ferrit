@@ -68,23 +68,23 @@ impl App {
     pub(super) fn update_preview(&mut self) {
         if self.nav.focus != Pane::Files {
             self.invalidate_image_query();
-            self.right.preview = Preview::None;
+            self.render.preview = Preview::None;
             return;
         }
         let rows = self.files_tree_rows();
         let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Files)) else {
             self.invalidate_image_query();
-            self.right.preview = Preview::None;
+            self.render.preview = Preview::None;
             return;
         };
         let Some(entry) = self.snapshot.files.get(*index) else {
             self.invalidate_image_query();
-            self.right.preview = Preview::None;
+            self.render.preview = Preview::None;
             return;
         };
         if !preview::is_image_path(&entry.path) {
             self.invalidate_image_query();
-            self.right.preview = Preview::None;
+            self.render.preview = Preview::None;
             return;
         }
         let path = entry.path.clone();
@@ -95,14 +95,14 @@ impl App {
         let generation = self.workers.image.generation;
         self.workers.image.path = Some(path.clone());
         if let (Some(sender), true) = (self.workers.sender.clone(), self.repo.is_some()) {
-            self.right.preview = Preview::Note("loading image...".into());
+            self.render.preview = Preview::Note("loading image...".into());
             self.queue_image_query(sender, path, generation);
         } else {
             let bytes = match &self.repo {
                 Some(repo) => match repo.blob_bytes(&path, git::blob::Rev::Workdir) {
                     Ok(bytes) => bytes,
                     Err(error) => {
-                        self.right.preview =
+                        self.render.preview =
                             Preview::Note(format!("[image] {}  ({error})", path.display()));
                         return;
                     },
@@ -111,7 +111,7 @@ impl App {
                     .map(<[u8]>::to_vec)
                     .unwrap_or_default(),
             };
-            self.right.preview = preview::from_bytes(&self.right.picker, &path, &bytes);
+            self.render.preview = preview::from_bytes(&self.right.picker, &path, &bytes);
         }
     }
 
@@ -161,7 +161,7 @@ impl App {
         if completion.generation == self.workers.image.generation
             && self.workers.image.path.as_ref() == Some(&completion.path)
         {
-            self.right.preview = match completion.result {
+            self.render.preview = match completion.result {
                 Ok(image) => Preview::Image(Box::new(self.right.picker.new_resize_protocol(image))),
                 Err(error) => Preview::Note(error.to_string()),
             };

@@ -15,7 +15,7 @@ fn the_last_question_names_the_users_github_alias_from_their_ssh_config() {
     app.set_ssh_config_path(project.ssh_config(&["github.com-personal", "github.com-work"]));
     app.open_create_remote();
     press(&mut app, KeyCode::Enter);
-    let Shown::Confirm { lines, .. } = shown(&mut app) else {
+    let Shown::Confirm { lines, .. } = shown(&app) else {
         panic!("the question")
     };
     assert!(

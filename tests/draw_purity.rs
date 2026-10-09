@@ -67,7 +67,7 @@ fn fake_app() -> App {
 }
 
 /// What a user can observe without looking at pixels.
-fn observable(app: &mut App) -> String {
+fn observable(app: &App) -> String {
     let status: Vec<String> = app.status_lines().iter().map(ToString::to_string).collect();
     let rows: Vec<(usize, usize)> = PANES
         .iter()
@@ -170,9 +170,9 @@ fn drawing_changes_nothing_a_user_can_observe() {
     let (all, _folder) = screens();
     for (name, mut app) in all {
         for size in SIZES {
-            let before = observable(&mut app);
+            let before = observable(&app);
             let _ = frame(&mut app, size);
-            let after = observable(&mut app);
+            let after = observable(&app);
             assert_eq!(
                 before, after,
                 "{name} at {size:?}: drawing changed the state"
@@ -198,4 +198,49 @@ fn what_a_frame_learned_reaches_the_mouse() {
         Pane::Files,
         "a click low in the left column did not change the focus"
     );
+}
+
+/// Something that brings a screen up on the app.
+type Opener = dyn Fn(&mut App);
+
+/// While the side sheet slides out, the flag that says "it is open" is already
+/// false and only its animation says "still on screen". Drawing must read that
+/// animation (it holds it while it draws), or the last frames of every close
+/// would vanish. Close it, draw one frame into the slide, and that frame must
+/// differ from the one after the slide has finished.
+///
+/// (The help and the commit popup cannot be caught mid-slide from here:
+/// `feed_key` finishes the help's animation, and the commit popup is gone from
+/// the state as soon as it is closed.)
+#[test]
+fn the_side_sheet_sliding_out_is_still_drawn() {
+    let size = (120, 40);
+    let open_dashboard = |app: &mut App| key(app, 'D');
+    let open_settings = |app: &mut App| {
+        app.set_author_click_area(Rect::new(0, 0, 6, 1));
+        app.feed_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 1,
+            row: 0,
+            modifiers: KeyModifiers::NONE,
+        });
+    };
+    let cases: [(&str, &Opener); 2] =
+        [("dashboard", &open_dashboard), ("settings", &open_settings)];
+    for (name, open) in cases {
+        let mut app = fake_app();
+        open(&mut app);
+        settle(&mut app);
+        assert!(app.sheet_is_open(), "{name}: the sheet did not open");
+        app.feed_key(KeyEvent::from(KeyCode::Esc));
+        app.advance_clock(Duration::from_millis(16));
+        assert!(app.sheet_is_open(), "{name}: it closed at once");
+        let sliding = frame(&mut app, size);
+        settle(&mut app);
+        let closed = frame(&mut app, size);
+        assert_ne!(
+            sliding, closed,
+            "{name}: nothing is drawn while it slides out"
+        );
+    }
 }

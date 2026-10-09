@@ -12,11 +12,11 @@ fn x_on_status_with_no_remote_offers_to_create_the_repository() {
     let mut app = project.app();
     app.feed_key(KeyEvent::from(KeyCode::Char('1')));
     app.feed_key(KeyEvent::from(KeyCode::Char('x')));
-    assert_eq!(shown(&mut app), Shown::Menu(vec![CREATE_ROW.to_owned()]));
+    assert_eq!(shown(&app), Shown::Menu(vec![CREATE_ROW.to_owned()]));
 
     // The row's letter, or Enter, starts the flow: the gh check, then the form.
     app.feed_key(KeyEvent::from(KeyCode::Char('g')));
-    assert!(matches!(shown(&mut app), Shown::Form { .. }));
+    assert!(matches!(shown(&app), Shown::Form { .. }));
     assert_eq!(project.calls(), ["--version", "auth status"]);
 }
 
@@ -38,7 +38,7 @@ fn x_on_branches_adds_the_row_after_the_branch_actions() {
     let mut app = project.app();
     app.feed_key(KeyEvent::from(KeyCode::Char('3')));
     app.feed_key(KeyEvent::from(KeyCode::Char('x')));
-    let Shown::Menu(rows) = shown(&mut app) else {
+    let Shown::Menu(rows) = shown(&app) else {
         panic!("a menu")
     };
     assert_eq!(rows.first().map(String::as_str), Some("Rename branch  (r)"));
@@ -52,15 +52,11 @@ fn with_any_remote_the_row_is_not_there() {
     let mut app = project.app();
     app.feed_key(KeyEvent::from(KeyCode::Char('1')));
     app.feed_key(KeyEvent::from(KeyCode::Char('x')));
-    assert_eq!(
-        shown(&mut app),
-        Shown::Nothing,
-        "nothing to offer on Status"
-    );
+    assert_eq!(shown(&app), Shown::Nothing, "nothing to offer on Status");
 
     app.feed_key(KeyEvent::from(KeyCode::Char('3')));
     app.feed_key(KeyEvent::from(KeyCode::Char('x')));
-    if let Shown::Menu(rows) = shown(&mut app) {
+    if let Shown::Menu(rows) = shown(&app) {
         assert!(rows.iter().all(|r| r != CREATE_ROW), "{rows:?}");
     }
 }
@@ -76,7 +72,7 @@ fn the_row_waits_while_a_network_operation_runs() {
     app.feed_key(KeyEvent::from(KeyCode::Char('x')));
     app.feed_key(KeyEvent::from(KeyCode::Char('g')));
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Note("another network operation is running".to_owned())
     );
     drop(rx);

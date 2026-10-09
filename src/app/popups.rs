@@ -4,6 +4,7 @@ use super::{
     App, CommandLogView, CommitPopupView, KeyCode, KeyEvent, MenuView, Popup, PopupView,
     TextInputMode,
 };
+use crate::components::tui_overlay::state::OverlayState;
 
 /// Rows a `PageUp` / `PageDown` moves the command log viewer.
 const COMMAND_LOG_PAGE: usize = 10;
@@ -38,8 +39,17 @@ enum PopupKind {
 }
 
 impl App {
-    /// Read active popup as one enum for the renderer.
-    pub fn popup_view(&mut self) -> Option<PopupView<'_>> {
+    /// Read active popup as one enum, without any animation state.
+    pub fn popup_view(&self) -> Option<PopupView<'_>> {
+        self.popup_view_with(None)
+    }
+
+    /// The active popup for drawing: `overlay` is the commit popup's animation, which
+    /// the views of the commit editor and of the stage-everything question carry.
+    pub(crate) fn popup_view_with<'a>(
+        &'a self,
+        overlay: Option<&'a mut OverlayState>,
+    ) -> Option<PopupView<'a>> {
         let kind = match self.modal.popup()? {
             Popup::Commit(_) => PopupKind::Commit,
             Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
@@ -54,10 +64,8 @@ impl App {
             Popup::Note(_) => PopupKind::Note,
         };
         match kind {
-            PopupKind::Commit => self.commit_popup().map(PopupView::Commit),
-            PopupKind::CommitAllConfirm => {
-                Some(PopupView::CommitAllConfirm(&mut self.render.commit))
-            },
+            PopupKind::Commit => self.commit_popup_with(overlay).map(PopupView::Commit),
+            PopupKind::CommitAllConfirm => Some(PopupView::CommitAllConfirm(overlay)),
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
             PopupKind::Name => self.name_popup().map(PopupView::Name),

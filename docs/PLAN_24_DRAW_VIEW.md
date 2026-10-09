@@ -1,6 +1,6 @@
 # Plan: phase 24, drawing reads the app, it does not change it
 
-**Status: in progress (C0 to C3 done: the facts are out; `RenderState`, C4 to C7, is open).** The step 6 that `PLAN_22_APP_SPLIT.md` left open ("a view for drawing").
+**Status: done (C0 to C7).** The step 6 that `PLAN_22_APP_SPLIT.md` left open ("a view for drawing").
 Nothing a user sees changes; what changes is what the drawing code is allowed to touch.
 
 What differs from the sketch below, and why:
@@ -21,6 +21,24 @@ What differs from the sketch below, and why:
   `draw_painted`, `draw_into`, `draw_panes`, `draw_right_pane` (the image protocol and the
   diff cache), `settings::draw` and `dashboard_sheet::draw` (the drawer's animation). That is
   exactly the set `RenderState` is for, so the decision point of C3 is "go on".
+- **`RenderState` is in** (`render_state.rs`): the help, side-sheet and commit-popup animations,
+  the `Toast`, the image `Preview` and the rendered-diff cache. `App.render` is its home; `draw`
+  takes it out with `mem::take`, draws from `&App` with `&mut RenderState`, puts it back, then
+  lands the facts. **The only `&mut App` left in `screens/` are the two public entry points**
+  (`draw`, `draw_painted`); every other function takes `&App`.
+- **What had to change around it:** `HelpState::is_visible` and `dismiss` take the help overlay
+  as an argument; `popup_view` and `commit_popup` became `&self` (they carry no animation) with a
+  `*_with(Some(overlay))` form for drawing, so `PopupView::CommitAllConfirm` now holds an
+  `Option<&mut OverlayState>`; `rendered_diff` takes the cache; `dashboard_open_in(&overlay)`
+  exists for the one check drawing makes. About forty test helpers lost a needless `&mut App`
+  (clippy listed them).
+- **The take-and-restore window is real and is now tested.** The first attempt at a test did
+  not catch a deliberate misread (`app.help_is_open()` instead of the argument), because the
+  help's `open` flag is still true then. The trap only shows while an overlay slides *out*, so
+  `the_side_sheet_sliding_out_is_still_drawn` closes a sheet, draws one frame into the slide and
+  requires it to differ from the settled one. It fails under that mutation. The help and the
+  commit popup cannot be caught mid-slide from a test (`feed_key` finishes the help's animation,
+  the commit popup leaves the state when closed); that gap is in the test's comment.
 - **Checked:** `tests/draw_purity.rs` (C0, written first and shown to fail when `draw` changes
   the focus), the 1,005 tests including every frame test, clippy with and without
   `--all-features`.

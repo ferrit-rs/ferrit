@@ -23,7 +23,7 @@ fn the_check_runs_off_the_ui_thread_then_the_form_opens_on_the_folder_name() {
         visibility,
         focus,
         error,
-    } = shown(&mut app)
+    } = shown(&app)
     else {
         panic!("a form")
     };
@@ -41,7 +41,7 @@ fn a_missing_or_signed_out_gh_says_what_to_do_and_shows_no_form() {
     let mut app = project.app();
     app.set_gh_program(GhProgram::new("/nonexistent/ferrit-test/gh"));
     app.open_create_remote();
-    let Shown::Note(message) = shown(&mut app) else {
+    let Shown::Note(message) = shown(&app) else {
         panic!("a note")
     };
     assert!(
@@ -53,7 +53,7 @@ fn a_missing_or_signed_out_gh_says_what_to_do_and_shows_no_form() {
     fs::write(project.dir.join("signed-out"), "").unwrap();
     let mut app = project.app();
     app.open_create_remote();
-    let Shown::Note(message) = shown(&mut app) else {
+    let Shown::Note(message) = shown(&app) else {
         panic!("a note")
     };
     assert!(message.contains("gh auth login"), "{message}");
@@ -66,13 +66,13 @@ fn closing_while_gh_is_checked_ignores_the_late_answer() {
     let (mut app, rx) = ready_app(&project);
     app.open_create_remote();
     press(&mut app, KeyCode::Esc);
-    assert_eq!(shown(&mut app), Shown::Nothing);
+    assert_eq!(shown(&app), Shown::Nothing);
     match rx.recv_timeout(Duration::from_secs(20)) {
         Ok(event @ AppEvent::GhChecked { .. }) => app.deliver_event(event),
         other => panic!("expected GhChecked, got {other:?}"),
     }
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Nothing,
         "no form pops up behind the user's back"
     );
@@ -85,7 +85,7 @@ fn a_repository_that_has_a_remote_gets_a_note_and_no_check() {
     let (mut app, rx) = ready_app(&project);
     app.open_create_remote();
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Note("this repository already has a remote".to_owned())
     );
     assert!(rx.try_recv().is_err());
@@ -105,7 +105,7 @@ fn the_form_edits_its_three_fields_with_tab_arrows_and_space() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "A small tool");
     assert_eq!(
-        shown(&mut app),
+        shown(&app),
         Shown::Form {
             name: "acme/tool".to_owned(),
             description: "A small tool".to_owned(),
@@ -121,7 +121,7 @@ fn the_form_edits_its_three_fields_with_tab_arrows_and_space() {
     press(&mut app, KeyCode::Right);
     let Shown::Form {
         visibility, focus, ..
-    } = shown(&mut app)
+    } = shown(&app)
     else {
         panic!("a form")
     };
@@ -140,12 +140,12 @@ fn a_bad_name_stays_on_the_form_with_the_reason_until_it_is_edited() {
     type_text(&mut app, "my repo");
     press(&mut app, KeyCode::Enter);
 
-    let Shown::Form { error, .. } = shown(&mut app) else {
+    let Shown::Form { error, .. } = shown(&app) else {
         panic!("still the form")
     };
     assert!(error.unwrap().contains("not allowed in a name"));
     type_text(&mut app, "x");
-    let Shown::Form { error, .. } = shown(&mut app) else {
+    let Shown::Form { error, .. } = shown(&app) else {
         panic!("a form")
     };
     assert_eq!(error, None, "typing clears the reason");
@@ -164,7 +164,7 @@ fn the_last_question_names_what_will_happen_and_a_private_one_takes_enter() {
         title,
         visibility,
         lines,
-    } = shown(&mut app)
+    } = shown(&app)
     else {
         panic!("the question")
     };
@@ -179,7 +179,7 @@ fn the_last_question_names_what_will_happen_and_a_private_one_takes_enter() {
     assert_eq!(project.calls().len(), 2, "only the two status reads so far");
 
     press(&mut app, KeyCode::Enter);
-    assert_eq!(shown(&mut app), Shown::Nothing);
+    assert_eq!(shown(&app), Shown::Nothing);
     assert_eq!(app.remote_busy_label(), Some("Creating repository\u{2026}"));
     wait_for_created(&mut app, &rx);
     assert_eq!(project.remotes(), "origin");
@@ -196,7 +196,7 @@ fn a_public_repository_is_confirmed_by_y_alone_and_enter_does_nothing() {
 
     let Shown::Confirm {
         visibility, lines, ..
-    } = shown(&mut app)
+    } = shown(&app)
     else {
         panic!("the question")
     };
@@ -207,7 +207,7 @@ fn a_public_repository_is_confirmed_by_y_alone_and_enter_does_nothing() {
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Char(' '));
     assert!(
-        matches!(shown(&mut app), Shown::Confirm { .. }),
+        matches!(shown(&app), Shown::Confirm { .. }),
         "Enter and Space are not a yes"
     );
     assert!(app.remote_busy_label().is_none());
@@ -233,9 +233,9 @@ fn n_and_esc_at_the_question_go_back_to_the_form_with_its_fields() {
     type_text(&mut app, "tool");
     for key in [KeyCode::Char('n'), KeyCode::Esc] {
         press(&mut app, KeyCode::Enter);
-        assert!(matches!(shown(&mut app), Shown::Confirm { .. }));
+        assert!(matches!(shown(&app), Shown::Confirm { .. }));
         press(&mut app, key);
-        let Shown::Form { name, .. } = shown(&mut app) else {
+        let Shown::Form { name, .. } = shown(&app) else {
             panic!("the form")
         };
         assert_eq!(name, "tool");
@@ -248,7 +248,7 @@ fn cancelling_at_any_step_leaves_no_remote_and_gh_untouched_beyond_its_checks() 
     let (mut app, rx) = ready_app(&project);
     open_form(&mut app, &rx);
     press(&mut app, KeyCode::Esc);
-    assert_eq!(shown(&mut app), Shown::Nothing);
+    assert_eq!(shown(&app), Shown::Nothing);
 
     // The typed fields are remembered for the next time.
     app.open_create_remote();
@@ -257,10 +257,10 @@ fn cancelling_at_any_step_leaves_no_remote_and_gh_untouched_beyond_its_checks() 
         other => panic!("expected GhChecked, got {other:?}"),
     }
     press(&mut app, KeyCode::Enter);
-    assert!(matches!(shown(&mut app), Shown::Confirm { .. }));
+    assert!(matches!(shown(&app), Shown::Confirm { .. }));
     press(&mut app, KeyCode::Esc);
     press(&mut app, KeyCode::Esc);
-    assert_eq!(shown(&mut app), Shown::Nothing);
+    assert_eq!(shown(&app), Shown::Nothing);
 
     assert_eq!(project.remotes(), "");
     assert!(
@@ -294,7 +294,7 @@ fn a_refusal_reopens_the_form_on_the_name_with_every_field_kept() {
         focus,
         error,
         ..
-    } = shown(&mut app)
+    } = shown(&app)
     else {
         panic!("the form is back")
     };
