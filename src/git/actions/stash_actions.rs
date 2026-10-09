@@ -1,39 +1,29 @@
 //! Stash actions: `s` on Files opens a message popup, Stash-pane keys apply,
 //! pop and drop the selected entry. See `docs/PLAN_10_STASH.md`.
 
-use std::path::PathBuf;
-
 use crate::app::App;
 use crate::git;
-use crate::git::stash::StashOutcome;
+use crate::git::stash::{self, StashOutcome};
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::selection::SelectionKey;
-use crate::interface::panes::views::DiffView;
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::confirm::ConfirmPrompt;
 use crate::interface::popups::popup::Popup;
 
 impl App {
-    /// The selected stash entry's oid, only while Stash is focused, in
-    /// `Mode::Nav` and no popup is up.
+    /// The selected stash entry, only while Stash is focused in `Mode::Nav`
+    /// and no popup is up.
     fn selected_stash(&self) -> Option<&git::model::StashEntry> {
-        if self.nav.focus != Pane::Stash
-            || self.nav.mode != Mode::Nav
-            || self.modal.popup().is_some()
-        {
+        if !self.nav.on_stash() || self.modal.popup().is_some() {
             return None;
         }
-        self.snapshot.stashes.get(self.selected(Pane::Stash))
+        self.rows().selected_stash()
     }
 
     /// `s` (Nav, Files focused): open the stash message popup. A clean tree
     /// opens nothing and says so.
     pub(crate) fn open_stash_popup(&mut self) {
-        if self.nav.focus != Pane::Files
-            || self.nav.mode != Mode::Nav
-            || self.modal.popup().is_some()
-        {
+        if !self.nav.on_files() || self.modal.popup().is_some() {
             return;
         }
         if self.snapshot.files.is_empty() {
@@ -66,40 +56,22 @@ impl App {
         }
     }
 
-    /// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either,
-    /// same reason as drop (`docs/PLAN_10_STASH.md`) — both mutate the working
-    /// tree at once, with no undo, exactly like the discard prompt they mirror.
+    /// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either.
     pub(crate) fn restore_stash_prompt(&mut self, pop: bool) {
         let Some(entry) = self.selected_stash() else {
             return;
         };
-        let verb = if pop { "pop" } else { "apply" };
-        let message = format!("{verb} stash@{{{}}}: {}?", entry.index, entry.message);
-        let oid = entry.oid.clone();
-        self.modal.ask(ConfirmPrompt {
-            message,
-            action: ConfirmAction::RestoreStash { oid, pop },
-        });
+        let prompt = ConfirmPrompt::restore_stash(entry, pop);
+        self.modal.ask(prompt);
     }
 
     /// Confirmed apply or pop. A clean restore moves the focus to Files with
     /// the first restored file selected, like lazygit; a conflict or an error
     /// leaves the focus on Stash.
     pub(crate) fn restore_stash(&mut self, oid: &str, pop: bool) {
-        let first_file = match &self.right.diff {
-            DiffView::Stash(entry, diff) if entry.oid == oid => diff
-                .files
-                .first()
-                .and_then(|f| diff.text.get(f.new_path.clone()))
-                .map(PathBuf::from),
-            _ => None,
-        };
+        let first_file = self.right.diff.first_stash_file(oid);
         let Some(repo) = &mut self.repo else { return };
-        let result = if pop {
-            repo.stash_pop(oid)
-        } else {
-            repo.stash_apply(oid)
-        };
+        let result = stash::restore(repo.as_mut(), oid, pop);
         if matches!(result, Ok(StashOutcome::Done)) {
             self.nav.focus = Pane::Files;
             if let Some(path) = first_file {
@@ -121,18 +93,13 @@ impl App {
         }
     }
 
-    /// `d` on the Stash pane: ask before dropping, the one irreversible
-    /// stash action.
+    /// `d` on the Stash pane: ask before dropping.
     pub(crate) fn drop_stash_prompt(&mut self) {
         let Some(entry) = self.selected_stash() else {
             return;
         };
-        let message = format!("drop stash@{{{}}}: {}?", entry.index, entry.message);
-        let oid = entry.oid.clone();
-        self.modal.ask(ConfirmPrompt {
-            message,
-            action: ConfirmAction::DropStash { oid },
-        });
+        let prompt = ConfirmPrompt::drop_stash(entry);
+        self.modal.ask(prompt);
     }
 
     /// Confirmed `d`: `git stash drop`, refreshing either way.

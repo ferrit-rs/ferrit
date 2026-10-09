@@ -8,6 +8,9 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::commit`.
 
+use super::error::GitResult;
+use super::port::GitPort;
+
 /// What kind of commit to make.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommitKind {
@@ -64,3 +67,17 @@ pub(crate) const INITIAL_FILE: &str = "README.md";
 /// commit and the remote repository, so the history is honest about it.
 pub const INITIAL_MESSAGE: &str =
     "Initial commit\n\nThis initial commit and the remote repository were created by Ferrit.\n";
+
+/// `git commit --fixup=<target>` with what is staged, for a later autosquash.
+/// Nothing staged is an error, not an empty commit.
+pub fn fixup(repo: &dyn GitPort, target: &str, author: Option<String>) -> GitResult<String> {
+    let opts = CommitOpts {
+        sign_off: false,
+        no_verify: false,
+        author,
+    };
+    let kind = CommitKind::Fixup {
+        target: target.to_owned(),
+    };
+    repo.commit(&kind, "", opts)
+}

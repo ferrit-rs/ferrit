@@ -2,6 +2,7 @@
 
 use crate::git::actions::git_config_edit;
 use crate::git::apply::Granule;
+use crate::git::model::{CommitEntry, StashEntry};
 use std::path::{Path, PathBuf};
 
 /// A pending confirmation: a `d` discard (phase 6) or a branch delete
@@ -72,6 +73,55 @@ impl ConfirmPrompt {
         Self {
             message: format!("delete branch {name}?"),
             action: ConfirmAction::DeleteBranch { name, force: false },
+        }
+    }
+}
+
+impl ConfirmPrompt {
+    /// Ask before applying or popping a stash entry: both mutate the working
+    /// tree at once, with no undo (`docs/PLAN_10_STASH.md`).
+    pub(crate) fn restore_stash(entry: &StashEntry, pop: bool) -> Self {
+        let verb = if pop { "pop" } else { "apply" };
+        Self {
+            message: format!("{verb} stash@{{{}}}: {}?", entry.index, entry.message),
+            action: ConfirmAction::RestoreStash {
+                oid: entry.oid.clone(),
+                pop,
+            },
+        }
+    }
+
+    /// Ask before dropping a stash entry, the one irreversible stash action.
+    pub(crate) fn drop_stash(entry: &StashEntry) -> Self {
+        Self {
+            message: format!("drop stash@{{{}}}: {}?", entry.index, entry.message),
+            action: ConfirmAction::DropStash {
+                oid: entry.oid.clone(),
+            },
+        }
+    }
+
+    /// Ask before dropping a commit (the reflog still has it, but nothing in
+    /// ferrit shows that).
+    pub(crate) fn drop_commit(entry: &CommitEntry) -> Self {
+        Self {
+            message: format!("drop {} {}?", entry.short_hash, entry.summary),
+            action: ConfirmAction::DropCommit {
+                hash: entry.full_hash.clone(),
+            },
+        }
+    }
+
+    /// Ask before squashing a commit into the one below it.
+    pub(crate) fn squash_commit(entry: &CommitEntry, below: &CommitEntry) -> Self {
+        Self {
+            message: format!(
+                "squash {} {} into {} {}?",
+                entry.short_hash, entry.summary, below.short_hash, below.summary
+            ),
+            action: ConfirmAction::SquashCommit {
+                hash: entry.full_hash.clone(),
+            },
         }
     }
 }

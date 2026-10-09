@@ -18,6 +18,8 @@
 
 use std::path::Path;
 
+use super::model::CommitEntry;
+
 /// What to do with the selected commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RebaseEdit {
@@ -73,4 +75,27 @@ pub fn build_todo(
 /// `text` as one shell word, safe for a path containing spaces or quotes.
 pub(crate) fn shell_quote(text: &str) -> String {
     format!("'{}'", text.replace('\'', "'\\''"))
+}
+
+/// Does any `fixup! <subject>` / `squash! <subject>` among `commits[..=selected]`
+/// (newest first) have a commit with that subject further down, still inside
+/// the range? Only then does an autosquash from `selected` change anything.
+#[must_use]
+pub fn has_foldable_fixup(commits: &[CommitEntry], selected: usize) -> bool {
+    let Some(range) = commits.get(..=selected) else {
+        return false;
+    };
+    range.iter().enumerate().any(|(index, commit)| {
+        let Some(target) = commit
+            .summary
+            .strip_prefix("fixup! ")
+            .or_else(|| commit.summary.strip_prefix("squash! "))
+        else {
+            return false;
+        };
+        range
+            .iter()
+            .skip(index + 1)
+            .any(|candidate| candidate.summary == target)
+    })
 }

@@ -4,6 +4,7 @@ use crate::git;
 use crate::git::actions::create_remote;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInput;
+use std::path::PathBuf;
 
 /// What the right pane shows behind the image preview. A second cached,
 /// rebuilt-on-nav value alongside `preview`, not a replacement: an image
@@ -107,4 +108,19 @@ pub struct MenuView {
     pub selected: usize,
     /// What the highlighted row does; empty when the menu has no hints.
     pub hint: &'static str,
+}
+
+impl DiffView {
+    /// The first file the stash `oid` touches, when this view shows that stash:
+    /// where a restore puts the selection.
+    pub(crate) fn first_stash_file(&self, oid: &str) -> Option<PathBuf> {
+        match self {
+            Self::Stash(entry, diff) if entry.oid == oid => diff
+                .files
+                .first()
+                .and_then(|f| diff.text.get(f.new_path.clone()))
+                .map(PathBuf::from),
+            _ => None,
+        }
+    }
 }

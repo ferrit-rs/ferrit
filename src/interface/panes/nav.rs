@@ -218,4 +218,20 @@ impl Nav {
         });
         self.selection[Pane::Branches] = 0;
     }
+
+    /// Is the Stash pane focused in `Mode::Nav`?
+    pub(crate) fn on_stash(&self) -> bool {
+        self.focus == Pane::Stash && self.mode == Mode::Nav
+    }
+
+    /// Is the Files pane focused in `Mode::Nav`?
+    pub(crate) fn on_files(&self) -> bool {
+        self.focus == Pane::Files && self.mode == Mode::Nav
+    }
+
+    /// Is the Commits pane showing its list (not one commit's files) in
+    /// `Mode::Nav`, where the rewrite keys act?
+    pub(crate) fn on_commit_list(&self) -> bool {
+        self.focus == Pane::Commits && self.mode == Mode::Nav && self.commit_drill.is_none()
+    }
 }

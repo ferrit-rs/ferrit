@@ -8,7 +8,7 @@ use ratatui::text::Line;
 use super::nav::Nav;
 use super::row_lines;
 use crate::git::Snapshot;
-use crate::git::model::{BranchEntry, FileEntry};
+use crate::git::model::{BranchEntry, CommitEntry, FileEntry, StashEntry};
 use crate::interface::panes::pane::{BranchesTab, Pane};
 use crate::interface::panes::selection::{
     SelectionKey, find_file_row_key, selection_key_for_file_rows,
@@ -316,6 +316,16 @@ impl PaneRows<'_> {
 }
 
 impl<'a> PaneRows<'a> {
+    /// The stash entry under the cursor.
+    pub(crate) fn selected_stash(&self) -> Option<&'a StashEntry> {
+        self.snapshot.stashes.get(self.nav.selection[Pane::Stash])
+    }
+
+    /// The commit under the cursor on the Commits pane's list.
+    pub(crate) fn selected_commit(&self) -> Option<&'a CommitEntry> {
+        self.snapshot.commits.get(self.nav.selection[Pane::Commits])
+    }
+
     /// The branch under the cursor on the Branches pane's local list.
     pub(crate) fn selected_branch(&self) -> Option<&'a BranchEntry> {
         self.snapshot

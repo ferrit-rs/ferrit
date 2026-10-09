@@ -5,9 +5,8 @@
 use crate::app::App;
 use crate::git;
 use crate::git::rebase::RebaseEdit;
-use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::confirm::ConfirmPrompt;
 
 impl App {
     /// The selected commit, when a rewrite key may act on it: Commits focused
@@ -15,22 +14,14 @@ impl App {
     /// up, and no merge / rebase / cherry-pick / revert already stopped (that
     /// is what the `m` menu is for; say so instead of doing nothing).
     fn rewrite_target(&mut self) -> Option<git::model::CommitEntry> {
-        if self.nav.focus != Pane::Commits
-            || self.nav.mode != Mode::Nav
-            || self.nav.commit_drill.is_some()
-            || self.modal.is_some()
-            || self.repo.is_none()
-        {
+        if !self.nav.on_commit_list() || self.modal.is_some() || self.repo.is_none() {
             return None;
         }
         if self.snapshot.operation.is_some() {
             self.report_notice("finish or abort the operation in progress first (m)");
             return None;
         }
-        self.snapshot
-            .commits
-            .get(self.selected(Pane::Commits))
-            .cloned()
+        self.rows().selected_commit().cloned()
     }
 
     /// `w` on Commits: reword the selected commit. `HEAD` keeps phase 7's
@@ -60,12 +51,7 @@ impl App {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
-        self.modal.ask(ConfirmPrompt {
-            message: format!("drop {} {}?", entry.short_hash, entry.summary),
-            action: ConfirmAction::DropCommit {
-                hash: entry.full_hash,
-            },
-        });
+        self.modal.ask(ConfirmPrompt::drop_commit(&entry));
     }
 
     /// `s` (squash, keeps both messages, asks first like drop) or `S` (fixup,
@@ -80,15 +66,7 @@ impl App {
         if fixup {
             self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Fixup);
         } else if let Some(below) = below {
-            self.modal.ask(ConfirmPrompt {
-                message: format!(
-                    "squash {} {} into {} {}?",
-                    entry.short_hash, entry.summary, below.short_hash, below.summary
-                ),
-                action: ConfirmAction::SquashCommit {
-                    hash: entry.full_hash,
-                },
-            });
+            self.modal.ask(ConfirmPrompt::squash_commit(&entry, below));
         } else {
             self.run_rebase_edit(&entry.full_hash, &RebaseEdit::Squash);
         }
@@ -110,16 +88,12 @@ impl App {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
-        let opts = git::commit::CommitOpts {
-            sign_off: false,
-            no_verify: false,
-            author: self.authorship.author_arg(),
-        };
-        let kind = git::commit::CommitKind::Fixup {
-            target: entry.full_hash,
-        };
         let Some(repo) = &self.repo else { return };
-        match repo.commit(&kind, "", opts) {
+        match git::commit::fixup(
+            repo.as_ref(),
+            &entry.full_hash,
+            self.authorship.author_arg(),
+        ) {
             Ok(_) => self.request_refresh(),
             Err(git::error::GitError::NothingStaged) => {
                 self.report_error(git::error::GitError::NothingStaged);
@@ -136,7 +110,7 @@ impl App {
             return;
         };
         let selected = self.selected(Pane::Commits);
-        if !has_foldable_fixup(&self.snapshot.commits, selected) {
+        if !git::rebase::has_foldable_fixup(&self.snapshot.commits, selected) {
             self.report_notice("no fixup! or squash! commit above this one to fold");
             return;
         }
@@ -155,26 +129,4 @@ impl App {
         let result = repo.rebase_edit(hash, edit);
         self.finish_operation(result);
     }
-}
-
-/// Does any `fixup! <subject>` / `squash! <subject>` among `commits[..=selected]`
-/// (newest first) have a commit with that subject further down, still inside
-/// the range? Only then does an autosquash from `selected` change anything.
-fn has_foldable_fixup(commits: &[git::model::CommitEntry], selected: usize) -> bool {
-    let Some(range) = commits.get(..=selected) else {
-        return false;
-    };
-    range.iter().enumerate().any(|(index, commit)| {
-        let Some(target) = commit
-            .summary
-            .strip_prefix("fixup! ")
-            .or_else(|| commit.summary.strip_prefix("squash! "))
-        else {
-            return false;
-        };
-        range
-            .iter()
-            .skip(index + 1)
-            .any(|candidate| candidate.summary == target)
-    })
 }
