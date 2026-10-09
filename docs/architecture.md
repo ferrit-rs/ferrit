@@ -96,7 +96,8 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 | `src/app/mod.rs` | `App`, which owns the parts below and orchestrates what reads several of them (the run loop, a refresh, the event match); a behaviour that touches one part lives in that part |
 | `src/app/{pane,views,popup,confirm,drill,diff_cursor,selection,refresh,pane_rows}.rs` | the types `App` is made of, one file each: the panes and what each shows (`PaneRows`, a read-only view over `Nav` and the snapshot), the right column's diff views, popups and questions, the drill-downs, the line cursor, the selection keys, the result of a refresh |
 | `src/app/{nav,authorship,full_screens,help,right_pane,modal,workers,hit_areas,render_state}.rs` and `sheet.rs` | the parts of `App` with a name: where the user is in the panes, who commits are by, the configuration and what it makes, the full-screen views, the side sheets, the help screen, the theme being edited, the right column, a popup or a question, background work in flight, where the last frame put the clickable things |
-| `src/app/dispatch.rs`, `input.rs`, `keymap.rs` | actions, key routing, remappable keys |
+| `src/keybindings/` | the remappable bindings (`keymap`: `Action`, `Context`, `Keymap`) and the key bar and help screen built from them (`hints`) |
+| `src/app/dispatch.rs`, `input.rs` | routing a key or a click to the part of the app that owns it, and running an `Action` |
 | `src/app/*_actions.rs`, `staging.rs`, `commit.rs`, `remote.rs` | one feature each |
 | `src/app/screens/` | drawing only |
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); the sheet itself is `app/settings.rs` |

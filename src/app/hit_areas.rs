@@ -6,8 +6,9 @@
 use enum_map::EnumMap;
 use ratatui::layout::Rect;
 
+use super::Pane;
 use super::settings::SettingsHits;
-use super::{Pane, hints};
+use crate::keybindings::hints;
 
 #[derive(Default)]
 pub(crate) struct HitAreas {

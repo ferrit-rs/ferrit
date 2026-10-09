@@ -6,9 +6,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::app::keymap;
 use crate::config;
 use crate::domain::git::diff::DiffOpts;
+use crate::keybindings::keymap;
 use crate::theme::palette::Palette;
 use crate::theme::scheme::ColorDepth;
 

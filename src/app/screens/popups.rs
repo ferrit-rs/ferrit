@@ -7,7 +7,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
-use crate::app::hints::{self, HelpLine};
 use crate::app::row_lines;
 use crate::app::{CommandLogView, CommitPopupView, MenuView};
 use crate::components::tui_overlay::anchor::Anchor;
@@ -22,6 +21,7 @@ use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::select_list::SelectList;
 use crate::components::ui::text_input::TextInput;
 use crate::domain::git::host::Visibility;
+use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 
 /// The help screen: one line per binding of the focused pane and of the global

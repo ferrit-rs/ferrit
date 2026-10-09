@@ -3,8 +3,8 @@
 
 use unicode_width::UnicodeWidthStr;
 
-use super::Pane;
 use super::keymap::{Action, Context, KeyBinding, Keymap};
+use crate::app::pane::Pane;
 
 impl Action {
     /// The short word for a key hint (`Stage: <space>`).

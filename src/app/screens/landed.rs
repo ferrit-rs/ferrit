@@ -8,7 +8,8 @@
 use ratatui::layout::Rect;
 
 use crate::app::settings::SettingsHits;
-use crate::app::{App, Pane, hints};
+use crate::app::{App, Pane};
+use crate::keybindings::hints;
 
 /// `None` and empty mean "this frame did not touch it": the previous value stays.
 #[derive(Default)]

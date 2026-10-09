@@ -6,8 +6,6 @@
 //! `App::mock()` is the repo-free path the render tests use.
 
 pub mod events;
-pub mod hints;
-pub mod keymap;
 pub mod mock;
 pub mod row_lines;
 pub mod screens;
@@ -184,7 +182,7 @@ impl App {
     fn base(repo: Option<Box<dyn GitPort>>, config: crate::config::Config) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
-        let keymap = keymap::Keymap::from_overrides(&config.keys).0;
+        let keymap = crate::keybindings::keymap::Keymap::from_overrides(&config.keys).0;
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
@@ -303,8 +301,8 @@ impl App {
     }
 
     /// The help screen's content for the focused pane, from the live keymap.
-    pub(crate) fn help_lines(&self) -> Vec<hints::HelpLine> {
-        hints::help_lines(&self.prefs.keymap, &self.key_contexts())
+    pub(crate) fn help_lines(&self) -> Vec<crate::keybindings::hints::HelpLine> {
+        crate::keybindings::hints::help_lines(&self.prefs.keymap, &self.key_contexts())
     }
 
     /// `[ui] mouse`: should the terminal capture the mouse?

@@ -19,7 +19,7 @@ use std::fmt;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::Pane;
+use crate::app::pane::Pane;
 use crate::config::KeyOverrides;
 
 /// Where a binding applies. `resolve` tries the most specific context first,

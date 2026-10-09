@@ -5,8 +5,8 @@
 
 use ratatui::crossterm::event::KeyEvent;
 
-use super::keymap::{Action, Context, KeyBinding};
 use super::{App, Mode, PANES, Pane, events, git};
+use crate::keybindings::keymap::{Action, Context, KeyBinding};
 
 impl App {
     /// The contexts a key is looked up in, most specific first: the diff

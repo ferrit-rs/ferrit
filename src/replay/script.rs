@@ -13,7 +13,7 @@
 //! `'single quoted'` (literal). Inside `exec`, `write`, `git` and `config`,
 //! `{dir}`, `{origin}` and `{other}` stand for the fixture's paths.
 
-use crate::app::keymap::KeyBinding;
+use crate::keybindings::keymap::KeyBinding;
 
 /// How a `git ... -> "..."` check compares.
 #[derive(Debug, Clone, PartialEq, Eq)]

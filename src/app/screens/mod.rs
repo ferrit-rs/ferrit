@@ -14,7 +14,6 @@ use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::hints::{self, Bar};
 use crate::app::sheet::Sheet;
 use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
 use crate::app::{mock, row_lines};
@@ -25,6 +24,7 @@ use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git::command_log;
 use crate::domain::image::preview::Preview;
+use crate::keybindings::hints::{self, Bar};
 use crate::theme::palette::Palette;
 
 pub mod dashboard;

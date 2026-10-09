@@ -231,7 +231,7 @@ impl Config {
         issues.extend(unknown_keys(&file, &config));
         issues.extend(config.theme.drop_unknown_colors());
         issues.extend(config.clamp_ranges());
-        issues.extend(crate::app::keymap::Keymap::from_overrides(&config.keys).1);
+        issues.extend(crate::keybindings::keymap::Keymap::from_overrides(&config.keys).1);
         (config, issues)
     }
 

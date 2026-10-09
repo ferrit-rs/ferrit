@@ -7,6 +7,7 @@ pub mod components;
 pub mod config;
 pub mod domain;
 pub mod infra;
+pub mod keybindings;
 /// The scripted test harness behind `--replay` and `--fixture`. Test seam, only
 /// built with the `test-util` feature.
 #[cfg(feature = "test-util")]

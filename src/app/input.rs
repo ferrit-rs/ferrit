@@ -5,7 +5,7 @@ use super::{
     App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
     MouseEventKind, PANES, Pane, Position,
 };
-use crate::app::hints;
+use crate::keybindings::hints;
 
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
