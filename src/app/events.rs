@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use color_eyre::Result;
 
-use crate::app::AppError;
+use crate::app::error::AppError;
 use notify_debouncer_full::notify::RecursiveMode;
 use notify_debouncer_full::{DebounceEventResult, new_debouncer};
 use ratatui::crossterm::event::{self, Event};

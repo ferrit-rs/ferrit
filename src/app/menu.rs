@@ -4,14 +4,15 @@
 //! `Popup::Menu` is deliberately not specific to operations: phase 12's `x`
 //! menu reuses it with more `MenuAction`s.
 
-use super::{
-    App, ConfirmAction, ConfirmPrompt, GitResult, KeyCode, KeyEvent, Popup, git, operation_noun,
-};
+use super::{App, KeyCode, KeyEvent, git, operation_noun};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::popup::Popup;
+use crate::git::error::GitResult;
 use crate::git::operation::{OperationOutcome, Step};
 
 /// What choosing a menu row does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MenuAction {
+pub(crate) enum MenuAction {
     Continue,
     Skip,
     Abort,
@@ -36,19 +37,19 @@ pub(super) enum MenuAction {
 /// One row: what it says, the key that runs it from anywhere in the menu, and
 /// what it does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct MenuItem {
-    pub(super) label: &'static str,
-    pub(super) shortcut: char,
-    pub(super) action: MenuAction,
+pub(crate) struct MenuItem {
+    pub(crate) label: &'static str,
+    pub(crate) shortcut: char,
+    pub(crate) action: MenuAction,
     /// One line under the menu while the row is highlighted; empty for none.
-    pub(super) hint: &'static str,
+    pub(crate) hint: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MenuState {
-    pub(super) title: String,
-    pub(super) items: Vec<MenuItem>,
-    pub(super) selected: usize,
+pub(crate) struct MenuState {
+    pub(crate) title: String,
+    pub(crate) items: Vec<MenuItem>,
+    pub(crate) selected: usize,
 }
 
 /// The rows of the operation menu. A merge has no skip: git has no
@@ -80,7 +81,7 @@ fn operation_items(operation: git::model::Operation) -> Vec<MenuItem> {
 impl App {
     /// `m`: the menu for the merge, rebase, cherry-pick or revert git is
     /// stopped in. Inert when there is none.
-    pub(super) fn open_operation_menu(&mut self) {
+    pub(crate) fn open_operation_menu(&mut self) {
         let Some(operation) = self.snapshot.operation else {
             return;
         };
@@ -96,7 +97,7 @@ impl App {
 
     /// Every key while a menu is up: `j` / `k` move, `Enter` or a row's own
     /// letter runs it, `Esc` closes.
-    pub(super) fn menu_key(&mut self, key: KeyEvent) {
+    pub(crate) fn menu_key(&mut self, key: KeyEvent) {
         let Some(Popup::Menu(menu)) = self.modal.popup_mut() else {
             return;
         };
@@ -156,7 +157,7 @@ impl App {
     }
 
     /// Run one step and say where git stopped.
-    pub(super) fn apply_operation_step(&mut self, step: Step) {
+    pub(crate) fn apply_operation_step(&mut self, step: Step) {
         let Some(repo) = &self.repo else { return };
         let result = repo.operation_step(step);
         self.finish_operation(result);
@@ -164,7 +165,7 @@ impl App {
 
     /// Refresh and report where git stopped after a step or a rewrite.
     /// Refreshes either way: a refusal changes nothing, a step changes a lot.
-    pub(super) fn finish_operation(&mut self, result: GitResult<OperationOutcome>) {
+    pub(crate) fn finish_operation(&mut self, result: GitResult<OperationOutcome>) {
         self.request_refresh();
         match result {
             Ok(OperationOutcome::Done) => {},

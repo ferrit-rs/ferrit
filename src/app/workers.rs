@@ -12,9 +12,9 @@ use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use super::AppError;
 use super::diff_query::DiffQueryState;
 use super::events::RemoteOp;
+use crate::app::error::AppError;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
 /// follow-up snapshot instead of queuing stale concurrent reads.
@@ -32,7 +32,7 @@ pub(super) struct ImageQueryState {
     pub(super) pending: Option<(PathBuf, u64)>,
 }
 
-pub(super) struct Workers {
+pub(crate) struct Workers {
     /// A handle onto `Events`' own channel, so a key can hand a background
     /// thread a way back onto it. `None` in `App::mock()` and right after
     /// `App::open`: only `run()` has an `Events` to ask for one. A

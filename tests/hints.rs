@@ -140,7 +140,7 @@ fn an_unbound_action_loses_its_segment_and_a_group_shrinks() {
 fn frame(app: &mut App, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
-        .draw(|f| ferrit::app::screens::draw(f, app))
+        .draw(|f| ferrit::interface::screens::draw(f, app))
         .unwrap();
     terminal.backend().to_string()
 }

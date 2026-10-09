@@ -1,10 +1,14 @@
 //! Branches-pane actions: checkout, create, delete, fast-forward, merge.
 
 use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{
-    App, BranchDrill, BranchesTab, ConfirmAction, ConfirmPrompt, GitResult, Pane, Popup,
-    SelectionKey, TextInput, git,
-};
+use super::{App, git};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::drill::BranchDrill;
+use crate::app::pane::{BranchesTab, Pane};
+use crate::app::popup::Popup;
+use crate::app::selection::SelectionKey;
+use crate::git::error::GitResult;
+use crate::interface::components::ui::text_input::TextInput;
 
 /// How a merge is done: the choices of the `M` menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

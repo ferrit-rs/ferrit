@@ -12,8 +12,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use crate::components::ui::cut::cut_middle;
-use crate::components::ui::dialog::Dialog;
+use crate::interface::components::ui::cut::cut_middle;
+use crate::interface::components::ui::dialog::Dialog;
 use crate::theme::palette::Palette;
 
 /// The dialog is never wider than this.

@@ -12,12 +12,12 @@ use ratatui::widgets::{Paragraph, Sparkline, Widget};
 
 use super::text::{axis_date, figure, figure_columns, plural};
 use super::{Ctx, note};
-use crate::components::ui::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
-use crate::components::ui::donut::{self, Donut, Slice};
-use crate::components::ui::heatmap::{self, HeatMap};
-use crate::components::ui::share_bar::stacked_bar;
 use crate::git::stats::series::{Bucket, Granularity};
 use crate::git::stats::share::{fold, shares};
+use crate::interface::components::ui::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
+use crate::interface::components::ui::donut::{self, Donut, Slice};
+use crate::interface::components::ui::heatmap::{self, HeatMap};
+use crate::interface::components::ui::share_bar::stacked_bar;
 
 const DAY: i64 = 86_400;
 /// Columns and rows the ring is drawn in: 32 x 32 dots, so it looks round.
@@ -32,14 +32,14 @@ const HEAT_SHORT: u16 = 4;
 
 const SLOT_NAMES: [&str; 6] = ["feat", "fix", "docs", "test", "refactor", "others"];
 
-pub(super) const NO_COMMITS: &str = "no commits in this window";
+pub(crate) const NO_COMMITS: &str = "no commits in this window";
 
 fn count_f64(n: usize) -> f64 {
     u32::try_from(n).map_or_else(|_| f64::from(u32::MAX), f64::from)
 }
 
 /// `commits per day`, the dim words after the section title.
-pub(super) fn activity_unit(ctx: &Ctx<'_>) -> String {
+pub(crate) fn activity_unit(ctx: &Ctx<'_>) -> String {
     let per = match ctx.stats.granularity {
         Granularity::Day => "day",
         Granularity::Week => "week",
@@ -63,7 +63,7 @@ fn activity_caption(ctx: &Ctx<'_>, peak: Bucket, long: bool) -> String {
     )
 }
 
-pub(super) fn activity(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn activity(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     let stats = ctx.stats;
     if stats.totals.commits == 0 {
         note(buf, area, NO_COMMITS, ctx.dim());
@@ -223,7 +223,7 @@ fn pieces(ctx: &Ctx<'_>) -> (Vec<Piece>, u64) {
     (out, total)
 }
 
-pub(super) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     let (pieces, total) = pieces(ctx);
     if total == 0 {
         note(buf, area, NO_COMMITS, ctx.dim());
@@ -293,11 +293,11 @@ pub(super) fn kinds(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
 }
 
 /// `26 weeks`, the dim words after the section title.
-pub(super) fn heat_unit(width: u16) -> String {
+pub(crate) fn heat_unit(width: u16) -> String {
     format!("{} weeks", heatmap::weeks_shown(width))
 }
 
-pub(super) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn heat(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     if area.height < 2 {
         return;
     }

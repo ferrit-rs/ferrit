@@ -2,7 +2,10 @@
 //! selected commit, each as one `git rebase -i`. See
 //! `docs/PLAN_11_REBASE.md` R4.
 
-use super::{App, ConfirmAction, ConfirmPrompt, Mode, Pane, git};
+use super::{App, git};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::diff_cursor::Mode;
+use crate::app::pane::Pane;
 use crate::git::rebase::RebaseEdit;
 
 impl App {

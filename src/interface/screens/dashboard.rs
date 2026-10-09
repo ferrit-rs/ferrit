@@ -22,10 +22,10 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 
 use self::text::{date, thousands, window_label};
-use crate::components::ui::chart_palette::{ChartMode, ChartPalette};
-use crate::components::ui::panel::Panel;
-use crate::components::ui::scroll_bar::ScrollBar;
 use crate::git::stats::{NUMSTAT_CAP, RepoStats, WALK_CAP};
+use crate::interface::components::ui::chart_palette::{ChartMode, ChartPalette};
+use crate::interface::components::ui::panel::Panel;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
 
 /// Two columns from this width.
 pub const WIDE: u16 = 110;
@@ -83,23 +83,23 @@ pub struct View<'a> {
 }
 
 /// A view with stats in hand.
-pub(super) struct Ctx<'a> {
+pub(crate) struct Ctx<'a> {
     pub stats: &'a RepoStats,
     pub view: &'a View<'a>,
 }
 
 impl Ctx<'_> {
-    pub(super) fn colors(&self) -> &ChartPalette {
+    pub(crate) fn colors(&self) -> &ChartPalette {
         &self.view.colors
     }
 
-    pub(super) fn dim(&self) -> Style {
+    pub(crate) fn dim(&self) -> Style {
         self.view.colors.dim
     }
 }
 
 /// One line of text at the top of `area`.
-pub(super) fn note(buf: &mut Buffer, area: Rect, text: &str, style: Style) {
+pub(crate) fn note(buf: &mut Buffer, area: Rect, text: &str, style: Style) {
     Paragraph::new(Line::styled(text.to_owned(), style)).render(area, buf);
 }
 

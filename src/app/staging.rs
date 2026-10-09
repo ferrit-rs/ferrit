@@ -2,11 +2,18 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{
-    App, AppError, ApplyDir, ApplyTarget, ConfirmAction, ConfirmPrompt, DiffCursor, DiffSide,
-    DiffView, FileRow, GitResult, Granule, Mode, Pane, Range, events, git, hunk_content_id,
-    hunk_id_at, hunk_lines_for, selectable_lines,
+use super::{App, Range, events, git};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::diff_cursor::{
+    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
 };
+use crate::app::error::AppError;
+use crate::app::pane::Pane;
+use crate::app::tree::FileRow;
+use crate::app::views::DiffView;
+use crate::git::apply::{ApplyDir, ApplyTarget};
+use crate::git::diff::DiffSide;
+use crate::git::error::GitResult;
 
 impl App {
     /// The `FileEntry` behind the Files pane's current selection, or `None`

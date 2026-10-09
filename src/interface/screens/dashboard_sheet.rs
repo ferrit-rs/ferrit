@@ -4,23 +4,24 @@
 //! margins) and at most 95 % of the terminal, so the panes stay in sight.
 
 use super::landed::Landed;
-use crate::app::render_state::RenderState;
+use crate::interface::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;
 
 use super::dashboard::Chrome;
-use super::{charts_mode_from_env, dashboard, unix_now};
+use super::{dashboard, unix_now};
 use crate::app::App;
-use crate::components::ui::chart_palette::ChartPalette;
-use crate::components::ui::drawer::Drawer;
+use crate::interface::components::ui::chart_palette::ChartPalette;
+use crate::interface::components::ui::chart_palette::charts_mode_from_env;
+use crate::interface::components::ui::drawer::Drawer;
 
 /// The most of the terminal's width the drawer takes, in percent.
 const MAX_PERCENT: u16 = 95;
 
 /// Draw the drawer and the page in it, over `area`. The page's scroll is clamped
 /// to what it can scroll.
-pub(super) fn draw(
+pub(crate) fn draw(
     frame: &mut Frame<'_>,
     area: Rect,
     app: &App,

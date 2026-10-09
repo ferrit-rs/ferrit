@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::app::WorkerError;
 use crate::app::image_query::ImageError;
+use crate::app::workers::WorkerError;
 use crate::config::error::ConfigError;
 use crate::git::error::GitError;
 

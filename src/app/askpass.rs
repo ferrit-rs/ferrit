@@ -3,12 +3,15 @@
 //! on the terminal the TUI owns (`git::askpass`,
 //! `docs/PLAN_9_REMOTE.md`, "Credentials").
 
-use super::{App, CommitPopupView, KeyCode, KeyEvent, Popup, TextInput, TextInputMode, mpsc};
+use super::{App, KeyCode, KeyEvent, mpsc};
+use crate::app::popup::Popup;
+use crate::app::views::CommitPopupView;
 use crate::git::askpass;
+use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 
 /// One pending question and where its answer goes. `typed` holds the real
 /// text; `shown` is what the popup draws, dots when the answer is secret.
-pub(super) struct AskpassPrompt {
+pub(crate) struct AskpassPrompt {
     prompt: String,
     typed: TextInput,
     shown: TextInput,
@@ -26,7 +29,7 @@ impl App {
     /// A git child asked `prompt`. Open the popup, unless another popup is
     /// up: overwriting a half-typed commit message would lose it, so that
     /// question is cancelled and the operation fails instead.
-    pub(super) fn on_askpass(&mut self, prompt: String, reply: mpsc::Sender<Option<String>>) {
+    pub(crate) fn on_askpass(&mut self, prompt: String, reply: mpsc::Sender<Option<String>>) {
         if self.modal.popup().is_some() {
             let _ = reply.send(None);
             return;
@@ -42,7 +45,7 @@ impl App {
 
     /// Enter answers, Esc cancels (git then reports the failed login);
     /// anything else edits the answer.
-    pub(super) fn askpass_key(&mut self, key: KeyEvent) {
+    pub(crate) fn askpass_key(&mut self, key: KeyEvent) {
         let Some(Popup::Askpass(ask)) = self.modal.popup_mut() else {
             return;
         };

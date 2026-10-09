@@ -5,17 +5,17 @@
 //! (`settings`); this one only says which it is and opens and closes it.
 
 use super::{App, dashboard};
-use crate::components::tui_overlay::state::OverlayState;
 use crate::config::settings::SettingsSheet;
+use crate::interface::components::tui_overlay::state::OverlayState;
 
 /// The drawer and what it can hold. One drawer state means one animation and,
 /// by construction, one sheet at a time.
 #[derive(Default)]
 pub(crate) struct Sheets {
     /// Which sheet the drawer holds while it is not closed.
-    pub(super) kind: Sheet,
-    pub(super) settings: SettingsSheet,
-    pub(super) dashboard: dashboard::Dashboard,
+    pub(crate) kind: Sheet,
+    pub(crate) settings: SettingsSheet,
+    pub(crate) dashboard: dashboard::Dashboard,
 }
 
 /// What the drawer holds. Kept while it slides out, so the last frames of the
@@ -31,7 +31,7 @@ pub(crate) enum Sheet {
 
 impl App {
     /// Open `sheet` in the drawer, ready for its first frame.
-    pub(super) fn open_sheet(&mut self, sheet: Sheet) {
+    pub(crate) fn open_sheet(&mut self, sheet: Sheet) {
         self.sheets.kind = sheet;
         match sheet {
             Sheet::Settings => self.prepare_settings_sheet(),
@@ -41,7 +41,7 @@ impl App {
     }
 
     /// Slide the drawer out.
-    pub(super) fn close_sheet(&mut self) {
+    pub(crate) fn close_sheet(&mut self) {
         self.render.sheet.close();
     }
 
@@ -53,7 +53,7 @@ impl App {
 
     /// `dashboard_is_open` for a drawer animation held elsewhere: drawing owns the
     /// render state while it runs, so it asks with its own.
-    pub(super) fn dashboard_open_in(&self, drawer: &OverlayState) -> bool {
+    pub(crate) fn dashboard_open_in(&self, drawer: &OverlayState) -> bool {
         self.sheets.kind == Sheet::Dashboard && !drawer.is_closed() && !drawer.is_closing()
     }
 

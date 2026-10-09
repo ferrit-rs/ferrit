@@ -2,9 +2,11 @@
 
 use super::sheet::Sheet;
 use super::{
-    App, FullScreen, KeyCode, KeyEvent, KeyModifiers, Mode, MouseButton, MouseEvent,
-    MouseEventKind, PANES, Pane, Position,
+    App, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind, Position,
 };
+use crate::app::diff_cursor::Mode;
+use crate::app::full_screens::FullScreen;
+use crate::app::pane::{PANES, Pane};
 use crate::keybindings::hints;
 
 const KEY_CONFIRM_YES: char = 'y';

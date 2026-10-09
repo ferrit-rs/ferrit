@@ -8,11 +8,11 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::components::tui_overlay::anchor::Anchor;
-use crate::components::tui_overlay::backdrop::Backdrop;
-use crate::components::tui_overlay::overlay::Overlay;
-use crate::components::tui_overlay::slide::Slide;
-use crate::components::tui_overlay::state::OverlayState;
+use crate::interface::components::tui_overlay::anchor::Anchor;
+use crate::interface::components::tui_overlay::backdrop::Backdrop;
+use crate::interface::components::tui_overlay::overlay::Overlay;
+use crate::interface::components::tui_overlay::slide::Slide;
+use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::theme::palette::Palette;
 
 const ANIMATION_TIME: Duration = Duration::from_millis(160);

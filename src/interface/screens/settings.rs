@@ -4,12 +4,12 @@
 
 use super::landed::Landed;
 use crate::app::App;
-use crate::app::render_state::RenderState;
 use crate::app::settings::{Click, SettingsHits};
-use crate::components::ui::drawer::Drawer;
-use crate::components::ui::scroll_bar::ScrollBar;
-use crate::components::ui::separator::Separator;
 use crate::config::settings::{Kind, SaveState, SettingsRow};
+use crate::interface::components::ui::drawer::Drawer;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
+use crate::interface::components::ui::separator::Separator;
+use crate::interface::render_state::RenderState;
 use crate::theme::color_picker::{ColorPicker, grid_metrics, rgb};
 use crate::theme::config::{Preset, ThemeMode};
 use crate::theme::palette::Palette;
@@ -169,7 +169,7 @@ fn hint(app: &App) -> &'static str {
 
 /// Draw the sheet and record where its clickable parts landed (nothing
 /// clickable when it is not on screen).
-pub(super) fn draw(
+pub(crate) fn draw(
     frame: &mut Frame<'_>,
     area: Rect,
     app: &App,

@@ -5,7 +5,7 @@
 //! Colours come from `theme`.
 
 use self::landed::Landed;
-use crate::app::render_state::RenderState;
+use crate::interface::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -14,16 +14,18 @@ use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
+use crate::app::App;
+use crate::app::full_screens::FullScreen;
+use crate::app::pane::{PANES, Pane};
 use crate::app::sheet::Sheet;
-use crate::app::{App, DiffView, FullScreen, PANES, Pane, PopupView};
+use crate::app::views::{DiffView, PopupView};
 use crate::app::{mock, row_lines};
-use crate::components::ui::chart_palette::charts_mode_from_env;
-use crate::components::ui::key_bar::KeyBar;
-use crate::components::ui::pane_list::PaneList;
-use crate::components::ui::panel::Panel;
-use crate::components::ui::scroll_bar::ScrollBar;
 use crate::git::command_log;
 use crate::git::image::preview::Preview;
+use crate::interface::components::ui::key_bar::KeyBar;
+use crate::interface::components::ui::pane_list::PaneList;
+use crate::interface::components::ui::panel::Panel;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::keybindings::hints::{self, Bar};
 use crate::theme::palette::Palette;
 

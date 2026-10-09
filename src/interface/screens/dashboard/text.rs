@@ -5,18 +5,18 @@ use ratatui::style::Style;
 use ratatui::text::Span;
 use unicode_width::UnicodeWidthStr;
 
-use crate::components::ui::share_bar::{pad_label, percent_label};
 use crate::git::stats::Window;
 use crate::git::stats::series::{Granularity, civil_from_days};
 use crate::git::stats::share::Share;
+use crate::interface::components::ui::share_bar::{pad_label, percent_label};
 
 const DAY: i64 = 86_400;
 /// A share of fewer items than this misleads: the screen shows counts.
-pub(super) const MIN_WHOLE: u64 = 20;
+pub(crate) const MIN_WHOLE: u64 = 20;
 
 /// The one relative-time formatter of the screen: "just now", "5 min ago",
 /// "2 h ago", "3 d ago", "6 w ago", "4 mo ago", "2 y ago". Never "0 h ago".
-pub(super) fn relative_time(now: i64, then: i64) -> String {
+pub(crate) fn relative_time(now: i64, then: i64) -> String {
     let secs = (now - then).max(0);
     let days = secs / DAY;
     if secs < 60 {
@@ -36,7 +36,7 @@ pub(super) fn relative_time(now: i64, then: i64) -> String {
     }
 }
 
-pub(super) const fn window_label(window: Window) -> &'static str {
+pub(crate) const fn window_label(window: Window) -> &'static str {
     match window {
         Window::Days7 => "7 days",
         Window::Days30 => "30 days",
@@ -47,14 +47,14 @@ pub(super) const fn window_label(window: Window) -> &'static str {
 }
 
 /// `YYYY-MM-DD` (UTC).
-pub(super) fn date(secs: i64) -> String {
+pub(crate) fn date(secs: i64) -> String {
     let (y, m, d) = civil_from_days(secs.div_euclid(DAY));
     format!("{y:04}-{m:02}-{d:02}")
 }
 
 /// An axis label: `YYYY-MM` for months, else `MM-DD`, or the whole date when
 /// the axis spans more than a year.
-pub(super) fn axis_date(secs: i64, granularity: Granularity, long: bool) -> String {
+pub(crate) fn axis_date(secs: i64, granularity: Granularity, long: bool) -> String {
     let (y, m, d) = civil_from_days(secs.div_euclid(DAY));
     match (granularity, long) {
         (Granularity::Month, _) => format!("{y:04}-{m:02}"),
@@ -64,12 +64,12 @@ pub(super) fn axis_date(secs: i64, granularity: Granularity, long: bool) -> Stri
 }
 
 /// `1 commit`, `3 commits`.
-pub(super) fn plural(n: usize, one: &str, many: &str) -> String {
+pub(crate) fn plural(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
 
 /// `999`, `87.5k`, `1.2M`.
-pub(super) fn compact(n: u64) -> String {
+pub(crate) fn compact(n: u64) -> String {
     let tenths = |n: u64, unit: u64| {
         let t = n * 10 / unit;
         format!("{}.{}", t / 10, t % 10)
@@ -84,7 +84,7 @@ pub(super) fn compact(n: u64) -> String {
 }
 
 /// `20 000`: groups of three, a space between.
-pub(super) fn thousands(n: usize) -> String {
+pub(crate) fn thousands(n: usize) -> String {
     let digits = n.to_string();
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
@@ -99,7 +99,7 @@ pub(super) fn thousands(n: usize) -> String {
 /// The figure beside a bar: `41 %  (124)`, or `124  (41 %)` when counts are
 /// asked for, and only the count when the whole has fewer than `MIN_WHOLE`
 /// items. `–` when there is no whole.
-pub(super) fn figure(share: Share, whole: u64, show_counts: bool) -> String {
+pub(crate) fn figure(share: Share, whole: u64, show_counts: bool) -> String {
     if whole == 0 {
         return "–".to_owned();
     }
@@ -113,7 +113,7 @@ pub(super) fn figure(share: Share, whole: u64, show_counts: bool) -> String {
 /// The figures of one chart lined up in two columns: the first figure right
 /// aligned, the bracketed second one left aligned and dimmed. Also the total
 /// width of a figure.
-pub(super) fn figure_columns(figures: &[String], dim: Style) -> (Vec<Vec<Span<'static>>>, usize) {
+pub(crate) fn figure_columns(figures: &[String], dim: Style) -> (Vec<Vec<Span<'static>>>, usize) {
     let split: Vec<(&str, String)> = figures
         .iter()
         .map(|f| match f.split_once("  (") {

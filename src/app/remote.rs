@@ -1,9 +1,12 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
-use super::{
-    App, AppError, AppEvent, ConfirmAction, ConfirmPrompt, Popup, Result, TextInput, WorkerKind,
-    events, mpsc, run_worker, thread,
-};
+use super::{App, Result, events, mpsc, thread};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::error::AppError;
+use crate::app::events::AppEvent;
+use crate::app::popup::Popup;
+use crate::app::workers::{WorkerKind, run_worker};
+use crate::interface::components::ui::text_input::TextInput;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;

@@ -6,11 +6,11 @@
 //! ```rust
 //! use std::time::Duration;
 //! use ratatui_core::layout::Constraint;
-//! use ferrit::components::tui_overlay::anchor::Anchor;
-//! use ferrit::components::tui_overlay::easing::Easing;
-//! use ferrit::components::tui_overlay::overlay::Overlay;
-//! use ferrit::components::tui_overlay::slide::Slide;
-//! use ferrit::components::tui_overlay::state::OverlayState;
+//! use ferrit::interface::components::tui_overlay::anchor::Anchor;
+//! use ferrit::interface::components::tui_overlay::easing::Easing;
+//! use ferrit::interface::components::tui_overlay::overlay::Overlay;
+//! use ferrit::interface::components::tui_overlay::slide::Slide;
+//! use ferrit::interface::components::tui_overlay::state::OverlayState;
 //!
 //! let overlay = Overlay::new()
 //!     .anchor(Anchor::Right)

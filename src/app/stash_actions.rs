@@ -3,10 +3,15 @@
 
 use std::path::PathBuf;
 
-use super::{
-    App, ConfirmAction, ConfirmPrompt, DiffView, Mode, Pane, Popup, SelectionKey, TextInput, git,
-};
+use super::{App, git};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::diff_cursor::Mode;
+use crate::app::pane::Pane;
+use crate::app::popup::Popup;
+use crate::app::selection::SelectionKey;
+use crate::app::views::DiffView;
 use crate::git::stash::StashOutcome;
+use crate::interface::components::ui::text_input::TextInput;
 
 impl App {
     /// The selected stash entry's oid, only while Stash is focused, in

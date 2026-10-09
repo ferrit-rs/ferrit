@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use super::{App, CommitDrill, FileRow, Pane, commit_drill_files};
+use super::App;
+use crate::app::drill::CommitDrill;
+use crate::app::pane::Pane;
+use crate::app::tree::{FileRow, commit_drill_files};
 
 impl App {
     /// Enter on a directory row in the Files pane: toggle it collapsed or

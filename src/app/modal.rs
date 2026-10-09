@@ -6,10 +6,11 @@
 //! Methods live on `Modal`, not on `App`, so a caller can hold the popup
 //! mutably while it reads other fields of `App`.
 
-use super::{ConfirmPrompt, Popup};
+use crate::app::confirm::ConfirmPrompt;
+use crate::app::popup::Popup;
 
 #[derive(Default)]
-pub(super) enum Modal {
+pub(crate) enum Modal {
     #[default]
     None,
     Popup(Popup),

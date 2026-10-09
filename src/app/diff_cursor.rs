@@ -9,7 +9,7 @@ use std::ops::Range;
 /// to stage within it", scoped to the Files pane — the only one with
 /// anything to stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(super) enum Mode {
+pub(crate) enum Mode {
     #[default]
     Nav,
     Diff,
@@ -20,21 +20,21 @@ pub(super) enum Mode {
 /// split always shows at most one file per side, so there is no "flatten
 /// every file's hunks" step, just the diff's own line numbering.
 #[derive(Debug, Clone, Default)]
-pub(super) struct DiffCursor {
-    pub(super) side: DiffSide,
-    pub(super) line: usize,
+pub(crate) struct DiffCursor {
+    pub(crate) side: DiffSide,
+    pub(crate) line: usize,
     /// V-select anchor. `None` is a single line, `Some(a)` is the range
     /// `a..=line` (order-independent: whichever end moves).
-    pub(super) anchor: Option<usize>,
+    pub(crate) anchor: Option<usize>,
     /// Content hash of the hunk the cursor sits in (header + body text), so
     /// a background refresh can re-find the same hunk even if surrounding
     /// hunks changed line count. gitu hashes the same way for its `Item.id`.
-    pub(super) hunk_id: u64,
+    pub(crate) hunk_id: u64,
 }
 
 /// What `<space>` / `d` act on in `Mode::Diff`: the whole hunk under the
 /// cursor, or a V-selected subset of its `+`/`-` lines.
-pub(super) enum Granule {
+pub(crate) enum Granule {
     Hunk {
         patch: String,
     },
@@ -51,15 +51,15 @@ pub(super) enum Granule {
 /// chosen). Built fresh per diff-mode operation from the current `Diff` —
 /// cheap at working-tree sizes, the same "no cache" choice `files_tree_rows`
 /// already makes.
-pub(super) struct HunkLines {
-    pub(super) hunk_index: usize,
-    pub(super) lines: Range<usize>,
-    pub(super) selectable: Vec<usize>,
+pub(crate) struct HunkLines {
+    pub(crate) hunk_index: usize,
+    pub(crate) lines: Range<usize>,
+    pub(crate) selectable: Vec<usize>,
 }
 
 /// Body-line ranges (global `diff.text` line indices) for every hunk of a
 /// single-file `Diff`, plus which of those lines are selectable.
-pub(super) fn hunk_lines_for(diff: &git::diff::Diff) -> Vec<HunkLines> {
+pub(crate) fn hunk_lines_for(diff: &git::diff::Diff) -> Vec<HunkLines> {
     let Some(file) = diff.files.first() else {
         return Vec::new();
     };
@@ -97,7 +97,7 @@ pub(super) fn hunk_lines_for(diff: &git::diff::Diff) -> Vec<HunkLines> {
 
 /// Every selectable line across every hunk of `diff`, in order. `j` / `k` in
 /// `Mode::Diff` step through this list, skipping context lines entirely.
-pub(super) fn selectable_lines(diff: &git::diff::Diff) -> Vec<usize> {
+pub(crate) fn selectable_lines(diff: &git::diff::Diff) -> Vec<usize> {
     hunk_lines_for(diff)
         .into_iter()
         .flat_map(|hl| hl.selectable)
@@ -110,7 +110,7 @@ pub(super) fn selectable_lines(diff: &git::diff::Diff) -> Vec<usize> {
 /// cursor is actually on whenever it moves, so `resync_diff_cursor` (which
 /// runs after *every* key, not just a stage) does not mistake "moved to a
 /// different hunk" for "the old hunk vanished" and snap back to it.
-pub(super) fn hunk_id_at(diff: &git::diff::Diff, line: usize) -> Option<u64> {
+pub(crate) fn hunk_id_at(diff: &git::diff::Diff, line: usize) -> Option<u64> {
     let hl = hunk_lines_for(diff)
         .into_iter()
         .find(|hl| hl.lines.contains(&line))?;
@@ -120,7 +120,7 @@ pub(super) fn hunk_id_at(diff: &git::diff::Diff, line: usize) -> Option<u64> {
 /// Stable id for hunk `hunk_index` of `diff`: a hash of its header + body
 /// text, so a background refresh can re-find the same hunk even once
 /// staging moved a *different* hunk out from under it (gitu's `Item.id`).
-pub(super) fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
+pub(crate) fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
     use std::hash::{Hash as _, Hasher as _};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     if let Some(hunk) = diff.files.first().and_then(|f| f.hunks.get(hunk_index)) {

@@ -8,8 +8,6 @@
 pub mod events;
 pub mod mock;
 pub mod row_lines;
-pub mod screens;
-pub mod terminal;
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -17,8 +15,8 @@ use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::components::ui::mouse_pointer::MousePointer;
-use crate::components::ui::toast::Toast;
+use crate::interface::components::ui::mouse_pointer::MousePointer;
+use crate::interface::components::ui::toast::Toast;
 use crate::theme::palette::Palette;
 use color_eyre::Result;
 use ratatui::crossterm::event::{
@@ -28,16 +26,13 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::Line;
 
 use crate::app::events::{AppEvent, Events};
-use crate::app::screens as ui;
-use crate::app::terminal::Tui;
-use crate::components::ui::text_input::{TextInput, TextInputMode};
 use crate::git;
-use crate::git::apply::{ApplyDir, ApplyTarget};
-use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::image::detect;
-use crate::git::image::preview::{self, Preview};
+use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
+use crate::interface::screens as ui;
+use crate::interface::terminal::Tui;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
 fn operation_noun(operation: git::model::Operation) -> &'static str {
@@ -49,67 +44,67 @@ const TOAST_TICK_MS: u64 = 250;
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
-    prefs: crate::config::prefs::Prefs,
+    pub(crate) prefs: crate::config::prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    sheets: sheet::Sheets,
+    pub(crate) sheets: sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
-    full_screens: full_screens::FullScreens,
+    pub(crate) full_screens: full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
     pub nav: nav::Nav,
     /// Whether the help overlay is up.
-    pub help: help::HelpState,
+    pub help: crate::interface::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
     /// (set by the renderer), so scroll keys can stop at the end.
     /// Text and focus state for the help command search.
-    should_quit: bool,
+    pub(crate) should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
-    repo: Option<Box<dyn GitPort>>,
+    pub(crate) repo: Option<Box<dyn GitPort>>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
-    repo_name: String,
+    pub(crate) repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
-    authorship: authorship::Authorship,
+    pub(crate) authorship: authorship::Authorship,
     pub theme: crate::theme::editor::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
-    snapshot: git::Snapshot,
+    pub(crate) snapshot: git::Snapshot,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
-    last_error: Option<Arc<AppError>>,
+    pub(crate) last_error: Option<Arc<AppError>>,
     /// Optional worktree watcher failure; polling remains active as fallback.
-    watch_error: Option<Arc<AppError>>,
+    pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    right: right_pane::RightPane,
+    pub(crate) right: right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    hits: hit_areas::HitAreas,
+    pub(crate) hits: hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
-    mouse_pointer: MousePointer,
+    pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
-    render: render_state::RenderState,
+    pub(crate) render: crate::interface::render_state::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
-    new_branch_title: String,
+    pub(crate) new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    modal: modal::Modal,
+    pub(crate) modal: modal::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
-    commit_draft: Option<String>,
+    pub(crate) commit_draft: Option<String>,
     /// Background work in flight: the event channel, the refresh, diff and
     /// image workers, and the one network operation at a time.
-    workers: workers::Workers,
+    pub(crate) workers: workers::Workers,
     /// Set when the app was rebuilt on a new repository: `run` points the
     /// filesystem watch at this root and clears it.
-    watch_request: Option<PathBuf>,
+    pub(crate) watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
-    terminal_request: Option<crate::config::settings::TerminalRequest>,
-    create_remote: create_remote::CreateRemote,
+    pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
+    pub(crate) create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
     /// case, not a repurposing of that one field with a colour flag.
-    status_note: Option<String>,
+    pub(crate) status_note: Option<String>,
 }
 
 mod authorship;
@@ -117,7 +112,6 @@ mod confirm;
 mod diff_cursor;
 mod drill;
 pub mod full_screens;
-pub mod help;
 pub(crate) mod hit_areas;
 mod modal;
 pub mod nav;
@@ -125,7 +119,6 @@ pub mod pane;
 mod pane_rows;
 mod popup;
 pub mod refresh;
-mod render_state;
 pub(crate) mod right_pane;
 pub mod selection;
 mod tree;
@@ -161,22 +154,14 @@ pub(crate) use error::AppError;
 #[cfg(test)]
 mod tests;
 
-use self::confirm::{ConfirmAction, ConfirmPrompt};
-use self::diff_cursor::{
-    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
-};
-use self::drill::{BranchDrill, CommitDrill};
+use self::diff_cursor::Mode;
 use self::full_screens::FullScreen;
-use self::pane::{BranchesTab, PANES, Pane};
+use self::pane::Pane;
 use self::pane_rows::PaneRows;
-use self::popup::Popup;
 use self::refresh::RefreshCompletion;
-use self::selection::{SelectionKey, find_file_row_key, selection_key_for_file_rows};
-use self::views::{
-    BranchLog, CommandLogView, CommitPopupView, DiffView, FilesDiff, MenuView, PopupView,
-};
-use self::workers::{WorkerError, WorkerKind, run_worker};
-use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
+use self::views::DiffView;
+use self::workers::{WorkerKind, run_worker};
+use tree::{FileRow, drill_tree_rows};
 
 impl App {
     fn base(repo: Option<Box<dyn GitPort>>, config: crate::config::Config) -> Self {
@@ -192,7 +177,7 @@ impl App {
             sheets: sheet::Sheets::default(),
             full_screens: full_screens::FullScreens::default(),
             nav: nav::Nav::default(),
-            help: help::HelpState::default(),
+            help: crate::interface::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
@@ -204,7 +189,7 @@ impl App {
             watch_error: None,
             hits: hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
-            render: render_state::RenderState::default(),
+            render: crate::interface::render_state::RenderState::default(),
             new_branch_title: String::new(),
             modal: modal::Modal::default(),
             commit_draft: None,
@@ -953,7 +938,7 @@ impl App {
             // A setting changed that only this loop can carry out.
             if let Some(crate::config::settings::TerminalRequest::Mouse(on)) =
                 self.take_terminal_request()
-                && let Err(error) = terminal::set_mouse(on)
+                && let Err(error) = crate::interface::terminal::set_mouse(on)
             {
                 self.report_notice(format!("cannot switch the mouse: {error}"));
             }

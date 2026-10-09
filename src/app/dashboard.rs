@@ -14,9 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 use super::sheet::Sheet;
-use super::{
-    App, AppError, AppEvent, KeyCode, KeyEvent, MouseEvent, MouseEventKind, WorkerKind, run_worker,
-};
+use super::{App, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use crate::app::error::AppError;
+use crate::app::events::AppEvent;
+use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::port::GitPort;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};

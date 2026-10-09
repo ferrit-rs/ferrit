@@ -3,11 +3,15 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use super::{
-    App, AppError, AppEvent, FileRow, Pane, Preview, WorkerKind, git, mock, preview, run_worker,
-    thread,
-};
+use super::{App, git, mock, thread};
+use crate::app::error::AppError;
+use crate::app::events::AppEvent;
+use crate::app::pane::Pane;
+use crate::app::tree::FileRow;
+use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::error::GitResult;
+use crate::git::image::preview;
+use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
 
 /// Image worker result, applied only if selection and generation still match.

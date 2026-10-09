@@ -12,26 +12,26 @@ use std::time::Duration;
 
 use ratatui::crossterm::event::MouseEvent;
 
-use super::diff_query::RightKey;
-use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::toast::Toast;
+use crate::app::diff_query::RightKey;
+use crate::interface::components::tui_overlay::state::OverlayState;
+use crate::interface::components::ui::toast::Toast;
 
-pub(super) struct RenderState {
+pub(crate) struct RenderState {
     /// The help dialog.
-    pub(super) help: OverlayState,
+    pub(crate) help: OverlayState,
     /// The side drawer, whichever sheet it holds.
-    pub(super) sheet: OverlayState,
+    pub(crate) sheet: OverlayState,
     /// The backdrop of the commit editor and of the "stage everything?" question.
-    pub(super) commit: OverlayState,
+    pub(crate) commit: OverlayState,
     /// The bottom-right error notification, dismissed by its `x`, `Esc` or a timeout.
-    pub(super) toast: Option<Toast>,
+    pub(crate) toast: Option<Toast>,
     /// The right pane's image: a live protocol that resizes and re-encodes itself
     /// at render time, through `&mut`.
-    pub(super) preview: Preview,
+    pub(crate) preview: Preview,
     /// The styled commit diff, kept so scrolling does not rerun syntax
     /// highlighting. Keyed by the selection, the diff text, the focus range and
     /// the pane width.
-    pub(super) diff_cache: Option<RenderedDiff>,
+    pub(crate) diff_cache: Option<RenderedDiff>,
 }
 
 impl Default for RenderState {
@@ -48,16 +48,16 @@ impl Default for RenderState {
 }
 
 pub(crate) struct RenderedDiff {
-    pub(super) key: Option<RightKey>,
-    pub(super) source: String,
-    pub(super) focus: Option<Range<usize>>,
-    pub(super) width: usize,
-    pub(super) text: Text<'static>,
+    pub(crate) key: Option<RightKey>,
+    pub(crate) source: String,
+    pub(crate) focus: Option<Range<usize>>,
+    pub(crate) width: usize,
+    pub(crate) text: Text<'static>,
 }
 
 impl RenderState {
     /// Count the error toast's timeout and animation, and drop it once closed.
-    pub(super) fn tick_toast(&mut self, elapsed: Duration) {
+    pub(crate) fn tick_toast(&mut self, elapsed: Duration) {
         if let Some(toast) = &mut self.toast {
             toast.tick(elapsed);
             if toast.is_closed() {
@@ -67,7 +67,7 @@ impl RenderState {
     }
 
     /// Start closing the toast. `true` when there was one to close.
-    pub(super) fn dismiss_toast(&mut self) -> bool {
+    pub(crate) fn dismiss_toast(&mut self) -> bool {
         match &mut self.toast {
             Some(toast) if !toast.is_closing() => {
                 toast.dismiss();
@@ -80,20 +80,20 @@ impl RenderState {
 
 /// Which of the animated things were moving at one instant.
 #[derive(Clone, Copy)]
-pub(super) struct Animating {
+pub(crate) struct Animating {
     sheet: bool,
     help: bool,
     toast: bool,
 }
 
 impl Animating {
-    pub(super) const fn any(self) -> bool {
+    pub(crate) const fn any(self) -> bool {
         self.sheet || self.help || self.toast
     }
 }
 
 impl RenderState {
-    pub(super) fn animating(&self) -> Animating {
+    pub(crate) fn animating(&self) -> Animating {
         Animating {
             sheet: self.sheet.is_animating(),
             help: self.help.is_animating(),
@@ -102,7 +102,7 @@ impl RenderState {
     }
 
     /// Advance every animation and the toast's timeout by `elapsed`.
-    pub(super) fn tick(&mut self, elapsed: Duration) {
+    pub(crate) fn tick(&mut self, elapsed: Duration) {
         self.sheet.tick(elapsed);
         self.help.tick(elapsed);
         self.tick_toast(elapsed);
@@ -111,7 +111,7 @@ impl RenderState {
     /// The same at the end of a batch of events: a sheet or the help that began
     /// to animate during the batch waits for its first frame, so only the ones
     /// already moving (`was`) advance.
-    pub(super) fn tick_after_batch(&mut self, elapsed: Duration, was: Animating) {
+    pub(crate) fn tick_after_batch(&mut self, elapsed: Duration, was: Animating) {
         if self.sheet.is_animating() && was.sheet {
             self.sheet.tick(elapsed);
         }
@@ -122,7 +122,7 @@ impl RenderState {
     }
 
     /// Give a mouse event to the toast. `true` when it consumed it.
-    pub(super) fn toast_mouse(&mut self, event: MouseEvent) -> bool {
+    pub(crate) fn toast_mouse(&mut self, event: MouseEvent) -> bool {
         self.toast
             .as_mut()
             .is_some_and(|toast| toast.on_mouse(event))

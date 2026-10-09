@@ -9,14 +9,15 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 
+use crate::app::App;
 use crate::app::row_lines;
-use crate::app::{App, DiffView};
-use crate::components::ui::panel::Panel;
-use crate::components::ui::scroll_bar::ScrollBar;
+use crate::app::views::DiffView;
 use crate::git;
+use crate::interface::components::ui::panel::Panel;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::theme::palette::Palette;
 
-pub(super) fn draw_files_columns(
+pub(crate) fn draw_files_columns(
     frame: &mut Frame<'_>,
     app: &App,
     landed: &mut Landed,
@@ -67,7 +68,7 @@ pub(super) fn draw_files_columns(
 
 /// One-sided file changes use a single full-width panel, matching lazygit's
 /// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
-pub(super) fn draw_single_file_diff(
+pub(crate) fn draw_single_file_diff(
     frame: &mut Frame<'_>,
     app: &App,
     landed: &mut Landed,

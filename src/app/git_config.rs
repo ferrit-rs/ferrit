@@ -3,7 +3,9 @@
 //! Drawing is `screens/git_config.rs`; every read and write is `Repo::config*`,
 //! so git stays the owner of the file format.
 
-use super::{App, AppError, FullScreen, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use super::{App, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use crate::app::error::AppError;
+use crate::app::full_screens::FullScreen;
 use crate::git::config::{ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 

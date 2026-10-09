@@ -14,7 +14,10 @@ use crate::theme::palette::Palette;
 
 use super::pane_rows::PaneRows;
 use super::refresh::Shared;
-use super::{BranchDrill, BranchesTab, CommitDrill, Mode, PANES, Pane, SelectionKey};
+use crate::app::diff_cursor::Mode;
+use crate::app::drill::{BranchDrill, CommitDrill};
+use crate::app::pane::{BranchesTab, PANES, Pane};
+use crate::app::selection::SelectionKey;
 
 #[derive(Default)]
 pub struct Nav {

@@ -16,8 +16,9 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::{App, screens as ui};
+use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
+use ferrit::interface::screens as ui;
 use ferrit::theme::scheme::Scheme;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

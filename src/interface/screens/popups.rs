@@ -8,36 +8,36 @@ use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
 use crate::app::row_lines;
-use crate::app::{CommandLogView, CommitPopupView, MenuView};
-use crate::components::tui_overlay::anchor::Anchor;
-use crate::components::tui_overlay::backdrop::Backdrop;
-use crate::components::tui_overlay::overlay::Overlay;
-use crate::components::tui_overlay::slide::Slide;
-use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::dialog::Dialog;
-use crate::components::ui::key_bar::KeyBar;
-use crate::components::ui::panel::Panel;
-use crate::components::ui::scroll_bar::ScrollBar;
-use crate::components::ui::select_list::SelectList;
-use crate::components::ui::text_input::TextInput;
+use crate::app::views::{CommandLogView, CommitPopupView, MenuView};
 use crate::git::host::Visibility;
+use crate::interface::components::tui_overlay::anchor::Anchor;
+use crate::interface::components::tui_overlay::backdrop::Backdrop;
+use crate::interface::components::tui_overlay::overlay::Overlay;
+use crate::interface::components::tui_overlay::slide::Slide;
+use crate::interface::components::tui_overlay::state::OverlayState;
+use crate::interface::components::ui::dialog::Dialog;
+use crate::interface::components::ui::key_bar::KeyBar;
+use crate::interface::components::ui::panel::Panel;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
+use crate::interface::components::ui::select_list::SelectList;
+use crate::interface::components::ui::text_input::TextInput;
 use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 
 /// The help screen: one line per binding of the focused pane and of the global
 /// context, scrolled to `scroll`. Returns how many lines fit, so the scroll
 /// keys know where the end is.
-pub(super) struct HelpView<'a> {
-    pub(super) accent: ratatui::style::Color,
-    pub(super) lines: &'a [HelpLine],
-    pub(super) scroll: usize,
-    pub(super) overlay_state: &'a mut OverlayState,
-    pub(super) query: &'a TextInput,
-    pub(super) searching: bool,
-    pub(super) palette: &'a Palette,
+pub(crate) struct HelpView<'a> {
+    pub(crate) accent: ratatui::style::Color,
+    pub(crate) lines: &'a [HelpLine],
+    pub(crate) scroll: usize,
+    pub(crate) overlay_state: &'a mut OverlayState,
+    pub(crate) query: &'a TextInput,
+    pub(crate) searching: bool,
+    pub(crate) palette: &'a Palette,
 }
 
-pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, view: HelpView<'_>) -> usize {
+pub(crate) fn draw_help(frame: &mut Frame<'_>, area: Rect, view: HelpView<'_>) -> usize {
     let HelpView {
         accent,
         lines,
@@ -177,7 +177,7 @@ pub(super) fn draw_help(frame: &mut Frame<'_>, area: Rect, view: HelpView<'_>) -
 }
 
 /// Shared editor popup for commit messages and branch names.
-pub(super) fn draw_commit(
+pub(crate) fn draw_commit(
     frame: &mut Frame<'_>,
     area: Rect,
     view: &mut CommitPopupView<'_>,
@@ -315,7 +315,7 @@ pub(super) fn draw_commit(
 }
 
 /// Confirm staging all worktree changes when `c` is pressed with an empty index.
-pub(super) fn draw_commit_all_confirm(
+pub(crate) fn draw_commit_all_confirm(
     frame: &mut Frame<'_>,
     area: Rect,
     state: &mut OverlayState,
@@ -366,7 +366,7 @@ pub(super) fn draw_commit_all_confirm(
     );
 }
 
-pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str, palette: &Palette) {
+pub(crate) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str, palette: &Palette) {
     let width = 60.min(area.width);
     let content_lines = message.lines().count().max(1);
     let body_rows = u16::try_from(content_lines)
@@ -392,7 +392,7 @@ pub(super) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str, palett
 
 /// The `@` viewer: every recorded command, newest at the bottom, scrolled up
 /// by `view.from_bottom` rows (clamped to what exists).
-pub(super) fn draw_command_log_view(
+pub(crate) fn draw_command_log_view(
     frame: &mut Frame<'_>,
     area: Rect,
     view: &CommandLogView,
@@ -439,7 +439,7 @@ pub(super) fn draw_command_log_view(
 
 /// A list of actions with the highlighted row filled, `Enter` or a row's own
 /// letter to run it.
-pub(super) fn draw_menu(
+pub(crate) fn draw_menu(
     frame: &mut Frame<'_>,
     area: Rect,
     view: &MenuView,
@@ -481,7 +481,7 @@ pub(super) fn draw_menu(
 
 /// The popups of creating the GitHub repository: the `gh` check, the form, and
 /// the last question (`docs/PLAN_15_CREATE_REMOTE.md`).
-pub(super) fn draw_create_remote(
+pub(crate) fn draw_create_remote(
     frame: &mut Frame<'_>,
     area: Rect,
     view: &CreateRemoteView<'_>,

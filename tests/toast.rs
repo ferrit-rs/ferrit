@@ -15,10 +15,11 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use ferrit::app::App;
 use ferrit::app::error::AppError;
 use ferrit::app::events::{AppEvent, RemoteOp};
-use ferrit::app::{App, screens as ui};
-use ferrit::components::ui::toast::Toast;
+use ferrit::interface::components::ui::toast::Toast;
+use ferrit::interface::screens as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

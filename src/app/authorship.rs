@@ -8,7 +8,7 @@ use crate::git::port::{GitPort, GitRead};
 use crate::git::profile::Profile;
 use crate::git::profile::settings::{Identity, IdentitySource, Settings};
 
-pub(super) struct Authorship {
+pub(crate) struct Authorship {
     /// The identities git knows, refreshed with the repository.
     pub(super) profile: Profile,
     /// Ferrit's pick for this run; `None` is git's own.

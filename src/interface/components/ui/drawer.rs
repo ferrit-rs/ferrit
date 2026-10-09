@@ -4,11 +4,11 @@ use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType};
 
-use crate::components::tui_overlay::anchor::Anchor;
-use crate::components::tui_overlay::backdrop::Backdrop;
-use crate::components::tui_overlay::overlay::Overlay;
-use crate::components::tui_overlay::slide::Slide;
-use crate::components::tui_overlay::state::OverlayState;
+use crate::interface::components::tui_overlay::anchor::Anchor;
+use crate::interface::components::tui_overlay::backdrop::Backdrop;
+use crate::interface::components::tui_overlay::overlay::Overlay;
+use crate::interface::components::tui_overlay::slide::Slide;
+use crate::interface::components::tui_overlay::state::OverlayState;
 
 /// Right-side drawer shell. Returns its inner area for caller-owned content.
 #[must_use]

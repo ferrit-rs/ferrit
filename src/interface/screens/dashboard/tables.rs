@@ -11,14 +11,14 @@ use ratatui::widgets::{Paragraph, Widget};
 use super::charts::NO_COMMITS;
 use super::text::{MIN_WHOLE, compact, figure, figure_columns, plural, relative_time};
 use super::{Ctx, note};
-use crate::components::ui::cut::{cut_end, cut_middle};
-use crate::components::ui::share_bar::{percent_label, single_bar, stacked_bar};
 use crate::git::stats::HotFiles;
 use crate::git::stats::branches::BranchHealth;
 use crate::git::stats::share::{Share, fold, shares};
+use crate::interface::components::ui::cut::{cut_end, cut_middle};
+use crate::interface::components::ui::share_bar::{percent_label, single_bar, stacked_bar};
 
 /// Branch rows drawn before "+N more".
-pub(super) const BRANCH_ROWS: usize = 8;
+pub(crate) const BRANCH_ROWS: usize = 8;
 /// Hot files listed at most (the stats keep ten).
 const HOT_ROWS: usize = 10;
 /// Hidden files named in the footer before "…".
@@ -82,7 +82,7 @@ fn bar_rows(ctx: &Ctx<'_>, width: u16, rows: &[BarRow], name_cap: usize) -> Vec<
         .collect()
 }
 
-pub(super) fn contributors(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn contributors(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     let stats = ctx.stats;
     let total: u64 = stats.authors.iter().map(|a| count(a.commits)).sum();
     if total == 0 {
@@ -208,7 +208,7 @@ fn lines_summary(ctx: &Ctx<'_>, width: u16) -> Vec<Line<'static>> {
 }
 
 /// The dim words after the Hot files title.
-pub(super) fn hot_unit(ctx: &Ctx<'_>) -> &'static str {
+pub(crate) fn hot_unit(ctx: &Ctx<'_>) -> &'static str {
     match &ctx.stats.hot_files {
         Some(hot) if count(hot.commits) < MIN_WHOLE => "commits touching",
         _ => "share of commits touching",
@@ -217,7 +217,7 @@ pub(super) fn hot_unit(ctx: &Ctx<'_>) -> &'static str {
 
 /// The dim footer under the list: `2 files hidden (CHANGELOG.md, Cargo.lock)` and
 /// `3 files no longer in the tree`, on one line when they fit, else on two.
-pub(super) fn hot_footer(hot: &HotFiles, width: usize) -> Vec<String> {
+pub(crate) fn hot_footer(hot: &HotFiles, width: usize) -> Vec<String> {
     let mut notes = Vec::new();
     if !hot.hidden.is_empty() {
         let named: Vec<&str> = hot
@@ -254,7 +254,7 @@ pub(super) fn hot_footer(hot: &HotFiles, width: usize) -> Vec<String> {
     notes.iter().map(|n| cut_end(n, width)).collect()
 }
 
-pub(super) fn hot_files(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn hot_files(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     if ctx.stats.totals.commits == 0 {
         note(buf, area, NO_COMMITS, ctx.dim());
         return;
@@ -361,7 +361,7 @@ fn branch_summary(ctx: &Ctx<'_>) -> Line<'static> {
     Line::from(spans)
 }
 
-pub(super) fn branches(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
+pub(crate) fn branches(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
     let stats = ctx.stats;
     let colors = ctx.colors();
     let dim = ctx.dim();
@@ -444,7 +444,7 @@ pub(super) fn branches(ctx: &Ctx<'_>, area: Rect, buf: &mut Buffer) {
 }
 
 /// The single line of the In progress section.
-pub(super) fn progress_line(ctx: &Ctx<'_>) -> Line<'static> {
+pub(crate) fn progress_line(ctx: &Ctx<'_>) -> Line<'static> {
     let work = &ctx.stats.work;
     let mut parts = vec![format!("{} changed", work.changed)];
     for (n, word) in [
@@ -481,7 +481,7 @@ pub(super) fn progress_line(ctx: &Ctx<'_>) -> Line<'static> {
 /// The stat tiles under the header, two rows: the values in bold ink (the commit
 /// count, the hero figure, in the bold accent) over dim labels, separated by
 /// spacing only. Tiles that do not fit the width are left out, last first.
-pub(super) fn tiles(ctx: &Ctx<'_>, width: u16) -> [Line<'static>; 2] {
+pub(crate) fn tiles(ctx: &Ctx<'_>, width: u16) -> [Line<'static>; 2] {
     let t = &ctx.stats.totals;
     let noun = |n: usize, one: &str, many: &str| (if n == 1 { one } else { many }).to_owned();
     let remote = if t.remote_branches > 0 {
@@ -542,7 +542,7 @@ pub(super) fn tiles(ctx: &Ctx<'_>, width: u16) -> [Line<'static>; 2] {
 }
 
 /// `Commits 423 · Authors 2 · Branches 6 (+3 remote) · Tags 5 · 35 commits since v0.7.0`.
-pub(super) fn totals_line(ctx: &Ctx<'_>) -> Line<'static> {
+pub(crate) fn totals_line(ctx: &Ctx<'_>) -> Line<'static> {
     let t = &ctx.stats.totals;
     let dim = ctx.dim();
     let bold = Style::new().add_modifier(Modifier::BOLD);

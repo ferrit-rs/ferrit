@@ -21,7 +21,7 @@ use std::process::Command;
 
 use ferrit::app::App;
 use ferrit::app::pane::Pane;
-use ferrit::app::screens as ui;
+use ferrit::interface::screens as ui;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

@@ -106,7 +106,7 @@ fn char_key(c: char) -> KeyEvent {
 fn render(app: &mut App, w: u16, h: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
     terminal
-        .draw(|f| ferrit::app::screens::draw(f, app))
+        .draw(|f| ferrit::interface::screens::draw(f, app))
         .unwrap();
     terminal.backend().to_string()
 }

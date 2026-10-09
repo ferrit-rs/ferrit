@@ -13,9 +13,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use ferrit::app::{App, screens as ui};
+use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::git::error::GitError;
+use ferrit::interface::screens as ui;
 use ferrit::theme::config::{Base, SchemeChoice};
 use ferrit::theme::scheme::{ColorDepth, Scheme, contrast};
 use ratatui::Terminal;

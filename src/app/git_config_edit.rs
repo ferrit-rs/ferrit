@@ -6,15 +6,18 @@
 
 use super::context_menu::NameKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, ConfirmAction, ConfirmPrompt, KeyCode, KeyEvent, Popup, TextInput};
+use super::{App, KeyCode, KeyEvent};
+use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::popup::Popup;
 use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use crate::git::config_keys::{KeyType, lookup};
+use crate::interface::components::ui::text_input::TextInput;
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
 
 /// One change the screen can ask git for.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum ConfigOp {
+pub(crate) enum ConfigOp {
     /// Set `key` in the write scope. `replacing` names the one value to change
     /// when the key holds several there.
     Set {
@@ -35,7 +38,7 @@ pub(super) enum ConfigOp {
 
 /// What to carry on with once the first global write is confirmed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum GlobalResume {
+pub(crate) enum GlobalResume {
     Edit,
     Toggle,
     Add,
@@ -43,7 +46,7 @@ pub(super) enum GlobalResume {
 
 /// What a menu row will set, remembered while the menu is up.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PickTarget {
+pub(crate) struct PickTarget {
     key: String,
     kind: ValueKind,
     replacing: Option<String>,
@@ -68,7 +71,7 @@ fn truthy(value: &str) -> bool {
 
 impl App {
     /// `e` / `Enter`: edit the selected value in the write scope.
-    pub(super) fn edit_git_config_value(&mut self) {
+    pub(crate) fn edit_git_config_value(&mut self) {
         let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
@@ -139,7 +142,7 @@ impl App {
     }
 
     /// `Space`: flip a known boolean key.
-    pub(super) fn toggle_git_config_bool(&mut self) {
+    pub(crate) fn toggle_git_config_bool(&mut self) {
         let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
@@ -172,7 +175,7 @@ impl App {
     }
 
     /// `a`: ask for a key, then its value.
-    pub(super) fn add_git_config_key(&mut self) {
+    pub(crate) fn add_git_config_key(&mut self) {
         if self.ask_before_global_write(GlobalResume::Add) {
             return;
         }
@@ -185,7 +188,7 @@ impl App {
     }
 
     /// `d`: unset the selected value in the write scope, after asking.
-    pub(super) fn unset_git_config_value(&mut self) {
+    pub(crate) fn unset_git_config_value(&mut self) {
         let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
@@ -224,7 +227,7 @@ impl App {
 
     /// `y` on the unset question. Asking named the file, so for the global
     /// scope this is also the session's global confirmation.
-    pub(super) fn confirm_git_config_unset(&mut self, op: &ConfigOp) {
+    pub(crate) fn confirm_git_config_unset(&mut self, op: &ConfigOp) {
         if self.full_screens.git_config.scope == WriteScope::Global {
             self.full_screens.git_config.global_confirmed = true;
         }
@@ -251,7 +254,7 @@ impl App {
     }
 
     /// `y` on the global question: remember it, then do what was asked.
-    pub(super) fn resume_git_config_edit(&mut self, resume: GlobalResume) {
+    pub(crate) fn resume_git_config_edit(&mut self, resume: GlobalResume) {
         self.full_screens.git_config.global_confirmed = true;
         match resume {
             GlobalResume::Edit => self.edit_git_config_value(),
@@ -274,7 +277,7 @@ impl App {
     }
 
     /// A menu row of the allowed values was chosen.
-    pub(super) fn pick_config_value(&mut self, index: usize) {
+    pub(crate) fn pick_config_value(&mut self, index: usize) {
         let Some(target) = self.full_screens.git_config.pick.take() else {
             return;
         };
@@ -290,7 +293,7 @@ impl App {
     }
 
     /// `Enter` in a config popup. `true` when the popup should close.
-    pub(super) fn submit_git_config_name(&mut self, kind: &NameKind, text: &str) -> bool {
+    pub(crate) fn submit_git_config_name(&mut self, kind: &NameKind, text: &str) -> bool {
         match kind {
             NameKind::ConfigKey => {
                 let key = text.trim().to_owned();
@@ -386,7 +389,7 @@ impl App {
 
     /// Run one change, re-read, and say what happened. `false` when git refused
     /// (its message is in the toast and nothing changed).
-    pub(super) fn perform_git_config_op(&mut self, op: &ConfigOp) -> bool {
+    pub(crate) fn perform_git_config_op(&mut self, op: &ConfigOp) -> bool {
         let Some(repo) = &self.repo else {
             return false;
         };
@@ -443,7 +446,7 @@ impl App {
     }
 
     /// Keys of the config screen's edit actions, called from `git_config_key`.
-    pub(super) fn git_config_edit_key(&mut self, key: KeyEvent) -> bool {
+    pub(crate) fn git_config_edit_key(&mut self, key: KeyEvent) -> bool {
         match key.code {
             KeyCode::Char('e') | KeyCode::Enter => self.edit_git_config_value(),
             KeyCode::Char(' ') => self.toggle_git_config_bool(),

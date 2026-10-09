@@ -1,10 +1,10 @@
 //! New-branch, upstream-input and note popup state / key handling.
 
-use super::{
-    App, CommandLogView, CommitPopupView, KeyCode, KeyEvent, MenuView, Popup, PopupView,
-    TextInputMode,
-};
-use crate::components::tui_overlay::state::OverlayState;
+use super::{App, KeyCode, KeyEvent};
+use crate::app::popup::Popup;
+use crate::app::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
+use crate::interface::components::tui_overlay::state::OverlayState;
+use crate::interface::components::ui::text_input::TextInputMode;
 
 /// Rows a `PageUp` / `PageDown` moves the command log viewer.
 const COMMAND_LOG_PAGE: usize = 10;

@@ -11,12 +11,12 @@ use std::path::PathBuf;
 /// "anything that loses work asks first". `y` runs `action`, `n` / `Esc`
 /// cancels; nothing else can happen while it is up, same as the help
 /// overlay.
-pub(super) struct ConfirmPrompt {
-    pub(super) message: String,
-    pub(super) action: ConfirmAction,
+pub(crate) struct ConfirmPrompt {
+    pub(crate) message: String,
+    pub(crate) action: ConfirmAction,
 }
 
-pub(super) enum ConfirmAction {
+pub(crate) enum ConfirmAction {
     /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
     DiscardFile(PathBuf),
     /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).

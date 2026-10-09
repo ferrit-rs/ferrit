@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use super::git_config;
 
 #[derive(Default)]
-pub(super) struct FullScreens {
+pub(crate) struct FullScreens {
     /// The view showing, if any.
     pub(super) active: FullScreen,
     pub(super) git_config: git_config::GitConfigScreen,

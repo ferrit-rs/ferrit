@@ -1,11 +1,11 @@
 //! What a popup can be.
 
 use super::{askpass, commit, context_menu, create_remote, menu};
-use crate::components::ui::text_input::TextInput;
+use crate::interface::components::ui::text_input::TextInput;
 
 /// Modal state that owns all input while it is up, the same idea as
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
-pub(super) enum Popup {
+pub(crate) enum Popup {
     Commit(commit::CommitDraft),
     CommitAllConfirm,
     /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*

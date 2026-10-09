@@ -11,11 +11,15 @@
 
 use super::branch_actions::MergeKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, BranchesTab, Mode, Pane, Popup, TextInput, git};
+use super::{App, git};
+use crate::app::diff_cursor::Mode;
+use crate::app::pane::{BranchesTab, Pane};
+use crate::app::popup::Popup;
+use crate::interface::components::ui::text_input::TextInput;
 
 /// What a name popup will do with the text typed into it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum NameKind {
+pub(crate) enum NameKind {
     RenameBranch {
         from: String,
     },
@@ -34,14 +38,14 @@ pub(super) enum NameKind {
 
 /// A name popup's purpose and its title (which may name a commit).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct NameTarget {
-    pub(super) kind: NameKind,
-    pub(super) title: String,
+pub(crate) struct NameTarget {
+    pub(crate) kind: NameKind,
+    pub(crate) title: String,
 }
 
 impl NameTarget {
     /// The footer hint for this popup.
-    pub(super) fn hints(&self) -> &'static str {
+    pub(crate) fn hints(&self) -> &'static str {
         match self.kind {
             NameKind::RenameBranch { .. } | NameKind::RenameStash { .. } => {
                 "Rename: Enter | Cancel: Esc"
@@ -66,7 +70,7 @@ fn item(label: &'static str, shortcut: char, action: MenuAction) -> MenuItem {
 impl App {
     /// `x` or a right-click: the menu for the selected row, or a note that it
     /// has nothing extra. Inert while a popup or a confirm is up.
-    pub(super) fn open_context_menu(&mut self) {
+    pub(crate) fn open_context_menu(&mut self) {
         if self.modal.is_some() || self.repo.is_none() {
             return;
         }
@@ -157,7 +161,7 @@ impl App {
 
     /// Run a menu action that belongs to the `x` menu, on the row it was opened
     /// for (the selection has not moved: a menu is modal).
-    pub(super) fn run_context_action(&mut self, action: MenuAction) {
+    pub(crate) fn run_context_action(&mut self, action: MenuAction) {
         let index = self.selected(self.nav.focus);
         match action {
             MenuAction::RenameBranch => {
@@ -224,7 +228,7 @@ impl App {
         }
     }
 
-    pub(super) fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
+    pub(crate) fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
         self.modal
             .open_popup(Popup::Name(NameTarget { kind, title }, input));
     }
@@ -232,7 +236,7 @@ impl App {
     /// `Enter` in a name popup. Success closes it and refreshes; a refusal
     /// (a taken name, an empty message) keeps the popup and the text for a
     /// retry, the same rule as the new-branch popup.
-    pub(super) fn submit_name(&mut self) {
+    pub(crate) fn submit_name(&mut self) {
         let Some(Popup::Name(target, input)) = self.modal.popup() else {
             return;
         };
@@ -279,7 +283,7 @@ impl App {
     /// A right-click on a row: focus that pane, move its selection there, then
     /// open its menu. Off any row it does nothing. (A left click also toggles a
     /// directory; this one must not.)
-    pub(super) fn right_click(&mut self, column: u16, row: u16) {
+    pub(crate) fn right_click(&mut self, column: u16, row: u16) {
         if self.modal.is_some() || self.help.open {
             return;
         }

@@ -7,43 +7,44 @@
 
 use ratatui::layout::Rect;
 
+use crate::app::App;
+use crate::app::pane::Pane;
 use crate::app::settings::SettingsHits;
-use crate::app::{App, Pane};
 use crate::keybindings::hints;
 
 /// `None` and empty mean "this frame did not touch it": the previous value stays.
 #[derive(Default)]
-pub(super) struct Landed {
+pub(crate) struct Landed {
     /// A left pane's bordered rect.
-    pub(super) left: Vec<(Pane, Rect)>,
+    pub(crate) left: Vec<(Pane, Rect)>,
     /// A left pane's list offset after ratatui scrolled it to keep the selection in view.
-    pub(super) list_offset: Vec<(Pane, usize)>,
+    pub(crate) list_offset: Vec<(Pane, usize)>,
     /// The whole right column.
-    pub(super) right_area: Option<Rect>,
+    pub(crate) right_area: Option<Rect>,
     /// Inner height of the right pane's diff box.
-    pub(super) right_viewport: Option<usize>,
+    pub(crate) right_viewport: Option<usize>,
     /// The author's name in the info panel (`Rect::ZERO` when not drawn).
-    pub(super) author: Option<Rect>,
+    pub(crate) author: Option<Rect>,
     /// The Dashboard trigger beside it.
-    pub(super) dashboard: Option<Rect>,
+    pub(crate) dashboard: Option<Rect>,
     /// The key bar's rect and what each part of it runs.
-    pub(super) keybar: Option<(Rect, Vec<hints::KeybarHit>)>,
+    pub(crate) keybar: Option<(Rect, Vec<hints::KeybarHit>)>,
     /// The settings sheet's clickable parts.
-    pub(super) settings_hits: Option<SettingsHits>,
+    pub(crate) settings_hits: Option<SettingsHits>,
     /// The settings sheet's scroll after keeping the selected row in view, and
     /// whether that following has now been done.
-    pub(super) settings_scroll: Option<(usize, bool)>,
+    pub(crate) settings_scroll: Option<(usize, bool)>,
     /// The git config screen's first visible row.
-    pub(super) git_config_offset: Option<usize>,
+    pub(crate) git_config_offset: Option<usize>,
     /// How many help lines fit.
-    pub(super) help_rows: Option<usize>,
+    pub(crate) help_rows: Option<usize>,
     /// How far the dashboard page scrolls, at most.
-    pub(super) dashboard_max_scroll: Option<usize>,
+    pub(crate) dashboard_max_scroll: Option<usize>,
 }
 
 impl App {
     /// Take in what a frame learned.
-    pub(super) fn land(&mut self, landed: Landed) {
+    pub(crate) fn land(&mut self, landed: Landed) {
         for &(pane, rect) in &landed.left {
             self.hits.left[pane] = rect;
             // A wheel scroll leaves the view where it put it only while the

@@ -10,38 +10,40 @@ use ratatui::text::Text;
 use ratatui_image::picker::Picker;
 
 use super::diff_query::RightKey;
-use super::render_state::RenderedDiff;
-use super::{DiffCursor, DiffView, hunk_content_id, hunk_lines_for, row_lines};
+use super::row_lines;
+use crate::app::diff_cursor::{DiffCursor, hunk_content_id, hunk_lines_for};
+use crate::app::views::DiffView;
 use crate::git;
 use crate::git::diff::DiffSide;
+use crate::interface::render_state::RenderedDiff;
 use crate::theme::palette::Palette;
 
 pub(crate) struct RightPane {
     /// Terminal graphics backend for the image preview. Starts on half-blocks
     /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
     /// iterm2 when the real terminal supports one.
-    pub(super) picker: Picker,
+    pub(crate) picker: Picker,
     /// Diff for the current selection, behind any image preview. Rebuilt on
     /// nav and on background `Refresh`.
-    pub(super) diff: DiffView,
+    pub(crate) diff: DiffView,
     /// What `diff` currently describes. `None` when no diff applies.
-    pub(super) key: Option<RightKey>,
+    pub(crate) key: Option<RightKey>,
     /// First visible line of the diff. Kept across a `Refresh` of an unchanged
     /// selection; reset to 0 when the selection changes.
-    pub(super) scroll: usize,
+    pub(crate) scroll: usize,
     /// Inner height of the diff box, reported by each frame (`Landed`). Drives the viewport-aware scroll clamp and the page steps. 0
     /// before the first draw: the clamp is then permissive by one screen and
     /// the next frame corrects it.
-    pub(super) viewport: usize,
+    pub(crate) viewport: usize,
     /// Whole right-pane rect from the last frame (`Landed`), for routing the mouse wheel
     /// to the diff (over the right column) or the selection (over the left).
-    pub(super) area: Rect,
+    pub(crate) area: Rect,
     /// The line cursor, meaningful only in `Mode::Diff`.
-    pub(super) cursor: DiffCursor,
+    pub(crate) cursor: DiffCursor,
 }
 
 impl RightPane {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             picker: Picker::halfblocks(),
             diff: DiffView::None,
@@ -59,7 +61,7 @@ impl RightPane {
     /// preview? The scroll keys and the wheel are inert over an image, a
     /// `Note`, and the mock bodies; without this, they leak through to the
     /// left pane's own selection instead (moving the wrong thing).
-    pub(super) const fn is_diff(&self) -> bool {
+    pub(crate) const fn is_diff(&self) -> bool {
         matches!(
             self.diff,
             DiffView::Files(_)
@@ -97,14 +99,14 @@ impl RightPane {
     }
 
     /// Clamp the scroll into `0..=max_scroll()`.
-    pub(super) fn clamp_scroll(&mut self) {
+    pub(crate) fn clamp_scroll(&mut self) {
         self.scroll = self.scroll.min(self.max_scroll());
     }
 
     /// Move the viewport by `delta` lines, clamped so it stops with the last
     /// line at the bottom of the pane. `isize::MIN` / `isize::MAX` snap to the
     /// top / bottom.
-    pub(super) fn scroll_by(&mut self, delta: isize) {
+    pub(crate) fn scroll_by(&mut self, delta: isize) {
         let mag = delta.unsigned_abs();
         self.scroll = if delta >= 0 {
             self.scroll.saturating_add(mag).min(self.max_scroll())
@@ -113,12 +115,12 @@ impl RightPane {
         };
     }
 
-    pub(super) fn set_scroll(&mut self, line: usize) {
+    pub(crate) fn set_scroll(&mut self, line: usize) {
         self.scroll = line;
         self.clamp_scroll();
     }
 
-    pub(super) fn set_viewport(&mut self, rows: usize) {
+    pub(crate) fn set_viewport(&mut self, rows: usize) {
         self.viewport = rows;
         self.clamp_scroll();
     }
@@ -129,7 +131,7 @@ impl RightPane {
     /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
     /// a no-op on the Files split, which has two diffs and no single anchor
     /// list to jump through.
-    pub(super) fn jump_anchor(&mut self, dir: isize) {
+    pub(crate) fn jump_anchor(&mut self, dir: isize) {
         let anchors = match &self.diff {
             DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.file_lines(),
             DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
@@ -151,7 +153,7 @@ impl RightPane {
     /// Scroll the shared Files-split viewport so `cursor.line` stays on
     /// screen, the same "a jump always lands visibly" rule phase 3's `]` /
     /// `[` already follows.
-    pub(super) fn ensure_cursor_visible(&mut self) {
+    pub(crate) fn ensure_cursor_visible(&mut self) {
         let viewport = self.viewport.max(1);
         if self.cursor.line < self.scroll {
             self.scroll = self.cursor.line;
@@ -174,7 +176,7 @@ impl RightPane {
     /// drop to `Mode::Nav` once that side has no more changes to show at
     /// all — even if the other side now does; switching sides on the user's
     /// behalf would silently change what the next `<space>` does.
-    pub(super) fn resync_cursor(&mut self) -> bool {
+    pub(crate) fn resync_cursor(&mut self) -> bool {
         let DiffView::Files(files) = &self.diff else {
             return false;
         };
@@ -219,7 +221,7 @@ impl RightPane {
     /// commit diff goes through this cache: it is keyed for one `Diff` at a
     /// time, and the Files split renders its two sides directly instead
     /// (`ui::draw_files_columns`).
-    pub(super) fn rendered_diff(
+    pub(crate) fn rendered_diff(
         &self,
         palette: &Palette,
         cache: &mut Option<RenderedDiff>,

@@ -19,12 +19,13 @@ use std::fs;
 use std::time::Duration;
 
 use common::TempDir;
+use ferrit::app::App;
 use ferrit::app::pane::Pane;
-use ferrit::app::{App, screens as ui};
 use ferrit::config::ConfigLoad;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
+use ferrit::interface::screens as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

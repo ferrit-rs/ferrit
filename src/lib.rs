@@ -3,9 +3,10 @@
 //! `docs/PLAN_SELF_TESTING.md`.
 
 pub mod app;
-pub mod components;
+
 pub mod config;
 pub mod git;
+pub mod interface;
 pub mod keybindings;
 /// The scripted test harness behind `--replay` and `--fixture`. Test seam, only
 /// built with the `test-util` feature.

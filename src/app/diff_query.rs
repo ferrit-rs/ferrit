@@ -4,10 +4,14 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
-use super::{
-    App, AppError, AppEvent, BranchLog, DiffView, FileRow, FilesDiff, Mode, Pane, WorkerKind,
-    run_worker,
-};
+use super::App;
+use crate::app::diff_cursor::Mode;
+use crate::app::error::AppError;
+use crate::app::events::AppEvent;
+use crate::app::pane::Pane;
+use crate::app::tree::FileRow;
+use crate::app::views::{BranchLog, DiffView, FilesDiff};
+use crate::app::workers::{WorkerKind, run_worker};
 
 use crate::git;
 use crate::git::diff::{DiffOpts, DiffSide};

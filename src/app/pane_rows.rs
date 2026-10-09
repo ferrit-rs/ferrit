@@ -6,10 +6,10 @@
 use ratatui::text::Line;
 
 use super::nav::Nav;
-use super::{
-    BranchesTab, FileRow, Pane, SelectionKey, StageState, dir_stage_state, drill_tree_rows,
-    find_file_row_key, row_lines, selection_key_for_file_rows, tree_rows,
-};
+use super::row_lines;
+use crate::app::pane::{BranchesTab, Pane};
+use crate::app::selection::{SelectionKey, find_file_row_key, selection_key_for_file_rows};
+use crate::app::tree::{FileRow, StageState, dir_stage_state, drill_tree_rows, tree_rows};
 use crate::git::{self, Snapshot};
 use crate::theme::palette::Palette;
 

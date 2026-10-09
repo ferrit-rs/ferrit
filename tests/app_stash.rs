@@ -212,7 +212,7 @@ fn an_empty_stash_pane_offers_no_apply_pop_or_drop_in_the_key_bar() {
     app.feed_key(char_key('5'));
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal
-        .draw(|f| ferrit::app::screens::draw(f, &mut app))
+        .draw(|f| ferrit::interface::screens::draw(f, &mut app))
         .unwrap();
     let out = terminal.backend().to_string();
     for hint in ["Apply:", "Pop:", "Drop:"] {

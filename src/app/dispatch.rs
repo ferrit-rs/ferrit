@@ -5,7 +5,9 @@
 
 use ratatui::crossterm::event::KeyEvent;
 
-use super::{App, Mode, PANES, Pane, events, git};
+use super::{App, events, git};
+use crate::app::diff_cursor::Mode;
+use crate::app::pane::{PANES, Pane};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 
 impl App {

@@ -15,10 +15,10 @@ use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::git_config::ConfigRow;
-use crate::components::ui::cut::cut_end;
-use crate::components::ui::panel::Panel;
-use crate::components::ui::scroll_bar::ScrollBar;
 use crate::git::config::{Scope, WriteScope, display_value};
+use crate::interface::components::ui::cut::cut_end;
+use crate::interface::components::ui::panel::Panel;
+use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::theme::palette::Palette;
 
 /// Full markers from this width.

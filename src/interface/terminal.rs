@@ -14,7 +14,7 @@ use ratatui::crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
-use crate::components::ui::mouse_pointer::MousePointer;
+use crate::interface::components::ui::mouse_pointer::MousePointer;
 
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 

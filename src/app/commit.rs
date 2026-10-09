@@ -1,34 +1,38 @@
 //! Commit editor state and actions, following lazygit's summary/description
 //! editor: `c` opens it; Tab switches fields; Enter confirms summary.
 
-use super::{
-    App, AppError, ApplyDir, CommitPopupView, KeyCode, KeyEvent, KeyModifiers, Pane, Popup,
-    SelectionKey, TextInput, TextInputMode, git,
-};
-use crate::components::tui_overlay::state::OverlayState;
+use super::{App, KeyCode, KeyEvent, KeyModifiers, git};
+use crate::app::error::AppError;
+use crate::app::pane::Pane;
+use crate::app::popup::Popup;
+use crate::app::selection::SelectionKey;
+use crate::app::views::CommitPopupView;
+use crate::git::apply::ApplyDir;
+use crate::interface::components::tui_overlay::state::OverlayState;
+use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum CommitField {
+pub(crate) enum CommitField {
     Summary,
     Description,
 }
 
 /// The older commit a reword popup will rewrite with `git rebase -i`, instead
 /// of amending `HEAD`.
-pub(super) struct RewordTarget {
-    pub(super) hash: String,
-    pub(super) title: String,
+pub(crate) struct RewordTarget {
+    pub(crate) hash: String,
+    pub(crate) title: String,
 }
 
-pub(super) struct CommitDraft {
-    pub(super) summary: TextInput,
-    pub(super) description: TextInput,
-    pub(super) focus: CommitField,
-    pub(super) kind: git::commit::CommitKind,
+pub(crate) struct CommitDraft {
+    pub(crate) summary: TextInput,
+    pub(crate) description: TextInput,
+    pub(crate) focus: CommitField,
+    pub(crate) kind: git::commit::CommitKind,
     /// `Some` when rewording a commit other than `HEAD`.
-    pub(super) reword: Option<RewordTarget>,
-    pub(super) sign_off: bool,
-    pub(super) no_verify: bool,
+    pub(crate) reword: Option<RewordTarget>,
+    pub(crate) sign_off: bool,
+    pub(crate) no_verify: bool,
     history_index: Option<usize>,
     saved_summary: String,
 }
@@ -134,7 +138,7 @@ impl App {
 
     /// `c` / `A` / `w`: open the commit editor. Amend / Reword pre-fill
     /// `HEAD`'s message; a plain commit restores a cancelled draft.
-    pub(super) fn open_commit(&mut self, kind: git::commit::CommitKind) {
+    pub(crate) fn open_commit(&mut self, kind: git::commit::CommitKind) {
         if self.modal.popup().is_some() {
             return;
         }
@@ -182,7 +186,7 @@ impl App {
 
     /// Open the editor to reword the older commit `hash` (a rebase, not an
     /// amend), pre-filled with its message.
-    pub(super) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
+    pub(crate) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
         self.open_commit_editor(git::commit::CommitKind::Reword, Some(message.to_owned()));
         if let Some(Popup::Commit(draft)) = self.modal.popup_mut() {
             draft.reword = Some(RewordTarget { hash, title });
@@ -209,7 +213,7 @@ impl App {
     }
 
     /// Handle the explicit "commit all" choice shown when the index is empty.
-    pub(super) fn commit_all_confirm_key(&mut self, key: KeyEvent) {
+    pub(crate) fn commit_all_confirm_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('y') => {
                 let result = self
@@ -241,7 +245,7 @@ impl App {
     }
 
     /// Route lazygit-style commit-editor keys while the editor owns input.
-    pub(super) fn commit_popup_key(&mut self, key: KeyEvent) {
+    pub(crate) fn commit_popup_key(&mut self, key: KeyEvent) {
         let Some(Popup::Commit(draft)) = self.modal.popup_mut() else {
             return;
         };
@@ -334,7 +338,7 @@ impl App {
     }
 
     /// Submit current editor content with `git commit`.
-    pub(super) fn do_commit(&mut self) {
+    pub(crate) fn do_commit(&mut self) {
         let Some(Popup::Commit(draft)) = self.modal.popup() else {
             return;
         };

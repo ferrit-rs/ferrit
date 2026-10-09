@@ -12,16 +12,18 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-use super::{
-    App, AppError, AppEvent, KeyCode, KeyEvent, Popup, Result, TextInput, TextInputMode,
-    WorkerKind, events, mpsc, run_worker, thread,
-};
+use super::{App, KeyCode, KeyEvent, Result, events, mpsc, thread};
+use crate::app::error::AppError;
+use crate::app::events::AppEvent;
+use crate::app::popup::Popup;
+use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::error::GitError;
 use crate::git::host::{
     self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
     ssh_remote_url, validate_description,
 };
 use crate::git::ssh_config::read_github_aliases;
+use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 
 /// What the form holds, and all the user chooses: the name, the visibility and
 /// the description. Kept on the app while `gh` runs, so a refusal can reopen the
@@ -72,7 +74,7 @@ impl Field {
 
 /// The form's fields as they are being typed.
 #[derive(Debug)]
-pub(super) struct Form {
+pub(crate) struct Form {
     name: TextInput,
     description: TextInput,
     visibility: Visibility,
@@ -146,7 +148,7 @@ impl Form {
 
 /// Where the popup is.
 #[derive(Debug)]
-pub(super) enum Step {
+pub(crate) enum Step {
     /// `gh` is being asked whether it is ready; the answer carries this number
     /// so one that arrives after the popup was closed is ignored.
     Checking {
@@ -243,7 +245,7 @@ pub struct CreateRemote {
 impl CreateRemote {
     /// Keep the `gh` program a test or the replay injected when the app is
     /// rebuilt on a new repository (`App::attach_repository`).
-    pub(super) fn carry_program_from(&mut self, previous: &Self) {
+    pub(crate) fn carry_program_from(&mut self, previous: &Self) {
         self.gh = previous.gh.clone();
         self.ssh_config.clone_from(&previous.ssh_config);
     }
@@ -319,7 +321,7 @@ impl App {
 
     /// `AppEvent::GhChecked` arrived. Only the check the popup is waiting for
     /// counts; `gh` ready opens the form, anything else says what to do.
-    pub(super) fn on_gh_checked(&mut self, generation: u64, status: GhStatus) {
+    pub(crate) fn on_gh_checked(&mut self, generation: u64, status: GhStatus) {
         let waiting = matches!(
             self.modal.popup(),
             Some(Popup::CreateRemote(Step::Checking { generation: g })) if *g == generation
@@ -418,7 +420,7 @@ impl App {
     }
 
     /// Every key while the popup is up.
-    pub(super) fn create_remote_key(&mut self, key: KeyEvent) {
+    pub(crate) fn create_remote_key(&mut self, key: KeyEvent) {
         let Some(Popup::CreateRemote(step)) = self.modal.popup_mut() else {
             return;
         };
@@ -604,13 +606,13 @@ impl App {
     }
 
     /// A push finished well: it was no longer "the one after a creation".
-    pub(super) fn create_remote_push_done(&mut self) {
+    pub(crate) fn create_remote_push_done(&mut self) {
         self.create_remote.pushing_after = false;
     }
 
     /// The failure of the push that followed a creation says the repository
     /// exists and how to retry; any other failure is left as it is.
-    pub(super) fn explain_push_after_creation(&mut self, failure: AppError) -> AppError {
+    pub(crate) fn explain_push_after_creation(&mut self, failure: AppError) -> AppError {
         if !std::mem::take(&mut self.create_remote.pushing_after) {
             return failure;
         }

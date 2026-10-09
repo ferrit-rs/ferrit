@@ -3,8 +3,8 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-use crate::components::tui_overlay::state::OverlayState;
-use crate::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::components::tui_overlay::state::OverlayState;
+use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 
 /// Whether keys move through the help or type into its search box.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +78,7 @@ impl HelpState {
     }
 
     /// A key while the search box has the keyboard.
-    pub(super) fn search_key(&mut self, key: KeyEvent) {
+    pub(crate) fn search_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Enter | KeyCode::Esc => self.mode = HelpMode::Browse,
             _ if self.query.handle_key_event(key, TextInputMode::SingleLine) => {
@@ -88,14 +88,14 @@ impl HelpState {
         }
     }
 
-    pub(super) fn start_search(&mut self) {
+    pub(crate) fn start_search(&mut self) {
         self.query = TextInput::default();
         self.mode = HelpMode::Search;
         self.scroll = 0;
     }
 
     /// Scroll for `code` over `total` filtered lines; `false` for any other key.
-    pub(super) fn scroll_key(&mut self, code: KeyCode, total: usize) -> bool {
+    pub(crate) fn scroll_key(&mut self, code: KeyCode, total: usize) -> bool {
         let max = total.saturating_sub(self.rows.max(1));
         let page = self.rows.saturating_sub(1).max(1);
         match code {
