@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc f5ac62d73b727e923fb4c5475da127a99a72c15f0c2410a0d191da26ee79902d # shrinks to (lines, marker, _) = ([(Deleted, "")], false, [false])
+cc 76a478421a002ffa5efa567b0d11ac9cb8b1b4c27c0683545a8534dc9f1c83ee # shrinks to (lines, marker, mask) = ([(Deleted, "")], false, [false])
+cc 5caf22ccff366e48ff57b31858838e9cd9e9e8151fb885ce0fc77eaabceddb58 # shrinks to files = [("a.rs", [GenHunk { old_start: 1, new_start: 1, lines: [(Context, "")] }])]

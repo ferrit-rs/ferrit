@@ -36,6 +36,9 @@ thiserror = "2"
 unicode-segmentation = "1.13"
 unicode-width = "0.2"
 
+[dev-dependencies]
+proptest = "1"
+
 # See also clippy.toml and rust-toolchain.toml.
 #
 # Layout: lint GROUPS first at negative priority (single-lint overrides below

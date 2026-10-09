@@ -102,7 +102,8 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 
 ## How it is tested
 
-Three levels, from cheap to broad: unit tests beside the code, integration tests in
-`tests/` (headless `TestBackend` frames and `App` seams such as `feed_key`), and replay
+Four levels, from cheap to broad: unit tests beside the code, property tests for the
+parsers of text read from git (`tests/proptest_diff.rs`), integration tests in `tests/`
+(headless `TestBackend` frames and `App` seams such as `feed_key`), and replay
 scripts that press keys on a deterministic fixture repository and assert on the screen.
 See [ADR 2](adr/0002-replay-scripts-as-integration-tests.md) and `PLAN_SELF_TESTING.md`.

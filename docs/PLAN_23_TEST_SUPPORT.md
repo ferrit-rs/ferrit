@@ -1,6 +1,6 @@
 # Plan: phase 23, test support and a narrow public API
 
-**Status: in progress (C0 to C3 done: the shared kit and the file splits; the property tests and the API narrowing are open).** Fourth and last slice of the architecture clean-up. It makes the test
+**Status: in progress (C0 to C3 and the property tests done; the API narrowing is open).** Fourth and last slice of the architecture clean-up. It makes the test
 suite easy to read and extend, and makes the library surface say what is public on purpose.
 
 What differs from the sketch below, and why:
@@ -19,8 +19,19 @@ What differs from the sketch below, and why:
   and count are unchanged; the largest file left is `tests/config.rs` at 775 lines.
 - **The 10-line `#![allow]` header stays in each test crate.** Rust has no way to share an
   inner attribute across crates, and a workspace lint table cannot differ per target.
-- **Not done:** `proptest` for the diff parsers (a new dependency to justify and a property
-  to find first), the `test-support` feature, `pub(crate)` for the library, and
+- **`proptest` added, for two properties' worth of code** (`tests/proptest_diff.rs`, 8
+  properties): the diff parser (any text parses without panicking and every range it reports
+  slices the text in order; a generated well-formed diff parses back to the files, paths, hunk
+  headers, counts and bodies that made it, with git's `@@ -5 +5 @@` form for a count of 1) and
+  `apply::transform_body` (selecting everything is the identity; whatever is selected the old
+  side never changes; the new side is exactly the context, the unselected deletions and the
+  selected additions; selecting nothing leaves no change; an out-of-range index is ignored).
+  Checked by breaking the code: demoting an unselected `-` to context wrongly, and defaulting a
+  missing hunk count to 0, each fail a property and shrink to a minimal input. It is a
+  dev-dependency only; every crate it pulls in is MIT or Apache-2.0, which `deny.toml` allows.
+  `tests/proptest_diff.proptest-regressions` keeps the minimal failing cases from that check,
+  which proptest replays on every run.
+- **Not done:** the `test-support` feature, `pub(crate)` for the library, and
   `#![warn(missing_docs)]` on `domain`. Narrowing the API touches every `use ferrit::...` in
   the tests, so it is its own step.
 

@@ -12,6 +12,9 @@
 - A test about app logic, not about git, uses `FakeGit` and `App::with_git`. A test about
   git itself uses a real temporary repository. New `FakeGit` behaviour comes with a
   scenario in `tests/fake_git_contract.rs` that also runs on `Repo`.
+- Free-form text read from `git` (the diff parser, the line-selection rewrite) is covered by
+  property tests in `tests/proptest_diff.rs`; a new parser of that kind gets properties there
+  before it gets more examples.
 - A test file that grows past about 700 lines becomes a folder (`main.rs`, `support.rs`,
   one module per behaviour), like `tests/git_rebase/`.
 
