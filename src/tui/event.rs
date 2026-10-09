@@ -81,6 +81,17 @@ pub(crate) enum Event {
     WelcomeSelected(usize),
     /// Leave the program.
     Quit,
+    /// Choose a value on the git config screen's menu.
+    PickConfigValue(usize),
+    /// Open the create-a-repository flow.
+    OpenCreateRemote,
+    /// A config key or value was typed: hand it to the git config screen.
+    SubmitGitConfigName {
+        /// Key or value.
+        kind: crate::tui::components::menu::NameKind,
+        /// What was typed, spaces kept.
+        text: String,
+    },
     /// Forget the start of a V-selection.
     ClearAnchor,
     /// Apply or pop a stash entry (needs the repository for writing).
@@ -200,6 +211,13 @@ impl App {
                 Event::LeaveDiff => self.nav.mode = Mode::Nav,
                 Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
                 Event::Quit => self.should_quit = true,
+                Event::PickConfigValue(index) => self.pick_config_value(index),
+                Event::OpenCreateRemote => self.open_create_remote(),
+                Event::SubmitGitConfigName { kind, text } => {
+                    if self.submit_git_config_name(&kind, &text) {
+                        self.modal.close_popup();
+                    }
+                },
                 Event::ClearAnchor => self.right.cursor.anchor = None,
                 Event::RestoreStash { oid, pop } => {
                     let first_file = self.right.diff.first_stash_file(&oid);
@@ -231,6 +249,50 @@ impl App {
                     )));
                 },
             }
+        }
+    }
+}
+
+impl App {
+    /// A popup asking for a name, for the screens that are not migrated yet.
+    pub(crate) fn open_name(
+        &mut self,
+        kind: crate::tui::components::menu::NameKind,
+        title: String,
+        input: crate::tui::widgets::text_input::TextInput,
+    ) {
+        self.apply(vec![crate::tui::components::menu::open_name(
+            kind, title, input,
+        )]);
+    }
+
+    /// Run one step of the merge, rebase, cherry-pick or revert and say where
+    /// git stopped.
+    pub(crate) fn apply_operation_step(&mut self, step: crate::git::operation::Step) {
+        let Some(repo) = &self.repo else { return };
+        let result = repo.operation_step(step);
+        self.finish_operation(result);
+    }
+
+    /// Refresh and report where git stopped after a step or a rewrite.
+    /// Refreshes either way: a refusal changes nothing, a step changes a lot.
+    pub(crate) fn finish_operation(&mut self, result: GitResult<OperationOutcome>) {
+        self.request_refresh();
+        match result {
+            Ok(OperationOutcome::Done) => {},
+            Ok(OperationOutcome::Stopped { conflicted: true }) => {
+                self.modal.open_popup(Popup::Note(
+                    "stopped on a conflict. Resolve it in Files, then press m and Continue."
+                        .to_owned(),
+                ));
+            },
+            Ok(OperationOutcome::Stopped { conflicted: false }) => {
+                self.modal.open_popup(Popup::Note(
+                    "stopped for you to edit. Make your change, then press m and Continue."
+                        .to_owned(),
+                ));
+            },
+            Err(e) => self.report_error(e),
         }
     }
 }

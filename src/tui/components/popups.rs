@@ -219,7 +219,20 @@ impl App {
             return;
         }
         if matches!(self.modal.popup(), Some(Popup::Menu(_))) {
-            self.menu_key(key);
+            let outcome = match self.modal.popup_mut() {
+                Some(Popup::Menu(menu)) => menu::on_key(menu, key),
+                _ => return,
+            };
+            let events = match outcome {
+                menu::MenuKey::Stay => Vec::new(),
+                menu::MenuKey::Close => vec![Event::ClosePopup],
+                menu::MenuKey::Choose(action) => {
+                    let mut events = vec![Event::ClosePopup];
+                    events.extend(menu::run_action(action, &self.env()));
+                    events
+                },
+            };
+            self.apply(events);
             return;
         }
         if matches!(self.modal.popup(), Some(Popup::CreateRemote(_))) {
@@ -294,8 +307,20 @@ impl App {
             let events = stash::push(&message, self.repo.as_deref());
             self.apply(events);
         }
-        if submit_name_now {
-            self.submit_name();
+        if submit_name_now && let Some(Popup::Name(target, input)) = self.modal.popup() {
+            let kind = target.kind.clone();
+            let text = input.text();
+            let events = if matches!(
+                kind,
+                menu::NameKind::ConfigKey | menu::NameKind::ConfigValue(_)
+            ) {
+                vec![Event::SubmitGitConfigName { kind, text }]
+            } else if let Some(repo) = &mut self.repo {
+                menu::submit_name(&kind, &text, repo.as_mut())
+            } else {
+                Vec::new()
+            };
+            self.apply(events);
         }
         if let Some(value) = submit_upstream {
             let events = remote::submit_upstream(&value);

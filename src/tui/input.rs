@@ -7,7 +7,7 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
-use crate::tui::components::{branches, commits, files, popups, remote, stash, welcome};
+use crate::tui::components::{branches, commits, files, menu, popups, remote, stash, welcome};
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
 use crate::tui::keymap::{Action, Context, KeyBinding};
@@ -338,8 +338,8 @@ impl App {
             Action::Dashboard => self.open_dashboard(),
             Action::GitConfig => self.open_git_config(),
             Action::CreateRemote => self.open_create_remote(),
-            Action::OperationMenu => self.open_operation_menu(),
-            Action::ContextMenu => self.open_context_menu(),
+            Action::OperationMenu => self.apply(menu::open_operation(&self.env())),
+            Action::ContextMenu => self.apply(menu::open_context(&self.env())),
             Action::Back => self.go_back(),
             Action::Enter => self.enter_selected(),
             Action::EnterDiff => self.apply(files::enter_diff(&self.env())),
@@ -454,5 +454,25 @@ impl App {
         };
         let events = popups::confirm(prompt.action, &self.env());
         self.apply(events);
+    }
+}
+
+impl App {
+    /// A right-click on a row: focus that pane, move its selection there, then
+    /// open its menu. Off any row it does nothing. (A left click also toggles a
+    /// directory; this one must not.)
+    fn right_click(&mut self, column: u16, row: u16) {
+        if self.modal.is_some() || self.help.open {
+            return;
+        }
+        let Some(pane) = self.pane_at(column, row) else {
+            return;
+        };
+        self.nav.right_focused = false;
+        self.nav.mode = Mode::Nav;
+        if self.click_pane(pane, row) {
+            self.update_right_pane();
+            self.apply(menu::open_context(&self.env()));
+        }
     }
 }
