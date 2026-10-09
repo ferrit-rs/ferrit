@@ -510,6 +510,10 @@ impl Pane {
 }
 
 pub struct App {
+    /// The side drawer and the sheets it holds: settings, dashboard.
+    sheets: sheet::Sheets,
+    /// The views that replace the panes: git config, welcome.
+    full_screens: full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
     pub nav: nav::Nav,
     /// Whether the help overlay is up.
@@ -525,8 +529,6 @@ pub struct App {
     repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
     authorship: authorship::Authorship,
-    /// First visible line of the settings sheet.
-    settings_scroll: usize,
     pub theme: theme_editor::ThemeEditor,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
     config_file: Option<PathBuf>,
@@ -554,11 +556,6 @@ pub struct App {
     palette: Palette,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
-    /// The side sheet's drawer: one for every sheet (`app::sheet`).
-    pub(crate) sheet_overlay: OverlayState,
-    /// Centered help dialog animation and backdrop state.
-    /// Which sheet the drawer holds while it is not closed.
-    sheet: sheet::Sheet,
     /// Backdrop state for the commit editor modal.
     pub(crate) commit_overlay: OverlayState,
     /// Persistent bottom-right error notification, dismissed by clicking `x`.
@@ -576,21 +573,11 @@ pub struct App {
     /// Background work in flight: the event channel, the refresh, diff and
     /// image workers, and the one network operation at a time.
     workers: workers::Workers,
-    /// The view that replaces the five panes, if any (`docs/PLAN_13_DASHBOARD.md`).
-    full_screen: FullScreen,
-    dashboard: dashboard::Dashboard,
-    git_config: git_config::GitConfigScreen,
     /// Set when the app was rebuilt on a new repository: `run` points the
     /// filesystem watch at this root and clears it.
     watch_request: Option<PathBuf>,
-    /// The folder the welcome screen is about; `None` once there is a repository.
-    welcome_dir: Option<PathBuf>,
-    /// The settings sheet's highlighted row and footer (`docs/PLAN_17_SETTINGS.md`).
-    settings: settings::SettingsSheet,
     /// A change the run loop has to carry out in the terminal, once.
     terminal_request: Option<settings::TerminalRequest>,
-    /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.
-    welcome_selected: usize,
     create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
@@ -600,6 +587,7 @@ pub struct App {
 }
 
 mod authorship;
+mod full_screens;
 pub mod help;
 pub mod hit_areas;
 mod modal;
@@ -669,13 +657,14 @@ impl App {
             identity_source,
         });
         Self {
+            sheets: sheet::Sheets::default(),
+            full_screens: full_screens::FullScreens::default(),
             nav: nav::Nav::default(),
             help: help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship: authorship::Authorship::new(profile, git_user_name),
-            settings_scroll: 0,
             theme: theme_editor::ThemeEditor::new(theme_config),
             config,
             right: right_pane::RightPane::new(),
@@ -688,22 +677,14 @@ impl App {
             hits: hit_areas::HitAreas::default(),
             palette,
             mouse_pointer: MousePointer::default(),
-            sheet_overlay: OverlayState::new().with_duration(Duration::from_millis(200)),
-            sheet: sheet::Sheet::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
             new_branch_title: String::new(),
             modal: modal::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
-            full_screen: FullScreen::None,
-            dashboard: dashboard::Dashboard::default(),
-            git_config: git_config::GitConfigScreen::default(),
             watch_request: None,
-            welcome_dir: None,
-            settings: settings::SettingsSheet::default(),
             terminal_request: None,
-            welcome_selected: 0,
             create_remote: create_remote::CreateRemote::default(),
             status_note: None,
         }
@@ -785,8 +766,9 @@ impl App {
         } = load;
         let mut app = Self::base(None, config);
         app.config_file = file;
-        app.full_screen = FullScreen::Welcome;
-        app.welcome_dir = Some(dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()));
+        app.full_screens.active = FullScreen::Welcome;
+        app.full_screens.welcome_dir =
+            Some(dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()));
         app.report_config_issues(&issues);
         app
     }
@@ -1295,12 +1277,12 @@ impl App {
     /// Configured Git author name, shown in the Info panel header when set.
     /// The view that replaces the panes, `FullScreen::None` for the normal screen.
     pub fn full_screen(&self) -> FullScreen {
-        self.full_screen
+        self.full_screens.active
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
     pub fn dashboard(&self) -> &dashboard::Dashboard {
-        &self.dashboard
+        &self.sheets.dashboard
     }
 
     pub fn git_user_name(&self) -> Option<&str> {
@@ -1535,7 +1517,7 @@ impl App {
             && !self.workers.diff.in_flight
             && !self.workers.image.in_flight
             && self.workers.remote_busy.is_none()
-            && !self.dashboard.is_busy()
+            && !self.sheets.dashboard.is_busy()
     }
 
     /// Back to synchronous work (undo `set_event_sender`).
@@ -1986,7 +1968,7 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
-            let was_animating = self.sheet_overlay.is_animating();
+            let was_animating = self.sheets.overlay.is_animating();
             let help_was_animating = self.help.overlay.is_animating();
             let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
             let remote_animating = self.workers.remote_busy.is_some();
@@ -2006,7 +1988,7 @@ impl App {
                     Ok(Some(batch)) => batch,
                     Ok(None) => {
                         let elapsed = overlay_tick.elapsed();
-                        self.sheet_overlay.tick(elapsed);
+                        self.sheets.overlay.tick(elapsed);
                         self.help.overlay.tick(elapsed);
                         self.tick_toast(elapsed);
                         overlay_tick = Instant::now();
@@ -2051,8 +2033,8 @@ impl App {
                 self.watch_error = watcher_error(&events);
                 self.last_error = self.watch_error.clone();
             }
-            if self.sheet_overlay.is_animating() && was_animating {
-                self.sheet_overlay.tick(overlay_tick.elapsed());
+            if self.sheets.overlay.is_animating() && was_animating {
+                self.sheets.overlay.tick(overlay_tick.elapsed());
             }
             if self.help.overlay.is_animating() && help_was_animating {
                 self.help.overlay.tick(overlay_tick.elapsed());
@@ -2069,7 +2051,7 @@ impl App {
             }
             self.workers.remote_busy = None;
         }
-        self.dashboard.stop_and_join();
+        self.sheets.dashboard.stop_and_join();
         Ok(())
     }
 
@@ -2078,7 +2060,7 @@ impl App {
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
-        self.sheet_overlay.tick(elapsed);
+        self.sheets.overlay.tick(elapsed);
         self.help.overlay.tick(elapsed);
     }
 
@@ -2086,7 +2068,7 @@ impl App {
     /// replay, which has no clock to wait on.
     #[doc(hidden)]
     pub fn finish_animations(&mut self) {
-        self.sheet_overlay.tick(Duration::from_secs(1));
+        self.sheets.overlay.tick(Duration::from_secs(1));
         self.help.overlay.tick(Duration::from_secs(1));
     }
 

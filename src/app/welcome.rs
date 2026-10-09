@@ -12,12 +12,12 @@ const WELCOME_ROWS: usize = 2;
 impl App {
     /// The highlighted row: 0 is `git init`, 1 is quit.
     pub fn welcome_selected(&self) -> usize {
-        self.welcome_selected
+        self.full_screens.welcome_selected
     }
 
     /// The folder the welcome screen is about, while it is up.
     pub fn welcome_dir(&self) -> Option<&Path> {
-        self.welcome_dir.as_deref()
+        self.full_screens.welcome_dir.as_deref()
     }
 
     /// Every key on the welcome screen (after a pending question, which owns
@@ -28,12 +28,14 @@ impl App {
     pub(super) fn welcome_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') | KeyCode::End => {
-                self.welcome_selected = (self.welcome_selected + 1).min(WELCOME_ROWS - 1);
+                self.full_screens.welcome_selected =
+                    (self.full_screens.welcome_selected + 1).min(WELCOME_ROWS - 1);
             },
             KeyCode::Up | KeyCode::Char('k') | KeyCode::Home => {
-                self.welcome_selected = self.welcome_selected.saturating_sub(1);
+                self.full_screens.welcome_selected =
+                    self.full_screens.welcome_selected.saturating_sub(1);
             },
-            KeyCode::Enter if self.welcome_selected == 0 => self.ask_init(),
+            KeyCode::Enter if self.full_screens.welcome_selected == 0 => self.ask_init(),
             KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('i') => self.ask_init(),
             _ => {},
@@ -44,7 +46,7 @@ impl App {
     /// is the user's home directory, where a `git init` is the mistake this
     /// question exists to catch.
     fn ask_init(&mut self) {
-        let Some(dir) = self.welcome_dir.clone() else {
+        let Some(dir) = self.full_screens.welcome_dir.clone() else {
             return;
         };
         let home = std::env::var_os("HOME").is_some_and(|home| Path::new(&home) == dir);

@@ -169,7 +169,7 @@ fn hint(app: &App) -> &'static str {
 pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
     let accent = app.theme.config.color();
     let selected_row = app.settings().selected;
-    let Some(inner) = Drawer::new(&mut app.sheet_overlay, " Settings ")
+    let Some(inner) = Drawer::new(&mut app.sheets.overlay, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
         .render(frame, area)
@@ -237,16 +237,16 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
 
     let viewport = usize::from(body.height);
     let max_scroll = lines.len().saturating_sub(viewport);
-    if app.settings.follow {
-        app.settings.follow = false;
-        if selected_line < app.settings_scroll {
-            app.settings_scroll = selected_line;
-        } else if viewport > 0 && selected_line >= app.settings_scroll + viewport {
-            app.settings_scroll = selected_line + 1 - viewport;
+    if app.sheets.settings.follow {
+        app.sheets.settings.follow = false;
+        if selected_line < app.sheets.settings.scroll {
+            app.sheets.settings.scroll = selected_line;
+        } else if viewport > 0 && selected_line >= app.sheets.settings.scroll + viewport {
+            app.sheets.settings.scroll = selected_line + 1 - viewport;
         }
     }
-    app.settings_scroll = app.settings_scroll.min(max_scroll);
-    let scroll = app.settings_scroll;
+    app.sheets.settings.scroll = app.sheets.settings.scroll.min(max_scroll);
+    let scroll = app.sheets.settings.scroll;
 
     let on_screen = |line: usize| -> Option<u16> {
         (scroll..scroll + viewport)

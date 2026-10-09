@@ -43,7 +43,7 @@ Known gaps, each with a plan:
 - `domain/git` still holds the `git2` adapter itself, so "the domain has no `git2`" is not
   true yet; moving it to an `infra/` layer means splitting 21 files into their types and
   their `git2` code (`PLAN_21_GIT_PORT.md`, C4).
-- `App` is smaller (87 fields to 37) but not small. The full-screen views and the sheets
+- `App` is smaller (87 fields to 30) but not small. Configuration and the create-remote flow
   are still loose on it, and `screens::draw` still takes `&mut App`
   (`PLAN_22_APP_SPLIT.md`).
 - The library exposes more than it needs to, and the test seams (`replay`, `FakeGit`) are
@@ -80,7 +80,7 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 | Path | Holds |
 | --- | --- |
 | `src/app/mod.rs` | `App`, the run loop, the event match |
-| `src/app/{nav,authorship,help,theme_editor,right_pane,modal,workers,hit_areas}.rs` | the parts of `App` with a name: where the user is in the panes, who commits are by, the help screen, the theme being edited, the right column, a popup or a question, background work in flight, where the last frame put the clickable things |
+| `src/app/{nav,authorship,full_screens,help,theme_editor,right_pane,modal,workers,hit_areas}.rs` and `sheet.rs` | the parts of `App` with a name: where the user is in the panes, who commits are by, the full-screen views, the side sheets, the help screen, the theme being edited, the right column, a popup or a question, background work in flight, where the last frame put the clickable things |
 | `src/app/dispatch.rs`, `input.rs`, `keymap.rs` | actions, key routing, remappable keys |
 | `src/app/*_actions.rs`, `staging.rs`, `commit.rs`, `remote.rs` | one feature each |
 | `src/app/screens/` | drawing only |

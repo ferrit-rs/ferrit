@@ -171,27 +171,27 @@ impl GitConfigScreen {
 impl App {
     /// The git config screen's state, for the screen that draws it and for tests.
     pub fn git_config(&self) -> &GitConfigScreen {
-        &self.git_config
+        &self.full_screens.git_config
     }
 
     /// Show the git config screen over the panes, with a fresh listing.
     pub fn open_git_config(&mut self) {
         if self.reread_git_config() {
-            self.git_config.filtering = false;
-            self.git_config.note = None;
-            self.full_screen = FullScreen::GitConfig;
+            self.full_screens.git_config.filtering = false;
+            self.full_screens.git_config.note = None;
+            self.full_screens.active = FullScreen::GitConfig;
         }
     }
 
     /// The renderer's word on where the list starts: keep it.
     pub(crate) const fn set_git_config_offset(&mut self, offset: usize) {
-        self.git_config.offset = offset;
+        self.full_screens.git_config.offset = offset;
     }
 
     pub fn close_git_config(&mut self) {
-        self.full_screen = FullScreen::None;
-        self.git_config.filtering = false;
-        self.git_config.set_filter(String::new());
+        self.full_screens.active = FullScreen::None;
+        self.full_screens.git_config.filtering = false;
+        self.full_screens.git_config.set_filter(String::new());
     }
 
     /// `git config --list` again; `false` (after an error toast) when git
@@ -203,7 +203,7 @@ impl App {
         };
         match repo.config() {
             Ok(view) => {
-                self.git_config.set_view(view);
+                self.full_screens.git_config.set_view(view);
                 true
             },
             Err(e) => {
@@ -216,7 +216,7 @@ impl App {
     /// Every key while the screen is up (after the popups, a pending
     /// confirmation and the help overlay, which own input before it).
     pub(super) fn git_config_key(&mut self, key: KeyEvent) {
-        if self.git_config.filtering {
+        if self.full_screens.git_config.filtering {
             self.git_config_filter_key(key);
             return;
         }
@@ -231,19 +231,20 @@ impl App {
         }
         match key.code {
             // A kept filter goes first; the next `Esc` leaves.
-            KeyCode::Esc if !self.git_config.filter.is_empty() => {
-                self.git_config.set_filter(String::new());
+            KeyCode::Esc if !self.full_screens.git_config.filter.is_empty() => {
+                self.full_screens.git_config.set_filter(String::new());
             },
             KeyCode::Esc | KeyCode::Char('q') => self.close_git_config(),
-            KeyCode::Char('j') | KeyCode::Down => self.git_config.move_by(1),
-            KeyCode::Char('k') | KeyCode::Up => self.git_config.move_by(-1),
-            KeyCode::PageDown => self.git_config.move_by(PAGE),
-            KeyCode::PageUp => self.git_config.move_by(-PAGE),
-            KeyCode::Home => self.git_config.selected = 0,
+            KeyCode::Char('j') | KeyCode::Down => self.full_screens.git_config.move_by(1),
+            KeyCode::Char('k') | KeyCode::Up => self.full_screens.git_config.move_by(-1),
+            KeyCode::PageDown => self.full_screens.git_config.move_by(PAGE),
+            KeyCode::PageUp => self.full_screens.git_config.move_by(-PAGE),
+            KeyCode::Home => self.full_screens.git_config.selected = 0,
             KeyCode::End => {
-                self.git_config.selected = self.git_config.rows.len().saturating_sub(1);
+                self.full_screens.git_config.selected =
+                    self.full_screens.git_config.rows.len().saturating_sub(1);
             },
-            KeyCode::Char('/') => self.git_config.filtering = true,
+            KeyCode::Char('/') => self.full_screens.git_config.filtering = true,
             KeyCode::Char('s') => self.toggle_git_config_scope(),
             KeyCode::Char('r') => {
                 self.reread_git_config();
@@ -256,15 +257,15 @@ impl App {
 
     /// `Esc` clears the filter and leaves it, `Enter` leaves it as typed.
     fn git_config_filter_key(&mut self, key: KeyEvent) {
-        let mut text = self.git_config.filter.clone();
+        let mut text = self.full_screens.git_config.filter.clone();
         match key.code {
             KeyCode::Esc => {
-                self.git_config.filtering = false;
-                self.git_config.set_filter(String::new());
+                self.full_screens.git_config.filtering = false;
+                self.full_screens.git_config.set_filter(String::new());
                 return;
             },
             KeyCode::Enter => {
-                self.git_config.filtering = false;
+                self.full_screens.git_config.filtering = false;
                 return;
             },
             KeyCode::Backspace => {
@@ -273,11 +274,11 @@ impl App {
             KeyCode::Char(c) => text.push(c),
             _ => return,
         }
-        self.git_config.set_filter(text);
+        self.full_screens.git_config.set_filter(text);
     }
 
     fn toggle_git_config_scope(&mut self) {
-        self.git_config.scope = match self.git_config.scope {
+        self.full_screens.git_config.scope = match self.full_screens.git_config.scope {
             WriteScope::Local => WriteScope::Global,
             WriteScope::Global | WriteScope::Worktree => WriteScope::Local,
         };
@@ -286,8 +287,8 @@ impl App {
     /// Only the wheel does anything: it moves the selection.
     pub(super) fn git_config_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
-            MouseEventKind::ScrollUp => self.git_config.move_by(-WHEEL_ROWS),
-            MouseEventKind::ScrollDown => self.git_config.move_by(WHEEL_ROWS),
+            MouseEventKind::ScrollUp => self.full_screens.git_config.move_by(-WHEEL_ROWS),
+            MouseEventKind::ScrollDown => self.full_screens.git_config.move_by(WHEEL_ROWS),
             _ => {},
         }
     }

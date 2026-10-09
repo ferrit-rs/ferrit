@@ -150,10 +150,10 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     draw_command_log(frame, app, log);
     draw_keybar(frame, keybar, app);
 
-    if app.sheet_overlay.is_closed() {
+    if app.sheets.overlay.is_closed() {
         app.hits.settings = crate::app::settings::SettingsHits::default();
     } else {
-        match app.sheet {
+        match app.sheets.kind {
             Sheet::Settings => settings::draw(frame, area, app, &palette),
             Sheet::Dashboard => {
                 // Above the key bar, which stays the dashboard's own.

@@ -56,17 +56,17 @@ impl App {
         }
 
         // A full-screen view owns the keys after the overlays above.
-        if self.full_screen == FullScreen::GitConfig {
+        if self.full_screens.active == FullScreen::GitConfig {
             self.git_config_key(key);
             return;
         }
-        if self.full_screen == FullScreen::Welcome {
+        if self.full_screens.active == FullScreen::Welcome {
             self.welcome_key(key);
             return;
         }
 
-        if !self.sheet_overlay.is_closed() {
-            match self.sheet {
+        if !self.sheets.overlay.is_closed() {
+            match self.sheets.kind {
                 Sheet::Settings => self.settings_key(key),
                 Sheet::Dashboard => self.dashboard_key(key),
             }
@@ -112,9 +112,9 @@ impl App {
             return;
         }
         if matches!(ev.kind, MouseEventKind::Moved) {
-            let over_author = self.sheet_overlay.is_closed()
+            let over_author = self.sheets.overlay.is_closed()
                 && self.hits.author.contains(Position::new(ev.column, ev.row));
-            let over_dashboard = self.sheet_overlay.is_closed()
+            let over_dashboard = self.sheets.overlay.is_closed()
                 && self
                     .hits
                     .dashboard
@@ -125,17 +125,17 @@ impl App {
 
         // The panes are not on screen: their areas from the last frame must not
         // answer clicks. The wheel scrolls the dashboard.
-        if self.full_screen == FullScreen::GitConfig {
+        if self.full_screens.active == FullScreen::GitConfig {
             self.git_config_mouse(ev);
             return;
         }
         // Nothing to click without a repository.
-        if self.full_screen == FullScreen::Welcome {
+        if self.full_screens.active == FullScreen::Welcome {
             return;
         }
 
-        if !self.sheet_overlay.is_closed() {
-            match self.sheet {
+        if !self.sheets.overlay.is_closed() {
+            match self.sheets.kind {
                 Sheet::Settings => self.settings_mouse(ev),
                 Sheet::Dashboard => self.dashboard_mouse(ev),
             }

@@ -22,7 +22,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let accent = app.theme.config.color();
     // The page plus the drawer's two border columns, no more.
     let width = (dashboard::MAX_WIDTH + 2).min(area.width.saturating_mul(MAX_PERCENT) / 100);
-    let Some(inner) = Drawer::new(&mut app.sheet_overlay, " Dashboard ")
+    let Some(inner) = Drawer::new(&mut app.sheets.overlay, " Dashboard ")
         .width(Constraint::Length(width))
         .border_style(Style::new().fg(accent))
         .render(frame, area)

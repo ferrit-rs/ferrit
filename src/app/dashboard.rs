@@ -180,55 +180,55 @@ impl App {
 
     /// The sheet is about to open: at the top, no old error, statistics asked for.
     pub(super) fn prepare_dashboard_sheet(&mut self) {
-        self.dashboard.error = None;
-        self.dashboard.scroll = 0;
+        self.sheets.dashboard.error = None;
+        self.sheets.dashboard.scroll = 0;
         self.ensure_stats(false);
     }
 
     /// The renderer's word on how far the page scrolls: keep the offset in it.
     pub(crate) fn clamp_dashboard_scroll(&mut self, max: usize) {
-        self.dashboard.scroll = self.dashboard.scroll.min(max);
+        self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.min(max);
     }
 
     /// Back to the panes. A running computation is told to stop; its result, if
     /// it still arrives, is kept only when it is good.
     pub fn close_dashboard(&mut self) {
         self.close_sheet();
-        self.dashboard.cancel_running();
+        self.sheets.dashboard.cancel_running();
     }
 
     /// Make sure the current window has statistics, or is on its way to have
     /// them. `force` recomputes even when the cache is fresh (`r`).
     fn ensure_stats(&mut self, force: bool) {
         let fingerprint = self.refs_fingerprint();
-        if fingerprint != self.dashboard.fingerprint {
-            self.dashboard.cache = std::array::from_fn(|_| None);
-            self.dashboard.fingerprint = fingerprint;
+        if fingerprint != self.sheets.dashboard.fingerprint {
+            self.sheets.dashboard.cache = std::array::from_fn(|_| None);
+            self.sheets.dashboard.fingerprint = fingerprint;
         }
-        let slot = self.dashboard.window;
-        let cached = self.dashboard.cached();
+        let slot = self.sheets.dashboard.window;
+        let cached = self.sheets.dashboard.cached();
         if !force && cached.is_some_and(|c| !c.churn_pending) {
             return;
         }
-        if !force && self.dashboard.in_flight == Some(slot) {
+        if !force && self.sheets.dashboard.in_flight == Some(slot) {
             return;
         }
         if force {
-            self.dashboard.store(slot, None);
+            self.sheets.dashboard.store(slot, None);
         }
-        self.dashboard.cancel_running();
-        self.dashboard.generation += 1;
-        self.dashboard.cancel = Arc::new(AtomicBool::new(false));
-        self.dashboard.in_flight = Some(slot);
-        self.dashboard.error = None;
+        self.sheets.dashboard.cancel_running();
+        self.sheets.dashboard.generation += 1;
+        self.sheets.dashboard.cancel = Arc::new(AtomicBool::new(false));
+        self.sheets.dashboard.in_flight = Some(slot);
+        self.sheets.dashboard.error = None;
 
         let Some(repo) = self.repo_handle() else {
-            self.dashboard.in_flight = None;
+            self.sheets.dashboard.in_flight = None;
             return;
         };
-        let generation = self.dashboard.generation;
-        let window = self.dashboard.window();
-        let cancel = Arc::clone(&self.dashboard.cancel);
+        let generation = self.sheets.dashboard.generation;
+        let window = self.sheets.dashboard.window();
+        let cancel = Arc::clone(&self.sheets.dashboard.cancel);
         let Some(sender) = self.workers.sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): do it now.
             for full in [false, true] {
@@ -242,7 +242,7 @@ impl App {
             }
             return;
         };
-        self.dashboard.worker = Some(thread::spawn(move || {
+        self.sheets.dashboard.worker = Some(thread::spawn(move || {
             for full in [false, true] {
                 if cancel.load(Ordering::Acquire) {
                     break;
@@ -266,7 +266,7 @@ impl App {
     /// result is cached whether or not the screen is still up, an error only
     /// shows when it is.
     pub(super) fn on_stats_done(&mut self, completion: StatsCompletion) {
-        if completion.generation != self.dashboard.generation {
+        if completion.generation != self.sheets.dashboard.generation {
             return;
         }
         let Some(slot) = WINDOWS.iter().position(|w| *w == completion.window) else {
@@ -274,26 +274,26 @@ impl App {
         };
         match completion.result {
             Ok(stats) => {
-                self.dashboard.store(
+                self.sheets.dashboard.store(
                     slot,
                     Some(Cached {
                         stats: *stats,
                         churn_pending: !completion.full,
                     }),
                 );
-                self.dashboard.error = None;
+                self.sheets.dashboard.error = None;
             },
             Err(message) => {
                 if self.dashboard_is_open() {
-                    self.dashboard.error = Some(message.to_string());
+                    self.sheets.dashboard.error = Some(message.to_string());
                 }
             },
         }
-        if completion.full || self.dashboard.error.is_some() {
-            if let Some(worker) = self.dashboard.worker.take() {
+        if completion.full || self.sheets.dashboard.error.is_some() {
+            if let Some(worker) = self.sheets.dashboard.worker.take() {
                 let _ = worker.join();
             }
-            self.dashboard.in_flight = None;
+            self.sheets.dashboard.in_flight = None;
         }
     }
 
@@ -315,21 +315,23 @@ impl App {
             KeyCode::Char('t') => self.cycle_window(true),
             KeyCode::Char('T') => self.cycle_window(false),
             KeyCode::Char('r') => self.ensure_stats(true),
-            KeyCode::Char('n') => self.dashboard.show_counts = !self.dashboard.show_counts,
+            KeyCode::Char('n') => {
+                self.sheets.dashboard.show_counts = !self.sheets.dashboard.show_counts;
+            },
             KeyCode::Char('k') | KeyCode::Up => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_sub(1);
+                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_sub(1);
             },
             KeyCode::Char('j') | KeyCode::Down => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_add(1);
+                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_add(1);
             },
             KeyCode::PageUp => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_sub(PAGE);
+                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_sub(PAGE);
             },
             KeyCode::PageDown => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_add(PAGE);
+                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_add(PAGE);
             },
-            KeyCode::Home => self.dashboard.scroll = 0,
-            KeyCode::End => self.dashboard.scroll = usize::MAX,
+            KeyCode::Home => self.sheets.dashboard.scroll = 0,
+            KeyCode::End => self.sheets.dashboard.scroll = usize::MAX,
             _ => {},
         }
     }
@@ -341,17 +343,20 @@ impl App {
         match ev.kind {
             MouseEventKind::Down(ratatui::crossterm::event::MouseButton::Left)
                 if !self
-                    .sheet_overlay
+                    .sheets
+                    .overlay
                     .overlay_rect()
                     .is_some_and(|rect| rect.contains(point)) =>
             {
                 self.close_dashboard();
             },
             MouseEventKind::ScrollUp => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_sub(WHEEL_ROWS);
+                self.sheets.dashboard.scroll =
+                    self.sheets.dashboard.scroll.saturating_sub(WHEEL_ROWS);
             },
             MouseEventKind::ScrollDown => {
-                self.dashboard.scroll = self.dashboard.scroll.saturating_add(WHEEL_ROWS);
+                self.sheets.dashboard.scroll =
+                    self.sheets.dashboard.scroll.saturating_add(WHEEL_ROWS);
             },
             _ => {},
         }
@@ -359,12 +364,12 @@ impl App {
 
     fn cycle_window(&mut self, forward: bool) {
         let count = WINDOWS.len();
-        self.dashboard.window = if forward {
-            (self.dashboard.window + 1) % count
+        self.sheets.dashboard.window = if forward {
+            (self.sheets.dashboard.window + 1) % count
         } else {
-            (self.dashboard.window + count - 1) % count
+            (self.sheets.dashboard.window + count - 1) % count
         };
-        self.dashboard.scroll = 0;
+        self.sheets.dashboard.scroll = 0;
         self.ensure_stats(false);
     }
 }

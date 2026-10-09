@@ -142,6 +142,8 @@ pub struct SettingsSheet {
     /// The next frame scrolls the selected row into view.
     pub follow: bool,
     pub save: SaveState,
+    /// First visible line of the sheet.
+    pub scroll: usize,
 }
 
 /// Something only the run loop can do for a setting that changed.
@@ -163,7 +165,7 @@ fn stepped(value: u64, up: bool, min: u64, max: u64) -> u64 {
 impl App {
     /// The sheet's state, for the screen that draws it and for tests.
     pub fn settings(&self) -> &SettingsSheet {
-        &self.settings
+        &self.sheets.settings
     }
 
     /// The live configuration: what ferrit is using now, saved or not.
@@ -283,10 +285,10 @@ impl App {
     /// footer and the setting still applies for this run.
     pub(super) fn save_settings(&mut self, section: Section) {
         let Some(path) = self.config_file.clone() else {
-            self.settings.save = SaveState::Idle;
+            self.sheets.settings.save = SaveState::Idle;
             return;
         };
-        self.settings.save = match Config::save_sections(&path, &self.config, &[section]) {
+        self.sheets.settings.save = match Config::save_sections(&path, &self.config, &[section]) {
             Ok(()) => SaveState::Saved,
             Err(error) => SaveState::Failed(error.to_string()),
         };
@@ -328,7 +330,7 @@ impl App {
 
     fn selected_row(&self) -> SettingsRow {
         SettingsRow::ALL
-            .get(self.settings.selected)
+            .get(self.sheets.settings.selected)
             .copied()
             .unwrap_or(SettingsRow::Theme)
     }
@@ -337,8 +339,8 @@ impl App {
     /// scrolled into view.
     pub(super) fn prepare_settings_sheet(&mut self) {
         self.theme.mode = ThemeMode::Idle;
-        self.settings_scroll = 0;
-        self.settings.follow = true;
+        self.sheets.settings.scroll = 0;
+        self.sheets.settings.follow = true;
     }
 
     /// Every key while the sheet is up. It owns the keyboard: `↑` `↓` move
@@ -361,12 +363,12 @@ impl App {
         match key.code {
             KeyCode::Esc => self.close_sheet(),
             KeyCode::Up | KeyCode::Char('k') => {
-                self.settings.selected = self.settings.selected.saturating_sub(1);
-                self.settings.follow = true;
+                self.sheets.settings.selected = self.sheets.settings.selected.saturating_sub(1);
+                self.sheets.settings.follow = true;
             },
             KeyCode::Down | KeyCode::Char('j') => {
-                self.settings.selected = (self.settings.selected + 1).min(last);
-                self.settings.follow = true;
+                self.sheets.settings.selected = (self.sheets.settings.selected + 1).min(last);
+                self.sheets.settings.follow = true;
             },
             KeyCode::Left | KeyCode::Char('h') => self.change_setting(row, false),
             KeyCode::Right | KeyCode::Char('l' | ' ') => self.change_setting(row, true),
@@ -374,11 +376,15 @@ impl App {
                 self.theme.mode = ThemeMode::Palette;
                 self.sync_theme_picker_selection();
             },
-            KeyCode::PageUp => self.settings_scroll = self.settings_scroll.saturating_sub(10),
-            KeyCode::PageDown => self.settings_scroll = self.settings_scroll.saturating_add(10),
+            KeyCode::PageUp => {
+                self.sheets.settings.scroll = self.sheets.settings.scroll.saturating_sub(10);
+            },
+            KeyCode::PageDown => {
+                self.sheets.settings.scroll = self.sheets.settings.scroll.saturating_add(10);
+            },
             KeyCode::Home | KeyCode::End => {
-                self.settings.selected = if key.code == KeyCode::Home { 0 } else { last };
-                self.settings.follow = true;
+                self.sheets.settings.selected = if key.code == KeyCode::Home { 0 } else { last };
+                self.sheets.settings.follow = true;
             },
             _ => {},
         }
@@ -417,10 +423,12 @@ impl App {
         let point = Position::new(ev.column, ev.row);
         match ev.kind {
             MouseEventKind::ScrollUp => {
-                self.settings_scroll = self.settings_scroll.saturating_sub(WHEEL_ROWS);
+                self.sheets.settings.scroll =
+                    self.sheets.settings.scroll.saturating_sub(WHEEL_ROWS);
             },
             MouseEventKind::ScrollDown => {
-                self.settings_scroll = self.settings_scroll.saturating_add(WHEEL_ROWS);
+                self.sheets.settings.scroll =
+                    self.sheets.settings.scroll.saturating_add(WHEEL_ROWS);
             },
             MouseEventKind::Down(MouseButton::Left) => {
                 let grid = self.hits.settings.color_grid;
@@ -437,7 +445,7 @@ impl App {
                     .iter()
                     .find(|(area, ..)| area.contains(point))
                 {
-                    self.settings.selected =
+                    self.sheets.settings.selected =
                         SettingsRow::ALL.iter().position(|r| *r == row).unwrap_or(0);
                     match click {
                         Click::Row => {},
@@ -446,7 +454,8 @@ impl App {
                         Click::Step(up) => self.change_setting(row, up),
                     }
                 } else if !self
-                    .sheet_overlay
+                    .sheets
+                    .overlay
                     .overlay_rect()
                     .is_some_and(|rect| rect.contains(point))
                 {

@@ -69,18 +69,18 @@ fn truthy(value: &str) -> bool {
 impl App {
     /// `e` / `Enter`: edit the selected value in the write scope.
     pub(super) fn edit_git_config_value(&mut self) {
-        let Some(row) = self.git_config.selected_row().cloned() else {
+        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
         if let Some(reason) = Self::git_config_read_only(&row.entry.key, row.entry.scope) {
-            self.git_config.note = Some(reason);
+            self.full_screens.git_config.note = Some(reason);
             return;
         }
         if self.ask_before_global_write(GlobalResume::Edit) {
             return;
         }
-        let scope = self.git_config.scope;
+        let scope = self.full_screens.git_config.scope;
         let replacing = self.replacing_in(scope, &row.entry.key, row.entry.scope, &row.entry.value);
         let known = lookup(&key).map(|k| k.kind);
         let title = format!("{key} ({})", scope_name(scope));
@@ -103,7 +103,7 @@ impl App {
                 .iter()
                 .position(|v| *v == row.entry.value)
                 .unwrap_or(0);
-            self.git_config.pick = Some(PickTarget {
+            self.full_screens.git_config.pick = Some(PickTarget {
                 key,
                 kind: kind.value_kind(),
                 replacing,
@@ -140,22 +140,23 @@ impl App {
 
     /// `Space`: flip a known boolean key.
     pub(super) fn toggle_git_config_bool(&mut self) {
-        let Some(row) = self.git_config.selected_row().cloned() else {
+        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
         if lookup(&key).map(|k| k.kind) != Some(KeyType::Bool) {
-            self.git_config.note = Some(format!("{key} is not a boolean: Enter edits it"));
+            self.full_screens.git_config.note =
+                Some(format!("{key} is not a boolean: Enter edits it"));
             return;
         }
         if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
-            self.git_config.note = Some(reason);
+            self.full_screens.git_config.note = Some(reason);
             return;
         }
         if self.ask_before_global_write(GlobalResume::Toggle) {
             return;
         }
-        let scope = self.git_config.scope;
+        let scope = self.full_screens.git_config.scope;
         let replacing = self.replacing_in(scope, &key, row.entry.scope, &row.entry.value);
         let value = if truthy(&row.entry.value) {
             "false"
@@ -175,7 +176,7 @@ impl App {
         if self.ask_before_global_write(GlobalResume::Add) {
             return;
         }
-        let scope = self.git_config.scope;
+        let scope = self.full_screens.git_config.scope;
         self.open_name(
             NameKind::ConfigKey,
             format!("New key ({})", scope_name(scope)),
@@ -185,30 +186,31 @@ impl App {
 
     /// `d`: unset the selected value in the write scope, after asking.
     pub(super) fn unset_git_config_value(&mut self) {
-        let Some(row) = self.git_config.selected_row().cloned() else {
+        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
         if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
-            self.git_config.note = Some(reason);
+            self.full_screens.git_config.note = Some(reason);
             return;
         }
-        let scope = self.git_config.scope;
+        let scope = self.full_screens.git_config.scope;
         if scope_of(row.entry.scope) != Some(scope) {
-            self.git_config.note = Some(format!(
+            self.full_screens.git_config.note = Some(format!(
                 "{key} is not set in {}: press s to switch the scope",
                 scope_name(scope)
             ));
             return;
         }
         if row.included {
-            self.git_config.note = Some(format!(
+            self.full_screens.git_config.note = Some(format!(
                 "{key} comes from an included file: edit that file directly"
             ));
             return;
         }
         let shown = display_value(&key, &row.entry.value);
-        let file = if scope == WriteScope::Global && !self.git_config.global_confirmed {
+        let file = if scope == WriteScope::Global && !self.full_screens.git_config.global_confirmed
+        {
             format!(" ({})", self.global_file_label())
         } else {
             String::new()
@@ -223,8 +225,8 @@ impl App {
     /// `y` on the unset question. Asking named the file, so for the global
     /// scope this is also the session's global confirmation.
     pub(super) fn confirm_git_config_unset(&mut self, op: &ConfigOp) {
-        if self.git_config.scope == WriteScope::Global {
-            self.git_config.global_confirmed = true;
+        if self.full_screens.git_config.scope == WriteScope::Global {
+            self.full_screens.git_config.global_confirmed = true;
         }
         self.perform_git_config_op(op);
     }
@@ -233,7 +235,9 @@ impl App {
     /// file. `true` when it asked (the caller stops; `resume_git_config_edit`
     /// carries on after the yes).
     fn ask_before_global_write(&mut self, resume: GlobalResume) -> bool {
-        if self.git_config.scope != WriteScope::Global || self.git_config.global_confirmed {
+        if self.full_screens.git_config.scope != WriteScope::Global
+            || self.full_screens.git_config.global_confirmed
+        {
             return false;
         }
         self.modal.ask(ConfirmPrompt {
@@ -248,7 +252,7 @@ impl App {
 
     /// `y` on the global question: remember it, then do what was asked.
     pub(super) fn resume_git_config_edit(&mut self, resume: GlobalResume) {
-        self.git_config.global_confirmed = true;
+        self.full_screens.git_config.global_confirmed = true;
         match resume {
             GlobalResume::Edit => self.edit_git_config_value(),
             GlobalResume::Toggle => self.toggle_git_config_bool(),
@@ -258,7 +262,7 @@ impl App {
 
     /// The global file as the user would write it: `~/.gitconfig`.
     fn global_file_label(&self) -> String {
-        let Some(path) = self.git_config.global_file() else {
+        let Some(path) = self.full_screens.git_config.global_file() else {
             return "~/.gitconfig".to_owned();
         };
         std::env::var_os("HOME")
@@ -271,7 +275,7 @@ impl App {
 
     /// A menu row of the allowed values was chosen.
     pub(super) fn pick_config_value(&mut self, index: usize) {
-        let Some(target) = self.git_config.pick.take() else {
+        let Some(target) = self.full_screens.git_config.pick.take() else {
             return;
         };
         let Some(value) = target.values.get(index) else {
@@ -294,8 +298,8 @@ impl App {
                     self.report_notice("a key needs a name");
                     return false;
                 }
-                let scope = self.git_config.scope;
-                let exists = self.git_config.rows.iter().any(|r| {
+                let scope = self.full_screens.git_config.scope;
+                let exists = self.full_screens.git_config.rows.iter().any(|r| {
                     r.entry.key.eq_ignore_ascii_case(&key) && scope_of(r.entry.scope) == Some(scope)
                 });
                 let known = lookup(&key).map(|k| k.kind);
@@ -371,6 +375,7 @@ impl App {
         value: &str,
     ) -> Option<String> {
         let held = self
+            .full_screens
             .git_config
             .rows
             .iter()
@@ -385,7 +390,7 @@ impl App {
         let Some(repo) = &self.repo else {
             return false;
         };
-        let scope = self.git_config.scope;
+        let scope = self.full_screens.git_config.scope;
         let result = match op {
             ConfigOp::Set {
                 key,
@@ -415,7 +420,7 @@ impl App {
         self.reread_git_config();
         let note = match op {
             ConfigOp::Unset { .. } => {
-                let wins = self.git_config.effective(key).map(|e| {
+                let wins = self.full_screens.git_config.effective(key).map(|e| {
                     format!(
                         "{} value {} now wins",
                         scope_label(e.scope),
@@ -432,7 +437,7 @@ impl App {
                 format!("{key} changed in {}", scope_name(scope))
             },
         };
-        self.git_config.note = Some(note);
+        self.full_screens.git_config.note = Some(note);
         self.request_refresh();
         true
     }

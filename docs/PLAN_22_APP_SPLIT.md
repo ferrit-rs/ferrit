@@ -1,6 +1,6 @@
 # Plan: phase 22, break up `App`
 
-**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms, `Nav` and `Authorship` done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms, `Nav`, `Authorship`, `Sheets` and `FullScreens` done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
 
 What differs from the sketch below, and why:
@@ -28,7 +28,7 @@ What differs from the sketch below, and why:
 - **Not done: step 6, a `ViewState` for drawing.** `screens::draw` still takes `&mut App`.
   `HitAreas` is what a draw function writes, so it can now be passed on its own, but the
   sheets and popups still read half of `App`. Left for a later phase.
-- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 37 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
+- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 30 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
 
 ## Goal
 
@@ -221,10 +221,17 @@ that the types it exposes are small and named.
   three places (`commit`, `rebase_actions`, `create_remote`) and is now `author_arg()`.
   `repo_name` stayed on `App`: it names the repository, not the author.
 
-## What is left on `App` (37 fields)
+- **`Sheets` and `FullScreens`.** `App.sheets` (in `sheet.rs`) holds the drawer's animation,
+  which sheet it holds, the settings sheet and the dashboard; the settings scroll moved into
+  `SettingsSheet`, where it belongs. `App.full_screens` holds the active full-screen view,
+  the git config editor's state and the welcome screen's folder and row. Nine fields became
+  two; the 120-odd call sites were renamed by script and the compiler found no collision.
 
-Configuration (`config`, `keymap`, `config_file`, `color_depth`, `palette`), the
-full-screen and sheet layers (`full_screen`, `dashboard`, `git_config`, `welcome_*`,
-`settings*`, `sheet*`, `create_remote`), and a few singles (`repo`, `repo_name`, `toast`,
-`status_note`, `last_error`, `watch_error`, `should_quit`, `mouse_pointer`, `commit_draft`).
-The next cut, by cohesion: a `Screens` group for the full-screen views and the sheets.
+## What is left on `App` (30 fields)
+
+Configuration (`config`, `keymap`, `config_file`, `color_depth`, `palette`), the create-remote
+flow (`create_remote`), the two overlay animations (`commit_overlay`, `toast`), and a few
+singles (`repo`, `repo_name`, `status_note`, `last_error`, `watch_error`, `should_quit`,
+`mouse_pointer`, `commit_draft`, `new_branch_title`, `watch_request`, `terminal_request`).
+A `Look` group (config, keymap, palette, colour depth) is the next cohesive cut; past that,
+what remains is `App` doing its job as the root of the state.
