@@ -7,17 +7,17 @@ use super::AuthorStat;
 
 /// Commits of one email (or of one name, when the commit has no email).
 #[derive(Default)]
-pub(super) struct AuthorAcc {
-    pub(super) name: String,
-    pub(super) email: String,
-    pub(super) commits: usize,
-    pub(super) last: i64,
+pub(crate) struct AuthorAcc {
+    pub(crate) name: String,
+    pub(crate) email: String,
+    pub(crate) commits: usize,
+    pub(crate) last: i64,
 }
 
 /// Merge the per-email groups that share a name (case-insensitive, trimmed,
 /// non-empty) into one `AuthorStat`, the most frequent email first (ties:
 /// alphabetical). The lines are filled in later from `emails`.
-pub(super) fn merge(accs: impl IntoIterator<Item = (String, AuthorAcc)>) -> Vec<AuthorStat> {
+pub(crate) fn merge(accs: impl IntoIterator<Item = (String, AuthorAcc)>) -> Vec<AuthorStat> {
     let mut by_name: BTreeMap<String, Vec<AuthorAcc>> = BTreeMap::new();
     for (key, acc) in accs {
         let name = acc.name.trim().to_lowercase();

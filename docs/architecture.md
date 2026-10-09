@@ -1,7 +1,7 @@
 # Architecture
 
 Ferrit is one crate with a thin binary (`src/main.rs`, a `clap` wrapper) over a library
-(`src/lib.rs`). The library has three layers.
+(`src/lib.rs`). The library has four parts: `app`, `components`, `domain` and `infra`.
 
 ```
             main.rs  (clap, terminal setup)
@@ -14,18 +14,24 @@ Ferrit is one crate with a thin binary (`src/main.rs`, a `clap` wrapper) over a 
 └──────────────┬──────────────┘        │  (know nothing of git)     │
                │ uses                  └────────────────────────────┘
                ▼
-┌─────────────────────────────┐
-│ domain/                     │
-│  git/      model, Repo, ops │──► git2 (reads) · `git` subprocess (writes)
-│  profile/  identities       │
-│  image/    format detection │
+┌─────────────────────────────┐        ┌────────────────────────────┐
+│ domain/                     │        │ infra/git/                 │
+│  git/   model, GitPort      │◄───────│  Repo : GitPort            │
+│         traits, FakeGit     │        │  git2 (reads)              │
+│  profile/  identities       │        │  `git` subprocess (writes) │
+│  image/    format detection │        └────────────────────────────┘
 └─────────────────────────────┘
 ```
 
+The dependency rule is `app -> domain <- infra`: `infra` implements the traits that
+`domain` defines, and `app` never names it except to build the app.
+
 Rules that hold today, and that the tests and lints keep:
 
-- `domain/git` imports no `ratatui` and no `crossterm`. Rows handed to the UI are owned
-  model types (`domain/git/model.rs`), not `git2` types.
+- `domain/` does not name `git2`, and `domain/git` imports no `ratatui` and no `crossterm`.
+  Rows handed to the UI are owned model types (`domain/git/model.rs`). `tests/layering.rs`
+  checks it on the sources, along with `app/` reaching `infra` only in `App::open` and
+  `git init`.
 - `components/` knows nothing about git or `App`.
 - `app/` reaches git only through the `GitPort` traits (`domain/git/port.rs`). The real
   adapter is `Repo`; tests can use `FakeGit` (`domain/git/fake.rs`). `app/` names the
@@ -40,9 +46,10 @@ Rules that hold today, and that the tests and lints keep:
 - No `unsafe`, no `unwrap`/`expect`/`panic` outside tests (`Cargo.toml` `[lints]`).
 
 Known gaps, each with a plan:
-- `domain/git` still holds the `git2` adapter itself, so "the domain has no `git2`" is not
-  true yet; moving it to an `infra/` layer means splitting 21 files into their types and
-  their `git2` code (`PLAN_21_GIT_PORT.md`, C4).
+- The code that only runs a subprocess (`exec`, `process`, `askpass`, `ssh_config`, and `gh`
+  in `host`) is still in `domain/git`; it names no `git2`, but it is infrastructure, and
+  `app/` calls some of it directly (`PLAN_21_GIT_PORT.md`, C4).
+- `domain/image` still imports `ratatui_image` for the preview protocol.
 - `App` is smaller (87 fields to 30) but not small. Configuration and the create-remote flow
   are still loose on it, and `screens::draw` still takes `&mut App`
   (`PLAN_22_APP_SPLIT.md`).
@@ -85,7 +92,8 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 | `src/app/*_actions.rs`, `staging.rs`, `commit.rs`, `remote.rs` | one feature each |
 | `src/app/screens/` | drawing only |
 | `src/app/config/`, `theme*.rs` | `config.toml` and the painted themes |
-| `src/domain/git/` | the git model, reads, writes, statistics; `port.rs` (the traits) and `fake.rs` (the in-memory git) |
+| `src/domain/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git) |
+| `src/infra/git/` | the `git2` and subprocess adapter: `Repo`, and for each `domain/git/<x>.rs` the code that reads with `git2` or runs `git` |
 | `src/components/ui/` | widgets (donut, heat map, palette, toast, drawer, ...) |
 | `src/components/tui_overlay/` | vendored overlay code, with its upstream licence |
 | `src/replay/` | the scripted test harness (see ADR 2) |

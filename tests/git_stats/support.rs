@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::stats::{RepoStats, StatsOptions, Window};
+use ferrit::infra::git::Repo;
 
 pub(crate) const NOW: i64 = 1_790_683_200;
 pub(crate) const DAY: i64 = 86_400;

@@ -25,7 +25,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use ferrit::app::App;
 use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::screens as ui;
-use ferrit::domain::git::Repo;
+use ferrit::infra::git::Repo;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

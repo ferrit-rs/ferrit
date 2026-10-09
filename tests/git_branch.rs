@@ -20,9 +20,9 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::Path;
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::branch::MergeOutcome;
 use ferrit::domain::git::error::GitError;
+use ferrit::infra::git::Repo;
 use git2::Repository;
 
 /// A repo with `base` at one commit and `feat` branched off it at a

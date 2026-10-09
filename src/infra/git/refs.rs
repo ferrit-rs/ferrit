@@ -2,22 +2,23 @@
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
 
+use crate::infra::git::read_error;
 use git2::{BranchType, Repository};
 
-use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::error::GitResult;
 use crate::domain::git::model::BranchEntry;
 
 /// Read the local branches, HEAD first, then alphabetical by name.
 pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
     let mut out: Vec<BranchEntry> = repo
         .branches(Some(BranchType::Local))
-        .map_err(GitError::Read)?
+        .map_err(read_error)?
         .map(|res| {
-            let (branch, _) = res.map_err(GitError::Read)?;
+            let (branch, _) = res.map_err(read_error)?;
             let is_head = branch.is_head();
             let name = branch
                 .name()
-                .map_err(GitError::Read)?
+                .map_err(read_error)?
                 .unwrap_or("(invalid utf-8)")
                 .to_owned();
 

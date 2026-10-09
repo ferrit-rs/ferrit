@@ -3,9 +3,9 @@
 use std::sync::atomic::AtomicBool;
 
 use crate::support::{NOW, RICHARD, TempDir, ago, commit, git, init, project, stats_at};
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::stats::{StatsOptions, Window};
+use ferrit::infra::git::Repo;
 
 #[test]
 fn an_empty_repository_reads_zero_without_failing() {

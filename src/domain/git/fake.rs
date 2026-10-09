@@ -10,22 +10,24 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use super::Snapshot;
-use super::apply::{ApplyDir, ApplyTarget};
-use super::blob::Rev;
-use super::branch::MergeOutcome;
-use super::commit::{CommitKind, CommitOpts};
-use super::config::{ConfigView, ValueKind, WriteScope};
-use super::diff::{Diff, DiffOpts, DiffSide};
-use super::error::{GitError, GitResult};
-use super::host::{CreateRequest, CreatedRepo, GhProgram};
-use super::model::{BranchEntry, Change, CommitEntry, FileEntry, PushState, RemoteEntry};
-use super::operation::{OperationOutcome, Step};
-use super::port::{
+use crate::domain::git::apply::{ApplyDir, ApplyTarget};
+use crate::domain::git::blob::Rev;
+use crate::domain::git::branch::MergeOutcome;
+use crate::domain::git::commit::{CommitKind, CommitOpts};
+use crate::domain::git::config::{ConfigView, ValueKind, WriteScope};
+use crate::domain::git::diff::{Diff, DiffOpts, DiffSide};
+use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::domain::git::model::{
+    BranchEntry, Change, CommitEntry, FileEntry, PushState, RemoteEntry,
+};
+use crate::domain::git::operation::{OperationOutcome, Step};
+use crate::domain::git::port::{
     GitBranches, GitConfig, GitHistory, GitIndex, GitPort, GitRead, GitRemote, GitStash,
 };
-use super::rebase::RebaseEdit;
-use super::stash::StashOutcome;
-use super::stats::{RepoStats, StatsOptions, Window};
+use crate::domain::git::rebase::RebaseEdit;
+use crate::domain::git::stash::StashOutcome;
+use crate::domain::git::stats::{RepoStats, StatsOptions, Window};
 use crate::domain::profile::settings::{Identity, IdentitySource};
 
 /// An in-memory repository. Clones share one state, which is what

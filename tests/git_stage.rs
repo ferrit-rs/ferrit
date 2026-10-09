@@ -20,10 +20,10 @@ use common::{TempDir, commit_all, git};
 use std::fs;
 use std::path::Path;
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::apply::{ApplyDir, ApplyTarget};
 use ferrit::domain::git::diff::{DiffOpts, DiffSide};
 use ferrit::domain::git::error::GitError;
+use ferrit::infra::git::Repo;
 use git2::Repository;
 
 /// `git <args>` in `dir`, output as trimmed stdout text.

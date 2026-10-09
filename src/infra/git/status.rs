@@ -2,11 +2,12 @@
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
 
+use crate::infra::git::read_error;
 use std::path::PathBuf;
 
 use git2::{ErrorCode, Repository, Status, StatusOptions};
 
-use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::error::GitResult;
 use crate::domain::git::model::{Change, FileEntry, StatusHeader};
 
 /// Read the header: branch, upstream, ahead/behind, conflict count.
@@ -18,10 +19,7 @@ pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
             out.detached = repo.head_detached().unwrap_or(false);
             let local_oid = head.target();
             out.branch = if out.detached {
-                local_oid.map_or_else(
-                    || "HEAD".to_owned(),
-                    |oid| crate::domain::git::short_hash(&oid),
-                )
+                local_oid.map_or_else(|| "HEAD".to_owned(), |oid| super::short_hash(&oid))
             } else {
                 head.shorthand().unwrap_or("HEAD").to_owned()
             };
@@ -49,10 +47,10 @@ pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
                     |t| t.trim_start_matches("refs/heads/").to_owned(),
                 );
         },
-        Err(e) => return Err(GitError::Read(e)),
+        Err(e) => return Err(read_error(e)),
     }
 
-    let index = repo.index().map_err(GitError::Read)?;
+    let index = repo.index().map_err(read_error)?;
     out.conflicts = if index.has_conflicts() {
         index.conflicts().map_or(0, Iterator::count)
     } else {
@@ -72,7 +70,7 @@ pub(super) fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
         .renames_index_to_workdir(true)
         .exclude_submodules(true);
 
-    let statuses = repo.statuses(Some(&mut opts)).map_err(GitError::Read)?;
+    let statuses = repo.statuses(Some(&mut opts)).map_err(read_error)?;
 
     let mut out: Vec<FileEntry> = statuses
         .iter()

@@ -23,7 +23,8 @@ cargo run
 
 Source responsibilities are separated by area:
 
-- `src/domain/`: Git models, the `GitPort` traits and their adapters, profile, and image logic.
+- `src/domain/`: Git types, the `GitPort` traits, profile, and image logic.
+- `src/infra/git/`: the `git2` and subprocess adapter behind those traits.
   `app/` goes through `GitPort`; a test that only needs app logic can use `FakeGit` and
   `App::with_git` instead of building a repository.
 - `src/app/`: Ferrit state, events, screens, keymap, and terminal lifecycle.

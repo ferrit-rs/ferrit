@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use crate::domain::git::Repo;
-use crate::domain::git::diff::stderr;
+use super::Repo;
+use super::diff::stderr;
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
 

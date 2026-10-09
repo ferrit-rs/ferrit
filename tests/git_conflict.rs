@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::domain::git::Repo;
+use ferrit::infra::git::Repo;
 use git2::Repository;
 
 /// `main` and `side` both rewrite `f`, then `side` is merged into `main`:

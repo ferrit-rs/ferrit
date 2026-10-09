@@ -1,7 +1,7 @@
 //! One error type for the backend. `thiserror` derives `Display` and
 //! `std::error::Error` (including `source`), so `main` and `App` can `?` it
 //! into a `color_eyre::Report` or turn it into a message without knowing about
-//! `git2`.
+//! `git2`: the adapter boxes its own error into `Open` and `Read`.
 
 use std::path::PathBuf;
 
@@ -10,12 +10,13 @@ pub enum GitError {
     /// No git repository at or above the given path.
     #[error("not a git repository: {0}")]
     NotARepository(PathBuf),
-    /// `git2` failed while opening the repository.
-    #[error("cannot open repository: {}", .0.message())]
-    Open(#[source] git2::Error),
-    /// `git2` failed while reading (status, refs, log, ...).
-    #[error("git read failed: {}", .0.message())]
-    Read(#[source] git2::Error),
+    /// The repository could not be opened. The cause is the adapter's own error
+    /// (`git2` for the real one), kept as the `source`.
+    #[error("cannot open repository: {0}")]
+    Open(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// A read failed (status, refs, log, ...). Same shape as `Open`.
+    #[error("git read failed: {0}")]
+    Read(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// `commit_diff` was handed a hash `git` does not know.
     #[error("no such commit: {0}")]
     NoSuchCommit(String),

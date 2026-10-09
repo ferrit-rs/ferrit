@@ -714,7 +714,7 @@ impl App {
             file,
             issues,
         } = load;
-        let mut app = Self::base(Some(Box::new(git::Repo::open(path)?)), config);
+        let mut app = Self::base(Some(Box::new(crate::infra::git::Repo::open(path)?)), config);
         app.config_file = file;
         app.refresh();
         app.report_config_issues(&issues);

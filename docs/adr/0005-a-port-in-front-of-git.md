@@ -1,6 +1,6 @@
 # 5. A port in front of git
 
-Status: accepted, partly done (`docs/PLAN_21_GIT_PORT.md`)
+Status: accepted, done (`docs/PLAN_21_GIT_PORT.md`)
 
 ## Context
 
@@ -25,8 +25,9 @@ and tied the application to `git2`.
 - Tests of app logic (`tests/app_fake_git.rs`) run in milliseconds and can inject
   failures. The contract suite already found a real difference: `Repo` cannot unstage
   before the first commit.
-- The adapter still lives under `domain/git/`, next to the types it fills. Splitting it
-  into an `infra/` layer is the open step.
+- The adapter lives in `infra/git/`: for each `domain/git/<x>.rs` that holds the types, the
+  code that reads with `git2` or runs `git` is `infra/git/<x>.rs`. `tests/layering.rs`
+  keeps `git2` out of the domain.
 - The inherent methods of `Repo` stay (tests call them directly), so the trait methods
   share their names; one `#[allow(clippy::same_name_method)]` records why.
 

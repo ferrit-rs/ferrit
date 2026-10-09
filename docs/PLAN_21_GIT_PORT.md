@@ -1,6 +1,6 @@
 # Plan: phase 21, a port for git
 
-**Status: in progress (C0 to C3 done; C4, the adapter move, open).** Second slice of the architecture clean-up. After phase 20 every
+**Status: done (C0 to C4; the subprocess-only helpers stay in `domain/git`, see below).** Second slice of the architecture clean-up. After phase 20 every
 git call returns `Result<_, GitError>`; this phase puts a trait in front of them so
 `app` depends on an abstraction and `git2` lives in an adapter.
 
@@ -23,7 +23,25 @@ What differs from the sketch below, and why:
   one commit; the gap is recorded in the test, not fixed here.
 - **`mock.rs` was not rebuilt on `FakeGit`.** It feeds `App::mock()` with canned rows and
   the render tests rely on those exact values; rewriting it would change frames for no gain.
-- **C4 is not done, and is bigger than the sketch said.** 21 of the 33 files under
+- **C4 done.** `src/infra/git/` holds `Repo` (`mod.rs`), the trait implementations
+  (`port_impl.rs`), and for each mixed file the half that reads with `git2` or runs `git`
+  (`apply`, `blob`, `branch`, `commit`, `config`, `diff`, `host`, `operation`, `rebase`,
+  `stash`, `stats`, `stats/branches`), plus the files that were all adapter (`log`, `refs`,
+  `remote`, `status`, `init`, `stats/churn`). The types and pure functions stay under the
+  same paths in `domain/git/`, so `ferrit::domain::git::branch::MergeOutcome` did not
+  move; `Repo` is now `ferrit::infra::git::Repo`. `GitError::Read` and `Open` hold a boxed
+  error (the adapter's `Git2Failure`, which keeps git's message and the `git2::Error` as the
+  source), so the domain no longer names `git2`. `tests/layering.rs` keeps it so.
+- **Left in `domain/git` on purpose:** the code that only runs a subprocess and names no
+  `git2` (`exec`, the new `process` for timeouts and cancellation, `askpass`, `ssh_config`,
+  `gh` in `host`), because `app/` calls it directly. `domain/image` still imports
+  `ratatui_image`.
+- **How it was done:** a script split each file at its item boundaries (types and pure
+  functions kept, the rest moved), then the compiler drove the visibility and import fixes.
+  Two bugs of the script were caught by checking that every original item exists exactly
+  once afterwards (a multi-line `const` swallowing the function after it, and an `impl`
+  matched by prefix).
+- **Original estimate of C4, kept for the record:** bigger than the sketch said. 21 of the 33 files under
   `src/domain/git/` import `git2`, and most of them define a public type (`Diff`,
   `ConfigView`, `MergeOutcome`, `CommitKind`, ...) next to the code that reads it from
   `git2`. Moving the adapter means splitting each file into its types (staying in

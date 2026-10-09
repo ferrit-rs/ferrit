@@ -18,7 +18,7 @@ use crate::domain::git::command_log::{self, CommandRecord, classify, redact};
 /// `git -C <workdir>`, ready for the caller to add arguments. The only
 /// constructor of a git `Command` in this crate (`tests/git_exec.rs` scans
 /// the sources to keep it that way).
-pub(super) fn git(workdir: &Path) -> Command {
+pub(crate) fn git(workdir: &Path) -> Command {
     let mut cmd = Command::new("git");
     cmd.arg("-C").arg(workdir);
     cmd
@@ -27,12 +27,12 @@ pub(super) fn git(workdir: &Path) -> Command {
 /// A command for an external program other than git (`gh`), ready for the
 /// caller to add arguments. Built here, beside `git()`, so the command log sees
 /// it too: `track` records it under the program's own name.
-pub(super) fn program(program: &OsStr) -> Command {
+pub(crate) fn program(program: &OsStr) -> Command {
     Command::new(program)
 }
 
 /// Run `cmd` to completion, capturing its output, and record it.
-pub(super) fn output(cmd: &mut Command) -> io::Result<Output> {
+pub(crate) fn output(cmd: &mut Command) -> io::Result<Output> {
     let tracked = track(cmd);
     let out = cmd.output();
     match out.as_ref() {
@@ -46,7 +46,7 @@ pub(super) fn output(cmd: &mut Command) -> io::Result<Output> {
 /// dropped, with the exit code given to `finish` or `None` if it never was
 /// (spawn failure, early return, cancellation), so a command is recorded
 /// exactly once on every path.
-pub(super) fn track(cmd: &Command) -> Tracked {
+pub(crate) fn track(cmd: &Command) -> Tracked {
     // A program other than git is recorded as it is: no `-C` pair to drop, no
     // config secrets to mask.
     let name = Path::new(cmd.get_program())
@@ -100,7 +100,7 @@ pub(super) fn track(cmd: &Command) -> Tracked {
 }
 
 /// A command being timed; see `track`.
-pub(super) struct Tracked {
+pub(crate) struct Tracked {
     argv: String,
     kind: command_log::CommandKind,
     started: Instant,
@@ -110,14 +110,14 @@ pub(super) struct Tracked {
 
 impl Tracked {
     /// Set the exit code and record now.
-    pub(super) fn finish(mut self, exit: Option<i32>) {
+    pub(crate) fn finish(mut self, exit: Option<i32>) {
         self.exit = exit;
     }
 
     /// `finish`, and keep the lines git wrote on stdout (up to
     /// `MAX_OUTPUT_LINES`) when this is a write: the answer the command log
     /// shows under the command.
-    pub(super) fn finish_with_stdout(mut self, exit: Option<i32>, stdout: &[u8]) {
+    pub(crate) fn finish_with_stdout(mut self, exit: Option<i32>, stdout: &[u8]) {
         self.exit = exit;
         if self.kind == command_log::CommandKind::Write {
             self.output = String::from_utf8_lossy(stdout)

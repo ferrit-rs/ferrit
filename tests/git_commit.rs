@@ -21,9 +21,9 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::commit::{CommitKind, CommitOpts};
 use ferrit::domain::git::error::GitError;
+use ferrit::infra::git::Repo;
 use git2::Repository;
 
 /// `git commit` (unlike `add`/`restore`/`apply`) needs a configured

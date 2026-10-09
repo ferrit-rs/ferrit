@@ -5,25 +5,26 @@
 //! of the file) asks `gh` whether it is ready.
 //!
 //! The target is typed as `name` or `owner/name`; there is no separate owner.
+//!
+//! This file holds the types and the pure functions. The code that reads with
+//! `git2` or runs `git` is `crate::infra::git::host`.
 
+use crate::domain::git::process::{REMOTE_TIMEOUT, run_child};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-use git2::Repository;
-
-use crate::domain::git::diff::{stderr, workdir};
-use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::error::GitError;
 use crate::domain::git::exec;
-use crate::domain::git::remote::{REMOTE_TIMEOUT, combined_output, run_child};
 
 /// Longest repository name GitHub takes.
-const NAME_MAX: usize = 100;
+pub(crate) const NAME_MAX: usize = 100;
+
 /// Longest account or organisation login GitHub takes.
-const OWNER_MAX: usize = 39;
+pub(crate) const OWNER_MAX: usize = 39;
+
 /// Longest repository description GitHub takes.
-const DESCRIPTION_MAX: usize = 350;
+pub(crate) const DESCRIPTION_MAX: usize = 350;
 
 /// The program to run for `gh`: `gh` from `PATH`, unless a test hands in a
 /// fake script. An injected value, not an environment variable: the crate
@@ -31,7 +32,7 @@ const DESCRIPTION_MAX: usize = 350;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GhProgram {
     program: OsString,
-    timeout: Duration,
+    pub(crate) timeout: Duration,
 }
 
 impl Default for GhProgram {
@@ -56,7 +57,7 @@ impl GhProgram {
         self
     }
 
-    fn program(&self) -> &OsStr {
+    pub(crate) fn program(&self) -> &OsStr {
         &self.program
     }
 }
@@ -117,7 +118,7 @@ pub enum HostError {
     DescriptionTooLong,
 }
 
-fn check_name(name: &str) -> Result<(), HostError> {
+pub(crate) fn check_name(name: &str) -> Result<(), HostError> {
     if name.is_empty() {
         return Err(HostError::EmptyName);
     }
@@ -136,7 +137,7 @@ fn check_name(name: &str) -> Result<(), HostError> {
     Ok(())
 }
 
-fn check_owner(owner: &str) -> Result<(), HostError> {
+pub(crate) fn check_owner(owner: &str) -> Result<(), HostError> {
     if owner.is_empty() {
         return Err(HostError::EmptyOwner);
     }
@@ -266,16 +267,6 @@ pub fn build_create_args(req: &CreateRequest, workdir: &Path) -> Result<Vec<OsSt
     Ok(args)
 }
 
-/// Run `gh <args>` and say whether it exited 0. A program that cannot be
-/// started, or that outlasts the timeout, counts as a failure. Both calls are
-/// recorded in the command log.
-fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
-    let mut cmd = exec::program(gh.program());
-    cmd.args(args);
-    run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
-        .is_ok_and(|out| out.status.success())
-}
-
 /// `gh --version`, then `gh auth status`. It reaches the network, so the app
 /// calls it from a worker, never from the UI thread. `gh auth status` also
 /// fails when the network is down: that reads as signed out, and `gh auth
@@ -299,7 +290,7 @@ pub struct CreatedRepo {
 }
 
 /// The line `gh repo create` prints on success is the repository's web URL.
-fn web_url(stdout: &str) -> String {
+pub(crate) fn web_url(stdout: &str) -> String {
     stdout
         .lines()
         .map(str::trim)
@@ -308,50 +299,12 @@ fn web_url(stdout: &str) -> String {
         .to_owned()
 }
 
-/// `gh repo create <target> --private|--public --source <workdir> --remote
-/// origin [--description …]`, without `--push`. Refuses, before running
-/// anything, a target that fails validation or a repository that already has
-/// an `origin` (`gh` would fail on it halfway). `gh`'s own refusal (a name
-/// taken, no right to create there) comes back as its message. Nothing is
-/// configured locally unless `gh` succeeds: it adds the remote itself, last.
-pub(super) fn create_repo(
-    repo: &Repository,
-    gh: &GhProgram,
-    req: &CreateRequest,
-    cancel: &AtomicBool,
-) -> GitResult<CreatedRepo> {
-    let workdir = workdir(repo)?;
-    let args = build_create_args(req, workdir).map_err(|e| GitError::HostFailed(e.to_string()))?;
-    if repo.find_remote("origin").is_ok() {
-        return Err(GitError::HostFailed(
-            "a remote called origin already exists".to_owned(),
-        ));
-    }
+/// Run `gh <args>` and say whether it exited 0. A program that cannot be
+/// started, or that outlasts the timeout, counts as a failure. Both calls are
+/// recorded in the command log.
+fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
     let mut cmd = exec::program(gh.program());
     cmd.args(args);
-    let out = run_child(cmd, "gh", gh.timeout, Some(cancel), &GitError::HostFailed)?;
-    if out.status.success() {
-        Ok(CreatedRepo {
-            web_url: web_url(&String::from_utf8_lossy(&out.stdout)),
-        })
-    } else {
-        Err(GitError::HostFailed(combined_output(&out)))
-    }
-}
-
-/// `git remote set-url <name> <url>`. Git refuses a remote that does not exist
-/// and says so.
-pub(super) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitResult<()> {
-    let mut cmd = exec::git(workdir(repo)?);
-    cmd.args(["remote", "set-url", "--", name, url]);
-    let out =
-        exec::output(&mut cmd).map_err(|e| GitError::HostFailed(format!("cannot run git: {e}")))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(GitError::HostFailed(format!(
-            "cannot set the URL of {name}: {}",
-            stderr(&out)
-        )))
-    }
+    run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
+        .is_ok_and(|out| out.status.success())
 }

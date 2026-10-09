@@ -237,7 +237,7 @@ fn a_path_named_on_purpose_keeps_the_error() {
 #[test]
 fn a_folder_with_a_repository_opens_it_either_way() {
     let dir = TempDir::new("welcome-start-repo");
-    ferrit::domain::git::Repo::init(&dir.0).unwrap();
+    ferrit::infra::git::Repo::init(&dir.0).unwrap();
     for explicit in [false, true] {
         let app = App::open_or_welcome(&dir.0, explicit, ConfigLoad::default()).unwrap();
         assert_eq!(app.full_screen(), FullScreen::None, "explicit: {explicit}");
@@ -248,7 +248,7 @@ fn a_folder_with_a_repository_opens_it_either_way() {
 #[test]
 fn a_folder_below_a_repository_opens_that_repository() {
     let dir = TempDir::new("welcome-start-below");
-    ferrit::domain::git::Repo::init(&dir.0).unwrap();
+    ferrit::infra::git::Repo::init(&dir.0).unwrap();
     let below = dir.0.join("deep/er");
     fs::create_dir_all(&below).unwrap();
     let app = App::open_or_welcome(&below, false, ConfigLoad::default()).unwrap();

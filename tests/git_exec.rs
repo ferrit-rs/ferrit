@@ -22,9 +22,9 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::command_log::{CommandKind, CommandRecord, recent};
 use ferrit::domain::git::diff::{DiffOpts, DiffSide};
+use ferrit::infra::git::Repo;
 use git2::Repository;
 
 fn fixture(tag: &str) -> TempDir {
@@ -198,6 +198,11 @@ fn a_command_that_never_completed_reads_as_an_error_line() {
     );
 }
 
+/// The only program the file starts is `delta`.
+fn only_spawns_delta(text: &str) -> bool {
+    text.matches("Command::new(").count() == text.matches("Command::new(\"delta\")").count()
+}
+
 #[test]
 fn every_git_subprocess_goes_through_exec() {
     fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -232,10 +237,15 @@ fn every_git_subprocess_goes_through_exec() {
                 file.display()
             );
         }
-        if file.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/domain/git"))
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        if (file.starts_with(manifest.join("src/domain/git"))
+            || file.starts_with(manifest.join("src/infra/git")))
             && !is_exec
             && !file.ends_with("command_log.rs")
             && (text.contains(".output()") || text.contains(".spawn()"))
+            // `delta` renders a diff for the screen; it is not a git command, so
+            // it has no business in the command log.
+            && !only_spawns_delta(&text)
         {
             assert!(
                 text.contains("exec::"),

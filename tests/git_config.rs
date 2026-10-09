@@ -7,10 +7,10 @@
 //! `git config --list --show-origin --show-scope -z` output.
 //! See `docs/PLAN_14_GIT_CONFIG.md` milestone G0.
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::config::{
     Origin, Scope, ValueKind, WriteScope, display_value, is_secret_key, parse,
 };
+use ferrit::infra::git::Repo;
 
 const SAMPLE: &str = "system\0file:/etc/gitconfig\0core.autocrlf\ninput\0\
 global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0\

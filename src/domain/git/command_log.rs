@@ -66,7 +66,7 @@ fn ring() -> &'static Mutex<VecDeque<CommandRecord>> {
 
 /// Append a record, dropping the oldest at capacity. A poisoned lock is
 /// recovered: a panic in one worker must not blind the log.
-pub(super) fn record(entry: CommandRecord) {
+pub(crate) fn record(entry: CommandRecord) {
     let mut ring = ring().lock().unwrap_or_else(PoisonError::into_inner);
     if ring.len() == CAPACITY {
         ring.pop_front();
@@ -91,7 +91,7 @@ pub fn recent(count: usize, include_reads: bool) -> Vec<CommandRecord> {
 }
 
 /// Read or write, from the subcommand and, for `stash` and `config`, its verb.
-pub(super) fn classify(subcommand: &str, verb: Option<&str>) -> CommandKind {
+pub(crate) fn classify(subcommand: &str, verb: Option<&str>) -> CommandKind {
     if READ_ONLY.contains(&subcommand)
         || (subcommand == "stash" && verb == Some("show"))
         || (subcommand == "config" && verb == Some("--list"))
@@ -105,7 +105,7 @@ pub(super) fn classify(subcommand: &str, verb: Option<&str>) -> CommandKind {
 /// Read or write for a program other than git. Only `gh`'s own checks read:
 /// `--version` and `auth status`; creating a repository, or anything unknown,
 /// is a write.
-pub(super) fn classify_program(args: &[String]) -> CommandKind {
+pub(crate) fn classify_program(args: &[String]) -> CommandKind {
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     match words.as_slice() {
         ["--version"] | ["auth", "status", ..] => CommandKind::Read,
@@ -115,7 +115,7 @@ pub(super) fn classify_program(args: &[String]) -> CommandKind {
 
 /// The arguments of a `git config` call with everything after a secret key
 /// (its new value, the old one it replaces) hidden. Other commands are left alone.
-pub(super) fn mask_config_secrets(args: Vec<String>) -> Vec<String> {
+pub(crate) fn mask_config_secrets(args: Vec<String>) -> Vec<String> {
     if args.first().map(String::as_str) != Some("config") {
         return args;
     }
@@ -130,7 +130,7 @@ pub(super) fn mask_config_secrets(args: Vec<String>) -> Vec<String> {
 
 /// `scheme://user:secret@host/path` becomes `scheme://user:***@host/path`.
 /// Anything without credentials is returned unchanged.
-pub(super) fn redact(arg: &str) -> String {
+pub(crate) fn redact(arg: &str) -> String {
     let Some(scheme_end) = arg.find("://") else {
         return arg.to_owned();
     };

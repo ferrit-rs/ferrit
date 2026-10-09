@@ -16,13 +16,13 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use ferrit::domain::git::Repo;
 use ferrit::domain::git::command_log::{CommandKind, recent};
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::host::{
     CreateRequest, GhProgram, GhStatus, HostError, Visibility, build_create_args, gh_status,
     parse_target, sanitize_name, ssh_remote_url, validate_description, validate_ssh_host,
 };
+use ferrit::infra::git::Repo;
 
 fn request(
     owner: Option<&str>,

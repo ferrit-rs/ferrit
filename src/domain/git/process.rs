@@ -1,15 +1,7 @@
-//! Fetch, pull and push by shelling out to `git`, so credentials (SSH
-//! agent, credential helpers, askpass), hooks (`pre-push`), and
-//! `pull.rebase`-style config all work the way they do for the user's own
-//! `git`. See `docs/PLAN_9_REMOTE.md`. Slow, network-crossing calls: run
-//! off the main thread — that plan's "Approach part 2" — this module only
-//! provides the blocking calls, threading is `App`'s concern.
-//!
-//! `git2`'s remote callbacks would need SSH-agent lookup, credential
-//! helpers and interactive prompts implemented by hand; the user's own
-//! `git` already has all of that solved. Reading which remotes exist is
-//! the one part of this module that stays a `git2` read (no credentials
-//! or hooks involved), same split the rest of `git::` already makes.
+//! Running a child process to completion with a timeout and a cancel flag:
+//! piped output, stdin closed, its own process group, recorded in the command
+//! log. Shared by git's network commands (`crate::infra::git::remote`) and by
+//! `gh` (`host`). No `git2` here, only `std::process`.
 
 use std::io::{self, Read};
 use std::path::Path;
@@ -18,48 +10,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use git2::Repository;
-
 use crate::domain::git::askpass;
-use crate::domain::git::diff::workdir;
 use crate::domain::git::error::{GitError, GitResult};
 use crate::domain::git::exec;
-use crate::domain::git::model::RemoteEntry;
 
-pub(super) const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
+pub(crate) const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
+
 const TERMINATE_GRACE: Duration = Duration::from_secs(2);
+
 const POLL_INTERVAL: Duration = Duration::from_millis(40);
-
-/// Configured remotes, alphabetical.
-pub(super) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
-    let mut names: Vec<String> = repo
-        .remotes()
-        .map_err(GitError::Read)?
-        .iter()
-        .filter_map(|res| res.ok().flatten())
-        .map(str::to_owned)
-        .collect();
-    names.sort();
-
-    names
-        .into_iter()
-        .map(|name| {
-            let remote = repo.find_remote(&name).map_err(GitError::Read)?;
-            let fetch_url = remote.url().unwrap_or_default().to_owned();
-            let push_url = remote
-                .pushurl()
-                .ok()
-                .flatten()
-                .unwrap_or(fetch_url.as_str())
-                .to_owned();
-            Ok(RemoteEntry {
-                name,
-                fetch_url,
-                push_url,
-            })
-        })
-        .collect()
-}
 
 /// `stdout` + `stderr`, each trimmed, joined by a newline when both are
 /// non-empty. Unlike `apply.rs`/`commit.rs`/`branch.rs`'s error-only
@@ -67,7 +26,7 @@ pub(super) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
 /// (git puts progress and the human summary on stderr, machine-parseable
 /// bits, when there are any, on stdout); ferrit does not parse either,
 /// just shows them.
-pub(super) fn combined_output(out: &Output) -> String {
+pub(crate) fn combined_output(out: &Output) -> String {
     let out_text = String::from_utf8_lossy(&out.stdout).trim().to_owned();
     let err_text = String::from_utf8_lossy(&out.stderr).trim().to_owned();
     match (out_text.is_empty(), err_text.is_empty()) {
@@ -80,7 +39,7 @@ pub(super) fn combined_output(out: &Output) -> String {
 /// `git -C <workdir> <...args>`, run to completion. `Ok`/`Err` both carry
 /// `combined_output`; the caller's `err` only decides which `GitError`
 /// variant wraps a non-zero exit.
-fn run_git(
+pub(crate) fn run_git(
     workdir: &Path,
     args: &[String],
     cancel: Option<&AtomicBool>,
@@ -95,7 +54,7 @@ fn run_git(
     }
 }
 
-fn run_command(
+pub(crate) fn run_command(
     workdir: &Path,
     args: &[String],
     cancel: Option<&AtomicBool>,
@@ -112,7 +71,7 @@ fn run_command(
 /// is set or `timeout` passes. `name` is how the program is called in the
 /// messages (`git`, `gh`). Shared by git's network commands and `gh`
 /// (`domain::git::host`).
-pub(super) fn run_child(
+pub(crate) fn run_child(
     mut command: Command,
     name: &str,
     timeout: Duration,
@@ -248,140 +207,3 @@ fn signal_process_group(pid: u32, force: bool) {
 
 #[cfg(not(unix))]
 fn signal_process_group(_pid: u32, _force: bool) {}
-
-/// `git fetch <remote>`, or plain `git fetch` (every remote, git's own
-/// default) when `remote` is `None`.
-pub(super) fn fetch(repo: &Repository, remote: Option<&str>) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    let mut args = vec!["fetch".to_owned()];
-    if let Some(name) = remote {
-        args.push(name.to_owned());
-    }
-    run_git(workdir, &args, None, GitError::FetchFailed)
-}
-
-pub(crate) fn fetch_cancellable(
-    repo: &Repository,
-    remote: Option<&str>,
-    cancel: &AtomicBool,
-) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    let mut args = vec!["fetch".to_owned()];
-    if let Some(name) = remote {
-        args.push(name.to_owned());
-    }
-    run_git(workdir, &args, Some(cancel), GitError::FetchFailed)
-}
-
-/// `git pull`. No flags: `pull.rebase` / `pull.ff` decide the shape, same
-/// as any other `git config` this backend already defers to.
-pub(super) fn pull(repo: &Repository) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    run_git(workdir, &["pull".to_owned()], None, GitError::PullFailed)
-}
-
-pub(crate) fn pull_cancellable(repo: &Repository, cancel: &AtomicBool) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    run_git(
-        workdir,
-        &["pull".to_owned()],
-        Some(cancel),
-        GitError::PullFailed,
-    )
-}
-
-/// `HEAD`'s branch name, needed to spell out `git push -u <remote>
-/// <branch>` (git does not infer the branch from `-u` alone the first
-/// time an upstream is set).
-fn current_branch_name(repo: &Repository) -> GitResult<String> {
-    let head = repo.head().map_err(GitError::Read)?;
-    head.shorthand()
-        .map(str::to_owned)
-        .map_err(|_| GitError::PushFailed("HEAD is not on a branch".to_owned()))
-}
-
-/// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
-/// `Some(remote)` — `<remote>` is chosen by `App`, not here. A plain push
-/// with no upstream configured fails with git's own stable "has no
-/// upstream branch" message; detected by substring, same technique
-/// `branch.rs`'s unmerged-delete detection already uses, and reported as
-/// `GitError::NoUpstream` rather than a generic `PushFailed` so `App` can
-/// act on it (offer `-u`) instead of just displaying it.
-pub(super) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<String> {
-    push_with_lease(repo, set_upstream, false)
-}
-
-fn push_with_lease(
-    repo: &Repository,
-    set_upstream: Option<&str>,
-    force_with_lease: bool,
-) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    let mut args = vec!["push".to_owned()];
-    if force_with_lease {
-        args.push("--force-with-lease".to_owned());
-    }
-    if let Some(remote) = set_upstream {
-        let branch = current_branch_name(repo)?;
-        args.push("-u".to_owned());
-        args.push(remote.to_owned());
-        args.push(branch);
-    }
-
-    run_push(workdir, &args, None, set_upstream, false)
-}
-
-pub(crate) fn push_cancellable(
-    repo: &Repository,
-    set_upstream: Option<&str>,
-    upstream_branch: Option<&str>,
-    force_with_lease: bool,
-    set_upstream_current: bool,
-    cancel: &AtomicBool,
-) -> GitResult<String> {
-    let workdir = workdir(repo)?;
-    let mut args = vec!["push".to_owned()];
-    if force_with_lease {
-        args.push("--force-with-lease".to_owned());
-    }
-    if set_upstream_current && set_upstream.is_none() {
-        args.push("-u".to_owned());
-    }
-    if let Some(remote) = set_upstream {
-        args.push("-u".to_owned());
-        args.push(remote.to_owned());
-        let local_branch = current_branch_name(repo)?;
-        args.push(match upstream_branch {
-            Some(branch) => format!("{local_branch}:{branch}"),
-            None => local_branch,
-        });
-    }
-    run_push(
-        workdir,
-        &args,
-        Some(cancel),
-        set_upstream,
-        set_upstream_current,
-    )
-}
-
-fn run_push(
-    workdir: &Path,
-    args: &[String],
-    cancel: Option<&AtomicBool>,
-    set_upstream: Option<&str>,
-    set_upstream_current: bool,
-) -> GitResult<String> {
-    let out = run_command(workdir, args, cancel, &GitError::PushFailed)?;
-    let combined = combined_output(&out);
-    if out.status.success() {
-        return Ok(combined);
-    }
-    if set_upstream.is_none()
-        && !set_upstream_current
-        && combined.contains("has no upstream branch")
-    {
-        return Err(GitError::NoUpstream);
-    }
-    Err(GitError::PushFailed(combined))
-}

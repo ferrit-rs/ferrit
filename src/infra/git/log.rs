@@ -3,17 +3,18 @@
 //!
 //! All types here are plain owned values. No `git2` type escapes this module.
 
+use crate::infra::git::read_error;
 use std::collections::{BTreeMap, HashSet};
 
 use git2::{BranchType, Oid, Repository, Revwalk, Sort};
 
-use crate::domain::git::error::{GitError, GitResult};
+use crate::domain::git::error::GitResult;
 use crate::domain::git::model::{CommitEntry, CommitRef, CommitRefKind, PushState};
 
 /// Walk HEAD's history, newest first, up to `max` entries. An unborn branch
 /// (fresh repo, no commits) comes back as an empty list, not an error.
 pub(super) fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
-    let mut revwalk = repo.revwalk().map_err(GitError::Read)?;
+    let mut revwalk = repo.revwalk().map_err(read_error)?;
     if revwalk.push_head().is_err() {
         return Ok(Vec::new());
     }
@@ -38,8 +39,8 @@ pub(super) fn commits_for(
     let Some(oid) = branch_ref.get().target() else {
         return Ok(Vec::new());
     };
-    let mut revwalk = repo.revwalk().map_err(GitError::Read)?;
-    revwalk.push(oid).map_err(GitError::Read)?;
+    let mut revwalk = repo.revwalk().map_err(read_error)?;
+    revwalk.push(oid).map_err(read_error)?;
     let mut entries = walk(repo, revwalk, max)?;
     decorate(repo, &mut entries);
     Ok(entries)
@@ -180,13 +181,13 @@ fn reachable(repo: &Repository, tip: Oid, wanted: &HashSet<Oid>) -> HashSet<Oid>
 fn walk(repo: &Repository, mut revwalk: Revwalk<'_>, max: usize) -> GitResult<Vec<CommitEntry>> {
     revwalk
         .set_sorting(Sort::TIME | Sort::TOPOLOGICAL)
-        .map_err(GitError::Read)?;
+        .map_err(read_error)?;
 
     revwalk
         .take(max)
         .map(|oid| {
-            let oid = oid.map_err(GitError::Read)?;
-            let commit = repo.find_commit(oid).map_err(GitError::Read)?;
+            let oid = oid.map_err(read_error)?;
+            let commit = repo.find_commit(oid).map_err(read_error)?;
             let full_hash = oid.to_string();
             Ok(CommitEntry {
                 short_hash: full_hash.chars().take(7).collect(),

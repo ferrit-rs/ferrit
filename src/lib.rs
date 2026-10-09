@@ -5,5 +5,6 @@
 pub mod app;
 pub mod components;
 pub mod domain;
+pub mod infra;
 #[doc(hidden)]
 pub mod replay;
