@@ -155,12 +155,6 @@ pub const RIGHT_DIFF: &str = "diff --git a/src/main.rs b/src/main.rs
 +    Ok(())
  }";
 
-/// Right pane when Branches is focused.
-pub const RIGHT_LOG: &str = "* 5e04050 (HEAD -> main) docs: expand the layout plan
-* 23023d9 docs: add inspiration notes
-* 2f9bd4f docs: drop the arch stub
-* d5bc03c chore: initial commit";
-
 /// Right pane when Commits is focused.
 pub const RIGHT_COMMIT: &str = "commit 5e04050
 Author: The ferrit Authors

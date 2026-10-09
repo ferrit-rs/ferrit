@@ -21,17 +21,13 @@ pub enum ApplyDir {
     Reverse,
 }
 
-/// What the patch touches. `Index` alone is stage/unstage; `Worktree` /
-/// `WorktreeAndIndex` are discard (the worktree side, optionally keeping the
-/// index in step).
+/// What the patch touches: the index (stage and unstage) or the worktree (discard).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApplyTarget {
     /// The index only: stage or unstage.
     Index,
     /// The worktree only.
     Worktree,
-    /// The worktree and the index together.
-    WorktreeAndIndex,
 }
 
 /// Turn a hunk body into a valid, self-contained patch body covering only

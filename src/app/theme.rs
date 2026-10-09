@@ -189,12 +189,8 @@ fn relative_age(tip_time: i64) -> String {
 
 /// lazygit branch row: `1d * main ↑2` for the checked-out branch (green,
 /// bold), `3d   feat/x` for the rest. Ahead/behind arrows in yellow when
-/// there is an upstream to compare against.
-pub fn branch_line(p: &Palette, entry: &BranchEntry) -> Line<'static> {
-    branch_line_with_status(p, entry, None)
-}
-
-/// Branch row with LazyGit-style inline operation status during remote work.
+/// there is an upstream to compare against, and, during remote work, the
+/// LazyGit-style inline operation status.
 pub fn branch_line_with_status(
     p: &Palette,
     entry: &BranchEntry,

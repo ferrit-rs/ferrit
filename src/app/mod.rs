@@ -1369,13 +1369,6 @@ impl App {
         self.help.is_visible(&self.render.help)
     }
 
-    /// The keybar's rect and click targets, written by `ui::draw_keybar`
-    /// each frame.
-    pub fn set_keybar_hits(&mut self, area: Rect, hits: Vec<hints::KeybarHit>) {
-        self.hits.keybar = area;
-        self.hits.keybar_hits = hits;
-    }
-
     /// A left pane's bordered rect, written by `ui::draw_left_column` each
     /// frame so a click can be routed to the pane it landed in.
     pub fn set_left_area(&mut self, pane: Pane, area: Rect) {

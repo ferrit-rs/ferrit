@@ -183,7 +183,6 @@ fn run_apply(
     match target {
         ApplyTarget::Index => args.push("--cached".to_owned()),
         ApplyTarget::Worktree => {},
-        ApplyTarget::WorktreeAndIndex => args.push("--index".to_owned()),
     }
     if dir == ApplyDir::Reverse {
         args.push("--reverse".to_owned());
