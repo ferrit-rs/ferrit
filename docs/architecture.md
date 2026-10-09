@@ -59,11 +59,11 @@ Known gaps, each with a plan:
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
-- `git/keys/` and the other glue files are still `impl App` blocks. `staging` and
-  `branch_actions` have been opened (the decisions are in `git::staging` and `git::branch`,
-  `App` only runs the plan and reports); the others, with `create_remote`, `commit`, `remote`,
-  `stash_actions`, `rebase_actions`, are next. The screens read `App`'s fields (`pub(crate)`),
-  which couples `interface` to `app`.
+- The handlers in `app/` still decide some things themselves (`create_remote`,
+  `git_config_edit`, `dashboard`, `settings_keys`, `popup_keys`, `commit`): the decision is
+  to move into the domain, as `git::staging`, `git::remote` and `git::branch` did, leaving
+  `App` only to run it and report. The screens read `App`'s fields (`pub(crate)`), which
+  couples `interface/screens` to `app`.
 - The library still exposes more than a library would: the integration tests reach into
   most of `app` and `interface`, and `App`'s public fields force their types to be
   nameable. The test seams that can be separated (`replay`, `FakeGit`) are behind the
@@ -116,7 +116,7 @@ only for a feature that has several files, and nothing deeper than two folders
 | `src/interface/screens/` | drawing only: reads `&App` and returns what the frame learned as a `Landed`; `row_lines` are the styled lines of git rows |
 | `src/interface/state/` | what the interface remembers, one file per thing: the panes (`nav`, `pane_rows`, `right_pane` with its diff cursor and cached render, `hit_areas`, the drill-downs, the selection keys, the diff views, what the right pane loads in `diff_query` / `image_query`), what can sit over them (`popup`, `confirm`, `modal`, the menus, the commit editor `commit_draft`, the create-remote form, the popup keys), the side sheets (`sheet`, `dashboard`), `help`, `full_screens` and `render_state` |
 | `src/interface/terminal.rs` | the terminal lifecycle |
-| `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); `keys` is the settings sheet's keys and clicks |
+| `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); its keys and clicks are `app/settings_keys.rs` |
 | `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`), the colour picker and the theme editor state |
 | `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `profile/` (commit identities) and `image/` (format detection, preview) |
 | `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, in files that follow the traits of `git/port.rs` (`read`, `index`, `history`, `branches`, `stashes`, `remotes`, `gitconfig`, `statistics`) |
