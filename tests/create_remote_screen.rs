@@ -14,9 +14,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-use ferrit::app::App;
 use ferrit::git::host::GhProgram;
-use ferrit::ui::screens as ui;
+use ferrit::tui::App;
+use ferrit::tui::screens as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

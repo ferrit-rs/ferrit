@@ -24,7 +24,7 @@ cp -R "$root/src" "$work/src"
 cp "$root/Cargo.toml" "$root/Cargo.lock" "$root/rust-toolchain.toml" "$root/clippy.toml" "$work/"
 rm "$work/src/lib.rs"
 {
-    printf 'mod app;\nmod config;\nmod git;\nmod theme;\nmod ui;\n\n'
+    printf 'mod config;\nmod git;\nmod theme;\nmod tui;\n\n'
     sed 's/ferrit::/crate::/g' "$root/src/main.rs"
 } > "$work/src/main.rs"
 # The dev-dependency on this crate points at a library that no longer exists here.

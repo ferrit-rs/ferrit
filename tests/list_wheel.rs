@@ -17,9 +17,9 @@ use common::TempDir;
 use std::fs;
 use std::path::Path;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
-use ferrit::ui::screens;
+use ferrit::tui::App;
+use ferrit::tui::screens;
+use ferrit::tui::state::pane::Pane;
 use git2::{Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

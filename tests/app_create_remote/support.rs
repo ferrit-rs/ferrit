@@ -8,12 +8,12 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
-use ferrit::app::events::AppEvent;
-use ferrit::app::state::create_remote_form::{CreateRemoteView, Field};
-use ferrit::app::state::views::PopupView;
 use ferrit::git::host::CreateDraft;
 use ferrit::git::host::{GhProgram, Visibility};
+use ferrit::tui::App;
+use ferrit::tui::events::AppEvent;
+use ferrit::tui::state::create_remote_form::{CreateRemoteView, Field};
+use ferrit::tui::state::views::PopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// A repository and a fake `gh` that logs its calls, adds `origin` like the

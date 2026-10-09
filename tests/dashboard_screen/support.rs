@@ -8,8 +8,8 @@ use ferrit::git::stats::{
     AuthorStat, FileStat, HotFiles, KindStat, Lines, RepoStats, Totals, Window, WorkState,
 };
 use ferrit::theme::palette::Palette;
-use ferrit::ui::screens::dashboard::{self, Chrome, View};
-use ferrit::ui::widgets::chart_palette::{ChartMode, ChartPalette};
+use ferrit::tui::screens::dashboard::{self, Chrome, View};
+use ferrit::tui::widgets::chart_palette::{ChartMode, ChartPalette};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

@@ -18,8 +18,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::process::Command;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;

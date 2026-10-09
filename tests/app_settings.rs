@@ -12,10 +12,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::App;
 use ferrit::config::Config;
 use ferrit::config::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
 use ferrit::theme::theme_config::{Preset, SchemeChoice};
+use ferrit::tui::App;
 
 struct Fixture {
     dir: PathBuf,

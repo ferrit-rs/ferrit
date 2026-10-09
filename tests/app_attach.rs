@@ -15,8 +15,8 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
-use ferrit::app::events::{AppEvent, Events};
+use ferrit::tui::App;
+use ferrit::tui::events::{AppEvent, Events};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 struct TempDir(PathBuf);

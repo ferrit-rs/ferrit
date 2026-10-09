@@ -18,9 +18,9 @@ mod common;
 use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
-use ferrit::app::state::views::DiffView;
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
+use ferrit::tui::state::views::DiffView;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
@@ -212,7 +212,7 @@ fn an_empty_stash_pane_offers_no_apply_pop_or_drop_in_the_key_bar() {
     app.feed_key(char_key('5'));
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal
-        .draw(|f| ferrit::ui::screens::draw(f, &mut app))
+        .draw(|f| ferrit::tui::screens::draw(f, &mut app))
         .unwrap();
     let out = terminal.backend().to_string();
     for hint in ["Apply:", "Pop:", "Drop:"] {

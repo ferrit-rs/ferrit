@@ -16,9 +16,9 @@
 
 use std::path::Path;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
 use ferrit::git::image::preview::Preview;
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
 
 fn main() {
     let mut app = match App::open(Path::new(".")) {

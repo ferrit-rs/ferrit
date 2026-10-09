@@ -10,14 +10,14 @@
 //! (`docs/PLAN_12_POLISH.md` P5): a builder handed another palette paints with
 //! it, and the default palette is the one ferrit always had.
 
-use ferrit::app::App;
-use ferrit::app::mock::{mock_commits, mock_files};
-use ferrit::app::state::pane::Pane;
 use ferrit::config::Config;
 use ferrit::git::diff::parse_diff;
 use ferrit::theme::palette::Palette;
-use ferrit::ui::screens::row_lines;
-use ferrit::ui::widgets::key_bar::KeyBar;
+use ferrit::tui::App;
+use ferrit::tui::mock::{mock_commits, mock_files};
+use ferrit::tui::screens::row_lines;
+use ferrit::tui::state::pane::Pane;
+use ferrit::tui::widgets::key_bar::KeyBar;
 use ratatui::style::Color;
 
 /// A palette where every colour is different from `Palette::DARK`'s and from
@@ -98,7 +98,7 @@ fn a_frame_on_the_default_palette_paints_borders_in_its_idle_colour() {
     app.nav.focus = Pane::Files;
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal
-        .draw(|f| ferrit::ui::screens::draw(f, &mut app))
+        .draw(|f| ferrit::tui::screens::draw(f, &mut app))
         .unwrap();
     let buffer = terminal.backend().buffer();
     assert!(

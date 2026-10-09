@@ -20,12 +20,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
-use ferrit::app::state::views::DiffView;
 use ferrit::config::error::ConfigError;
 use ferrit::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::theme::theme_config::{Preset, ThemeConfig};
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
+use ferrit::tui::state::views::DiffView;
 use git2::Repository;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -629,7 +629,7 @@ fn mouse_and_poll_settings_reach_the_app() {
 
 #[test]
 fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
-    use ferrit::app::state::pane::Pane;
+    use ferrit::tui::state::pane::Pane;
     use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     use ratatui::layout::Rect;
 

@@ -6,12 +6,12 @@ use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
 use crate::support::{DAY, buffer, render, stats, text, view};
-use ferrit::app::App;
 use ferrit::git::repo::Repo;
 use ferrit::git::stats::{StatsOptions, Window};
-use ferrit::ui::screens as ui;
-use ferrit::ui::screens::dashboard::Chrome;
-use ferrit::ui::widgets::chart_palette::ChartMode;
+use ferrit::tui::App;
+use ferrit::tui::screens as ui;
+use ferrit::tui::screens::dashboard::Chrome;
+use ferrit::tui::widgets::chart_palette::ChartMode;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

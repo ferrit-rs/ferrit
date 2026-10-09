@@ -5,9 +5,9 @@ use std::process::ExitCode;
 use clap::Parser;
 use color_eyre::Result;
 
-use ferrit::app::App;
 use ferrit::config::Config;
-use ferrit::ui::terminal as tui;
+use ferrit::tui::App;
+use ferrit::tui::terminal as tui;
 
 /// The everyday git manager for the terminal: a full TUI for your repository, and
 /// an empty folder to GitHub without leaving it.

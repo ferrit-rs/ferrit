@@ -22,10 +22,10 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::git::repo::Repo;
-use ferrit::ui::screens as ui;
+use ferrit::tui::App;
+use ferrit::tui::screens as ui;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

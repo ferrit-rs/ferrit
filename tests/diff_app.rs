@@ -19,9 +19,9 @@ mod common;
 use common::{TempDir, commit_all};
 use std::fs;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
-use ferrit::app::state::views::DiffView;
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
+use ferrit::tui::state::views::DiffView;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -106,7 +106,7 @@ fn char_key(c: char) -> KeyEvent {
 fn render(app: &mut App, w: u16, h: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
     terminal
-        .draw(|f| ferrit::ui::screens::draw(f, app))
+        .draw(|f| ferrit::tui::screens::draw(f, app))
         .unwrap();
     terminal.backend().to_string()
 }

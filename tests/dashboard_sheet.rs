@@ -16,10 +16,10 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::theme::scheme::Scheme;
-use ferrit::ui::screens as ui;
+use ferrit::tui::App;
+use ferrit::tui::screens as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{
@@ -157,16 +157,16 @@ fn a_click_on_the_panes_while_it_is_up_reaches_no_pane() {
     let mut app = repo.app("");
     app.open_dashboard();
     settle(&mut app, 140, 40);
-    let before = app.selected(ferrit::app::state::pane::Pane::Commits);
+    let before = app.selected(ferrit::tui::state::pane::Pane::Commits);
     click(&mut app, 3, 20);
     settle(&mut app, 140, 40);
     assert_eq!(
-        app.selected(ferrit::app::state::pane::Pane::Commits),
+        app.selected(ferrit::tui::state::pane::Pane::Commits),
         before
     );
     assert_eq!(
         app.nav.focus,
-        ferrit::app::state::pane::Pane::default(),
+        ferrit::tui::state::pane::Pane::default(),
         "no focus moved"
     );
 }

@@ -13,9 +13,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use ferrit::app::App;
 use ferrit::config::Config;
-use ferrit::ui::screens as ui;
+use ferrit::tui::App;
+use ferrit::tui::screens as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

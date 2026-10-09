@@ -8,8 +8,8 @@
 
 use std::path::Path;
 
-use crate::app::App;
 use crate::git::host::GhProgram;
+use crate::tui::App;
 
 /// What the fake does. `--version` and `auth status` succeed; `repo create`
 /// reads its `--source` directory and its target, makes `created.git` next to

@@ -4,7 +4,7 @@ use crate::support::{author, branch, buffer, col_of, is_braille, render, stats, 
 use ferrit::git::stats::KindStat;
 use ferrit::git::stats::kind::Kind;
 use ferrit::theme::palette::Palette;
-use ferrit::ui::widgets::chart_palette::{ChartMode, ChartPalette};
+use ferrit::tui::widgets::chart_palette::{ChartMode, ChartPalette};
 use ratatui::style::Color;
 
 #[test]

@@ -7,7 +7,7 @@
 use ratatui::crossterm::event::KeyCode;
 
 use super::script::{Directive, Script};
-use crate::app::keymap::KeyBinding;
+use crate::tui::keymap::KeyBinding;
 
 /// A pause between keys so the GIF can be followed.
 const PACE: &str = "Sleep 250ms";

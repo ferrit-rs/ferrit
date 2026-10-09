@@ -2,7 +2,7 @@
 //! call `app::screens::draw` against a `TestBackend` without a terminal. See
 //! `docs/PLAN_SELF_TESTING.md`.
 
-pub mod app;
+pub mod tui;
 
 pub mod config;
 pub mod git;
@@ -11,4 +11,3 @@ pub mod git;
 #[cfg(feature = "test-util")]
 pub mod replay;
 pub mod theme;
-pub mod ui;

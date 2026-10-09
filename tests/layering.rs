@@ -76,20 +76,20 @@ fn only_the_composition_root_and_git_init_name_the_adapter() {
     offenders.sort();
     assert_eq!(
         offenders,
-        ["app/mod.rs", "app/welcome.rs"],
+        ["tui/mod.rs", "tui/welcome.rs"],
         "everything else goes through the GitPort traits"
     );
 }
 
 #[test]
 fn the_git_domain_does_not_know_the_app() {
-    let offenders = files_with_code("git", "crate::app");
+    let offenders = files_with_code("git", "crate::tui");
     assert!(offenders.is_empty(), "git uses app in {offenders:?}");
 }
 
 /// A domain is a flat list of files named after what they do, with a folder only
 /// for a feature that has several files: nothing deeper than two folders under
-/// `src/<domain>/`, except the widgets of `ui/widgets`.
+/// `src/<domain>/`, except the widgets of `tui/widgets`.
 #[test]
 fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -97,20 +97,20 @@ fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
         .into_iter()
         .map(|path| path.strip_prefix(&root).unwrap().to_path_buf())
         .filter(|path| path.components().count() > 4)
-        .filter(|path| !path.starts_with("ui/widgets"))
+        .filter(|path| !path.starts_with("tui/widgets"))
         .map(|path| path.display().to_string())
         .collect();
     assert!(too_deep.is_empty(), "too deep: {too_deep:?}");
 }
 
-/// The behaviour of `App` is written in `app/` and nowhere else: a domain
+/// The behaviour of `App` is written in `tui/` and nowhere else: a domain
 /// defines its own types and rules and never an `impl App`.
 #[test]
 fn impl_app_is_only_written_in_app() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let offenders: Vec<String> = rust_files(&root)
         .into_iter()
-        .filter(|path| !path.starts_with(root.join("app")))
+        .filter(|path| !path.starts_with(root.join("tui")))
         .filter(|path| {
             fs::read_to_string(path)
                 .unwrap()
@@ -119,5 +119,5 @@ fn impl_app_is_only_written_in_app() {
         })
         .map(|path| path.strip_prefix(&root).unwrap().display().to_string())
         .collect();
-    assert!(offenders.is_empty(), "impl App outside app/: {offenders:?}");
+    assert!(offenders.is_empty(), "impl App outside tui/: {offenders:?}");
 }

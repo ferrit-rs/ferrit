@@ -20,9 +20,9 @@ mod common;
 use common::{TempDir, commit_all};
 use std::fs;
 
-use ferrit::app::App;
-use ferrit::app::mock;
-use ferrit::app::state::pane::Pane;
+use ferrit::tui::App;
+use ferrit::tui::mock;
+use ferrit::tui::state::pane::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -63,7 +63,7 @@ fn tall_diff_repo(tag: &str) -> (TempDir, App) {
 fn render_buffer(app: &mut App, w: u16, h: u16) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
     terminal
-        .draw(|f| ferrit::ui::screens::draw(f, app))
+        .draw(|f| ferrit::tui::screens::draw(f, app))
         .unwrap();
     terminal.backend().buffer().clone()
 }
@@ -247,7 +247,7 @@ fn commits_pane_still_renders_with_the_mock_fixture() {
         let mut app = App::mock();
         let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
         terminal
-            .draw(|f| ferrit::ui::screens::draw(f, &mut app))
+            .draw(|f| ferrit::tui::screens::draw(f, &mut app))
             .unwrap();
         terminal.backend().to_string()
     };

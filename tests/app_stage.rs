@@ -19,10 +19,10 @@ mod common;
 use common::{TempDir, commit_all};
 use std::fs;
 
-use ferrit::app::App;
-use ferrit::app::state::pane::Pane;
-use ferrit::app::state::views::DiffView;
 use ferrit::git::diff::DiffSide;
+use ferrit::tui::App;
+use ferrit::tui::state::pane::Pane;
+use ferrit::tui::state::views::DiffView;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

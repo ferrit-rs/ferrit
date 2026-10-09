@@ -18,11 +18,11 @@ use std::fs;
 use std::path::Path;
 use std::sync::mpsc;
 
-use ferrit::app::App;
-use ferrit::app::mock;
-use ferrit::app::state::pane::Pane;
 use ferrit::git::remote::RemoteOp;
-use ferrit::ui::screens as ui;
+use ferrit::tui::App;
+use ferrit::tui::mock;
+use ferrit::tui::screens as ui;
+use ferrit::tui::state::pane::Pane;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

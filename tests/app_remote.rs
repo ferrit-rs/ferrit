@@ -25,10 +25,10 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ferrit::app::App;
-use ferrit::app::events::AppEvent;
 use ferrit::git::error::GitError;
 use ferrit::git::remote::RemoteOp;
+use ferrit::tui::App;
+use ferrit::tui::events::AppEvent;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
