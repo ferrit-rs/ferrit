@@ -175,9 +175,16 @@ fn known_keys_are_real_git_keys_and_their_values_are_accepted_by_git() {
     assert!(status.success());
     let repo = Repo::open(&dir).unwrap();
 
+    // Some distributions list only part of the sections in `git help -c`
+    // (Debian's git 2.47 has no `init.*`): a key whose section is absent from
+    // the list cannot be checked against it, but git still has to accept it.
+    let listed_section = |key: &str| {
+        let section = key.split('.').next().unwrap_or_default();
+        real.iter().any(|k| k.split('.').next() == Some(section))
+    };
     for known in KNOWN_KEYS {
         assert!(
-            real.iter().any(|k| k == known.key),
+            real.iter().any(|k| k == known.key) || !listed_section(known.key),
             "{} is not a git key",
             known.key
         );
