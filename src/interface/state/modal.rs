@@ -6,8 +6,8 @@
 //! Methods live on `Modal`, not on `App`, so a caller can hold the popup
 //! mutably while it reads other fields of `App`.
 
-use crate::interface::popups::confirm::ConfirmPrompt;
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::confirm::ConfirmPrompt;
+use crate::interface::state::popup::Popup;
 
 #[derive(Default)]
 pub(crate) enum Modal {

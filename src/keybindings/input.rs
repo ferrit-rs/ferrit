@@ -1,10 +1,10 @@
 //! Keyboard and mouse input dispatch.
 
 use crate::app::App;
-use crate::interface::full_screens::FullScreen;
-use crate::interface::panes::diff_cursor::Mode;
-use crate::interface::panes::pane::{PANES, Pane};
-use crate::interface::sheets::sheet::Sheet;
+use crate::interface::state::diff_cursor::Mode;
+use crate::interface::state::full_screens::FullScreen;
+use crate::interface::state::pane::{PANES, Pane};
+use crate::interface::state::sheet::Sheet;
 use crate::keybindings::hints;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;

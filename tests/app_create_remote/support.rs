@@ -12,8 +12,8 @@ use ferrit::app::App;
 use ferrit::app::events::AppEvent;
 use ferrit::git::host::CreateDraft;
 use ferrit::git::host::{GhProgram, Visibility};
-use ferrit::interface::panes::views::PopupView;
-use ferrit::interface::popups::create_remote_form::{CreateRemoteView, Field};
+use ferrit::interface::state::create_remote_form::{CreateRemoteView, Field};
+use ferrit::interface::state::views::PopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// A repository and a fake `gh` that logs its calls, adds `origin` like the

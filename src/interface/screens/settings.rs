@@ -9,7 +9,7 @@ use crate::config::settings::{Kind, SaveState, SettingsRow};
 use crate::interface::components::ui::drawer::Drawer;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::interface::components::ui::separator::Separator;
-use crate::interface::render_state::RenderState;
+use crate::interface::state::render_state::RenderState;
 use crate::theme::color_picker::{ColorPicker, grid_metrics, rgb};
 use crate::theme::palette::Palette;
 use crate::theme::scheme::ColorDepth;

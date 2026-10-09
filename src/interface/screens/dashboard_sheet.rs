@@ -4,7 +4,7 @@
 //! margins) and at most 95 % of the terminal, so the panes stay in sight.
 
 use super::landed::Landed;
-use crate::interface::render_state::RenderState;
+use crate::interface::state::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;

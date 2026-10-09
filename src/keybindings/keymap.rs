@@ -20,7 +20,7 @@ use std::fmt;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::config::KeyOverrides;
-use crate::interface::panes::pane::Pane;
+use crate::interface::state::pane::Pane;
 
 /// Where a binding applies. `resolve` tries the most specific context first,
 /// then `Global`, which is how `d` means discard on Files, delete on Branches

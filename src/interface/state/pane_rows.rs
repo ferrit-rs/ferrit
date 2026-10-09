@@ -6,14 +6,14 @@
 use ratatui::text::Line;
 
 use super::nav::Nav;
-use super::row_lines;
 use crate::git::Snapshot;
 use crate::git::model::{BranchEntry, CommitEntry, FileEntry, StashEntry};
-use crate::interface::panes::pane::{BranchesTab, Pane};
-use crate::interface::panes::selection::{
+use crate::interface::screens::row_lines;
+use crate::interface::state::pane::{BranchesTab, Pane};
+use crate::interface::state::selection::{
     SelectionKey, find_file_row_key, selection_key_for_file_rows,
 };
-use crate::interface::panes::tree::{
+use crate::interface::state::tree::{
     FileRow, StageState, dir_stage_state, drill_tree_rows, tree_rows,
 };
 use crate::theme::palette::Palette;

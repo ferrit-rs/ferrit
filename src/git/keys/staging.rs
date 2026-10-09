@@ -12,10 +12,10 @@ use crate::git::error::GitResult;
 use crate::git::model::Change;
 use crate::git::remote::RemoteRequest;
 use crate::git::staging::{self, Plan, Refusal};
-use crate::interface::panes::diff_cursor::Mode;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::tree::FileRow;
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::state::diff_cursor::Mode;
+use crate::interface::state::pane::Pane;
+use crate::interface::state::tree::FileRow;
 
 impl App {
     /// `Enter` / `l` on a Files-pane file row (`Mode::Nav`): focus the diff

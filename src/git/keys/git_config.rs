@@ -6,7 +6,7 @@
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::git::config::{ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value};
-use crate::interface::full_screens::FullScreen;
+use crate::interface::state::full_screens::FullScreen;
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;

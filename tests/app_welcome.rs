@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use ferrit::app::App;
 use ferrit::config::ConfigLoad;
-use ferrit::interface::full_screens::FullScreen;
+use ferrit::interface::state::full_screens::FullScreen;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -263,7 +263,7 @@ fn a_folder_below_a_repository_opens_that_repository() {
 #[test]
 fn the_injected_gh_survives_the_git_init() {
     use ferrit::git::host::GhProgram;
-    use ferrit::interface::panes::views::PopupView;
+    use ferrit::interface::state::views::PopupView;
 
     let dir = TempDir::new("welcome-gh");
     let mut app = dir.welcome();

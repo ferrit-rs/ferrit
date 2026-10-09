@@ -14,9 +14,9 @@ use crate::app::App;
 use crate::git;
 use crate::git::branch::MergeKind;
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::diff_cursor::Mode;
-use crate::interface::panes::pane::{BranchesTab, Pane};
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::diff_cursor::Mode;
+use crate::interface::state::pane::{BranchesTab, Pane};
+use crate::interface::state::popup::Popup;
 
 /// What a name popup will do with the text typed into it.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -21,7 +21,7 @@ use std::fs;
 
 use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
-use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::state::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;

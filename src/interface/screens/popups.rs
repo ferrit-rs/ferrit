@@ -18,11 +18,9 @@ use crate::interface::components::ui::panel::Panel;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::interface::components::ui::select_list::SelectList;
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::row_lines;
-use crate::interface::panes::views::{CommandLogView, CommitPopupView, MenuView};
-use crate::interface::popups::create_remote_form::{
-    ConfirmView, CreateRemoteView, Field, FormView,
-};
+use crate::interface::screens::row_lines;
+use crate::interface::state::create_remote_form::{ConfirmView, CreateRemoteView, Field, FormView};
+use crate::interface::state::views::{CommandLogView, CommitPopupView, MenuView};
 use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 

@@ -19,8 +19,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 
 use ferrit::app::App;
-use ferrit::interface::panes::pane::Pane;
-use ferrit::interface::panes::views::DiffView;
+use ferrit::interface::state::pane::Pane;
+use ferrit::interface::state::views::DiffView;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens;
+use ferrit::interface::state::pane::Pane;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -286,7 +286,7 @@ fn space_on_a_directory_stages_and_unstages_everything_under_it() {
 #[test]
 fn a_commit_shows_git_s_own_answer_under_the_command() {
     use ferrit::git::command_log;
-    use ferrit::interface::panes::row_lines;
+    use ferrit::interface::screens::row_lines;
     use ferrit::theme::palette::Palette;
 
     let repo = Repo::new("commit-output");

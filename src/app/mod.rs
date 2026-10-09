@@ -42,13 +42,13 @@ pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
     pub(crate) prefs: crate::config::prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    pub(crate) sheets: crate::interface::sheets::sheet::Sheets,
+    pub(crate) sheets: crate::interface::state::sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
-    pub(crate) full_screens: crate::interface::full_screens::FullScreens,
+    pub(crate) full_screens: crate::interface::state::full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
-    pub nav: crate::interface::panes::nav::Nav,
+    pub nav: crate::interface::state::nav::Nav,
     /// Whether the help overlay is up.
-    pub help: crate::interface::help::HelpState,
+    pub help: crate::interface::state::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
     /// (set by the renderer), so scroll keys can stop at the end.
     /// Text and focus state for the help command search.
@@ -70,19 +70,19 @@ pub struct App {
     pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: crate::interface::panes::right_pane::RightPane,
+    pub(crate) right: crate::interface::state::right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: crate::interface::panes::hit_areas::HitAreas,
+    pub(crate) hits: crate::interface::state::hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
-    pub(crate) render: crate::interface::render_state::RenderState,
+    pub(crate) render: crate::interface::state::render_state::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
     pub(crate) new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    pub(crate) modal: crate::interface::popups::modal::Modal,
+    pub(crate) modal: crate::interface::state::modal::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
@@ -115,12 +115,12 @@ mod tests;
 
 use self::refresh::RefreshCompletion;
 use self::workers::{WorkerKind, run_worker};
-use crate::interface::full_screens::FullScreen;
-use crate::interface::panes::diff_cursor::Mode;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::pane_rows::PaneRows;
-use crate::interface::panes::tree::{FileRow, drill_tree_rows};
-use crate::interface::panes::views::DiffView;
+use crate::interface::state::diff_cursor::Mode;
+use crate::interface::state::full_screens::FullScreen;
+use crate::interface::state::pane::Pane;
+use crate::interface::state::pane_rows::PaneRows;
+use crate::interface::state::tree::{FileRow, drill_tree_rows};
+use crate::interface::state::views::DiffView;
 
 use crate::interface::screens::landed::Landed;
 
@@ -162,24 +162,24 @@ impl App {
         let authorship = git::authorship::Authorship::of(repo.as_deref());
         Self {
             prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
-            sheets: crate::interface::sheets::sheet::Sheets::default(),
-            full_screens: crate::interface::full_screens::FullScreens::default(),
-            nav: crate::interface::panes::nav::Nav::default(),
-            help: crate::interface::help::HelpState::default(),
+            sheets: crate::interface::state::sheet::Sheets::default(),
+            full_screens: crate::interface::state::full_screens::FullScreens::default(),
+            nav: crate::interface::state::nav::Nav::default(),
+            help: crate::interface::state::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship,
             theme: crate::theme::editor::ThemeEditor::new(theme_config),
-            right: crate::interface::panes::right_pane::RightPane::new(),
+            right: crate::interface::state::right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
-            hits: crate::interface::panes::hit_areas::HitAreas::default(),
+            hits: crate::interface::state::hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
-            render: crate::interface::render_state::RenderState::default(),
+            render: crate::interface::state::render_state::RenderState::default(),
             new_branch_title: String::new(),
-            modal: crate::interface::popups::modal::Modal::default(),
+            modal: crate::interface::state::modal::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
             watch_request: None,
@@ -496,7 +496,7 @@ impl App {
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
-    pub fn dashboard(&self) -> &crate::interface::sheets::dashboard::Dashboard {
+    pub fn dashboard(&self) -> &crate::interface::state::dashboard::Dashboard {
         &self.sheets.dashboard
     }
 
@@ -769,19 +769,19 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![crate::interface::panes::row_lines::error_line(
+            vec![crate::interface::screens::row_lines::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = crate::interface::panes::row_lines::status_header(&self.repo_name, h);
-            let mut lines = vec![crate::interface::panes::row_lines::status_line(
+            let line = crate::interface::screens::row_lines::status_header(&self.repo_name, h);
+            let mut lines = vec![crate::interface::screens::row_lines::status_line(
                 &self.prefs.palette,
                 &line,
             )];
             if h.conflicts > 0 {
-                lines.push(crate::interface::panes::row_lines::error_line(
+                lines.push(crate::interface::screens::row_lines::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -793,21 +793,21 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                crate::interface::panes::row_lines::operation_line(
+                crate::interface::screens::row_lines::operation_line(
                     &self.prefs.palette,
                     &operation.label(),
                 ),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(crate::interface::panes::row_lines::busy_line(
+            out.push(crate::interface::screens::row_lines::busy_line(
                 &self.prefs.palette,
                 label,
             ));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(crate::interface::panes::row_lines::status_line(
+            out.push(crate::interface::screens::row_lines::status_line(
                 &self.prefs.palette,
                 note,
             ));

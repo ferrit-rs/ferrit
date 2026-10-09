@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::app::App;
 use crate::git;
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

@@ -8,7 +8,7 @@ use crate::support::{
 };
 use ferrit::app::events::AppEvent;
 use ferrit::git::host::{GhProgram, Visibility};
-use ferrit::interface::popups::create_remote_form::Field;
+use ferrit::interface::state::create_remote_form::Field;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 #[test]

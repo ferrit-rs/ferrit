@@ -7,8 +7,8 @@ use enum_map::EnumMap;
 use ratatui::layout::Rect;
 
 use crate::config::keys::SettingsHits;
-use crate::interface::panes::pane::Pane;
 use crate::interface::screens::landed::Landed;
+use crate::interface::state::pane::Pane;
 use crate::keybindings::hints;
 
 #[derive(Default)]

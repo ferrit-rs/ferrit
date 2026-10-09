@@ -8,8 +8,8 @@ use crate::app::{App, operation_noun};
 use crate::git;
 use crate::git::error::GitResult;
 use crate::git::operation::{OperationOutcome, Step};
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::state::popup::Popup;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

@@ -87,3 +87,19 @@ fn the_git_domain_does_not_reach_into_the_app_except_through_its_keys() {
     let offenders = files_with_code_except("git", &["git/keys"], "crate::app");
     assert!(offenders.is_empty(), "git uses app in {offenders:?}");
 }
+
+/// A domain is a flat list of files named after what they do, with a folder only
+/// for a feature that has several files: nothing deeper than two folders under
+/// `src/<domain>/`, except the widgets of `interface/components/ui`.
+#[test]
+fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let too_deep: Vec<String> = rust_files(&root)
+        .into_iter()
+        .map(|path| path.strip_prefix(&root).unwrap().to_path_buf())
+        .filter(|path| path.components().count() > 4)
+        .filter(|path| !path.starts_with("interface/components"))
+        .map(|path| path.display().to_string())
+        .collect();
+    assert!(too_deep.is_empty(), "too deep: {too_deep:?}");
+}

@@ -5,10 +5,10 @@ use crate::app::App;
 use crate::git;
 use crate::git::stash::{self, StashOutcome};
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::selection::SelectionKey;
-use crate::interface::popups::confirm::ConfirmPrompt;
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::confirm::ConfirmPrompt;
+use crate::interface::state::pane::Pane;
+use crate::interface::state::popup::Popup;
+use crate::interface::state::selection::SelectionKey;
 
 impl App {
     /// The selected stash entry, only while Stash is focused in `Mode::Nav`

@@ -3,7 +3,7 @@
 use crate::git;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::popups::create_remote_form;
+use crate::interface::state::create_remote_form;
 use std::path::PathBuf;
 
 /// What the right pane shows behind the image preview. A second cached,

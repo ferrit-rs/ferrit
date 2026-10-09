@@ -8,8 +8,8 @@ use ratatui::crossterm::event::KeyEvent;
 use crate::app::App;
 use crate::git;
 use crate::git::remote::RemoteOp;
-use crate::interface::panes::diff_cursor::Mode;
-use crate::interface::panes::pane::{PANES, Pane};
+use crate::interface::state::diff_cursor::Mode;
+use crate::interface::state::pane::{PANES, Pane};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
 
 impl App {

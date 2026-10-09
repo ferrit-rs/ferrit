@@ -14,7 +14,7 @@ use ratatui::crossterm::event::MouseEvent;
 
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::toast::Toast;
-use crate::interface::panes::diff_query::RightKey;
+use crate::interface::state::diff_query::RightKey;
 
 pub(crate) struct RenderState {
     /// The help dialog.

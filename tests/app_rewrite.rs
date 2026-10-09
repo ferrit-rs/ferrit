@@ -20,8 +20,8 @@ use std::path::Path;
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens as ui;
+use ferrit::interface::state::pane::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

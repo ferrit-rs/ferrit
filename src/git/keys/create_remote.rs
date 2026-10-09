@@ -21,10 +21,10 @@ use crate::git::host::{
 };
 use crate::git::remote::RemoteOp;
 use crate::git::ssh_config::read_github_aliases;
-use crate::interface::popups::create_remote_form::{
+use crate::interface::state::create_remote_form::{
     Consequences, CreateRemoteView, Form, FormKey, Step,
 };
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::popup::Popup;
 use color_eyre::Result;
 use ratatui::crossterm::event::KeyEvent;
 use std::sync::mpsc;

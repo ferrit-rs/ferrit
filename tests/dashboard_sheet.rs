@@ -157,16 +157,16 @@ fn a_click_on_the_panes_while_it_is_up_reaches_no_pane() {
     let mut app = repo.app("");
     app.open_dashboard();
     settle(&mut app, 140, 40);
-    let before = app.selected(ferrit::interface::panes::pane::Pane::Commits);
+    let before = app.selected(ferrit::interface::state::pane::Pane::Commits);
     click(&mut app, 3, 20);
     settle(&mut app, 140, 40);
     assert_eq!(
-        app.selected(ferrit::interface::panes::pane::Pane::Commits),
+        app.selected(ferrit::interface::state::pane::Pane::Commits),
         before
     );
     assert_eq!(
         app.nav.focus,
-        ferrit::interface::panes::pane::Pane::default(),
+        ferrit::interface::state::pane::Pane::default(),
         "no focus moved"
     );
 }

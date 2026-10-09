@@ -21,7 +21,7 @@ about, plus `app`, which is what puts them together.
 │ fake,  │ │ help       │ │ prefs,   │ │ editor state     │
 │ repo/  │ └────────────┘ │ settings │ └──────────────────┘
 │ (git2) │                └──────────┘
-└────────┘   interface/  widgets, screens, panes, popups (what is seen)
+└────────┘   interface/  widgets, screens, state (what is seen)
 ```
 
 The domains do not know `app`. Inside `git`, the model and the `GitPort` traits are the
@@ -31,10 +31,10 @@ except to build the app.
 Rules that hold today, and that the tests and lints keep:
 
 - Only `git/repo` names `git2`, and nothing in `git` imports `ratatui` or `crossterm`
-  (`git/image` draws the preview, and `git/actions` is the glue with the keys). Rows handed to
+  (`git/image` draws the preview, and `git/keys` is the glue with the keys). Rows handed to
   the UI are owned model types (`git/model.rs`). `tests/layering.rs` checks it on the
   sources, along with `app/` reaching `git/repo` only in `App::open` and `git init`, and
-  `git` reaching into `app` only through `git/actions`.
+  `git` reaching into `app` only through `git/keys`.
 - `interface/components/` knows nothing about git or `App`; `theme/` knows nothing of what is drawn
   with it.
 - `app/` reaches git only through the `GitPort` traits (`git/port.rs`). The real adapter is
@@ -59,7 +59,7 @@ Known gaps, each with a plan:
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
-- `git/actions/` and the other glue files are still `impl App` blocks. `staging` and
+- `git/keys/` and the other glue files are still `impl App` blocks. `staging` and
   `branch_actions` have been opened (the decisions are in `git::staging` and `git::branch`,
   `App` only runs the plan and reports); the others, with `create_remote`, `commit`, `remote`,
   `stash_actions`, `rebase_actions`, are next. The screens read `App`'s fields (`pub(crate)`),
@@ -99,20 +99,26 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 
 ## Where things live
 
+The rule: a domain is a flat list of files named after what they do, with a folder
+only for a feature that has several files, and nothing deeper than two folders
+(`tests/layering.rs`). A feature keeps its name across the roles it plays:
+`git/<x>.rs` the types and rules, `git/repo/<x>.rs` how `Repo` does it,
+`git/keys/<x>.rs` what a key does with it, `interface/screens/<x>.rs` how it is drawn,
+`interface/state/<x>.rs` what the interface keeps of it.
+
+
 | Path | Holds |
 | --- | --- |
 | `src/app/mod.rs` | `App`, which owns the parts below and orchestrates what reads several of them (the run loop, a refresh, the event match); a behaviour that touches one part lives in that part |
 | `src/app/` | `App` and what only `App` can do: the run loop and the event match (`mod.rs`, `events.rs`), the background work in flight (`workers.rs`, `refresh.rs`), the errors shown to the user (`error.rs`), the repo-free sample (`mock.rs`) |
 | `src/keybindings/` | the remappable bindings (`keymap`), the key bar and help built from them (`hints`), and routing a key or a click to its owner (`input`, `dispatch`) |
 
-| `src/git/actions/` | what a key does to the repository, one file per feature (`staging`, `branch_actions`, `stash_actions`, `rebase_actions`, `commit`, `remote`, `create_remote`, `git_config`, `git_config_edit`, `welcome`, `askpass`): pick the target, call `git::<feature>`, report. These are the only files of `git/` that know `App` |
-| `src/interface/screens/` | drawing only; reads `&App` and returns what the frame learned as a `Landed` |
-| `src/interface/sheets/` | the side sheets: the dashboard and the sheet holder |
-| `src/interface/panes/` | the five left panes and the right column, as state: `Nav`, `PaneRows` (a read-only view over `Nav` and the snapshot), `RightPane` with its diff cursor and cached render, `HitAreas`, the drill-downs, the selection keys, the diff views, `diff_query`/`image_query`/`drill_nav` (what the right pane and the drill-downs load), and `row_lines` (the styled lines of git rows) |
-| `src/interface/popups/` | what can sit over the panes: `Popup`, `ConfirmPrompt`, the `Modal` that holds either, the popup keys, the menus and the context menu |
-| `src/interface/{help,render_state,terminal}.rs` | the help screen state, the animations, the toast and the image protocol a frame needs mutable, and the terminal lifecycle |
-| `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); `settings_sheet` is its keys and clicks |
-| `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config, the colour picker and the theme editor state |
+| `src/git/keys/` | what a key does to the repository, one file per feature (`staging`, `branch`, `stash`, `rebase`, `commit`, `remote`, `create_remote`, `git_config`, `git_config_edit`, `welcome`, `askpass`): pick the target, call `git::<feature>`, report. These are the only files of `git/` that know `App` |
+| `src/interface/screens/` | drawing only: reads `&App` and returns what the frame learned as a `Landed`; `row_lines` are the styled lines of git rows |
+| `src/interface/state/` | what the interface remembers, one file per thing: the panes (`nav`, `pane_rows`, `right_pane` with its diff cursor and cached render, `hit_areas`, the drill-downs, the selection keys, the diff views, what the right pane loads in `diff_query` / `image_query`), what can sit over them (`popup`, `confirm`, `modal`, the menus, the commit editor `commit_draft`, the create-remote form, the popup keys), the side sheets (`sheet`, `dashboard`), `help`, `full_screens` and `render_state` |
+| `src/interface/terminal.rs` | the terminal lifecycle |
+| `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); `keys` is the settings sheet's keys and clicks |
+| `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`), the colour picker and the theme editor state |
 | `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `profile/` (commit identities) and `image/` (format detection, preview) |
 | `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, and for each `git/<x>.rs` the code that reads with `git2` or runs `git` |
 | `src/interface/components/ui/` | widgets (donut, heat map, toast, drawer, ...) |

@@ -5,8 +5,8 @@
 use crate::app::App;
 use crate::git;
 use crate::git::rebase::RebaseEdit;
-use crate::interface::panes::pane::Pane;
-use crate::interface::popups::confirm::ConfirmPrompt;
+use crate::interface::state::confirm::ConfirmPrompt;
+use crate::interface::state::pane::Pane;
 
 impl App {
     /// The selected commit, when a rewrite key may act on it: Commits focused

@@ -3,9 +3,9 @@
 use std::collections::HashSet;
 
 use crate::app::App;
-use crate::interface::panes::drill::CommitDrill;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::tree::{FileRow, commit_drill_files};
+use crate::interface::state::drill::CommitDrill;
+use crate::interface::state::pane::Pane;
+use crate::interface::state::tree::{FileRow, commit_drill_files};
 
 impl App {
     /// Enter on a directory row in the Files pane: toggle it collapsed or

@@ -21,7 +21,7 @@ use std::fs;
 
 use ferrit::app::App;
 use ferrit::config::{Config, ConfigLoad};
-use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::state::pane::Pane;
 use ferrit::keybindings::hints::{Bar, HelpLine, filter_help_lines, help_lines, keybar_layout};
 use ferrit::keybindings::keymap::{Action, Context, Keymap};
 use git2::Repository;

@@ -14,7 +14,7 @@ use ferrit::app::App;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
-use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::state::pane::Pane;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn char_key(c: char) -> KeyEvent {

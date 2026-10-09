@@ -6,11 +6,11 @@ use crate::git::branch::{self, MergeKind, MergeOutcome};
 use crate::git::error::GitResult;
 use crate::git::staging;
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::pane::{BranchesTab, Pane};
-use crate::interface::panes::selection::SelectionKey;
-use crate::interface::popups::confirm::ConfirmPrompt;
-use crate::interface::popups::menu::MenuState;
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::confirm::ConfirmPrompt;
+use crate::interface::state::menu::MenuState;
+use crate::interface::state::pane::{BranchesTab, Pane};
+use crate::interface::state::popup::Popup;
+use crate::interface::state::selection::SelectionKey;
 
 impl App {
     /// Enter on the Branches pane: lazygit's branch -> log drill-down. Read

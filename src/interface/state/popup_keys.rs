@@ -3,8 +3,8 @@
 use crate::app::App;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInputMode;
-use crate::interface::panes::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::popup::Popup;
+use crate::interface::state::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

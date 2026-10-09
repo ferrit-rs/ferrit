@@ -12,13 +12,13 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
-use super::tree::StageState;
 use crate::git::command_log::{CommandKind, CommandRecord};
 use crate::git::diff::{Diff, DiffStat};
 use crate::git::model::FileEntry;
 use crate::git::model::{BranchEntry, CommitEntry, StashEntry};
 use crate::git::model::{Change, CommitRefKind, PushState};
 use crate::git::model::{RemoteEntry, StatusHeader};
+use crate::interface::state::tree::StageState;
 use crate::theme::palette::Palette;
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.

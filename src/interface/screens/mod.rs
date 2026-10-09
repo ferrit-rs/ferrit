@@ -5,7 +5,7 @@
 //! Colours come from `theme`.
 
 use self::landed::Landed;
-use crate::interface::render_state::RenderState;
+use crate::interface::state::render_state::RenderState;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -22,11 +22,10 @@ use crate::interface::components::ui::key_bar::KeyBar;
 use crate::interface::components::ui::pane_list::PaneList;
 use crate::interface::components::ui::panel::Panel;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
-use crate::interface::full_screens::FullScreen;
-use crate::interface::panes::pane::{PANES, Pane};
-use crate::interface::panes::row_lines;
-use crate::interface::panes::views::{DiffView, PopupView};
-use crate::interface::sheets::sheet::Sheet;
+use crate::interface::state::full_screens::FullScreen;
+use crate::interface::state::pane::{PANES, Pane};
+use crate::interface::state::sheet::Sheet;
+use crate::interface::state::views::{DiffView, PopupView};
 use crate::keybindings::hints::{self, Bar};
 use crate::theme::palette::Palette;
 
@@ -36,6 +35,7 @@ mod diff;
 pub(crate) mod git_config;
 pub(crate) mod landed;
 mod popups;
+pub mod row_lines;
 mod settings;
 pub(crate) mod welcome;
 

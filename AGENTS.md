@@ -39,7 +39,7 @@ needs a reason stated in the commit message.
 Keep distinct logic in separate files or modules. Group logic by domain:
 `src/git/` (Git types and traits, profile, image, and `git/repo`, the `git2` and subprocess
 adapter), `src/keybindings/`, `src/config/` and `src/theme/`; what the user sees
-(panes, popups, screens, reusable widgets, isolated `tui_overlay` code, the terminal
+(state, screens, reusable widgets, isolated `tui_overlay` code, the terminal
 lifecycle) goes under `src/interface/`; `src/app/` holds `App` and what reads several
 domains. Avoid mixing those responsibilities in one file.
 

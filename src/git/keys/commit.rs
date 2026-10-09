@@ -6,11 +6,11 @@ use crate::app::error::AppError;
 use crate::git;
 use crate::git::apply::ApplyDir;
 use crate::interface::components::tui_overlay::state::OverlayState;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::selection::SelectionKey;
-use crate::interface::panes::views::CommitPopupView;
-use crate::interface::popups::commit_draft::{CommitDraft, DraftKey, RewordTarget};
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::commit_draft::{CommitDraft, DraftKey, RewordTarget};
+use crate::interface::state::pane::Pane;
+use crate::interface::state::popup::Popup;
+use crate::interface::state::selection::SelectionKey;
+use crate::interface::state::views::CommitPopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 impl App {

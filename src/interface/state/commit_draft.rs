@@ -8,7 +8,7 @@ use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::model::CommitEntry;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
-use crate::interface::panes::views::CommitPopupView;
+use crate::interface::state::views::CommitPopupView;
 
 /// Which of the two fields has the keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

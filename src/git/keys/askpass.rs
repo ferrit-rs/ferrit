@@ -6,8 +6,8 @@
 use crate::app::App;
 use crate::git::askpass;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
-use crate::interface::panes::views::CommitPopupView;
-use crate::interface::popups::popup::Popup;
+use crate::interface::state::popup::Popup;
+use crate::interface::state::views::CommitPopupView;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use std::sync::mpsc;

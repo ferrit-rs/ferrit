@@ -12,8 +12,8 @@ use crate::git::error::GitResult;
 use crate::git::image::preview;
 use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
-use crate::interface::panes::pane::Pane;
-use crate::interface::panes::tree::FileRow;
+use crate::interface::state::pane::Pane;
+use crate::interface::state::tree::FileRow;
 use std::thread;
 
 /// Image worker result, applied only if selection and generation still match.

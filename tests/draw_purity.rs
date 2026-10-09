@@ -24,8 +24,8 @@ use ferrit::config::ConfigLoad;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
-use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens as ui;
+use ferrit::interface::state::pane::Pane;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

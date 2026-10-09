@@ -23,7 +23,7 @@ use ferrit::app::App;
 use ferrit::app::events::AppEvent;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::git::stats::Window;
-use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::state::pane::Pane;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
