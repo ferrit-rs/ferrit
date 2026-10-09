@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
-use super::App;
+use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
@@ -19,11 +19,11 @@ use crate::git::error::GitError;
 use crate::git::port::GitPort;
 
 #[derive(Default)]
-pub(super) struct DiffQueryState {
-    pub(super) in_flight: bool,
-    pub(super) pending: Option<(RightKey, u64)>,
-    pub(super) generation: u64,
-    pub(super) refresh_requested: bool,
+pub(crate) struct DiffQueryState {
+    pub(crate) in_flight: bool,
+    pub(crate) pending: Option<(RightKey, u64)>,
+    pub(crate) generation: u64,
+    pub(crate) refresh_requested: bool,
 }
 
 /// Identity of selected right-pane content.
@@ -88,7 +88,7 @@ impl App {
     /// owns the right pane, so it clears the diff. A `Refresh` of an unchanged
     /// selection rebuilds the text but keeps `right_scroll`; a changed
     /// selection resets the scroll to the top.
-    pub(super) fn update_diff(&mut self) {
+    pub(crate) fn update_diff(&mut self) {
         if self.workers.image.path.is_some() {
             self.right.diff = DiffView::None;
             self.right.key = None;
@@ -163,7 +163,7 @@ impl App {
         });
     }
 
-    pub(super) fn on_diff_done(&mut self, completion: DiffCompletion) {
+    pub(crate) fn on_diff_done(&mut self, completion: DiffCompletion) {
         let DiffCompletion {
             key,
             generation,

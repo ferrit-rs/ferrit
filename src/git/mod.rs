@@ -14,6 +14,7 @@
 
 #![warn(missing_docs)]
 
+pub mod actions;
 pub mod apply;
 pub mod askpass;
 pub mod blob;

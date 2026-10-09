@@ -7,7 +7,7 @@
 
 use ratatui::layout::Rect;
 
-use crate::app::settings::SettingsHits;
+use crate::config::settings_sheet::SettingsHits;
 use crate::interface::panes::pane::Pane;
 use crate::keybindings::hints;
 

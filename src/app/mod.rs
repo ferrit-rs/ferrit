@@ -17,10 +17,8 @@ use crate::interface::components::ui::mouse_pointer::MousePointer;
 use crate::interface::components::ui::toast::Toast;
 use crate::theme::palette::Palette;
 use color_eyre::Result;
-use ratatui::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
-use ratatui::layout::{Position, Rect};
+use ratatui::crossterm::event::{Event, KeyEvent, KeyEventKind, MouseEvent};
+use ratatui::layout::Rect;
 use ratatui::text::Line;
 
 use crate::app::events::{AppEvent, Events};
@@ -33,7 +31,7 @@ use crate::interface::screens as ui;
 use crate::interface::terminal::Tui;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
-fn operation_noun(operation: git::model::Operation) -> &'static str {
+pub(crate) fn operation_noun(operation: git::model::Operation) -> &'static str {
     operation.noun()
 }
 
@@ -44,9 +42,9 @@ pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
     pub(crate) prefs: crate::config::prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    pub(crate) sheets: sheet::Sheets,
+    pub(crate) sheets: crate::interface::sheets::sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
-    pub(crate) full_screens: full_screens::FullScreens,
+    pub(crate) full_screens: crate::interface::full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
     pub nav: crate::interface::panes::nav::Nav,
     /// Whether the help overlay is up.
@@ -61,7 +59,7 @@ pub struct App {
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     pub(crate) repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
-    pub(crate) authorship: authorship::Authorship,
+    pub(crate) authorship: git::profile::authorship::Authorship,
     pub theme: crate::theme::editor::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
@@ -97,7 +95,7 @@ pub struct App {
     pub(crate) watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
     pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
-    pub(crate) create_remote: create_remote::CreateRemote,
+    pub(crate) create_remote: git::actions::create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -105,43 +103,19 @@ pub struct App {
     pub(crate) status_note: Option<String>,
 }
 
-mod authorship;
-pub mod full_screens;
 pub mod refresh;
-mod welcome;
 pub mod workers;
 
-pub(crate) mod askpass;
-mod branch_actions;
-pub(crate) mod commit;
-pub(crate) mod context_menu;
-pub mod create_remote;
-pub mod dashboard;
-pub mod diff_query;
-mod dispatch;
-mod drill_nav;
 pub mod error;
-pub mod git_config;
-pub(crate) mod git_config_edit;
-pub mod image_query;
-mod input;
-pub(crate) mod menu;
-mod popups;
-mod rebase_actions;
-mod remote;
-pub mod settings;
-pub(crate) mod sheet;
-mod staging;
-mod stash_actions;
 
 pub(crate) use error::AppError;
 
 #[cfg(test)]
 mod tests;
 
-use self::full_screens::FullScreen;
 use self::refresh::RefreshCompletion;
 use self::workers::{WorkerKind, run_worker};
+use crate::interface::full_screens::FullScreen;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::pane_rows::PaneRows;
@@ -185,11 +159,11 @@ impl App {
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
-        let authorship = authorship::Authorship::of(repo.as_deref());
+        let authorship = git::profile::authorship::Authorship::of(repo.as_deref());
         Self {
             prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
-            sheets: sheet::Sheets::default(),
-            full_screens: full_screens::FullScreens::default(),
+            sheets: crate::interface::sheets::sheet::Sheets::default(),
+            full_screens: crate::interface::full_screens::FullScreens::default(),
             nav: crate::interface::panes::nav::Nav::default(),
             help: crate::interface::help::HelpState::default(),
             should_quit: false,
@@ -210,7 +184,7 @@ impl App {
             workers: workers::Workers::new(),
             watch_request: None,
             terminal_request: None,
-            create_remote: create_remote::CreateRemote::default(),
+            create_remote: git::actions::create_remote::CreateRemote::default(),
             status_note: None,
         }
     }
@@ -471,7 +445,7 @@ impl App {
 
     /// Rebuild both cached right-pane values (`preview`, then `diff`) for the
     /// current focus and selection. Cheap when nothing changed.
-    fn update_right_pane(&mut self) {
+    pub(crate) fn update_right_pane(&mut self) {
         self.update_preview();
         self.update_diff();
         self.sync_commit_file_scroll();
@@ -504,7 +478,7 @@ impl App {
     /// Called after *every* key while `Mode::Diff` is up: keeps the cursor
     /// where it was, or drops to `Mode::Nav` once the right pane has no line
     /// left to put it on (`RightPane::resync_cursor`).
-    fn resync_diff_cursor(&mut self) {
+    pub(crate) fn resync_diff_cursor(&mut self) {
         if self.nav.mode == Mode::Diff && !self.right.resync_cursor() {
             self.nav.mode = Mode::Nav;
         }
@@ -522,7 +496,7 @@ impl App {
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
-    pub fn dashboard(&self) -> &dashboard::Dashboard {
+    pub fn dashboard(&self) -> &crate::interface::sheets::dashboard::Dashboard {
         &self.sheets.dashboard
     }
 
@@ -783,7 +757,7 @@ impl App {
         self.rows().stash_lines()
     }
 
-    fn rows(&self) -> PaneRows<'_> {
+    pub(crate) fn rows(&self) -> PaneRows<'_> {
         PaneRows {
             nav: &self.nav,
             snapshot: &self.snapshot,
@@ -869,13 +843,13 @@ impl App {
     /// at startup. `None` for `App::mock()` and for a bare repo (no
     /// worktree root to reopen from), same reach as `watch_root` already
     /// has.
-    fn repo_handle(&self) -> Option<Box<dyn GitPort>> {
+    pub(crate) fn repo_handle(&self) -> Option<Box<dyn GitPort>> {
         self.repo.as_ref()?.reopen().ok()
     }
 
     /// A second handle on the repository for a worker thread, or why it could
     /// not be opened; `None` without a repository.
-    fn reopen_repo(&self) -> Option<GitResult<Box<dyn GitPort>>> {
+    pub(crate) fn reopen_repo(&self) -> Option<GitResult<Box<dyn GitPort>>> {
         self.repo.as_ref().map(|repo| repo.reopen())
     }
 

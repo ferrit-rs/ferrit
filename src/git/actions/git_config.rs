@@ -3,11 +3,15 @@
 //! Drawing is `screens/git_config.rs`; every read and write is `Repo::config*`,
 //! so git stays the owner of the file format.
 
-use super::{App, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use crate::app::App;
 use crate::app::error::AppError;
-use crate::app::full_screens::FullScreen;
 use crate::git::config::{ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value};
+use crate::interface::full_screens::FullScreen;
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::MouseEvent;
+use ratatui::crossterm::event::MouseEventKind;
 
 /// Rows `PgUp` / `PgDn` move.
 const PAGE: isize = 10;
@@ -46,9 +50,9 @@ pub struct GitConfigScreen {
     /// What the last action did, for the footer.
     pub note: Option<String>,
     /// The allowed-values menu that is up, and what choosing a row sets.
-    pub(super) pick: Option<super::git_config_edit::PickTarget>,
+    pub(crate) pick: Option<super::git_config_edit::PickTarget>,
     /// The first write to the global file was confirmed: it is asked once a session.
-    pub(super) global_confirmed: bool,
+    pub(crate) global_confirmed: bool,
 }
 
 impl Default for GitConfigScreen {
@@ -84,7 +88,7 @@ impl GitConfigScreen {
     }
 
     /// The file the global scope reads and writes, as the listing shows it.
-    pub(super) fn global_file(&self) -> Option<&std::path::Path> {
+    pub(crate) fn global_file(&self) -> Option<&std::path::Path> {
         self.view
             .entries
             .iter()
@@ -106,13 +110,13 @@ impl GitConfigScreen {
 
     /// Take a fresh listing and rebuild the rows, keeping the selection on the
     /// same value, else on the same key, else near where it was.
-    pub(super) fn set_view(&mut self, view: ConfigView) {
+    pub(crate) fn set_view(&mut self, view: ConfigView) {
         let before = self.selected_id();
         self.view = view;
         self.rebuild(before, false);
     }
 
-    pub(super) fn set_filter(&mut self, filter: String) {
+    pub(crate) fn set_filter(&mut self, filter: String) {
         let before = self.selected_id();
         self.filter = filter;
         self.rebuild(before, true);
@@ -196,7 +200,7 @@ impl App {
 
     /// `git config --list` again; `false` (after an error toast) when git
     /// could not answer or there is no repository.
-    pub(super) fn reread_git_config(&mut self) -> bool {
+    pub(crate) fn reread_git_config(&mut self) -> bool {
         let Some(repo) = &self.repo else {
             self.report_error(AppError::NoRepository);
             return false;
@@ -215,7 +219,7 @@ impl App {
 
     /// Every key while the screen is up (after the popups, a pending
     /// confirmation and the help overlay, which own input before it).
-    pub(super) fn git_config_key(&mut self, key: KeyEvent) {
+    pub(crate) fn git_config_key(&mut self, key: KeyEvent) {
         if self.full_screens.git_config.filtering {
             self.git_config_filter_key(key);
             return;
@@ -286,7 +290,7 @@ impl App {
     }
 
     /// Only the wheel does anything: it moves the selection.
-    pub(super) fn git_config_mouse(&mut self, ev: MouseEvent) {
+    pub(crate) fn git_config_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::ScrollUp => self.full_screens.git_config.move_by(-WHEEL_ROWS),
             MouseEventKind::ScrollDown => self.full_screens.git_config.move_by(WHEEL_ROWS),

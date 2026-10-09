@@ -15,18 +15,18 @@ use ratatui_image::{Resize, StatefulImage};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::App;
-use crate::app::full_screens::FullScreen;
 use crate::app::mock;
-use crate::app::sheet::Sheet;
 use crate::git::command_log;
 use crate::git::image::preview::Preview;
 use crate::interface::components::ui::key_bar::KeyBar;
 use crate::interface::components::ui::pane_list::PaneList;
 use crate::interface::components::ui::panel::Panel;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
+use crate::interface::full_screens::FullScreen;
 use crate::interface::panes::pane::{PANES, Pane};
 use crate::interface::panes::row_lines;
 use crate::interface::panes::views::{DiffView, PopupView};
+use crate::interface::sheets::sheet::Sheet;
 use crate::keybindings::hints::{self, Bar};
 use crate::theme::palette::Palette;
 
@@ -177,7 +177,7 @@ fn draw_panes(
     draw_keybar(frame, keybar, app, render, landed);
 
     if render.sheet.is_closed() {
-        landed.settings_hits = Some(crate::app::settings::SettingsHits::default());
+        landed.settings_hits = Some(crate::config::settings_sheet::SettingsHits::default());
     } else {
         match app.sheets.kind {
             Sheet::Settings => settings::draw(frame, area, app, &palette, render, landed),

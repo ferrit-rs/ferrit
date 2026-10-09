@@ -13,8 +13,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use ferrit::app::App;
-use ferrit::app::full_screens::FullScreen;
 use ferrit::config::ConfigLoad;
+use ferrit::interface::full_screens::FullScreen;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };

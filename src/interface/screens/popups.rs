@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
+use crate::git::actions::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
 use crate::git::host::Visibility;
 use crate::interface::components::tui_overlay::anchor::Anchor;
 use crate::interface::components::tui_overlay::backdrop::Backdrop;

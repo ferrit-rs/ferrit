@@ -4,14 +4,16 @@
 //! adds a key. Every change is one `git config` call at the screen's write
 //! scope (`Repo::config_*`); git validates the value.
 
-use super::context_menu::NameKind;
-use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, KeyCode, KeyEvent};
+use crate::app::App;
 use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use crate::git::config_keys::{KeyType, lookup};
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::context_menu::NameKind;
+use crate::interface::popups::menu::{MenuAction, MenuItem, MenuState};
 use crate::interface::popups::popup::Popup;
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
 

@@ -4,8 +4,8 @@
 
 use super::landed::Landed;
 use crate::app::App;
-use crate::app::settings::{Click, SettingsHits};
 use crate::config::settings::{Kind, SaveState, SettingsRow};
+use crate::config::settings_sheet::{Click, SettingsHits};
 use crate::interface::components::ui::drawer::Drawer;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::interface::components::ui::separator::Separator;

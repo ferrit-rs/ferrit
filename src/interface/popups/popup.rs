@@ -1,7 +1,9 @@
 //! What a popup can be.
 
-use crate::app::{askpass, commit, context_menu, create_remote, menu};
+use crate::git::actions::create_remote;
+use crate::git::actions::{askpass, commit};
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::popups::{context_menu, menu};
 
 /// Modal state that owns all input while it is up, the same idea as
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).

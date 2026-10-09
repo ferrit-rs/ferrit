@@ -9,6 +9,7 @@
 )]
 
 use super::*;
+use ratatui::crossterm::event::KeyCode;
 
 fn press(app: &mut App, code: KeyCode) {
     app.on_key(KeyEvent::from(code));

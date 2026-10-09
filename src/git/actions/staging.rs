@@ -4,8 +4,9 @@
 
 use std::ops::Range;
 
-use super::{App, events, git};
 use crate::app::error::AppError;
+use crate::app::{App, events};
+use crate::git;
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::model::Change;
@@ -20,7 +21,7 @@ impl App {
     /// for staging within it. A no-op off the Files pane, on a directory
     /// row, already in `Mode::Diff`, or when neither side has a selectable
     /// line to put the cursor on: those stage whole-file only, from `Mode::Nav`.
-    pub(super) fn enter_diff_mode(&mut self) {
+    pub(crate) fn enter_diff_mode(&mut self) {
         if self.nav.focus != Pane::Files || self.nav.mode == Mode::Diff {
             return;
         }
@@ -33,13 +34,13 @@ impl App {
     }
 
     /// `Esc` / `h` in `Mode::Diff`: back to `Mode::Nav`.
-    pub(super) fn leave_diff_mode(&mut self) {
+    pub(crate) fn leave_diff_mode(&mut self) {
         self.nav.mode = Mode::Nav;
     }
 
     /// Refresh after a stage / unstage / discard, then surface a failure in
     /// the Status pane.
-    pub(super) fn finish_apply(&mut self, result: GitResult<()>) {
+    pub(crate) fn finish_apply(&mut self, result: GitResult<()>) {
         self.request_refresh();
         if let Err(e) = result {
             self.report_error(e);
@@ -51,7 +52,7 @@ impl App {
     /// repository exactly as it was; the refresh still runs so a failed attempt
     /// (context drift from an external edit) re-reads the current diff for the
     /// retry (`docs/PLAN_6_STAGING.md` "apply fails").
-    pub(super) fn run_stage(&mut self, plan: Plan) {
+    pub(crate) fn run_stage(&mut self, plan: Plan) {
         let action = match plan {
             Plan::Nothing => return,
             Plan::Refuse(Refusal::ConflictMarkers(path)) => {
@@ -73,7 +74,7 @@ impl App {
     /// `<space>` on a Files row (`Mode::Nav`): stage or unstage the whole
     /// file or directory, direction inferred from which side has a change
     /// (`docs/PLAN_6_STAGING.md` "Stage vs unstage is one key").
-    pub(super) fn stage_selected_file(&mut self) {
+    pub(crate) fn stage_selected_file(&mut self) {
         if self.nav.focus != Pane::Files {
             return;
         }
@@ -96,7 +97,7 @@ impl App {
 
     /// `<space>` in `Mode::Diff`: stage/unstage the hunk under the cursor,
     /// or the V-selection when one is active.
-    pub(super) fn stage_diff_cursor(&mut self) {
+    pub(crate) fn stage_diff_cursor(&mut self) {
         let Some(granule) = self.right.current_granule() else {
             return;
         };
@@ -108,7 +109,7 @@ impl App {
     /// `a` (Nav, Files focused): stage every changed file if any is
     /// unstaged, else unstage everything: one `git` call either way
     /// (`docs/PLAN_6_STAGING.md` milestone S4).
-    pub(super) fn stage_all_files(&mut self) {
+    pub(crate) fn stage_all_files(&mut self) {
         if self.nav.focus != Pane::Files {
             return;
         }
@@ -124,7 +125,7 @@ impl App {
     /// under the cursor from `Mode::Diff`. Discard only ever touches the
     /// worktree (`docs/PLAN_6_STAGING.md`'s own scope), so it is a no-op on
     /// the Staged side and on a file with no worktree change of its own.
-    pub(super) fn discard_prompt(&mut self) {
+    pub(crate) fn discard_prompt(&mut self) {
         let prompt = match self.nav.mode {
             Mode::Nav if self.nav.focus == Pane::Files => {
                 let Some(entry) = self.rows().selected_file() else {
@@ -155,7 +156,7 @@ impl App {
     /// uses) re-opens the confirm one more time asking to force it,
     /// rather than reporting the refusal and stopping — `git branch -d`
     /// is offering a choice, not failing outright.
-    pub(super) fn run_confirm(&mut self) {
+    pub(crate) fn run_confirm(&mut self) {
         let Some(prompt) = self.modal.take_confirm() else {
             return;
         };

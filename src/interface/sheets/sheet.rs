@@ -4,7 +4,8 @@
 //! time. What a sheet shows and does with the keys is its own module
 //! (`settings`); this one only says which it is and opens and closes it.
 
-use super::{App, dashboard};
+use super::dashboard;
+use crate::app::App;
 use crate::config::settings::SettingsSheet;
 use crate::interface::components::tui_overlay::state::OverlayState;
 

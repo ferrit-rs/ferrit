@@ -2,7 +2,8 @@
 //! selected commit, each as one `git rebase -i`. See
 //! `docs/PLAN_11_REBASE.md` R4.
 
-use super::{App, git};
+use crate::app::App;
+use crate::git;
 use crate::git::rebase::RebaseEdit;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
@@ -34,7 +35,7 @@ impl App {
 
     /// `w` on Commits: reword the selected commit. `HEAD` keeps phase 7's
     /// `git commit --amend` path, no rebase needed.
-    pub(super) fn reword_selected_commit(&mut self) {
+    pub(crate) fn reword_selected_commit(&mut self) {
         if self.nav.focus == Pane::Commits && self.selected(Pane::Commits) == 0 {
             self.open_commit(git::commit::CommitKind::Reword);
             return;
@@ -55,7 +56,7 @@ impl App {
 
     /// `d` on Commits: ask before dropping, the one irreversible-looking
     /// rewrite (the reflog still has it, but nothing in ferrit shows that).
-    pub(super) fn drop_commit_prompt(&mut self) {
+    pub(crate) fn drop_commit_prompt(&mut self) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
@@ -71,7 +72,7 @@ impl App {
     /// drops this one, acts at once) on Commits: fold the selected commit
     /// into the one below it. The oldest commit has nothing below, so `s`
     /// there skips the question and reports why.
-    pub(super) fn fold_selected_commit(&mut self, fixup: bool) {
+    pub(crate) fn fold_selected_commit(&mut self, fixup: bool) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
@@ -95,7 +96,7 @@ impl App {
 
     /// `e` on Commits: stop the rebase at the selected commit so it can be
     /// amended, leaving the rebase in progress for `m` to continue.
-    pub(super) fn edit_selected_commit(&mut self) {
+    pub(crate) fn edit_selected_commit(&mut self) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
@@ -105,7 +106,7 @@ impl App {
     /// `F` on Commits: `git commit --fixup=<selected>` with what is staged,
     /// for a later autosquash. Nothing staged is an error, not an empty
     /// commit.
-    pub(super) fn create_fixup_commit(&mut self) {
+    pub(crate) fn create_fixup_commit(&mut self) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
@@ -130,7 +131,7 @@ impl App {
     /// `a` on Commits: fold every `fixup!` / `squash!` commit from the
     /// selected commit up into its target. Skipped, with a note, when no such
     /// commit has its target in that range (git would rewrite nothing).
-    pub(super) fn autosquash_from_selected(&mut self) {
+    pub(crate) fn autosquash_from_selected(&mut self) {
         let Some(entry) = self.rewrite_target() else {
             return;
         };
@@ -145,11 +146,11 @@ impl App {
     }
 
     /// Confirmed drop.
-    pub(super) fn drop_commit(&mut self, hash: &str) {
+    pub(crate) fn drop_commit(&mut self, hash: &str) {
         self.run_rebase_edit(hash, &RebaseEdit::Drop);
     }
 
-    pub(super) fn run_rebase_edit(&mut self, hash: &str, edit: &RebaseEdit) {
+    pub(crate) fn run_rebase_edit(&mut self, hash: &str, edit: &RebaseEdit) {
         let Some(repo) = &self.repo else { return };
         let result = repo.rebase_edit(hash, edit);
         self.finish_operation(result);

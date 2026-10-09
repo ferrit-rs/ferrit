@@ -14,13 +14,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 use super::sheet::Sheet;
-use super::{App, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::port::GitPort;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::MouseEvent;
+use ratatui::crossterm::event::MouseEventKind;
 
 /// The windows `t` cycles through, shortest first.
 const WINDOWS: [Window; 5] = [
@@ -133,7 +137,7 @@ impl Dashboard {
         self.show_counts
     }
 
-    pub(super) fn is_busy(&self) -> bool {
+    pub(crate) fn is_busy(&self) -> bool {
         self.in_flight.is_some()
     }
 
@@ -146,7 +150,7 @@ impl Dashboard {
     }
 
     /// Quit: same, but wait, so the process does not exit under the thread.
-    pub(super) fn stop_and_join(&mut self) {
+    pub(crate) fn stop_and_join(&mut self) {
         self.cancel.store(true, Ordering::Release);
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
@@ -180,7 +184,7 @@ impl App {
     }
 
     /// The sheet is about to open: at the top, no old error, statistics asked for.
-    pub(super) fn prepare_dashboard_sheet(&mut self) {
+    pub(crate) fn prepare_dashboard_sheet(&mut self) {
         self.sheets.dashboard.error = None;
         self.sheets.dashboard.scroll = 0;
         self.ensure_stats(false);
@@ -266,7 +270,7 @@ impl App {
     /// `AppEvent::StatsDone` arrived. A stale generation is dropped; a good
     /// result is cached whether or not the screen is still up, an error only
     /// shows when it is.
-    pub(super) fn on_stats_done(&mut self, completion: StatsCompletion) {
+    pub(crate) fn on_stats_done(&mut self, completion: StatsCompletion) {
         if completion.generation != self.sheets.dashboard.generation {
             return;
         }
@@ -300,7 +304,7 @@ impl App {
 
     /// Every key while the dashboard is up (after the popups, a pending
     /// confirmation and the help overlay, which own input before it).
-    pub(super) fn dashboard_key(&mut self, key: KeyEvent) {
+    pub(crate) fn dashboard_key(&mut self, key: KeyEvent) {
         // The key that opens the dashboard closes it, whatever it is bound to.
         let toggles = self
             .prefs
@@ -340,7 +344,7 @@ impl App {
 
     /// The wheel scrolls three rows a notch; a left click outside the drawer closes
     /// it (the panes behind are dimmed and not clickable).
-    pub(super) fn dashboard_mouse(&mut self, ev: MouseEvent) {
+    pub(crate) fn dashboard_mouse(&mut self, ev: MouseEvent) {
         let point = ratatui::layout::Position::new(ev.column, ev.row);
         match ev.kind {
             MouseEventKind::Down(ratatui::crossterm::event::MouseButton::Left)

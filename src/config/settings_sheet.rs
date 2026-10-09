@@ -7,11 +7,12 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 
-use super::{App, KeyModifiers};
+use crate::app::App;
 use crate::config::settings::{SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped};
 use crate::config::{Config, Section};
 use crate::theme::color_picker::{self, PaletteDirection};
 use crate::theme::config::{Preset, SchemeChoice, ThemeMode};
+use ratatui::crossterm::event::KeyModifiers;
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
@@ -149,7 +150,7 @@ impl App {
     /// The theme in `theme_config` changed (base, preset, colour): rebuild what
     /// was drawn from it, and mirror it into the live config so a clone of the
     /// config (the app rebuilt on a new repository) carries it.
-    pub(super) fn theme_changed(&mut self) {
+    pub(crate) fn theme_changed(&mut self) {
         let palette = self.theme.config.palette();
         // The cached diff holds syntax colours, which follow the base only: an
         // accent change must not make every click re-highlight the diff.
@@ -164,7 +165,7 @@ impl App {
     /// system with no config directory) is not an error: nothing is written. A
     /// file that cannot be written, or is not TOML, is reported in the sheet's
     /// footer and the setting still applies for this run.
-    pub(super) fn save_settings(&mut self, section: Section) {
+    pub(crate) fn save_settings(&mut self, section: Section) {
         let Some(path) = self.prefs.file.clone() else {
             self.sheets.settings.save = SaveState::Idle;
             return;
@@ -219,7 +220,7 @@ impl App {
 
     /// The sheet is about to open: back on the rows, at the top, the selected row
     /// scrolled into view.
-    pub(super) fn prepare_settings_sheet(&mut self) {
+    pub(crate) fn prepare_settings_sheet(&mut self) {
         self.theme.mode = ThemeMode::Idle;
         self.sheets.settings.scroll = 0;
         self.sheets.settings.follow = true;
@@ -228,7 +229,7 @@ impl App {
     /// Every key while the sheet is up. It owns the keyboard: `↑` `↓` move
     /// between rows, `←` `→` and `Space` change the value, `Enter` opens the
     /// colour picker on the accent, `Esc` goes back (picker) or closes.
-    pub(super) fn settings_key(&mut self, key: KeyEvent) {
+    pub(crate) fn settings_key(&mut self, key: KeyEvent) {
         match self.theme.mode {
             ThemeMode::Palette => self.picker_key(key),
             ThemeMode::EditingRgb => self.rgb_key(key),
@@ -300,7 +301,7 @@ impl App {
 
     /// The mouse while the sheet is up: a click sets the value it lands on, the
     /// wheel scrolls, a click outside closes it.
-    pub(super) fn settings_mouse(&mut self, ev: MouseEvent) {
+    pub(crate) fn settings_mouse(&mut self, ev: MouseEvent) {
         self.mouse_pointer.request(false);
         let point = Position::new(ev.column, ev.row);
         match ev.kind {
@@ -348,7 +349,7 @@ impl App {
         }
     }
 
-    pub(super) fn sync_theme_picker_selection(&mut self) {
+    pub(crate) fn sync_theme_picker_selection(&mut self) {
         self.theme.sync_picker_selection();
     }
 

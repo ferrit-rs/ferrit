@@ -10,16 +10,16 @@ use crate::git::profile::settings::{Identity, IdentitySource, Settings};
 
 pub(crate) struct Authorship {
     /// The identities git knows, refreshed with the repository.
-    pub(super) profile: Profile,
+    pub(crate) profile: Profile,
     /// Ferrit's pick for this run; `None` is git's own.
-    pub(super) selected: Option<Identity>,
+    pub(crate) selected: Option<Identity>,
     /// `user.name` as git resolves it here, shown in the info panel.
-    pub(super) git_user_name: Option<String>,
+    pub(crate) git_user_name: Option<String>,
 }
 
 impl Authorship {
     /// The authorship of a session over `repo`, or of the repo-free one.
-    pub(super) fn of(repo: Option<&dyn GitPort>) -> Self {
+    pub(crate) fn of(repo: Option<&dyn GitPort>) -> Self {
         let profile = repo.map_or_else(
             || {
                 Profile::new(Settings {
@@ -35,7 +35,7 @@ impl Authorship {
     }
 
     /// The identities git knows for `repo`.
-    pub(super) fn profile_of(repo: &dyn GitPort) -> Profile {
+    pub(crate) fn profile_of(repo: &dyn GitPort) -> Profile {
         let (global_identities, repository_identity, effective_identity, identity_source) =
             repo.identity_settings();
         Profile::new(Settings {
@@ -46,7 +46,7 @@ impl Authorship {
         })
     }
 
-    pub(super) fn new(profile: Profile, git_user_name: Option<String>) -> Self {
+    pub(crate) fn new(profile: Profile, git_user_name: Option<String>) -> Self {
         Self {
             profile,
             selected: None,
@@ -56,14 +56,14 @@ impl Authorship {
 
     /// The `--author` value for a commit: the pick as `Name <email>`, or `None`
     /// to let git use its own. A pick without an email is not a usable author.
-    pub(super) fn author_arg(&self) -> Option<String> {
+    pub(crate) fn author_arg(&self) -> Option<String> {
         let identity = self.selected.as_ref()?;
         let email = identity.email.as_ref()?;
         Some(format!("{} <{email}>", identity.name))
     }
 
     /// The popup's author line: who the next commit is by.
-    pub(super) fn line(&self) -> String {
+    pub(crate) fn line(&self) -> String {
         let show = |i: &Identity| match &i.email {
             Some(email) => format!("{} <{email}>", i.name),
             None => i.name.clone(),
@@ -77,7 +77,7 @@ impl Authorship {
 
     /// `Ctrl-A`: the next identity git knows (from its global config), then
     /// git's own, then round again. Nothing to cycle when git knows none.
-    pub(super) fn cycle(&mut self) {
+    pub(crate) fn cycle(&mut self) {
         let identities = self.profile.settings.available_identities();
         self.selected = match &self.selected {
             None => identities.first().cloned(),

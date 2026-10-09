@@ -10,7 +10,8 @@
 //! | Files (a conflicted file) | take ours, take theirs |
 
 use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, git};
+use crate::app::App;
+use crate::git;
 use crate::git::branch::MergeKind;
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::panes::diff_cursor::Mode;
@@ -31,7 +32,7 @@ pub(crate) enum NameKind {
     },
     StashKeepIndex,
     /// A git config value being typed (`app::git_config_edit`).
-    ConfigValue(super::git_config_edit::ConfigOp),
+    ConfigValue(git::actions::git_config_edit::ConfigOp),
     /// The key of a config entry about to be added.
     ConfigKey,
 }

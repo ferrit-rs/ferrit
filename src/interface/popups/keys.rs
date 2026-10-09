@@ -1,10 +1,12 @@
 //! New-branch, upstream-input and note popup state / key handling.
 
-use super::{App, KeyCode, KeyEvent};
+use crate::app::App;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInputMode;
 use crate::interface::panes::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use crate::interface::popups::popup::Popup;
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
 
 /// Rows a `PageUp` / `PageDown` moves the command log viewer.
 const COMMAND_LOG_PAGE: usize = 10;
@@ -172,7 +174,7 @@ impl App {
     }
 
     /// `@`: open the command log viewer, scrolled to the newest entry.
-    pub(super) fn open_command_log(&mut self) {
+    pub(crate) fn open_command_log(&mut self) {
         if self.modal.popup().is_none() {
             self.modal.open_popup(Popup::CommandLog { from_bottom: 0 });
         }
@@ -214,7 +216,7 @@ impl App {
 
     /// Every key while a non-commit popup is up. Commit editor routes to
     /// `app::commit`, which owns its separate summary/body key model.
-    pub(super) fn popup_key(&mut self, key: KeyEvent) {
+    pub(crate) fn popup_key(&mut self, key: KeyEvent) {
         if matches!(self.modal.popup(), Some(Popup::Commit(_))) {
             self.commit_popup_key(key);
             return;

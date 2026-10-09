@@ -5,7 +5,8 @@
 
 use ratatui::crossterm::event::KeyEvent;
 
-use super::{App, events, git};
+use crate::app::{App, events};
+use crate::git;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::{PANES, Pane};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
@@ -13,7 +14,7 @@ use crate::keybindings::keymap::{Action, Context, KeyBinding};
 impl App {
     /// The contexts a key is looked up in, most specific first: the diff
     /// cursor while it is up, then the focused pane, then everything.
-    pub(super) fn key_contexts(&self) -> Vec<Context> {
+    pub(crate) fn key_contexts(&self) -> Vec<Context> {
         let mut contexts = Vec::with_capacity(3);
         if self.nav.mode == Mode::Diff {
             contexts.push(Context::Diff);
@@ -27,7 +28,7 @@ impl App {
     /// the preview rebuild (and its diff subprocess): it changes no selection.
     /// Every other key ends by re-syncing the preview, since focus or
     /// selection may have moved.
-    pub(super) fn dispatch_key(&mut self, key: KeyEvent) {
+    pub(crate) fn dispatch_key(&mut self, key: KeyEvent) {
         let binding = KeyBinding::from_event(key);
         let action = self.prefs.keymap.resolve(&self.key_contexts(), binding);
         if let Some(action) = action {
@@ -59,7 +60,7 @@ impl App {
         }
     }
 
-    pub(super) fn run_action(&mut self, action: Action) {
+    pub(crate) fn run_action(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
             Action::Help => self.open_help(),
@@ -154,7 +155,7 @@ impl App {
         self.nav.focus = pane;
     }
 
-    pub(super) fn open_help(&mut self) {
+    pub(crate) fn open_help(&mut self) {
         self.help.show();
     }
 }

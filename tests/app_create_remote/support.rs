@@ -9,8 +9,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use ferrit::app::App;
-use ferrit::app::create_remote::{CreateDraft, CreateRemoteView, Field};
 use ferrit::app::events::AppEvent;
+use ferrit::git::actions::create_remote::{CreateDraft, CreateRemoteView, Field};
 use ferrit::git::host::{GhProgram, Visibility};
 use ferrit::interface::panes::views::PopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

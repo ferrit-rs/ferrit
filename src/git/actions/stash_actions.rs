@@ -3,7 +3,8 @@
 
 use std::path::PathBuf;
 
-use super::{App, git};
+use crate::app::App;
+use crate::git;
 use crate::git::stash::StashOutcome;
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::panes::diff_cursor::Mode;
@@ -28,7 +29,7 @@ impl App {
 
     /// `s` (Nav, Files focused): open the stash message popup. A clean tree
     /// opens nothing and says so.
-    pub(super) fn open_stash_popup(&mut self) {
+    pub(crate) fn open_stash_popup(&mut self) {
         if self.nav.focus != Pane::Files
             || self.nav.mode != Mode::Nav
             || self.modal.popup().is_some()
@@ -46,7 +47,7 @@ impl App {
     /// Success and "nothing to stash" close it; any other failure keeps the
     /// popup and the typed message so the user can retry (the phase 8
     /// new-branch rule).
-    pub(super) fn do_stash_push(&mut self) {
+    pub(crate) fn do_stash_push(&mut self) {
         let Some(Popup::Stash(buf)) = self.modal.popup() else {
             return;
         };
@@ -68,7 +69,7 @@ impl App {
     /// `<space>` (apply) or `g` (pop) on the Stash pane: ask before doing either,
     /// same reason as drop (`docs/PLAN_10_STASH.md`) — both mutate the working
     /// tree at once, with no undo, exactly like the discard prompt they mirror.
-    pub(super) fn restore_stash_prompt(&mut self, pop: bool) {
+    pub(crate) fn restore_stash_prompt(&mut self, pop: bool) {
         let Some(entry) = self.selected_stash() else {
             return;
         };
@@ -84,7 +85,7 @@ impl App {
     /// Confirmed apply or pop. A clean restore moves the focus to Files with
     /// the first restored file selected, like lazygit; a conflict or an error
     /// leaves the focus on Stash.
-    pub(super) fn restore_stash(&mut self, oid: &str, pop: bool) {
+    pub(crate) fn restore_stash(&mut self, oid: &str, pop: bool) {
         let first_file = match &self.right.diff {
             DiffView::Stash(entry, diff) if entry.oid == oid => diff
                 .files
@@ -122,7 +123,7 @@ impl App {
 
     /// `d` on the Stash pane: ask before dropping, the one irreversible
     /// stash action.
-    pub(super) fn drop_stash_prompt(&mut self) {
+    pub(crate) fn drop_stash_prompt(&mut self) {
         let Some(entry) = self.selected_stash() else {
             return;
         };
@@ -135,7 +136,7 @@ impl App {
     }
 
     /// Confirmed `d`: `git stash drop`, refreshing either way.
-    pub(super) fn drop_stash(&mut self, oid: &str) {
+    pub(crate) fn drop_stash(&mut self, oid: &str) {
         let Some(repo) = &mut self.repo else { return };
         let result = repo.stash_drop(oid);
         self.finish_branch_action(result);

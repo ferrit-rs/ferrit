@@ -1,8 +1,7 @@
 //! Branches-pane actions: checkout, create, delete, fast-forward, merge. Each
 //! picks the branch (`PaneRows`), makes the call (`git::branch`) and reports.
 
-use super::App;
-use super::menu::MenuState;
+use crate::app::App;
 use crate::git::branch::{self, MergeKind, MergeOutcome};
 use crate::git::error::GitResult;
 use crate::git::staging;
@@ -10,12 +9,13 @@ use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::panes::pane::{BranchesTab, Pane};
 use crate::interface::panes::selection::SelectionKey;
 use crate::interface::popups::confirm::ConfirmPrompt;
+use crate::interface::popups::menu::MenuState;
 use crate::interface::popups::popup::Popup;
 
 impl App {
     /// Enter on the Branches pane: lazygit's branch -> log drill-down. Read
     /// only, no checkout. `Esc` backs out (`on_key`).
-    pub(super) fn enter_branch_log(&mut self) {
+    pub(crate) fn enter_branch_log(&mut self) {
         if !self.nav.on_local_branches() {
             return;
         }
@@ -32,7 +32,7 @@ impl App {
     /// Refresh after a branch mutation (checkout / create / delete / fast-
     /// forward), then surface a failure in the Status pane. Same shape as
     /// `finish_apply`.
-    pub(super) fn finish_branch_action(&mut self, result: GitResult<()>) {
+    pub(crate) fn finish_branch_action(&mut self, result: GitResult<()>) {
         self.request_refresh();
         if let Err(e) = result {
             self.report_error(e);
@@ -42,7 +42,7 @@ impl App {
     /// `<space>` on the Branches pane (`Mode::Nav`): checkout the selected
     /// branch. `refresh()` picks up the new `HEAD`, branches, and files (a
     /// checkout changes the working tree too).
-    pub(super) fn checkout_selected_branch(&mut self) {
+    pub(crate) fn checkout_selected_branch(&mut self) {
         if !self.nav.on_local_branches() {
             return;
         }
@@ -56,7 +56,7 @@ impl App {
 
     /// `n` (Nav, Branches focused): open the new-branch popup, named from
     /// the selected branch once submitted.
-    pub(super) fn open_new_branch_popup(&mut self) {
+    pub(crate) fn open_new_branch_popup(&mut self) {
         if !self.nav.on_local_branches() || self.modal.popup().is_some() {
             return;
         }
@@ -75,7 +75,7 @@ impl App {
     /// name, or one already taken) keeps the popup open with the typed
     /// text so the user can fix it and retry: the message surfaces in
     /// the Status pane rather than a second popup layered on this one.
-    pub(super) fn do_create_branch(&mut self) {
+    pub(crate) fn do_create_branch(&mut self) {
         let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
             return;
         };
@@ -106,7 +106,7 @@ impl App {
     /// entirely: `git` refuses to delete it either way, so its own
     /// message goes straight to the Status line rather than opening a
     /// confirm for an outcome that is already certain.
-    pub(super) fn delete_branch_prompt(&mut self) {
+    pub(crate) fn delete_branch_prompt(&mut self) {
         if !self.nav.on_local_branches() {
             return;
         }
@@ -126,7 +126,7 @@ impl App {
     /// `u` (Nav, Branches focused): fast-forward the selected branch to
     /// its upstream, checked out or not. No confirm: exactly as reversible as
     /// any other git command, the reflog has your back.
-    pub(super) fn fast_forward_selected_branch(&mut self) {
+    pub(crate) fn fast_forward_selected_branch(&mut self) {
         if !self.nav.on_local_branches() {
             return;
         }
@@ -142,7 +142,7 @@ impl App {
     /// branch, and merge nothing until a row is chosen. On the current branch
     /// there is nothing to choose between, so it merges straight away (git
     /// answers "Already up to date").
-    pub(super) fn merge_selected_branch(&mut self) {
+    pub(crate) fn merge_selected_branch(&mut self) {
         if !self.nav.on_local_branches() || self.modal.is_some() {
             return;
         }
@@ -160,7 +160,7 @@ impl App {
     /// `refresh()` always runs, even on a conflict: the Files pane already
     /// renders `Change::Conflicted`, so the conflicted paths are visible
     /// without a dedicated flow.
-    pub(super) fn merge_selected_branch_with(&mut self, kind: MergeKind) {
+    pub(crate) fn merge_selected_branch_with(&mut self, kind: MergeKind) {
         if !self.nav.on_local_branches() {
             return;
         }

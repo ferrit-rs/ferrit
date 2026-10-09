@@ -16,11 +16,11 @@ use std::fs;
 use std::time::Duration;
 
 use ferrit::app::App;
-use ferrit::app::full_screens::FullScreen;
 use ferrit::config::ConfigLoad;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
+use ferrit::interface::full_screens::FullScreen;
 use ferrit::interface::panes::pane::Pane;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

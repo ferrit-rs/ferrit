@@ -2,5 +2,8 @@
 //! holds either.
 
 pub(crate) mod confirm;
+pub mod context_menu;
+pub mod keys;
+pub mod menu;
 pub(crate) mod modal;
 pub(crate) mod popup;

@@ -12,9 +12,9 @@ use std::time::Duration;
 
 use ratatui::crossterm::event::MouseEvent;
 
-use crate::app::diff_query::RightKey;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::toast::Toast;
+use crate::interface::panes::diff_query::RightKey;
 
 pub(crate) struct RenderState {
     /// The help dialog.

@@ -1,12 +1,12 @@
 //! The result of a repository refresh, as it comes back from its worker.
 
-use super::authorship::Authorship;
 use super::error::AppError;
 use crate::git;
 use crate::git::diff::DiffOpts;
 use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::profile::Profile;
+use crate::git::profile::authorship::Authorship;
 use crate::interface::panes::tree::commit_drill_files;
 use color_eyre::Result;
 use std::sync::Arc;
@@ -28,7 +28,7 @@ pub struct RefreshCompletion {
 impl RefreshCompletion {
     /// Read the snapshot, and the drilled branch log and commit files when the
     /// user is inside them, in one go (the worker's whole job).
-    pub(super) fn load(
+    pub(crate) fn load(
         repo: &mut dyn GitPort,
         branch: Option<String>,
         commit: Option<String>,
@@ -58,7 +58,7 @@ impl RefreshCompletion {
 
     /// The repository could not be opened: every part of the refresh fails
     /// with that error.
-    pub(super) fn failed(error: GitError, branch: Option<String>, commit: Option<String>) -> Self {
+    pub(crate) fn failed(error: GitError, branch: Option<String>, commit: Option<String>) -> Self {
         let error = Arc::new(AppError::from(error));
         Self {
             snapshot: Err(Arc::clone(&error)),

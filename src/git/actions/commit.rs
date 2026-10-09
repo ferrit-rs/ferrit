@@ -1,8 +1,9 @@
 //! Commit editor state and actions, following lazygit's summary/description
 //! editor: `c` opens it; Tab switches fields; Enter confirms summary.
 
-use super::{App, KeyCode, KeyEvent, KeyModifiers, git};
+use crate::app::App;
 use crate::app::error::AppError;
+use crate::git;
 use crate::git::apply::ApplyDir;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
@@ -10,6 +11,9 @@ use crate::interface::panes::pane::Pane;
 use crate::interface::panes::selection::SelectionKey;
 use crate::interface::panes::views::CommitPopupView;
 use crate::interface::popups::popup::Popup;
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::KeyModifiers;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommitField {

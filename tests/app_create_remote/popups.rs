@@ -6,8 +6,8 @@ use std::time::Duration;
 use crate::support::{
     Project, Shown, clear_name, open_form, press, ready_app, shown, type_text, wait_for_created,
 };
-use ferrit::app::create_remote::Field;
 use ferrit::app::events::AppEvent;
+use ferrit::git::actions::create_remote::Field;
 use ferrit::git::host::{GhProgram, Visibility};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

@@ -10,13 +10,13 @@ use ratatui::text::Text;
 use ratatui_image::picker::Picker;
 
 use super::row_lines;
-use crate::app::diff_query::RightKey;
 use crate::git;
 use crate::git::apply::Granule;
 use crate::git::diff::DiffSide;
 use crate::interface::panes::diff_cursor::{
     DiffCursor, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
 };
+use crate::interface::panes::diff_query::RightKey;
 use crate::interface::panes::views::DiffView;
 use crate::interface::render_state::RenderedDiff;
 use crate::theme::palette::Palette;

@@ -12,10 +12,10 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-use super::{App, KeyCode, KeyEvent, Result, events, mpsc, thread};
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
+use crate::app::{App, events};
 use crate::git::error::GitError;
 use crate::git::host::{
     self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
@@ -24,6 +24,11 @@ use crate::git::host::{
 use crate::git::ssh_config::read_github_aliases;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 use crate::interface::popups::popup::Popup;
+use color_eyre::Result;
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
+use std::sync::mpsc;
+use std::thread;
 
 /// What the form holds, and all the user chooses: the name, the visibility and
 /// the description. Kept on the app while `gh` runs, so a refusal can reopen the

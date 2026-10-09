@@ -1,14 +1,17 @@
 //! Fetch / pull / push: background remote ops and their completion.
 
-use super::{App, Result, events, mpsc, thread};
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
+use crate::app::{App, events};
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
 use crate::interface::popups::popup::Popup;
+use color_eyre::Result;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::thread;
 use std::time::Instant;
 
 impl App {
@@ -16,7 +19,7 @@ impl App {
     /// 8's branch actions, these act on the repo and its current branch,
     /// not a selected row. A no-op with no `event_sender` set
     /// (`App::mock()`, or a test driving `on_key` without `run()`).
-    pub(super) fn trigger_remote_op(&mut self, op: events::RemoteOp) {
+    pub(crate) fn trigger_remote_op(&mut self, op: events::RemoteOp) {
         let Some(sender) = self.workers.sender.clone() else {
             return;
         };
@@ -30,7 +33,7 @@ impl App {
     /// fallback, not the primary path, because ferrit already knows the
     /// answer without asking git. No upstream: honor `push.default=current`,
     /// otherwise open LazyGit-style editable `<remote> <branch>` prompt.
-    pub(super) fn push_current_branch(&mut self) {
+    pub(crate) fn push_current_branch(&mut self) {
         if self.modal.popup().is_some() {
             return;
         }
@@ -92,7 +95,7 @@ impl App {
             ))));
     }
 
-    pub(super) fn submit_upstream(&mut self, value: &str) {
+    pub(crate) fn submit_upstream(&mut self, value: &str) {
         let mut parts = value.split_whitespace();
         let (Some(remote), Some(branch), None) = (parts.next(), parts.next(), parts.next()) else {
             self.report_error(AppError::BadUpstream);
@@ -103,7 +106,7 @@ impl App {
     }
 
     /// `git push -u <remote> <local>:<remote branch>`.
-    pub(super) fn push_with_upstream(&mut self, remote: String, branch: String) {
+    pub(crate) fn push_with_upstream(&mut self, remote: String, branch: String) {
         let Some(sender) = self.workers.sender.clone() else {
             return;
         };
@@ -143,7 +146,7 @@ impl App {
         self.start_remote_op_with_force(op, push_upstream, None, false, sender);
     }
 
-    pub(super) fn start_remote_op_with_force(
+    pub(crate) fn start_remote_op_with_force(
         &mut self,
         op: events::RemoteOp,
         push_upstream: Option<String>,
@@ -260,7 +263,7 @@ impl App {
     }
 
     /// LazyGit-style label attached to the checked-out branch row.
-    pub(super) fn remote_branch_status(&self) -> Option<String> {
+    pub(crate) fn remote_branch_status(&self) -> Option<String> {
         let label = match self.workers.remote_busy? {
             events::RemoteOp::Fetch => "Fetching",
             events::RemoteOp::Pull => "Pulling",

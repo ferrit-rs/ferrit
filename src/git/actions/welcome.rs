@@ -4,8 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{App, KeyCode, KeyEvent, git};
+use crate::app::App;
+use crate::git;
 use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
 
 /// The rows of the screen, in order: `git init`, then quit.
 const WELCOME_ROWS: usize = 2;
@@ -26,7 +29,7 @@ impl App {
     /// runs the highlighted row, and its own letters run a row from anywhere,
     /// `i` to ask about `git init` and `q` or `Esc` to leave. Nothing else does
     /// anything, so no pane action can run without a repository.
-    pub(super) fn welcome_key(&mut self, key: KeyEvent) {
+    pub(crate) fn welcome_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') | KeyCode::End => {
                 self.full_screens.welcome_selected =
@@ -67,7 +70,7 @@ impl App {
 
     /// The yes: `git init`, then become an app on the new repository. A refusal
     /// (a read-only folder) is git's message and the welcome screen stays.
-    pub(super) fn init_here(&mut self, dir: &Path) {
+    pub(crate) fn init_here(&mut self, dir: &Path) {
         let made: Result<PathBuf, git::error::GitError> =
             git::repo::Repo::init(dir).map(|_| dir.to_path_buf());
         match made.and_then(|dir| self.attach_repository(&dir)) {

@@ -3,16 +3,18 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use super::{App, git, mock, thread};
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
+use crate::app::{App, mock};
+use crate::git;
 use crate::git::error::GitResult;
 use crate::git::image::preview;
 use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::tree::FileRow;
+use std::thread;
 
 /// Image worker result, applied only if selection and generation still match.
 #[doc(hidden)]
@@ -69,7 +71,7 @@ pub(crate) fn load(
 }
 
 impl App {
-    pub(super) fn update_preview(&mut self) {
+    pub(crate) fn update_preview(&mut self) {
         if self.nav.focus != Pane::Files {
             self.invalidate_image_query();
             self.render.preview = Preview::None;
@@ -119,7 +121,7 @@ impl App {
         }
     }
 
-    pub(super) fn invalidate_image_query(&mut self) {
+    pub(crate) fn invalidate_image_query(&mut self) {
         if self.workers.image.path.take().is_some() {
             self.workers.image.generation = self.workers.image.generation.saturating_add(1);
         }
@@ -160,7 +162,7 @@ impl App {
         });
     }
 
-    pub(super) fn on_image_done(&mut self, completion: ImageCompletion) {
+    pub(crate) fn on_image_done(&mut self, completion: ImageCompletion) {
         self.workers.image.in_flight = false;
         if completion.generation == self.workers.image.generation
             && self.workers.image.path.as_ref() == Some(&completion.path)

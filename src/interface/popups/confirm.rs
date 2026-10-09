@@ -1,6 +1,6 @@
 //! The key-bar question and what a yes does.
 
-use crate::app::git_config_edit;
+use crate::git::actions::git_config_edit;
 use crate::git::apply::Granule;
 use std::path::{Path, PathBuf};
 

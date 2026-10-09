@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::App;
+use crate::app::App;
 use crate::interface::panes::drill::CommitDrill;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::tree::{FileRow, commit_drill_files};
@@ -11,7 +11,7 @@ impl App {
     /// Enter on a directory row in the Files pane: toggle it collapsed or
     /// expanded (lazygit's tree). A no-op on a file row (`enter_diff_mode`
     /// handles that one instead).
-    pub(super) fn toggle_files_dir(&mut self) {
+    pub(crate) fn toggle_files_dir(&mut self) {
         if self.nav.focus != Pane::Files {
             return;
         }
@@ -29,7 +29,7 @@ impl App {
     /// Enter on the Commits pane: swap the commit list for that commit's own
     /// changed-file tree, in place, `enter_branch_log`'s counterpart one pane
     /// over. Read only. `Esc` backs out (`on_key`).
-    pub(super) fn enter_commit_files(&mut self) -> bool {
+    pub(crate) fn enter_commit_files(&mut self) -> bool {
         if self.nav.focus != Pane::Commits || self.nav.commit_drill.is_some() {
             return false;
         }
@@ -64,7 +64,7 @@ impl App {
 
     /// Enter on a directory row while drilled into a commit's file tree:
     /// toggle it collapsed or expanded, `toggle_files_dir`'s counterpart.
-    pub(super) fn toggle_commit_dir(&mut self) {
+    pub(crate) fn toggle_commit_dir(&mut self) {
         if self.nav.focus != Pane::Commits || self.nav.commit_drill.is_none() {
             return;
         }

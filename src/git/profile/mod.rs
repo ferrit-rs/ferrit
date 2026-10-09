@@ -17,3 +17,4 @@ impl Profile {
         Self { settings }
     }
 }
+pub(crate) mod authorship;

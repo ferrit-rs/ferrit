@@ -1,13 +1,18 @@
 //! Keyboard and mouse input dispatch.
 
-use super::sheet::Sheet;
-use super::{
-    App, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind, Position,
-};
-use crate::app::full_screens::FullScreen;
+use crate::app::App;
+use crate::interface::full_screens::FullScreen;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::{PANES, Pane};
+use crate::interface::sheets::sheet::Sheet;
 use crate::keybindings::hints;
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::KeyModifiers;
+use ratatui::crossterm::event::MouseButton;
+use ratatui::crossterm::event::MouseEvent;
+use ratatui::crossterm::event::MouseEventKind;
+use ratatui::layout::Position;
 
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
@@ -16,7 +21,7 @@ const KEY_CONFIRM_NO: char = 'n';
 const LIST_WHEEL_ROWS: isize = 2;
 
 impl App {
-    pub(super) fn on_key(&mut self, key: KeyEvent) {
+    pub(crate) fn on_key(&mut self, key: KeyEvent) {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             self.should_quit = true;
             return;
@@ -107,7 +112,7 @@ impl App {
     /// dismisses the help overlay first, and a click on a keybar hint runs its
     /// action. A right click opens the row's `x` menu; middle click, drag and
     /// move are no-ops.
-    pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
+    pub(crate) fn on_mouse(&mut self, ev: MouseEvent) {
         // `[ui] mouse = false` never enables mouse capture; a terminal that
         // sends events anyway still gets no reaction from ferrit.
         if !self.prefs.config.ui.mouse {
@@ -207,7 +212,7 @@ impl App {
 
     /// Which left pane a screen cell is in, `None` for the right pane, the
     /// command log, the keybar or an inter-pane gap.
-    pub(super) fn pane_at(&self, col: u16, row: u16) -> Option<Pane> {
+    pub(crate) fn pane_at(&self, col: u16, row: u16) -> Option<Pane> {
         let point = Position::new(col, row);
         PANES
             .into_iter()
@@ -217,7 +222,7 @@ impl App {
     /// Focus `pane`, then move its cursor to `screen_row` if that row maps
     /// to a real entry. Returns whether the cursor moved: `false` for the
     /// border / title row and for a click past the last entry.
-    pub(super) fn click_pane(&mut self, pane: Pane, screen_row: u16) -> bool {
+    pub(crate) fn click_pane(&mut self, pane: Pane, screen_row: u16) -> bool {
         self.nav.focus = pane; // focus first, even on the border or past the tail
         let Some(idx) = self.click_row(pane, screen_row) else {
             return false;
@@ -228,7 +233,7 @@ impl App {
 
     /// Screen row -> model index for a left pane. `None` for the border /
     /// title row, or a click past the last entry.
-    pub(super) fn click_row(&self, pane: Pane, screen_row: u16) -> Option<usize> {
+    pub(crate) fn click_row(&self, pane: Pane, screen_row: u16) -> Option<usize> {
         let area = self.hits.left[pane];
         let inner_row = screen_row.checked_sub(area.y.saturating_add(1))?;
         let idx = self.hits.list_offset[pane].saturating_add(usize::from(inner_row));
@@ -237,7 +242,7 @@ impl App {
 
     /// Mouse wheel over the right column scrolls the diff (lazygit's "wheel
     /// over the main view"); over a left pane it scrolls that pane's list.
-    pub(super) fn wheel(&mut self, ev: MouseEvent, step: isize) {
+    pub(crate) fn wheel(&mut self, ev: MouseEvent, step: isize) {
         let a = self.right.area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
         if over_right && self.right.is_diff() {
@@ -254,18 +259,18 @@ impl App {
         }
     }
 
-    pub(super) fn pane_offset(&self, delta: usize) -> Pane {
+    pub(crate) fn pane_offset(&self, delta: usize) -> Pane {
         let idx = (self.nav.focus.index() + delta) % PANES.len();
         PANES.get(idx).copied().unwrap_or(self.nav.focus)
     }
 
-    pub(super) fn select_down(&mut self) {
+    pub(crate) fn select_down(&mut self) {
         let last = self.row_count(self.nav.focus).saturating_sub(1);
         let cursor = &mut self.nav.selection[self.nav.focus];
         *cursor = (*cursor + 1).min(last);
     }
 
-    pub(super) fn select_up(&mut self) {
+    pub(crate) fn select_up(&mut self) {
         let cursor = &mut self.nav.selection[self.nav.focus];
         *cursor = cursor.saturating_sub(1);
     }

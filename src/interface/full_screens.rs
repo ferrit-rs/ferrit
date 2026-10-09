@@ -5,17 +5,17 @@
 
 use std::path::PathBuf;
 
-use super::git_config;
+use crate::git::actions::git_config;
 
 #[derive(Default)]
 pub(crate) struct FullScreens {
     /// The view showing, if any.
-    pub(super) active: FullScreen,
-    pub(super) git_config: git_config::GitConfigScreen,
+    pub(crate) active: FullScreen,
+    pub(crate) git_config: git_config::GitConfigScreen,
     /// The folder the welcome screen is about; `None` once there is a repository.
-    pub(super) welcome_dir: Option<PathBuf>,
+    pub(crate) welcome_dir: Option<PathBuf>,
     /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.
-    pub(super) welcome_selected: usize,
+    pub(crate) welcome_selected: usize,
 }
 
 /// A view that takes the whole terminal in place of the five panes: the git
