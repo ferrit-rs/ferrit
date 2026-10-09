@@ -4,7 +4,8 @@ use std::ops::Range;
 
 use crate::git::diff::DiffSide;
 use crate::tui::App;
-use crate::tui::components::diff::Mode;
+use crate::tui::components::diff::{CommitPopupView, Mode};
+use crate::tui::components::popups::Popup;
 
 impl App {
     /// Cursor state for the right-pane render: `(side, cursor line, V-select
@@ -20,5 +21,26 @@ impl App {
             return None;
         }
         self.right.granule_hint()
+    }
+}
+
+impl App {
+    /// The credential prompt as data, when it is up.
+    pub fn askpass_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Askpass(ask)) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: ask.prompt.trim_end().trim_end_matches(':'),
+            input: &ask.shown,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: ask.shown.lines(),
+            cursor: ask.shown.cursor(),
+            toggles: None,
+            author: None,
+            hints: "Send: Enter | Cancel: Esc",
+        })
     }
 }

@@ -1,5 +1,6 @@
 //! One file per piece of the interface: its state, its keys and how it is drawn.
 
+pub mod askpass;
 pub mod branches;
 pub mod command_log;
 pub mod commit_editor;

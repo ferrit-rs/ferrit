@@ -8,6 +8,7 @@ use crate::git::rebase::RebaseEdit;
 use crate::git::remote::RemoteRequest;
 use crate::theme::palette::Palette;
 use crate::tui::App;
+use crate::tui::components::askpass;
 use crate::tui::components::diff::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use crate::tui::components::menu;
 use crate::tui::components::{branches, stash};
@@ -211,7 +212,10 @@ impl App {
             return;
         }
         if matches!(self.modal.popup(), Some(Popup::Askpass(_))) {
-            self.askpass_key(key);
+            if let Some(Popup::Askpass(ask)) = self.modal.popup_mut() {
+                let events = askpass::key(ask, key);
+                self.apply(events);
+            }
             return;
         }
         if matches!(self.modal.popup(), Some(Popup::Menu(_))) {
@@ -294,7 +298,8 @@ impl App {
             self.submit_name();
         }
         if let Some(value) = submit_upstream {
-            self.submit_upstream(&value);
+            let events = remote::submit_upstream(&value);
+            self.apply(events);
         }
     }
 }
@@ -318,7 +323,7 @@ pub(crate) enum Popup {
     Upstream(TextInput),
     /// A passphrase, password or host-key question from ssh/git during a
     /// remote op (`app::askpass`).
-    Askpass(remote::AskpassPrompt),
+    Askpass(askpass::AskpassPrompt),
     /// A list of actions to pick from (`app::menu`): the `m` menu for an
     /// operation stopped mid-way, and later the `x` menu.
     Menu(menu::MenuState),

@@ -6,6 +6,7 @@
 //! `App::mock()` is the repo-free path the render tests use.
 
 use crate::git::commit::CommitKind;
+use crate::tui::components::askpass;
 use crate::tui::components::commit_editor;
 use crate::tui::components::diff::CommitPopupView;
 use crate::tui::components::keybar::HelpLine;
@@ -656,7 +657,10 @@ impl App {
             AppEvent::RemoteDone { op, message } => self.on_remote_done(op, message),
             AppEvent::RemoteCreated(result) => self.on_remote_created(result),
             AppEvent::GhChecked { generation, status } => self.on_gh_checked(generation, status),
-            AppEvent::Askpass { prompt, reply } => self.on_askpass(prompt, reply),
+            AppEvent::Askpass { prompt, reply } => {
+                let events = askpass::ask(prompt, reply, self.modal.popup().is_some());
+                self.apply(events);
+            },
             AppEvent::StatsDone(completion) => self.on_stats_done(completion),
             AppEvent::Input(_) => {},
         }

@@ -7,10 +7,12 @@ use crate::git::host::{
     sanitize_name, ssh_remote_url, validate_description,
 };
 use crate::git::remote::RemoteOp;
+use crate::git::remote::RemoteRequest;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::popups::Popup;
 use crate::tui::error::AppError;
+use crate::tui::event::Event;
 use crate::tui::events::AppEvent;
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::key_bar::KeyBar;
@@ -322,7 +324,10 @@ impl App {
         } else {
             // The push's own progress takes the status line from here.
             let branch = self.snapshot.header.branch.clone();
-            self.push_with_upstream("origin".to_owned(), branch);
+            self.apply(vec![Event::StartRemote(RemoteRequest::push_to(
+                "origin".to_owned(),
+                branch,
+            ))]);
             // Only a push that really started is the one to explain if it fails.
             self.create_remote.pushing_after = self.workers.remote_busy.is_some();
         }

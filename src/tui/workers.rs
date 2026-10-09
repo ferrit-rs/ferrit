@@ -7,6 +7,8 @@ use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::profile::Profile;
 use crate::git::remote::RemoteOp;
+use crate::git::remote::{self as remote_ops, RemoteRequest};
+use crate::tui::App;
 use crate::tui::components::diff::DiffQueryState;
 use crate::tui::components::panes::commit_drill_files;
 use crate::tui::error::AppError;
@@ -16,7 +18,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
@@ -223,5 +225,98 @@ impl RefreshCompletion {
             branch_log: branch.map(|name| (name, Err(Arc::clone(&error)))),
             commit_files: commit.map(|hash| (hash, Err(error))),
         }
+    }
+}
+
+impl App {
+    /// Spawn `request` on its own thread, `sender` its way back onto the same
+    /// channel `Events::next()` reads (`docs/PLAN_9_REMOTE.md`: network calls
+    /// are the first slow ones in `git::`, and running one on this thread
+    /// would freeze the whole UI). One at a time: a second call while one is
+    /// already running is ignored outright, not queued: two git processes
+    /// racing over the same `index.lock` is a real failure mode. A no-op with
+    /// no repo to reopen (`App::mock()`, a bare repo).
+    ///
+    /// Takes `sender` as a parameter rather than reading `self.workers.sender`
+    /// directly so a test can call this with its own channel, no `run()`
+    /// required.
+    pub(crate) fn start_remote(&mut self, request: RemoteRequest, sender: mpsc::Sender<AppEvent>) {
+        if self.workers.remote_busy.is_some() {
+            return;
+        }
+        let Some(repo) = self.repo_handle() else {
+            return;
+        };
+        let op = request.op;
+        self.workers.begin_remote(op);
+        self.status_note = None;
+        let cancel = Arc::clone(&self.workers.remote_cancel);
+        self.workers.remote_worker = Some(thread::spawn(move || {
+            let message = run_worker(WorkerKind::Remote, || {
+                remote_ops::run(repo.as_ref(), &request, &cancel)
+            })
+            .map_err(AppError::from)
+            .and_then(|result| result.map_err(AppError::from));
+            let _ = sender.send(AppEvent::RemoteDone { op, message });
+        }));
+    }
+
+    /// Integration-test seam: start `op` with `push_upstream` on a channel of
+    /// the test's own.
+    #[doc(hidden)]
+    pub fn start_remote_op(
+        &mut self,
+        op: RemoteOp,
+        push_upstream: Option<String>,
+        sender: mpsc::Sender<AppEvent>,
+    ) {
+        let request = RemoteRequest {
+            push_upstream,
+            ..RemoteRequest::new(op)
+        };
+        self.start_remote(request, sender);
+    }
+
+    /// `AppEvent::RemoteDone` arrived: clear the busy flag, show a success
+    /// line or the failure, then refresh: ahead/behind, branches, commits
+    /// and files may all have moved. `pub`: `App::run`'s own match arm calls
+    /// this, and so does a test that drove `start_remote_op` with its own
+    /// channel.
+    pub fn on_remote_done(&mut self, op: RemoteOp, message: Result<String, AppError>) {
+        self.workers.end_remote();
+        // Request refresh before setting the remote result. Async snapshot
+        // completion preserves this operation's failure as the final Status
+        // line; eventless callers refresh synchronously, then set it here.
+        self.request_refresh();
+        let message = match message {
+            Err(error) => Err(self.explain_push_after_creation(error)),
+            ok => {
+                self.create_remote_push_done();
+                ok
+            },
+        };
+        match message {
+            Ok(line) => {
+                self.workers.remote_refresh_error = None;
+                self.last_error = None;
+                // git's own words after a push (`To github.com:…`, `branch 'main'
+                // set up to track …`) are noise in the Status pane: the line
+                // above already shows the branch in step, and the command log
+                // has the command. A fetch or a pull keeps its line.
+                self.status_note = (op != RemoteOp::Push).then_some(line);
+            },
+            Err(error) => {
+                let error = Arc::new(error);
+                self.workers.remote_refresh_error =
+                    self.workers.sender.as_ref().map(|_| Arc::clone(&error));
+                self.status_note = None;
+                self.report_error(AppError::Background(error));
+            },
+        }
+    }
+
+    /// The Status pane's label while a fetch/pull/push is in flight.
+    pub fn remote_busy_label(&self) -> Option<&'static str> {
+        self.workers.remote_busy_label()
     }
 }

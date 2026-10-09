@@ -7,7 +7,7 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
-use crate::tui::components::{branches, commits, files, popups, stash};
+use crate::tui::components::{branches, commits, files, popups, remote, stash};
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
 use crate::tui::keymap::{Action, Context, KeyBinding};
@@ -339,9 +339,9 @@ impl App {
             Action::Enter => self.enter_selected(),
             Action::EnterDiff => self.apply(files::enter_diff(&self.env())),
             Action::Refresh => self.request_refresh(),
-            Action::Fetch => self.trigger_remote_op(RemoteOp::Fetch),
-            Action::Pull => self.trigger_remote_op(RemoteOp::Pull),
-            Action::Push => self.push_current_branch(),
+            Action::Fetch => self.apply(remote::trigger(RemoteOp::Fetch)),
+            Action::Pull => self.apply(remote::trigger(RemoteOp::Pull)),
+            Action::Push => self.apply(remote::push(&self.env())),
             Action::Commit => self.open_commit(git::commit::CommitKind::Normal),
             Action::Amend => self.open_commit(git::commit::CommitKind::Amend),
             Action::RewordHead => self.open_commit(git::commit::CommitKind::Reword),
