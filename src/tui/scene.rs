@@ -11,10 +11,10 @@ use crate::config::Config;
 use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::Snapshot;
 use crate::git::diff::DiffSide;
-use crate::git::host::CreateRemote;
 use crate::git::port::GitPort;
 use crate::theme::palette::Palette;
 use crate::tui::App;
+use crate::tui::components::create_remote::CreateRemoteState;
 use crate::tui::components::create_remote::{Consequences, CreateRemoteView};
 use crate::tui::components::dashboard::{Dashboard, Sheet};
 use crate::tui::components::diff::right_pane::{Mode, RightPane};
@@ -55,7 +55,7 @@ pub(crate) struct Scene<'a> {
     pub(crate) last_error: &'a Option<Arc<AppError>>,
     pub(crate) status_note: &'a Option<String>,
     pub(crate) new_branch_title: &'a str,
-    pub(crate) create_remote: &'a CreateRemote,
+    pub(crate) create_remote: &'a CreateRemoteState,
 }
 
 impl App {
@@ -526,7 +526,7 @@ impl<'a> Scene<'a> {
     }
 
     /// The creation's state, for the popups and for tests.
-    pub(crate) fn create_remote(self) -> &'a CreateRemote {
+    pub(crate) fn create_remote(self) -> &'a CreateRemoteState {
         self.create_remote
     }
 

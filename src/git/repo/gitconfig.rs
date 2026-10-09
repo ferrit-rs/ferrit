@@ -3,7 +3,7 @@
 use super::read::{stderr, workdir};
 use crate::git::config::{ConfigView, ValueKind, WriteScope, parse};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
+use crate::git::repo::exec;
 use git2::Repository;
 use std::ffi::OsStr;
 use std::path::Path;

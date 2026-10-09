@@ -1,20 +1,17 @@
 //! Creating the repository on GitHub through the user's own `gh`
 //! (`docs/PLAN_15_CREATE_REMOTE.md`). ferrit never holds a token: `gh` is
 //! already signed in. This module validates what the user typed, builds
-//! `gh`'s argument list from the validated fields only, and (see the other half
-//! of the file) asks `gh` whether it is ready.
+//! `gh`'s argument list from the validated fields only, and says what `gh` can answer.
+//! Asking `gh` is `crate::git::repo::remotes`.
 //!
 //! The target is typed as `name` or `owner/name`; there is no separate owner.
 //!
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::remotes`.
 
-use crate::git::error::GitError;
-use crate::git::exec;
-use crate::git::process::{REMOTE_TIMEOUT, run_child};
-use crate::git::ssh_config::read_github_aliases;
+use crate::git::REMOTE_TIMEOUT;
 use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 /// Longest repository name GitHub takes.
@@ -283,21 +280,6 @@ pub fn build_create_args(req: &CreateRequest, workdir: &Path) -> Result<Vec<OsSt
     Ok(args)
 }
 
-/// `gh --version`, then `gh auth status`. It reaches the network, so the app
-/// calls it from a worker, never from the UI thread. `gh auth status` also
-/// fails when the network is down: that reads as signed out, and `gh auth
-/// login` is then the thing to try either way.
-#[must_use]
-pub fn gh_status(gh: &GhProgram) -> GhStatus {
-    if !gh_succeeds(gh, &["--version"]) {
-        GhStatus::Missing
-    } else if gh_succeeds(gh, &["auth", "status"]) {
-        GhStatus::Ready
-    } else {
-        GhStatus::SignedOut
-    }
-}
-
 /// The repository `gh` made.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreatedRepo {
@@ -313,16 +295,6 @@ pub(crate) fn web_url(stdout: &str) -> String {
         .rfind(|line| line.starts_with("https://") || line.starts_with("http://"))
         .unwrap_or_default()
         .to_owned()
-}
-
-/// Run `gh <args>` and say whether it exited 0. A program that cannot be
-/// started, or that outlasts the timeout, counts as a failure. Both calls are
-/// recorded in the command log.
-fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
-    let mut cmd = exec::program(gh.program());
-    cmd.args(args);
-    run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
-        .is_ok_and(|out| out.status.success())
 }
 
 /// What the form holds, and all the user chooses: the name, the visibility and
@@ -349,44 +321,5 @@ impl CreateDraft {
             visibility: Visibility::Private,
             description: String::new(),
         }
-    }
-}
-
-/// The creation's own state on `App`.
-#[derive(Debug, Default)]
-pub struct CreateRemote {
-    /// The last draft, until a creation succeeds.
-    pub draft: Option<CreateDraft>,
-    /// Why the last creation was refused, for the form to show.
-    pub error: Option<String>,
-    /// The web URL of the repository just created.
-    pub web_url: Option<String>,
-    pub(crate) gh: GhProgram,
-    /// Bumped each time the check starts or is abandoned.
-    pub(crate) generation: u64,
-    /// The push in flight is the one that follows a creation.
-    pub(crate) pushing_after: bool,
-    /// The ssh config the host aliases are read from; `None` is
-    /// `~/.ssh/config`. A test points it elsewhere.
-    pub(crate) ssh_config: Option<PathBuf>,
-    /// The SSH host chosen when the creation started (the user's own alias, or
-    /// none), used once `gh` has made the repository.
-    pub(crate) ssh_host: String,
-}
-
-impl CreateRemote {
-    /// Keep the `gh` program a test or the replay injected when the app is
-    /// rebuilt on a new repository (`App::attach_repository`).
-    pub(crate) fn carry_program_from(&mut self, previous: &Self) {
-        self.gh = previous.gh.clone();
-        self.ssh_config.clone_from(&previous.ssh_config);
-    }
-
-    /// The GitHub aliases of the ssh config, in the order it lists them.
-    pub(crate) fn ssh_aliases(&self) -> Vec<String> {
-        let path = self.ssh_config.clone().or_else(|| {
-            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/config"))
-        });
-        path.map_or_else(Vec::new, |path| read_github_aliases(&path))
     }
 }

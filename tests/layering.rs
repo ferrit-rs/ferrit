@@ -170,3 +170,11 @@ fn only_the_draw_entry_points_name_app_among_the_drawing_code() {
         "App named in drawing code: {offenders:?}"
     );
 }
+
+/// Starting a process (`git`, `gh`) is the adapter's job: the domain files of
+/// `git/` decide and describe, they do not run anything.
+#[test]
+fn only_the_adapter_starts_git_and_gh() {
+    let offenders = files_with_code_except("git", &["git/repo", "git/diff.rs"], "Command::new");
+    assert!(offenders.is_empty(), "a process started in {offenders:?}");
+}

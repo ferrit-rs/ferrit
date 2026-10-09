@@ -3,7 +3,7 @@
 use super::read::{stderr, workdir};
 use crate::git::apply::{ApplyDir, ApplyTarget, transform_body};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
+use crate::git::repo::exec;
 use git2::Repository;
 use std::collections::BTreeSet;
 use std::io::Write as _;

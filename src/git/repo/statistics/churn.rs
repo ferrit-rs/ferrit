@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use git2::Repository;
 
-use crate::git::exec;
+use crate::git::repo::exec;
 use crate::git::stats::share::Share;
 use crate::git::stats::{FileStat, HotFiles, Lines};
 

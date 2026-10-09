@@ -7,11 +7,13 @@
 //! `crate::git::fake` names `Repo` except the composition root (`App::open`).
 
 pub(crate) mod branches;
+pub(crate) mod exec;
 pub(crate) mod gitconfig;
 pub(crate) mod history;
 pub(crate) mod index;
 mod init;
 pub(crate) mod port_impl;
+pub(crate) mod process;
 pub(crate) mod read;
 pub(crate) mod remotes;
 pub(crate) mod stashes;
@@ -29,7 +31,7 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
-use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::host::{CreateRequest, CreatedRepo, GhProgram, GhStatus};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{self, CommitEntry, RemoteEntry};
 use crate::git::rebase::RebaseEdit;
@@ -431,6 +433,12 @@ impl Repo {
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
         branches::merge_branch(&self.inner, name)
+    }
+
+    /// Whether `gh` can create a repository right now (see `remotes::gh_status`).
+    #[must_use]
+    pub fn gh_status(&self, gh: &GhProgram) -> GhStatus {
+        remotes::gh_status(gh)
     }
 
     /// Create the repository on GitHub through `gh` and add it as `origin`

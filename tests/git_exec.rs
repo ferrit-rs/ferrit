@@ -229,7 +229,7 @@ fn every_git_subprocess_goes_through_exec() {
         if file.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/replay")) {
             continue;
         }
-        let is_exec = file.ends_with("git/exec.rs");
+        let is_exec = file.ends_with("git/repo/exec.rs");
         if !is_exec {
             assert!(
                 !text.contains("Command::new(\"git\")"),

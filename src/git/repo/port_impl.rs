@@ -11,7 +11,7 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::GitResult;
-use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::host::{CreateRequest, CreatedRepo, GhProgram, GhStatus};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{CommitEntry, RemoteEntry};
 use crate::git::rebase::RebaseEdit;
@@ -238,6 +238,9 @@ impl GitRemote for Repo {
     }
     fn push_default_current(&self) -> bool {
         Self::push_default_current(self)
+    }
+    fn gh_status(&self, gh: &GhProgram) -> GhStatus {
+        Self::gh_status(self, gh)
     }
     fn create_repo(
         &self,

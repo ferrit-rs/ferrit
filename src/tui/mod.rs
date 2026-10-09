@@ -8,6 +8,7 @@
 use crate::config::settings::SettingsRow;
 use crate::git::commit::CommitKind;
 use crate::tui::components::commit_editor;
+use crate::tui::components::create_remote::CreateRemoteState;
 use crate::tui::components::git_config::keys::GitConfig;
 use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
@@ -100,7 +101,7 @@ pub struct App {
     pub(crate) watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
     pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
-    pub(crate) create_remote: git::host::CreateRemote,
+    pub(crate) create_remote: CreateRemoteState,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -201,7 +202,7 @@ impl App {
             workers: workers::Workers::new(),
             watch_request: None,
             terminal_request: None,
-            create_remote: git::host::CreateRemote::default(),
+            create_remote: CreateRemoteState::default(),
             status_note: None,
         }
     }

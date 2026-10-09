@@ -16,7 +16,7 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
-use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::host::{CreateRequest, CreatedRepo, GhProgram, GhStatus};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{BranchEntry, Change, CommitEntry, FileEntry, PushState, RemoteEntry};
 use crate::git::port::{
@@ -554,6 +554,10 @@ impl GitRemote for FakeGit {
     }
     fn push_default_current(&self) -> bool {
         false
+    }
+    fn gh_status(&self, gh: &GhProgram) -> GhStatus {
+        let _ = gh;
+        GhStatus::Missing
     }
     fn create_repo(
         &self,

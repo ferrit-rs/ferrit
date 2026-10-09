@@ -15,7 +15,7 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::GitResult;
-use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::host::{CreateRequest, CreatedRepo, GhProgram, GhStatus};
 use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{CommitEntry, RemoteEntry};
 use crate::git::rebase::RebaseEdit;
@@ -173,6 +173,9 @@ pub trait GitRemote {
     ) -> GitResult<String>;
     /// Whether a plain `git push` already knows where to go.
     fn push_default_current(&self) -> bool;
+    /// Whether `gh` can create a repository right now. Reaches the network:
+    /// call it off the main thread.
+    fn gh_status(&self, gh: &GhProgram) -> GhStatus;
     /// Create the repository on GitHub through `gh` and wire `origin`.
     fn create_repo(
         &self,

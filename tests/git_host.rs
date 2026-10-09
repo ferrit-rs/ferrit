@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use ferrit::git::command_log::{CommandKind, recent};
 use ferrit::git::error::GitError;
 use ferrit::git::host::{
-    CreateRequest, GhProgram, GhStatus, HostError, Visibility, build_create_args, gh_status,
-    parse_target, sanitize_name, ssh_remote_url, validate_description, validate_ssh_host,
+    CreateRequest, GhProgram, GhStatus, HostError, Visibility, build_create_args, parse_target,
+    sanitize_name, ssh_remote_url, validate_description, validate_ssh_host,
 };
 use ferrit::git::repo::Repo;
 
@@ -316,6 +316,28 @@ fn the_status_checks_are_logged_as_reads_under_gh_s_name() {
         assert!(found.iter().all(|r| r.kind == CommandKind::Read));
         assert!(found.iter().any(|r| r.exit == Some(0)));
     }
+}
+
+/// What `gh` answers, asked through a throwaway repository: the check is a
+/// method of the repository handle, the way the app calls it.
+fn gh_status(gh: &GhProgram) -> GhStatus {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "ferrit-gh-status-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::SeqCst)
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let init = Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["init", "-q", "."])
+        .status()
+        .unwrap();
+    assert!(init.success());
+    let status = Repo::open(&dir).unwrap().gh_status(gh);
+    let _ = fs::remove_dir_all(&dir);
+    status
 }
 
 /// A repository to create from, next to its fake `gh`.

@@ -10,11 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use crate::git::REMOTE_TIMEOUT;
 use crate::git::askpass;
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
-
-pub(crate) const REMOTE_TIMEOUT: Duration = Duration::from_secs(300);
+use crate::git::repo::exec;
 
 const TERMINATE_GRACE: Duration = Duration::from_secs(2);
 

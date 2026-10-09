@@ -6,8 +6,8 @@ use std::ops::Range;
 use crate::config::Config;
 use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::diff::DiffSide;
-use crate::git::host::CreateRemote;
 use crate::tui::App;
+use crate::tui::components::create_remote::CreateRemoteState;
 use crate::tui::components::create_remote::CreateRemoteView;
 use crate::tui::components::diff::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
 
@@ -96,7 +96,7 @@ impl App {
         self.scene().git_config()
     }
 
-    pub fn create_remote(&self) -> &CreateRemote {
+    pub fn create_remote(&self) -> &CreateRemoteState {
         self.scene().create_remote()
     }
 

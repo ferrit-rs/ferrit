@@ -14,10 +14,10 @@
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
 use crate::git::model::{
     BranchEntry, Change, CommitEntry, CommitRef, CommitRefKind, FileEntry, PushState, StatusHeader,
 };
+use crate::git::repo::exec;
 use crate::git::repo::read_error;
 use git2::{BranchType, ErrorCode, Oid, Repository, Revwalk, Sort, Status, StatusOptions};
 use std::collections::{BTreeMap, HashSet};

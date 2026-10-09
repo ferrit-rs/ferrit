@@ -14,10 +14,12 @@
 
 use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
-use crate::git::host::{CreateRequest, CreatedRepo, GhProgram, build_create_args, web_url};
+use crate::git::host::{
+    CreateRequest, CreatedRepo, GhProgram, GhStatus, build_create_args, web_url,
+};
 use crate::git::model::RemoteEntry;
-use crate::git::process::{combined_output, run_child, run_command, run_git};
+use crate::git::repo::exec;
+use crate::git::repo::process::{combined_output, run_child, run_command, run_git};
 use crate::git::repo::read_error;
 use git2::Repository;
 use std::path::Path;
@@ -239,4 +241,28 @@ pub(super) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitRes
             stderr(&out)
         )))
     }
+}
+
+/// `gh --version`, then `gh auth status`. It reaches the network, so the app
+/// calls it from a worker, never from the UI thread. `gh auth status` also
+/// fails when the network is down: that reads as signed out, and `gh auth
+/// login` is then the thing to try either way.
+pub(super) fn gh_status(gh: &GhProgram) -> GhStatus {
+    if !gh_succeeds(gh, &["--version"]) {
+        GhStatus::Missing
+    } else if gh_succeeds(gh, &["auth", "status"]) {
+        GhStatus::Ready
+    } else {
+        GhStatus::SignedOut
+    }
+}
+
+/// Run `gh <args>` and say whether it exited 0. A program that cannot be
+/// started, or that outlasts the timeout, counts as a failure. Both calls are
+/// recorded in the command log.
+fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
+    let mut cmd = exec::program(gh.program());
+    cmd.args(args);
+    run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
+        .is_ok_and(|out| out.status.success())
 }

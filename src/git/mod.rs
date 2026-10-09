@@ -23,7 +23,6 @@ pub mod config_edit;
 pub mod config_keys;
 pub mod diff;
 pub mod error;
-pub(crate) mod exec;
 #[cfg(feature = "test-util")]
 pub mod fake;
 pub mod host;
@@ -31,7 +30,6 @@ pub mod identity;
 pub mod image;
 pub mod model;
 pub mod port;
-pub(crate) mod process;
 pub mod rebase;
 pub mod refs;
 pub mod remote;
@@ -39,6 +37,9 @@ pub mod repo;
 pub mod ssh_config;
 pub mod staging;
 pub mod stats;
+
+/// How long a network command may run before it is given up on.
+pub(crate) const REMOTE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 use self::model::{BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, StatusHeader};
 

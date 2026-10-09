@@ -5,10 +5,10 @@
 use super::read::{stderr, workdir};
 use crate::git::commit::{CommitKind, CommitOpts, INITIAL_FILE, INITIAL_MESSAGE};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
 use crate::git::model::Operation;
 use crate::git::rebase::{OperationOutcome, Step, flag};
 use crate::git::rebase::{RebaseEdit, build_todo, shell_quote};
+use crate::git::repo::exec;
 use crate::git::repo::read_error;
 use git2::{Oid, Repository, RepositoryState, Sort, Status, StatusOptions};
 use std::fs;

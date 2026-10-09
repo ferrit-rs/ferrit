@@ -47,7 +47,7 @@ Rules that hold today, and that the tests and lints keep:
 - Errors keep their type up to the screen: `GitError`, `ConfigError`, `ImageError` and
   `AppError` (`thiserror`), with no `Result<_, String>` in `tui/` or `git/`. The only
   `String`s are in view state that is already text (a diff note, a settings footer).
-- Every `git` process is built in one function (`git/exec.rs`), so the command log sees
+- Every `git` process is built in one function (`git/repo/exec.rs`), so the command log sees
   every command (`tests/git_exec.rs`).
 - No `unsafe`, no `unwrap`/`expect`/`panic` outside tests (`Cargo.toml` `[lints]`).
 

@@ -2,8 +2,8 @@
 
 use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
 use crate::git::refs::MergeOutcome;
+use crate::git::repo::exec;
 use crate::git::repo::read_error;
 use git2::{BranchType, Repository};
 use std::path::Path;

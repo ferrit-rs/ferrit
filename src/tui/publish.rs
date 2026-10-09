@@ -11,8 +11,7 @@ use ratatui::crossterm::event::KeyEvent;
 
 use crate::git::error::GitError;
 use crate::git::host::{
-    self, CreateDraft, CreateRequest, GhProgram, GhStatus, parse_target, sanitize_name,
-    ssh_remote_url,
+    CreateDraft, CreateRequest, GhProgram, GhStatus, parse_target, sanitize_name, ssh_remote_url,
 };
 use crate::git::remote::{RemoteOp, RemoteRequest};
 use crate::tui::App;
@@ -68,12 +67,17 @@ impl App {
         let gh = self.create_remote.gh.clone();
         let Some(sender) = self.workers.sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): ask now.
-            let status = host::gh_status(&gh);
+            let status = self
+                .repo
+                .as_ref()
+                .map_or(GhStatus::Missing, |repo| repo.gh_status(&gh));
             self.on_gh_checked(generation, status);
             return;
         };
+        let repo = self.repo_handle();
         thread::spawn(move || {
-            let status = run_worker(WorkerKind::Remote, || host::gh_status(&gh))
+            let status = repo
+                .and_then(|repo| run_worker(WorkerKind::Remote, || repo.gh_status(&gh)).ok())
                 .unwrap_or(GhStatus::Missing);
             let _ = sender.send(AppEvent::GhChecked { generation, status });
         });
