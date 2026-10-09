@@ -7,7 +7,8 @@ use ratatui::text::Line;
 
 use super::nav::Nav;
 use super::row_lines;
-use crate::git::{self, Snapshot};
+use crate::git::Snapshot;
+use crate::git::model::FileEntry;
 use crate::interface::panes::pane::{BranchesTab, Pane};
 use crate::interface::panes::selection::{
     SelectionKey, find_file_row_key, selection_key_for_file_rows,
@@ -191,7 +192,7 @@ impl PaneRows<'_> {
                 .snapshot
                 .files
                 .get(index)
-                .map(git::model::FileEntry::display)
+                .map(FileEntry::display)
                 .unwrap_or_default(),
             _ => String::new(),
         }
@@ -311,5 +312,17 @@ impl PaneRows<'_> {
             .iter()
             .map(|entry| row_lines::stash_line(self.palette, entry))
             .collect()
+    }
+}
+
+impl<'a> PaneRows<'a> {
+    /// The `FileEntry` behind the Files pane's current selection, or `None` on
+    /// a directory row or an empty pane.
+    pub(crate) fn selected_file(&self) -> Option<&'a FileEntry> {
+        let rows = self.files_tree_rows();
+        let FileRow::File { index, .. } = rows.get(self.nav.selection[Pane::Files])? else {
+            return None;
+        };
+        self.snapshot.files.get(*index)
     }
 }

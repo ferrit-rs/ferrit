@@ -37,6 +37,7 @@ pub mod profile;
 pub mod rebase;
 pub mod repo;
 pub mod ssh_config;
+pub mod staging;
 pub mod stash;
 pub mod stats;
 

@@ -32,20 +32,6 @@ pub(crate) struct DiffCursor {
     pub(crate) hunk_id: u64,
 }
 
-/// What `<space>` / `d` act on in `Mode::Diff`: the whole hunk under the
-/// cursor, or a V-selected subset of its `+`/`-` lines.
-pub(crate) enum Granule {
-    Hunk {
-        patch: String,
-    },
-    Lines {
-        file_header: String,
-        hunk_header: String,
-        hunk_body: String,
-        lines: Vec<usize>,
-    },
-}
-
 /// One hunk's body as global (whole-`Diff::text`) line indices, plus which
 /// of those lines are selectable (`+`/`-`; context is read but never
 /// chosen). Built fresh per diff-mode operation from the current `Diff` —

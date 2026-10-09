@@ -30,6 +30,45 @@ pub enum ApplyTarget {
     Worktree,
 }
 
+/// What a stage, unstage or discard acts on in the diff: the whole hunk under
+/// the cursor, or a V-selected subset of its `+`/`-` lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Granule {
+    /// A whole hunk, as the patch `git apply` takes.
+    Hunk {
+        /// The file header and the hunk, ready to apply.
+        patch: String,
+    },
+    /// Some lines of one hunk.
+    Lines {
+        /// The `diff --git` header of the file.
+        file_header: String,
+        /// The `@@` line of the hunk.
+        hunk_header: String,
+        /// The hunk's lines, after its header.
+        hunk_body: String,
+        /// The selected lines, as 0-based indices into `hunk_body`.
+        lines: Vec<usize>,
+    },
+}
+
+impl Granule {
+    /// How a confirm question names it: `this hunk`, `1 line`, `3 lines`.
+    #[must_use]
+    pub fn describe(&self) -> String {
+        match self {
+            Self::Hunk { .. } => "this hunk".to_owned(),
+            Self::Lines { lines, .. } => {
+                format!(
+                    "{} line{}",
+                    lines.len(),
+                    if lines.len() == 1 { "" } else { "s" }
+                )
+            },
+        }
+    }
+}
+
 /// Turn a hunk body into a valid, self-contained patch body covering only
 /// `lines` (0-based indices into `body`'s own lines), gitu's
 /// `format_line_patch` rule. Exposed for `tests/apply_patch.rs`, which checks

@@ -1,8 +1,8 @@
 //! The key-bar question and what a yes does.
 
 use crate::app::git_config_edit;
-use crate::interface::panes::diff_cursor::Granule;
-use std::path::PathBuf;
+use crate::git::apply::Granule;
+use std::path::{Path, PathBuf};
 
 /// A pending confirmation: a `d` discard (phase 6) or a branch delete
 /// (`docs/PLAN_8_BRANCHES.md`), the first *other* thing that needed a
@@ -45,4 +45,22 @@ pub(crate) enum ConfirmAction {
     ConfigUnset(git_config_edit::ConfigOp),
     /// `i` on the welcome screen: `git init` in this folder.
     InitRepo(PathBuf),
+}
+
+impl ConfirmPrompt {
+    /// Ask before discarding every change a file has in the worktree.
+    pub(crate) fn discard_file(path: &Path) -> Self {
+        Self {
+            message: format!("discard all changes in {}?", path.display()),
+            action: ConfirmAction::DiscardFile(path.to_path_buf()),
+        }
+    }
+
+    /// Ask before discarding a hunk or some lines of a file.
+    pub(crate) fn discard_granule(granule: Granule, path: &Path) -> Self {
+        Self {
+            message: format!("discard {} in {}?", granule.describe(), path.display()),
+            action: ConfirmAction::DiscardGranule(granule),
+        }
+    }
 }

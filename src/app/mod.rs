@@ -8,7 +8,6 @@
 pub mod events;
 pub mod mock;
 
-use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
 use std::thread;

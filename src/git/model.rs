@@ -115,6 +115,11 @@ pub struct FileEntry {
 }
 
 impl FileEntry {
+    /// Unmerged, on either side.
+    pub fn is_conflicted(&self) -> bool {
+        self.staged == Change::Conflicted || self.worktree == Change::Conflicted
+    }
+
     /// Some of the path's changes sit in the index.
     pub fn has_staged(&self) -> bool {
         !matches!(

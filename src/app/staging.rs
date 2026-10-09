@@ -1,86 +1,37 @@
-//! Diff-cursor navigation and hunk/line staging (`Mode::Diff`).
+//! Staging, unstaging and discarding, from the keys that ask for them: pick
+//! what the key acts on (`PaneRows`, `RightPane`, `git::staging`), call the
+//! port, then refresh and tell the user how it went.
 
-use std::path::{Path, PathBuf};
+use std::ops::Range;
+use std::path::Path;
 
-use super::{App, Range, events, git};
+use super::{App, events, git};
 use crate::app::error::AppError;
-use crate::git::apply::{ApplyDir, ApplyTarget};
+use crate::git::apply::{ApplyDir, ApplyTarget, Granule};
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
-use crate::interface::panes::diff_cursor::{
-    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
-};
+use crate::git::model::Change;
+use crate::git::staging;
+use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::tree::FileRow;
-use crate::interface::panes::views::DiffView;
 use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
 
 impl App {
-    /// The `FileEntry` behind the Files pane's current selection, or `None`
-    /// on a directory row or an empty pane.
-    pub(super) fn selected_file(&self) -> Option<&git::model::FileEntry> {
-        let rows = self.rows().files_tree_rows();
-        let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
-            return None;
-        };
-        self.snapshot.files.get(*index)
-    }
-
-    /// The `Diff` the cursor currently lives in (`Mode::Diff`'s active
-    /// side), or `None` off the Files pane / without a real Files split.
-    pub(super) fn cursor_diff(&self) -> Option<&git::diff::Diff> {
-        let DiffView::Files(files) = &self.right.diff else {
-            return None;
-        };
-        Some(match self.right.cursor.side {
-            DiffSide::Worktree => &files.unstaged,
-            DiffSide::Staged => &files.staged,
-        })
-    }
-
     /// `Enter` / `l` on a Files-pane file row (`Mode::Nav`): focus the diff
     /// for staging within it. A no-op off the Files pane, on a directory
     /// row, already in `Mode::Diff`, or when neither side has a selectable
-    /// line to put the cursor on (binary, a pure rename, no change at all) —
-    /// those stage whole-file only, from `Mode::Nav`.
+    /// line to put the cursor on: those stage whole-file only, from `Mode::Nav`.
     pub(super) fn enter_diff_mode(&mut self) {
         if self.nav.focus != Pane::Files || self.nav.mode == Mode::Diff {
             return;
         }
-        let Some(entry) = self.selected_file() else {
+        let Some(entry) = self.rows().selected_file() else {
             return;
         };
-        let DiffView::Files(files) = &self.right.diff else {
-            return;
-        };
-        // Same direction rule as the file-level toggle: worktree changes
-        // lead, so a half-staged file's cursor starts where there's still
-        // something to stage.
-        let side = if entry.worktree == git::model::Change::None {
-            DiffSide::Staged
-        } else {
-            DiffSide::Worktree
-        };
-        let diff = match side {
-            DiffSide::Worktree => &files.unstaged,
-            DiffSide::Staged => &files.staged,
-        };
-        let hunks = hunk_lines_for(diff);
-        let Some(hunk) = hunks.iter().find(|hl| !hl.selectable.is_empty()) else {
-            return;
-        };
-        let Some(&line) = hunk.selectable.first() else {
-            return;
-        };
-
-        self.nav.mode = Mode::Diff;
-        self.right.cursor = DiffCursor {
-            side,
-            line,
-            anchor: None,
-            hunk_id: hunk_content_id(diff, hunk.hunk_index),
-        };
-        self.right.ensure_cursor_visible();
+        if self.right.start_cursor(entry.worktree != Change::None) {
+            self.nav.mode = Mode::Diff;
+        }
     }
 
     /// `Esc` / `h` in `Mode::Diff`: back to `Mode::Nav`.
@@ -88,131 +39,16 @@ impl App {
         self.nav.mode = Mode::Nav;
     }
 
-    /// `j` / `k` in `Mode::Diff`: move the line cursor over selectable
-    /// lines only, `docs/PLAN_6_STAGING.md`'s "context lines are
-    /// unselectable".
-    pub(super) fn move_diff_cursor(&mut self, dir: isize) {
-        let Some(diff) = self.cursor_diff() else {
-            return;
-        };
-        let lines = selectable_lines(diff);
-        let Some(pos) = lines.iter().position(|&l| l == self.right.cursor.line) else {
-            return;
-        };
-        let next = if dir > 0 {
-            pos.saturating_add(1).min(lines.len().saturating_sub(1))
-        } else {
-            pos.saturating_sub(1)
-        };
-        let Some(&line) = lines.get(next) else {
-            return;
-        };
-        // Crossing into a different hunk: re-tag `hunk_id` right away, or
-        // the very next keystroke's `resync_diff_cursor` (which runs on
-        // every key, not just a stage) reads the stale id, decides the old
-        // hunk "lost" this line, and snaps the cursor straight back to it.
-        let hunk_id = hunk_id_at(diff, line);
-        self.right.cursor.line = line;
-        if let Some(id) = hunk_id {
-            self.right.cursor.hunk_id = id;
-        }
-        self.right.ensure_cursor_visible();
-    }
-
-    /// `V` in `Mode::Diff`: start or clear a line V-selection.
-    pub(super) fn toggle_diff_anchor(&mut self) {
-        self.right.cursor.anchor = if self.right.cursor.anchor.is_some() {
-            None
-        } else {
-            Some(self.right.cursor.line)
-        };
-    }
-
-    /// `]` / `[` in `Mode::Diff`: move the cursor to the next / previous
-    /// hunk's first selectable line. Unlike the `Mode::Nav` `]` / `[`
-    /// (`jump_diff_anchor`), which scrolls a single commit diff and is a
-    /// no-op on the Files split, this moves the cursor itself.
-    pub(super) fn jump_diff_cursor_hunk(&mut self, dir: isize) {
-        let Some(diff) = self.cursor_diff() else {
-            return;
-        };
-        let starts: Vec<usize> = hunk_lines_for(diff)
-            .iter()
-            .filter_map(|hl| hl.selectable.first().copied())
-            .collect();
-        let cur = self.right.cursor.line;
-        let target = if dir > 0 {
-            starts.iter().find(|&&l| l > cur).copied()
-        } else {
-            starts.iter().rev().find(|&&l| l < cur).copied()
-        };
-        if let Some(line) = target {
-            let hunk_id = hunk_id_at(diff, line);
-            self.right.cursor.line = line;
-            if let Some(id) = hunk_id {
-                self.right.cursor.hunk_id = id;
-            }
-            self.right.ensure_cursor_visible();
-        }
-    }
-
-    /// What `<space>` / `d` would act on right now: the V-selected lines
-    /// when there is a selection, else the whole hunk under the cursor
-    /// (`docs/PLAN_6_STAGING.md` "Granule resolution", S1's simplified
-    /// rule). `None` when the cursor's hunk cannot be found (should not
-    /// happen while `Mode::Diff` is up) or a V-selection covers no `+`/`-`
-    /// line (only context was under it — a no-op, not an empty patch).
-    pub(super) fn current_granule(&self) -> Option<Granule> {
-        let diff = self.cursor_diff()?;
-        let file = diff.files.first()?;
-        let hunks = hunk_lines_for(diff);
-        let hl = hunks
-            .iter()
-            .find(|hl| hl.lines.contains(&self.right.cursor.line))?;
-        let hunk = file.hunks.get(hl.hunk_index)?;
-
-        if let Some(anchor) = self.right.cursor.anchor {
-            let lo = anchor.min(self.right.cursor.line);
-            let hi = anchor.max(self.right.cursor.line);
-            let lines: Vec<usize> = hl
-                .selectable
-                .iter()
-                .filter(|&&l| (lo..=hi).contains(&l))
-                .map(|&l| l - hl.lines.start)
-                .collect();
-            if lines.is_empty() {
-                return None;
-            }
-            Some(Granule::Lines {
-                file_header: diff.text.get(file.header.clone())?.to_owned(),
-                hunk_header: diff.text.get(hunk.header.clone())?.to_owned(),
-                hunk_body: diff.text.get(hunk.body.clone())?.to_owned(),
-                lines,
-            })
-        } else {
-            let patch = diff.text.get(file.header.start..hunk.body.end)?.to_owned();
-            Some(Granule::Hunk { patch })
-        }
-    }
-
-    /// Run a `Granule` through the matching backend call.
-    pub(super) fn apply_granule(
+    /// Run a `Granule` through the repository, if there is one.
+    fn apply_granule(
         &self,
         granule: &Granule,
         dir: ApplyDir,
         target: ApplyTarget,
     ) -> GitResult<()> {
-        let Some(repo) = &self.repo else {
-            return Ok(());
-        };
-        match granule {
-            Granule::Hunk { patch } => repo.apply_hunk(patch, dir, target),
-            Granule::Lines {
-                file_header,
-                hunk_header,
-                hunk_body,
-                lines,
-            } => repo.apply_lines(file_header, hunk_header, hunk_body, lines, dir, target),
+        match &self.repo {
+            Some(repo) => staging::apply_granule(repo.as_ref(), granule, dir, target),
+            None => Ok(()),
         }
     }
 
@@ -247,22 +83,16 @@ impl App {
             self.stage_directory(&path);
             return;
         }
-        let Some(entry) = self.selected_file() else {
+        let Some(entry) = self.rows().selected_file() else {
             return;
         };
-        let dir = if entry.worktree != git::model::Change::None {
-            ApplyDir::Forward
-        } else if entry.staged != git::model::Change::None {
-            ApplyDir::Reverse
-        } else {
+        let Some(dir) = staging::direction([entry]) else {
             return;
         };
         let path = entry.path.clone();
-        let conflicted = entry.staged == git::model::Change::Conflicted
-            || entry.worktree == git::model::Change::Conflicted;
         // `git add` on an unmerged path marks it resolved whatever the file
         // holds; refuse while conflict markers remain.
-        if dir == ApplyDir::Forward && conflicted && self.has_markers(&path) {
+        if dir == ApplyDir::Forward && entry.is_conflicted() && self.has_markers(&path) {
             self.report_error(AppError::ConflictMarkers(path));
             return;
         }
@@ -277,37 +107,24 @@ impl App {
     /// all when none is left to stage, as lazygit does. The root row (an empty
     /// path) is every file. Conflicted files that still hold markers block it.
     fn stage_directory(&mut self, directory: &Path) {
-        let under: Vec<&git::model::FileEntry> = self
+        let under = self
             .snapshot
             .files
             .iter()
-            .filter(|f| directory.as_os_str().is_empty() || f.path.starts_with(directory))
-            .collect();
-        let dir = if under.iter().any(|f| f.worktree != git::model::Change::None) {
-            ApplyDir::Forward
-        } else if under.iter().any(|f| f.staged != git::model::Change::None) {
-            ApplyDir::Reverse
-        } else {
+            .filter(|f| directory.as_os_str().is_empty() || f.path.starts_with(directory));
+        let Some(dir) = staging::direction(under.clone()) else {
             return;
         };
-        let blocked: Vec<PathBuf> = under
-            .iter()
-            .filter(|f| {
-                f.staged == git::model::Change::Conflicted
-                    || f.worktree == git::model::Change::Conflicted
-            })
-            .filter(|f| self.has_markers(&f.path))
-            .map(|f| f.path.clone())
-            .collect();
+        let Some(repo) = &self.repo else {
+            return;
+        };
+        let blocked = staging::unresolved_conflicts(repo.as_ref(), under);
         if dir == ApplyDir::Forward && !blocked.is_empty() {
             if let Some(first) = blocked.first() {
                 self.report_error(AppError::ConflictMarkers(first.clone()));
             }
             return;
         }
-        let Some(repo) = &self.repo else {
-            return;
-        };
         let result = if directory.as_os_str().is_empty() {
             repo.stage_all(dir)
         } else {
@@ -316,32 +133,17 @@ impl App {
         self.finish_apply(result);
     }
 
-    /// Conflict markers still in `path`. A file that cannot be read counts as
-    /// "has markers": refusing to stage is the safe side of an unknown.
+    /// Conflict markers still in `path`.
     fn has_markers(&self, path: &Path) -> bool {
         self.repo
             .as_ref()
-            .is_some_and(|repo| repo.has_conflict_markers(path).unwrap_or(true))
-    }
-
-    /// Conflicted paths that still hold markers, in Files order.
-    fn unresolved_conflicts(&self) -> Vec<PathBuf> {
-        self.snapshot
-            .files
-            .iter()
-            .filter(|f| {
-                f.staged == git::model::Change::Conflicted
-                    || f.worktree == git::model::Change::Conflicted
-            })
-            .filter(|f| self.has_markers(&f.path))
-            .map(|f| f.path.clone())
-            .collect()
+            .is_some_and(|repo| staging::has_markers(repo.as_ref(), path))
     }
 
     /// `<space>` in `Mode::Diff`: stage/unstage the hunk under the cursor,
     /// or the V-selection when one is active.
     pub(super) fn stage_diff_cursor(&mut self) {
-        let Some(granule) = self.current_granule() else {
+        let Some(granule) = self.right.current_granule() else {
             return;
         };
         let dir = match self.right.cursor.side {
@@ -354,36 +156,22 @@ impl App {
     }
 
     /// `a` (Nav, Files focused): stage every changed file if any is
-    /// unstaged, else unstage everything — one `git` call either way
+    /// unstaged, else unstage everything: one `git` call either way
     /// (`docs/PLAN_6_STAGING.md` milestone S4).
     pub(super) fn stage_all_files(&mut self) {
         if self.nav.focus != Pane::Files {
             return;
         }
-        let dir = if self
-            .snapshot
-            .files
-            .iter()
-            .any(|f| f.worktree != git::model::Change::None)
-        {
-            ApplyDir::Forward
-        } else if self
-            .snapshot
-            .files
-            .iter()
-            .any(|f| f.staged != git::model::Change::None)
-        {
-            ApplyDir::Reverse
-        } else {
+        let Some(dir) = staging::direction(&self.snapshot.files) else {
             return;
-        };
-        let blocked = if dir == ApplyDir::Forward {
-            self.unresolved_conflicts()
-        } else {
-            Vec::new()
         };
         let Some(repo) = &self.repo else {
             return;
+        };
+        let blocked = if dir == ApplyDir::Forward {
+            staging::unresolved_conflicts(repo.as_ref(), &self.snapshot.files)
+        } else {
+            Vec::new()
         };
         let result = if blocked.is_empty() {
             repo.stage_all(dir)
@@ -402,43 +190,28 @@ impl App {
     /// worktree (`docs/PLAN_6_STAGING.md`'s own scope), so it is a no-op on
     /// the Staged side and on a file with no worktree change of its own.
     pub(super) fn discard_prompt(&mut self) {
-        match self.nav.mode {
+        let prompt = match self.nav.mode {
             Mode::Nav if self.nav.focus == Pane::Files => {
-                let Some(entry) = self.selected_file() else {
+                let Some(entry) = self.rows().selected_file() else {
                     return;
                 };
-                if entry.worktree == git::model::Change::None {
+                if entry.worktree == Change::None {
                     return;
                 }
-                self.modal.ask(ConfirmPrompt {
-                    message: format!("discard all changes in {}?", entry.path.display()),
-                    action: ConfirmAction::DiscardFile(entry.path.clone()),
-                });
+                ConfirmPrompt::discard_file(&entry.path)
             },
             Mode::Diff if self.right.cursor.side == DiffSide::Worktree => {
-                let Some(granule) = self.current_granule() else {
+                let Some(granule) = self.right.current_granule() else {
                     return;
                 };
-                let Some(entry) = self.selected_file() else {
+                let Some(entry) = self.rows().selected_file() else {
                     return;
                 };
-                let what = match &granule {
-                    Granule::Hunk { .. } => "this hunk".to_owned(),
-                    Granule::Lines { lines, .. } => {
-                        format!(
-                            "{} line{}",
-                            lines.len(),
-                            if lines.len() == 1 { "" } else { "s" }
-                        )
-                    },
-                };
-                self.modal.ask(ConfirmPrompt {
-                    message: format!("discard {what} in {}?", entry.path.display()),
-                    action: ConfirmAction::DiscardGranule(granule),
-                });
+                ConfirmPrompt::discard_granule(granule, &entry.path)
             },
-            Mode::Nav | Mode::Diff => {},
-        }
+            Mode::Nav | Mode::Diff => return,
+        };
+        self.modal.ask(prompt);
     }
 
     /// `y` while a confirm prompt is up: run its action. A branch delete
@@ -458,7 +231,7 @@ impl App {
                     .files
                     .iter()
                     .find(|f| f.path == path)
-                    .is_some_and(|f| f.worktree == git::model::Change::Untracked);
+                    .is_some_and(|f| f.worktree == Change::Untracked);
                 let result = match &self.repo {
                     Some(repo) => repo.discard_file(&path, untracked),
                     None => return,
@@ -514,18 +287,9 @@ impl App {
     }
 
     /// Cursor state for the right-pane render: `(side, cursor line, V-select
-    /// range)` while `Mode::Diff` is up, else `None`. The range is
-    /// inclusive-exclusive (`a..b`) over `side`'s own `Diff::text` lines.
+    /// range)` while `Mode::Diff` is up, else `None`.
     pub fn diff_cursor(&self) -> Option<(DiffSide, usize, Option<Range<usize>>)> {
-        if self.nav.mode != Mode::Diff {
-            return None;
-        }
-        let range = self
-            .right
-            .cursor
-            .anchor
-            .map(|a| a.min(self.right.cursor.line)..a.max(self.right.cursor.line) + 1);
-        Some((self.right.cursor.side, self.right.cursor.line, range))
+        (self.nav.mode == Mode::Diff).then(|| self.right.cursor_view())
     }
 
     /// Right-pane title suffix while `Mode::Diff` is up: `hunk 1/3` or
@@ -534,23 +298,6 @@ impl App {
         if self.nav.mode != Mode::Diff {
             return None;
         }
-        let diff = self.cursor_diff()?;
-        let hunks = hunk_lines_for(diff);
-        let total = hunks.len();
-        let current = hunks
-            .iter()
-            .position(|hl| hl.lines.contains(&self.right.cursor.line))?;
-        Some(match self.right.cursor.anchor {
-            Some(anchor) => {
-                let lo = anchor.min(self.right.cursor.line) + 1;
-                let hi = anchor.max(self.right.cursor.line) + 1;
-                if lo == hi {
-                    format!("line {lo}")
-                } else {
-                    format!("lines {lo}-{hi}")
-                }
-            },
-            None => format!("hunk {}/{total}", current + 1),
-        })
+        self.right.granule_hint()
     }
 }

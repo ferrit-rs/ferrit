@@ -76,7 +76,7 @@ impl App {
         }
         let index = self.selected(self.nav.focus);
         let (title, mut items) = match self.nav.focus {
-            Pane::Files if self.nav.mode == Mode::Nav => match self.selected_file() {
+            Pane::Files if self.nav.mode == Mode::Nav => match self.rows().selected_file() {
                 Some(file)
                     if file.staged == git::model::Change::Conflicted
                         || file.worktree == git::model::Change::Conflicted =>
@@ -212,7 +212,7 @@ impl App {
                 );
             },
             MenuAction::TakeOurs | MenuAction::TakeTheirs => {
-                let Some(file) = self.selected_file() else {
+                let Some(file) = self.rows().selected_file() else {
                     return;
                 };
                 let path = file.path.clone();

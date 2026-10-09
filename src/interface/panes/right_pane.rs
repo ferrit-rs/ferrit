@@ -12,8 +12,11 @@ use ratatui_image::picker::Picker;
 use super::row_lines;
 use crate::app::diff_query::RightKey;
 use crate::git;
+use crate::git::apply::Granule;
 use crate::git::diff::DiffSide;
-use crate::interface::panes::diff_cursor::{DiffCursor, hunk_content_id, hunk_lines_for};
+use crate::interface::panes::diff_cursor::{
+    DiffCursor, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
+};
 use crate::interface::panes::views::DiffView;
 use crate::interface::render_state::RenderedDiff;
 use crate::theme::palette::Palette;
@@ -257,6 +260,193 @@ impl RightPane {
             DiffView::None | DiffView::Note(_) | DiffView::BranchLog(_) | DiffView::Files(_) => {
                 None
             },
+        }
+    }
+}
+
+/// The line cursor of the Files split (`Mode::Diff`): where it is, what it can
+/// move over, and which hunk or lines a stage would act on.
+impl RightPane {
+    /// The `Diff` the cursor currently lives in (the active side), or `None`
+    /// without a real Files split.
+    pub(crate) fn cursor_diff(&self) -> Option<&git::diff::Diff> {
+        let DiffView::Files(files) = &self.diff else {
+            return None;
+        };
+        Some(match self.cursor.side {
+            DiffSide::Worktree => &files.unstaged,
+            DiffSide::Staged => &files.staged,
+        })
+    }
+
+    /// Put the cursor on the first selectable line of a file's diff, starting
+    /// on the worktree side when it has a change there (worktree changes lead,
+    /// so a half-staged file's cursor starts where there is still something to
+    /// stage). `false`, and nothing moved, when neither side has a selectable
+    /// line (binary, a pure rename, no change at all).
+    pub(crate) fn start_cursor(&mut self, has_worktree_change: bool) -> bool {
+        let DiffView::Files(files) = &self.diff else {
+            return false;
+        };
+        let side = if has_worktree_change {
+            DiffSide::Worktree
+        } else {
+            DiffSide::Staged
+        };
+        let diff = match side {
+            DiffSide::Worktree => &files.unstaged,
+            DiffSide::Staged => &files.staged,
+        };
+        let hunks = hunk_lines_for(diff);
+        let Some(hunk) = hunks.iter().find(|hl| !hl.selectable.is_empty()) else {
+            return false;
+        };
+        let Some(&line) = hunk.selectable.first() else {
+            return false;
+        };
+        self.cursor = DiffCursor {
+            side,
+            line,
+            anchor: None,
+            hunk_id: hunk_content_id(diff, hunk.hunk_index),
+        };
+        self.ensure_cursor_visible();
+        true
+    }
+
+    /// Move the cursor one selectable line down (`dir > 0`) or up: context
+    /// lines are unselectable (`docs/PLAN_6_STAGING.md`).
+    pub(crate) fn move_cursor(&mut self, dir: isize) {
+        let Some(diff) = self.cursor_diff() else {
+            return;
+        };
+        let lines = selectable_lines(diff);
+        let Some(pos) = lines.iter().position(|&l| l == self.cursor.line) else {
+            return;
+        };
+        let next = if dir > 0 {
+            pos.saturating_add(1).min(lines.len().saturating_sub(1))
+        } else {
+            pos.saturating_sub(1)
+        };
+        let Some(&line) = lines.get(next) else {
+            return;
+        };
+        self.place_cursor(line);
+    }
+
+    /// Move the cursor to the next (`dir > 0`) or previous hunk's first
+    /// selectable line. Unlike `jump_anchor`, which scrolls a single commit
+    /// diff, this moves the cursor itself.
+    pub(crate) fn jump_cursor_hunk(&mut self, dir: isize) {
+        let Some(diff) = self.cursor_diff() else {
+            return;
+        };
+        let starts: Vec<usize> = hunk_lines_for(diff)
+            .iter()
+            .filter_map(|hl| hl.selectable.first().copied())
+            .collect();
+        let cur = self.cursor.line;
+        let target = if dir > 0 {
+            starts.iter().find(|&&l| l > cur).copied()
+        } else {
+            starts.iter().rev().find(|&&l| l < cur).copied()
+        };
+        if let Some(line) = target {
+            self.place_cursor(line);
+        }
+    }
+
+    /// Crossing into a different hunk re-tags `hunk_id` right away, or the very
+    /// next keystroke's `resync_cursor` (which runs on every key, not just a
+    /// stage) reads the stale id, decides the old hunk "lost" this line, and
+    /// snaps the cursor straight back to it.
+    fn place_cursor(&mut self, line: usize) {
+        let hunk_id = self.cursor_diff().and_then(|diff| hunk_id_at(diff, line));
+        self.cursor.line = line;
+        if let Some(id) = hunk_id {
+            self.cursor.hunk_id = id;
+        }
+        self.ensure_cursor_visible();
+    }
+
+    /// Start or clear a line V-selection.
+    pub(crate) fn toggle_anchor(&mut self) {
+        self.cursor.anchor = if self.cursor.anchor.is_some() {
+            None
+        } else {
+            Some(self.cursor.line)
+        };
+    }
+
+    /// The cursor for the render: `(side, cursor line, V-select range)`. The
+    /// range is inclusive-exclusive (`a..b`) over `side`'s own `Diff::text`.
+    pub(crate) fn cursor_view(&self) -> (DiffSide, usize, Option<Range<usize>>) {
+        let range = self
+            .cursor
+            .anchor
+            .map(|a| a.min(self.cursor.line)..a.max(self.cursor.line) + 1);
+        (self.cursor.side, self.cursor.line, range)
+    }
+
+    /// Title suffix: `hunk 1/3`, `lines 41-42` or `line 41`, so it is obvious
+    /// what a stage will hit.
+    pub(crate) fn granule_hint(&self) -> Option<String> {
+        let diff = self.cursor_diff()?;
+        let hunks = hunk_lines_for(diff);
+        let total = hunks.len();
+        let current = hunks
+            .iter()
+            .position(|hl| hl.lines.contains(&self.cursor.line))?;
+        Some(match self.cursor.anchor {
+            Some(anchor) => {
+                let lo = anchor.min(self.cursor.line) + 1;
+                let hi = anchor.max(self.cursor.line) + 1;
+                if lo == hi {
+                    format!("line {lo}")
+                } else {
+                    format!("lines {lo}-{hi}")
+                }
+            },
+            None => format!("hunk {}/{total}", current + 1),
+        })
+    }
+
+    /// What a stage or a discard would act on right now: the V-selected lines
+    /// when there is a selection, else the whole hunk under the cursor
+    /// (`docs/PLAN_6_STAGING.md` "Granule resolution"). `None` when the
+    /// cursor's hunk cannot be found, or a V-selection covers no `+`/`-` line
+    /// (only context was under it: a no-op, not an empty patch).
+    pub(crate) fn current_granule(&self) -> Option<Granule> {
+        let diff = self.cursor_diff()?;
+        let file = diff.files.first()?;
+        let hunks = hunk_lines_for(diff);
+        let hl = hunks
+            .iter()
+            .find(|hl| hl.lines.contains(&self.cursor.line))?;
+        let hunk = file.hunks.get(hl.hunk_index)?;
+
+        if let Some(anchor) = self.cursor.anchor {
+            let lo = anchor.min(self.cursor.line);
+            let hi = anchor.max(self.cursor.line);
+            let lines: Vec<usize> = hl
+                .selectable
+                .iter()
+                .filter(|&&l| (lo..=hi).contains(&l))
+                .map(|&l| l - hl.lines.start)
+                .collect();
+            if lines.is_empty() {
+                return None;
+            }
+            Some(Granule::Lines {
+                file_header: diff.text.get(file.header.clone())?.to_owned(),
+                hunk_header: diff.text.get(hunk.header.clone())?.to_owned(),
+                hunk_body: diff.text.get(hunk.body.clone())?.to_owned(),
+                lines,
+            })
+        } else {
+            let patch = diff.text.get(file.header.start..hunk.body.end)?.to_owned();
+            Some(Granule::Hunk { patch })
         }
     }
 }
