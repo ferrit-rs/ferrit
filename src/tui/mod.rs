@@ -5,8 +5,13 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+use crate::git::commit::CommitKind;
+use crate::tui::components::commit_editor;
+use crate::tui::components::diff::CommitPopupView;
 use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
+use crate::tui::components::popups::Popup;
+use crate::tui::widgets::tui_overlay::state::OverlayState;
 pub mod events;
 pub mod mock;
 
@@ -110,6 +115,7 @@ pub mod workers;
 pub mod components;
 pub mod draw;
 pub mod error;
+pub mod event;
 pub mod input;
 pub mod keymap;
 pub mod prefs;
@@ -986,4 +992,82 @@ fn watcher_error(events: &Events) -> Option<Arc<AppError>> {
             detail: detail.to_owned(),
         })
     })
+}
+
+impl App {
+    /// The commit popup as data, without any animation state.
+    pub fn commit_popup(&self) -> Option<CommitPopupView<'_>> {
+        self.commit_popup_with(None)
+    }
+
+    /// The commit popup for drawing: `overlay` is its animation.
+    pub(crate) fn commit_popup_with<'a>(
+        &'a self,
+        overlay: Option<&'a mut OverlayState>,
+    ) -> Option<CommitPopupView<'a>> {
+        let Some(Popup::Commit(draft)) = self.modal.popup() else {
+            return None;
+        };
+        Some(draft.view(self.authorship.line(), overlay))
+    }
+
+    /// Replace the identities git knows globally. Integration-test seam: the
+    /// real ones come from the machine's own git config.
+    #[doc(hidden)]
+    pub fn set_global_identities(&mut self, identities: Vec<(String, String)>) {
+        self.authorship.profile.settings.global_identities = identities
+            .into_iter()
+            .map(|(name, email)| git::identity::Identity {
+                name,
+                email: Some(email),
+            })
+            .collect();
+    }
+
+    /// `c` / `A` / `w`.
+    pub(crate) fn open_commit(&mut self, kind: CommitKind) {
+        if self.modal.popup().is_some() {
+            return;
+        }
+        let events = commit_editor::open(kind, &mut self.open_ctx());
+        self.apply(events);
+    }
+
+    /// Open the editor to reword the older commit `hash` with a rebase.
+    pub(crate) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
+        let events =
+            commit_editor::open_reword(hash, title, message, self.prefs.config.commit.sign_off);
+        self.apply(events);
+    }
+
+    /// The "commit all" question shown when the index is empty.
+    pub(crate) fn commit_all_confirm_key(&mut self, key: KeyEvent) {
+        let events = commit_editor::all_confirm_key(key, &mut self.open_ctx());
+        self.apply(events);
+    }
+
+    /// Keys while the commit editor owns input.
+    pub(crate) fn commit_popup_key(&mut self, key: KeyEvent) {
+        let Some(Popup::Commit(draft)) = self.modal.popup_mut() else {
+            return;
+        };
+        let ctx = commit_editor::SubmitCtx {
+            repo: self.repo.as_deref(),
+            commits: &self.snapshot.commits,
+            author: self.authorship.author_arg(),
+            drilled: self.nav.commit_drill.is_some(),
+        };
+        let events = commit_editor::popup_key(draft, key, &ctx);
+        self.apply(events);
+    }
+
+    fn open_ctx(&mut self) -> commit_editor::OpenCtx<'_> {
+        commit_editor::OpenCtx {
+            repo: self.repo.as_deref(),
+            files: &self.snapshot.files,
+            commits: &self.snapshot.commits,
+            sign_off: self.prefs.config.commit.sign_off,
+            saved: &mut self.commit_draft,
+        }
+    }
 }
