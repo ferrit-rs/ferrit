@@ -162,9 +162,7 @@ cargo run
 
 ## Architecture
 
-One crate organised by domain: `git/` (the model, the `GitPort` traits and the adapter),
-`keybindings/`, `config/`, `theme/`, `interface/` (widgets, screens, state) and `app/`, which puts
-them together (state, events, screens). The app talks to git
+One crate in four parts: `git/` (the model, the `GitPort` traits and the adapter), `app/` (the model and what changes it), `ui/` (screens and widgets) and `config/` with `theme/`. The app talks to git
 through a trait (`GitPort`), implemented by `git2` for reads and the `git`
 subprocess for changes, so hooks and signing behave as in your shell, and by an
 in-memory fake for tests. Errors are typed all the way to the screen. Slow work

@@ -1,15 +1,15 @@
 //! What the keys do in `App` for `branch`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::confirm::ConfirmPrompt;
+use crate::app::state::menu::MenuState;
+use crate::app::state::pane::{BranchesTab, Pane};
+use crate::app::state::popup::Popup;
+use crate::app::state::selection::SelectionKey;
 use crate::git::branch::{self, MergeKind, MergeOutcome};
 use crate::git::error::GitResult;
 use crate::git::staging;
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::confirm::ConfirmPrompt;
-use crate::interface::state::menu::MenuState;
-use crate::interface::state::pane::{BranchesTab, Pane};
-use crate::interface::state::popup::Popup;
-use crate::interface::state::selection::SelectionKey;
+use crate::ui::widgets::text_input::TextInput;
 
 impl App {
     /// Enter on the Branches pane: lazygit's branch -> log drill-down. Read

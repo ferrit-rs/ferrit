@@ -1,11 +1,11 @@
 //! What the keys do in `App` for `input`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::full_screens::FullScreen;
-use crate::interface::state::pane::{PANES, Pane};
-use crate::interface::state::sheet::Sheet;
-use crate::keybindings::hints;
+use crate::app::hints;
+use crate::app::state::diff_cursor::Mode;
+use crate::app::state::full_screens::FullScreen;
+use crate::app::state::pane::{PANES, Pane};
+use crate::app::state::sheet::Sheet;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::crossterm::event::KeyModifiers;

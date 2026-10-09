@@ -1,12 +1,12 @@
 //! What the keys do in `App` for `popup_keys`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
-use crate::interface::components::tui_overlay::state::OverlayState;
-use crate::interface::components::ui::text_input::TextInputMode;
-use crate::interface::state::popup::Popup;
-use crate::interface::state::popup_keys::PopupKind;
-use crate::interface::state::popup_keys::scrolled_command_log;
-use crate::interface::state::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
+use crate::app::state::popup::Popup;
+use crate::app::state::popup_keys::PopupKind;
+use crate::app::state::popup_keys::scrolled_command_log;
+use crate::app::state::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
+use crate::ui::widgets::text_input::TextInputMode;
+use crate::ui::widgets::tui_overlay::state::OverlayState;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

@@ -1,6 +1,10 @@
 //! What the keys do in `App` for `git_config_edit`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::state::context_menu::NameKind;
+use crate::app::state::menu::{MenuAction, MenuItem, MenuState};
+use crate::app::state::popup::Popup;
 use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use crate::git::config_edit::ConfigOp;
 use crate::git::config_edit::GlobalResume;
@@ -10,11 +14,7 @@ use crate::git::config_edit::scope_name;
 use crate::git::config_edit::scope_of;
 use crate::git::config_edit::truthy;
 use crate::git::config_keys::{KeyType, lookup};
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::interface::state::context_menu::NameKind;
-use crate::interface::state::menu::{MenuAction, MenuItem, MenuState};
-use crate::interface::state::popup::Popup;
+use crate::ui::widgets::text_input::TextInput;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

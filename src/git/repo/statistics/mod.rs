@@ -12,8 +12,7 @@ use crate::git::stats::authors::{self, AuthorAcc};
 use crate::git::stats::kind::{self, Kind};
 use crate::git::stats::series::{self, Granularity};
 use crate::git::stats::{
-    DAY, FileStat, HEAT_DAYS, HotFiles, KindStat, Lines, RepoStats, StatsOptions, Totals, Window,
-    WorkState,
+    DAY, HEAT_DAYS, KindStat, RepoStats, StatsOptions, Totals, Window, WorkState,
 };
 
 use super::read;

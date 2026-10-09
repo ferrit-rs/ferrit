@@ -1,11 +1,11 @@
 //! What the keys do in `App` for `dispatch`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::keymap::{Action, Context, KeyBinding};
+use crate::app::state::diff_cursor::Mode;
+use crate::app::state::pane::{PANES, Pane};
 use crate::git;
 use crate::git::remote::RemoteOp;
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::pane::{PANES, Pane};
-use crate::keybindings::keymap::{Action, Context, KeyBinding};
 use ratatui::crossterm::event::KeyEvent;
 
 impl App {

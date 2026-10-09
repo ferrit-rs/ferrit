@@ -3,8 +3,8 @@
 use crate::support::{author, branch, buffer, col_of, is_braille, render, stats, text, view};
 use ferrit::git::stats::KindStat;
 use ferrit::git::stats::kind::Kind;
-use ferrit::interface::components::ui::chart_palette::{ChartMode, ChartPalette};
 use ferrit::theme::palette::Palette;
+use ferrit::ui::widgets::chart_palette::{ChartMode, ChartPalette};
 use ratatui::style::Color;
 
 #[test]

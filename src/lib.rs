@@ -6,10 +6,9 @@ pub mod app;
 
 pub mod config;
 pub mod git;
-pub mod interface;
-pub mod keybindings;
 /// The scripted test harness behind `--replay` and `--fixture`. Test seam, only
 /// built with the `test-util` feature.
 #[cfg(feature = "test-util")]
 pub mod replay;
 pub mod theme;
+pub mod ui;

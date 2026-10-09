@@ -1,13 +1,13 @@
 //! What the keys do in `App` for `menu`: the glue between the interface, the git code and the app's state.
 
+use crate::app::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::state::menu::MenuAction;
+use crate::app::state::menu::MenuState;
+use crate::app::state::menu::operation_items;
+use crate::app::state::popup::Popup;
 use crate::app::{App, operation_noun};
 use crate::git::error::GitResult;
 use crate::git::operation::{OperationOutcome, Step};
-use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::interface::state::menu::MenuAction;
-use crate::interface::state::menu::MenuState;
-use crate::interface::state::menu::operation_items;
-use crate::interface::state::popup::Popup;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 

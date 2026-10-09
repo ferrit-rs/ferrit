@@ -20,8 +20,8 @@ use common::{TempDir, commit_all, configure_identity};
 use std::fs;
 
 use ferrit::app::App;
+use ferrit::app::state::pane::Pane;
 use ferrit::config::{Config, ConfigLoad};
-use ferrit::interface::state::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -152,7 +152,7 @@ fn a_global_binding_still_answers_inside_a_pane_context() {
         use ratatui::backend::TestBackend;
         let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
         terminal
-            .draw(|f| ferrit::interface::screens::draw(f, &mut app))
+            .draw(|f| ferrit::ui::screens::draw(f, &mut app))
             .unwrap();
         terminal.backend().to_string()
     };
@@ -180,7 +180,7 @@ fn frame(app: &mut App) -> String {
     use ratatui::backend::TestBackend;
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal
-        .draw(|f| ferrit::interface::screens::draw(f, app))
+        .draw(|f| ferrit::ui::screens::draw(f, app))
         .unwrap();
     terminal.backend().to_string()
 }

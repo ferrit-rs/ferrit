@@ -18,8 +18,8 @@ use std::fs;
 use std::path::Path;
 
 use ferrit::app::App;
-use ferrit::interface::screens;
-use ferrit::interface::state::pane::Pane;
+use ferrit::app::state::pane::Pane;
+use ferrit::ui::screens;
 use git2::{Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

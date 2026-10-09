@@ -20,9 +20,9 @@ use std::sync::mpsc;
 
 use ferrit::app::App;
 use ferrit::app::mock;
+use ferrit::app::state::pane::Pane;
 use ferrit::git::remote::RemoteOp;
-use ferrit::interface::screens as ui;
-use ferrit::interface::state::pane::Pane;
+use ferrit::ui::screens as ui;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

@@ -21,7 +21,7 @@ use std::fs;
 use std::path::Path;
 
 use ferrit::app::App;
-use ferrit::interface::state::pane::Pane;
+use ferrit::app::state::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

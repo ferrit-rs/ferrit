@@ -3,15 +3,15 @@
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
+use crate::app::state::diff_cursor::Mode;
+use crate::app::state::diff_query::DiffCompletion;
+use crate::app::state::diff_query::DiffQueryResult;
+use crate::app::state::diff_query::RightKey;
+use crate::app::state::diff_query::load;
+use crate::app::state::pane::Pane;
+use crate::app::state::tree::FileRow;
+use crate::app::state::views::{BranchLog, DiffView, FilesDiff};
 use crate::app::workers::{WorkerKind, run_worker};
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::diff_query::DiffCompletion;
-use crate::interface::state::diff_query::DiffQueryResult;
-use crate::interface::state::diff_query::RightKey;
-use crate::interface::state::diff_query::load;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::tree::FileRow;
-use crate::interface::state::views::{BranchLog, DiffView, FilesDiff};
 use std::sync::mpsc;
 use std::thread;
 

@@ -2,15 +2,15 @@
 
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
+use crate::app::state::image_query::ImageCompletion;
+use crate::app::state::image_query::load;
+use crate::app::state::pane::Pane;
+use crate::app::state::tree::FileRow;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::app::{App, mock};
 use crate::git;
 use crate::git::image::preview;
 use crate::git::image::preview::Preview;
-use crate::interface::state::image_query::ImageCompletion;
-use crate::interface::state::image_query::load;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::tree::FileRow;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;

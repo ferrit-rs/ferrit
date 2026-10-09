@@ -2,15 +2,15 @@
 
 use crate::app::App;
 use crate::app::error::AppError;
+use crate::app::state::commit_draft::{CommitDraft, DraftKey, RewordTarget};
+use crate::app::state::pane::Pane;
+use crate::app::state::popup::Popup;
+use crate::app::state::selection::SelectionKey;
+use crate::app::state::views::CommitPopupView;
 use crate::git;
 use crate::git::apply::ApplyDir;
 use crate::git::commit::{self, CommitKind, OpenPlan, Submitted};
-use crate::interface::components::tui_overlay::state::OverlayState;
-use crate::interface::state::commit_draft::{CommitDraft, DraftKey, RewordTarget};
-use crate::interface::state::pane::Pane;
-use crate::interface::state::popup::Popup;
-use crate::interface::state::selection::SelectionKey;
-use crate::interface::state::views::CommitPopupView;
+use crate::ui::widgets::tui_overlay::state::OverlayState;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 impl App {

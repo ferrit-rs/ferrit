@@ -15,9 +15,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ferrit::app::App;
+use ferrit::app::state::full_screens::FullScreen;
+use ferrit::app::state::views::PopupView;
 use ferrit::git::config::{Scope, WriteScope};
-use ferrit::interface::state::full_screens::FullScreen;
-use ferrit::interface::state::views::PopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn key(c: char) -> KeyEvent {

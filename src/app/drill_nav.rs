@@ -1,9 +1,9 @@
 //! What the keys do in `App` for `drill_nav`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
-use crate::interface::state::drill::CommitDrill;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::tree::{FileRow, commit_drill_files};
+use crate::app::state::drill::CommitDrill;
+use crate::app::state::pane::Pane;
+use crate::app::state::tree::{FileRow, commit_drill_files};
 use std::collections::HashSet;
 
 impl App {

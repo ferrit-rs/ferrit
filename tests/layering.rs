@@ -89,7 +89,7 @@ fn the_git_domain_does_not_know_the_app() {
 
 /// A domain is a flat list of files named after what they do, with a folder only
 /// for a feature that has several files: nothing deeper than two folders under
-/// `src/<domain>/`, except the widgets of `interface/components/ui`.
+/// `src/<domain>/`, except the widgets of `ui/widgets`.
 #[test]
 fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -97,7 +97,7 @@ fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
         .into_iter()
         .map(|path| path.strip_prefix(&root).unwrap().to_path_buf())
         .filter(|path| path.components().count() > 4)
-        .filter(|path| !path.starts_with("interface/components"))
+        .filter(|path| !path.starts_with("ui/widgets"))
         .map(|path| path.display().to_string())
         .collect();
     assert!(too_deep.is_empty(), "too deep: {too_deep:?}");

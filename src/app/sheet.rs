@@ -1,8 +1,8 @@
 //! What the keys do in `App` for `sheet`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
-use crate::interface::components::tui_overlay::state::OverlayState;
-use crate::interface::state::sheet::Sheet;
+use crate::app::state::sheet::Sheet;
+use crate::ui::widgets::tui_overlay::state::OverlayState;
 
 impl App {
     /// Open `sheet` in the drawer, ready for its first frame.

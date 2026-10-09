@@ -20,10 +20,10 @@ use std::collections::BTreeSet;
 use std::fs;
 
 use ferrit::app::App;
+use ferrit::app::hints::{Bar, HelpLine, filter_help_lines, help_lines, keybar_layout};
+use ferrit::app::keymap::{Action, Context, Keymap};
+use ferrit::app::state::pane::Pane;
 use ferrit::config::{Config, ConfigLoad};
-use ferrit::interface::state::pane::Pane;
-use ferrit::keybindings::hints::{Bar, HelpLine, filter_help_lines, help_lines, keybar_layout};
-use ferrit::keybindings::keymap::{Action, Context, Keymap};
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -140,7 +140,7 @@ fn an_unbound_action_loses_its_segment_and_a_group_shrinks() {
 fn frame(app: &mut App, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
-        .draw(|f| ferrit::interface::screens::draw(f, app))
+        .draw(|f| ferrit::ui::screens::draw(f, app))
         .unwrap();
     terminal.backend().to_string()
 }

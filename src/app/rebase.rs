@@ -1,10 +1,10 @@
 //! What the keys do in `App` for `rebase`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::confirm::ConfirmPrompt;
+use crate::app::state::pane::Pane;
 use crate::git;
 use crate::git::rebase::RebaseEdit;
-use crate::interface::state::confirm::ConfirmPrompt;
-use crate::interface::state::pane::Pane;
 
 impl App {
     /// The selected commit, when a rewrite key may act on it: Commits focused

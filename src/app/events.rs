@@ -28,9 +28,9 @@ pub enum AppEvent {
     /// the event boundary carries only owned, sendable application data.
     RefreshDone(Box<crate::app::RefreshCompletion>),
     /// Selected diff read finished. Generation and key reject stale results.
-    DiffDone(crate::interface::state::diff_query::DiffCompletion),
+    DiffDone(crate::app::state::diff_query::DiffCompletion),
     /// Selected image blob read/decode finished. Stale generations are dropped.
-    ImageDone(crate::interface::state::image_query::ImageCompletion),
+    ImageDone(crate::app::state::image_query::ImageCompletion),
     /// A background `fetch`/`pull`/`push` finished. `message` is already a
     /// user-facing string (`Ok` success line or `Err` failure text) — this
     /// module stays git-agnostic, so the spawned thread converts a
@@ -44,7 +44,7 @@ pub enum AppEvent {
         reply: Sender<Option<String>>,
     },
     /// The dashboard statistics worker answered (`app::dashboard`).
-    StatsDone(crate::interface::state::dashboard::StatsCompletion),
+    StatsDone(crate::app::state::dashboard::StatsCompletion),
     RemoteDone {
         op: crate::git::remote::RemoteOp,
         message: Result<String, AppError>,

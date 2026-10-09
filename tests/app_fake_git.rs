@@ -11,10 +11,10 @@
 //! See `docs/PLAN_21_GIT_PORT.md`.
 
 use ferrit::app::App;
+use ferrit::app::state::pane::Pane;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
-use ferrit::interface::state::pane::Pane;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn char_key(c: char) -> KeyEvent {

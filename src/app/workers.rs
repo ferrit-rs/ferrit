@@ -13,8 +13,8 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 
 use crate::app::error::AppError;
+use crate::app::state::diff_query::DiffQueryState;
 use crate::git::remote::RemoteOp;
-use crate::interface::state::diff_query::DiffQueryState;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
 /// follow-up snapshot instead of queuing stale concurrent reads.

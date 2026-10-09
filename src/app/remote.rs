@@ -3,11 +3,11 @@
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
+use crate::app::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::state::popup::Popup;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::remote::{self, PushPlan, RemoteOp, RemoteRequest};
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::interface::state::popup::Popup;
+use crate::ui::widgets::text_input::TextInput;
 use color_eyre::Result;
 use std::sync::Arc;
 use std::sync::mpsc;

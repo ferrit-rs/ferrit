@@ -2,16 +2,16 @@
 
 use crate::app::App;
 use crate::app::error::AppError;
+use crate::app::state::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::app::state::diff_cursor::Mode;
+use crate::app::state::pane::Pane;
+use crate::app::state::tree::FileRow;
 use crate::git;
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::model::Change;
 use crate::git::remote::RemoteRequest;
 use crate::git::staging::{self, Plan, Refusal};
-use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::tree::FileRow;
 use std::ops::Range;
 
 impl App {

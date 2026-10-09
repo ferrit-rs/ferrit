@@ -1,8 +1,8 @@
 //! What the keys do in `App` for `welcome`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::confirm::{ConfirmAction, ConfirmPrompt};
 use crate::git;
-use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use std::path::{Path, PathBuf};

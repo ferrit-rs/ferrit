@@ -12,12 +12,12 @@
 
 use ferrit::app::App;
 use ferrit::app::mock::{mock_commits, mock_files};
+use ferrit::app::state::pane::Pane;
 use ferrit::config::Config;
 use ferrit::git::diff::parse_diff;
-use ferrit::interface::components::ui::key_bar::KeyBar;
-use ferrit::interface::screens::row_lines;
-use ferrit::interface::state::pane::Pane;
 use ferrit::theme::palette::Palette;
+use ferrit::ui::screens::row_lines;
+use ferrit::ui::widgets::key_bar::KeyBar;
 use ratatui::style::Color;
 
 /// A palette where every colour is different from `Palette::DARK`'s and from
@@ -98,7 +98,7 @@ fn a_frame_on_the_default_palette_paints_borders_in_its_idle_colour() {
     app.nav.focus = Pane::Files;
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal
-        .draw(|f| ferrit::interface::screens::draw(f, &mut app))
+        .draw(|f| ferrit::ui::screens::draw(f, &mut app))
         .unwrap();
     let buffer = terminal.backend().buffer();
     assert!(

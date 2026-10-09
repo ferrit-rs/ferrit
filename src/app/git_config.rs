@@ -2,10 +2,10 @@
 
 use crate::app::App;
 use crate::app::error::AppError;
+use crate::app::keymap::{Action, Context, KeyBinding};
+use crate::app::state::full_screens::FullScreen;
+use crate::app::state::git_config::GitConfigScreen;
 use crate::git::config::WriteScope;
-use crate::interface::state::full_screens::FullScreen;
-use crate::interface::state::git_config::GitConfigScreen;
-use crate::keybindings::keymap::{Action, Context, KeyBinding};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::crossterm::event::MouseEvent;

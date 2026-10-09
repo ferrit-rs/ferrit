@@ -10,9 +10,9 @@
 //! the keymap existed, not from `keymap::DEFAULTS`: a default that drifts from
 //! the old behaviour fails here.
 
+use ferrit::app::keymap::{Action, Context, KeyBinding, Keymap};
+use ferrit::app::state::pane::Pane;
 use ferrit::config::Config;
-use ferrit::interface::state::pane::Pane;
-use ferrit::keybindings::keymap::{Action, Context, KeyBinding, Keymap};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use Action as A;
@@ -278,16 +278,11 @@ fn a_pane_maps_to_its_own_context() {
 
 // ------------------------------------------------------------------ [keys]
 
-/// The keymap a config file's text produces, and what was reported.
+/// The keymap a config file's text produces, and what was reported. (Reporting
+/// those issues to the user is the app's: `tests/app_keys.rs`.)
 fn from_toml(text: &str) -> (Keymap, Vec<String>) {
-    let (config, config_issues) = Config::parse(text);
-    let (map, issues) = Keymap::from_overrides(&config.keys);
-    // `Config::parse` reports the same key issues, once.
-    assert!(
-        issues.iter().all(|i| config_issues.contains(i)),
-        "{issues:?} vs {config_issues:?}"
-    );
-    (map, issues)
+    let (config, _) = Config::parse(text);
+    Keymap::from_overrides(&config.keys)
 }
 
 fn resolve(map: &Keymap, context: Context, text: &str) -> Option<Action> {

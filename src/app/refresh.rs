@@ -1,13 +1,13 @@
 //! The result of a repository refresh, as it comes back from its worker.
 
 use super::error::AppError;
+use crate::app::state::tree::commit_drill_files;
 use crate::git;
 use crate::git::authorship::Authorship;
 use crate::git::diff::DiffOpts;
 use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::profile::Profile;
-use crate::interface::state::tree::commit_drill_files;
 use color_eyre::Result;
 use std::sync::Arc;
 

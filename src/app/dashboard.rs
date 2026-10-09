@@ -2,12 +2,12 @@
 
 use crate::app::App;
 use crate::app::events::AppEvent;
-use crate::interface::state::dashboard::Cached;
-use crate::interface::state::dashboard::StatsCompletion;
-use crate::interface::state::dashboard::read_stats;
-use crate::interface::state::dashboard::{PAGE, WHEEL_ROWS, WINDOWS};
-use crate::interface::state::sheet::Sheet;
-use crate::keybindings::keymap::{Action, Context, KeyBinding};
+use crate::app::keymap::{Action, Context, KeyBinding};
+use crate::app::state::dashboard::Cached;
+use crate::app::state::dashboard::StatsCompletion;
+use crate::app::state::dashboard::read_stats;
+use crate::app::state::dashboard::{PAGE, WHEEL_ROWS, WINDOWS};
+use crate::app::state::sheet::Sheet;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::crossterm::event::MouseEvent;

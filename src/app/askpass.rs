@@ -1,11 +1,11 @@
 //! What the keys do in `App` for `askpass`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::askpass::AskpassPrompt;
+use crate::app::state::popup::Popup;
+use crate::app::state::views::CommitPopupView;
 use crate::git::askpass;
-use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
-use crate::interface::state::askpass::AskpassPrompt;
-use crate::interface::state::popup::Popup;
-use crate::interface::state::views::CommitPopupView;
+use crate::ui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use std::sync::mpsc;

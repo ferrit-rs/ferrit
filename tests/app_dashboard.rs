@@ -21,9 +21,9 @@ use std::time::Duration;
 
 use ferrit::app::App;
 use ferrit::app::events::AppEvent;
+use ferrit::app::state::pane::Pane;
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::git::stats::Window;
-use ferrit::interface::state::pane::Pane;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -336,14 +336,14 @@ fn a_click_reaches_no_pane_behind_the_dashboard_and_the_wheel_scrolls_it() {
     // A frame of the panes first, so their click areas exist.
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 40)).unwrap();
     terminal
-        .draw(|f| ferrit::interface::screens::draw(f, &mut app))
+        .draw(|f| ferrit::ui::screens::draw(f, &mut app))
         .unwrap();
     app.open_dashboard();
     // Let the drawer slide in, so it has an area a click can be inside of.
     for _ in 0..30 {
         app.advance_clock(Duration::from_millis(16));
         terminal
-            .draw(|f| ferrit::interface::screens::draw(f, &mut app))
+            .draw(|f| ferrit::ui::screens::draw(f, &mut app))
             .unwrap();
     }
     let selected = app.selected(Pane::Commits);

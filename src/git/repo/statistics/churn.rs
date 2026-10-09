@@ -7,9 +7,9 @@ use std::collections::BTreeMap;
 
 use git2::Repository;
 
-use super::{FileStat, HotFiles, Lines};
 use crate::git::exec;
 use crate::git::stats::share::Share;
+use crate::git::stats::{FileStat, HotFiles, Lines};
 
 /// Files listed as hot.
 const HOT_FILES: usize = 10;

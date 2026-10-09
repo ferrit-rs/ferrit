@@ -1,16 +1,16 @@
 //! What the keys do in `App` for `context_menu`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::context_menu::NameKind;
+use crate::app::state::context_menu::NameTarget;
+use crate::app::state::context_menu::item;
+use crate::app::state::diff_cursor::Mode;
+use crate::app::state::menu::{MenuAction, MenuItem, MenuState};
+use crate::app::state::pane::{BranchesTab, Pane};
+use crate::app::state::popup::Popup;
 use crate::git;
 use crate::git::branch::MergeKind;
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::context_menu::NameKind;
-use crate::interface::state::context_menu::NameTarget;
-use crate::interface::state::context_menu::item;
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::menu::{MenuAction, MenuItem, MenuState};
-use crate::interface::state::pane::{BranchesTab, Pane};
-use crate::interface::state::popup::Popup;
+use crate::ui::widgets::text_input::TextInput;
 
 impl App {
     /// `x` or a right-click: the menu for the selected row, or a note that it

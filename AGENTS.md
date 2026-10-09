@@ -36,12 +36,7 @@ first "yes":
 Adding a new dependency, a new module, or an abstraction with a single caller
 needs a reason stated in the commit message.
 
-Keep distinct logic in separate files or modules. Group logic by domain:
-`src/git/` (Git types and traits, profile, image, and `git/repo`, the `git2` and subprocess
-adapter), `src/keybindings/`, `src/config/` and `src/theme/`; what the user sees
-(state, screens, reusable widgets, isolated `tui_overlay` code, the terminal
-lifecycle) goes under `src/interface/`; `src/app/` holds `App` and what reads several
-domains. Avoid mixing those responsibilities in one file.
+Keep distinct logic in separate files or modules. `src/git/` is the backend (Git types and traits, identities, image, and `git/repo`, the `git2` and subprocess adapter) and knows nothing of the rest; `src/app/` is the model (`App`, `app/state/`) and what changes it; `src/ui/` only draws (screens, widgets, the terminal lifecycle); `src/config/` and `src/theme/` hold the settings and the colours. Avoid mixing those responsibilities in one file.
 
 
 

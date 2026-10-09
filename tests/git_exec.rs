@@ -186,7 +186,7 @@ fn a_command_that_never_completed_reads_as_an_error_line() {
         took: std::time::Duration::ZERO,
         output: Vec::new(),
     };
-    let line = ferrit::interface::screens::row_lines::command_line(&Palette::DARK, &record);
+    let line = ferrit::ui::screens::row_lines::command_line(&Palette::DARK, &record);
     let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
     assert!(text.ends_with("(not completed)"), "{text}");
     assert!(

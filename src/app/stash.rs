@@ -1,13 +1,13 @@
 //! What the keys do in `App` for `stash`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::confirm::ConfirmPrompt;
+use crate::app::state::pane::Pane;
+use crate::app::state::popup::Popup;
+use crate::app::state::selection::SelectionKey;
 use crate::git;
 use crate::git::stash::{self, StashOutcome};
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::confirm::ConfirmPrompt;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::popup::Popup;
-use crate::interface::state::selection::SelectionKey;
+use crate::ui::widgets::text_input::TextInput;
 
 impl App {
     /// The selected stash entry, only while Stash is focused in `Mode::Nav`

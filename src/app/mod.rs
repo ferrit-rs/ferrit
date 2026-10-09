@@ -35,9 +35,9 @@ use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::interface::components::ui::mouse_pointer::MousePointer;
-use crate::interface::components::ui::toast::Toast;
 use crate::theme::palette::Palette;
+use crate::ui::widgets::mouse_pointer::MousePointer;
+use crate::ui::widgets::toast::Toast;
 use color_eyre::Result;
 use ratatui::crossterm::event::{Event, KeyEvent, KeyEventKind, MouseEvent};
 use ratatui::layout::Rect;
@@ -49,8 +49,8 @@ use crate::git::error::GitResult;
 use crate::git::image::detect;
 use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
-use crate::interface::screens as ui;
-use crate::interface::terminal::Tui;
+use crate::ui::screens as ui;
+use crate::ui::terminal::Tui;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
 pub(crate) fn operation_noun(operation: git::model::Operation) -> &'static str {
@@ -62,15 +62,15 @@ const TOAST_TICK_MS: u64 = 250;
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
-    pub(crate) prefs: crate::config::prefs::Prefs,
+    pub(crate) prefs: state::prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    pub(crate) sheets: crate::interface::state::sheet::Sheets,
+    pub(crate) sheets: state::sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
-    pub(crate) full_screens: crate::interface::state::full_screens::FullScreens,
+    pub(crate) full_screens: state::full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
-    pub nav: crate::interface::state::nav::Nav,
+    pub nav: state::nav::Nav,
     /// Whether the help overlay is up.
-    pub help: crate::interface::state::help::HelpState,
+    pub help: state::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
     /// (set by the renderer), so scroll keys can stop at the end.
     /// Text and focus state for the help command search.
@@ -82,7 +82,7 @@ pub struct App {
     pub(crate) repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
     pub(crate) authorship: git::authorship::Authorship,
-    pub theme: crate::theme::editor::ThemeEditor,
+    pub theme: state::theme_editor::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     pub(crate) snapshot: git::Snapshot,
@@ -92,19 +92,19 @@ pub struct App {
     pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: crate::interface::state::right_pane::RightPane,
+    pub(crate) right: state::right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: crate::interface::state::hit_areas::HitAreas,
+    pub(crate) hits: state::hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
-    pub(crate) render: crate::interface::state::render_state::RenderState,
+    pub(crate) render: state::render_state::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
     pub(crate) new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    pub(crate) modal: crate::interface::state::modal::Modal,
+    pub(crate) modal: state::modal::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
@@ -129,6 +129,9 @@ pub mod refresh;
 pub mod workers;
 
 pub mod error;
+pub mod hints;
+pub mod keymap;
+pub mod state;
 
 pub(crate) use error::AppError;
 
@@ -137,14 +140,14 @@ mod tests;
 
 use self::refresh::RefreshCompletion;
 use self::workers::{WorkerKind, run_worker};
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::full_screens::FullScreen;
-use crate::interface::state::pane::Pane;
-use crate::interface::state::pane_rows::PaneRows;
-use crate::interface::state::tree::{FileRow, drill_tree_rows};
-use crate::interface::state::views::DiffView;
+use state::diff_cursor::Mode;
+use state::full_screens::FullScreen;
+use state::pane::Pane;
+use state::pane_rows::PaneRows;
+use state::tree::{FileRow, drill_tree_rows};
+use state::views::DiffView;
 
-use crate::interface::screens::landed::Landed;
+use crate::ui::screens::landed::Landed;
 
 impl App {
     /// Take in what a frame learned (`docs/PLAN_24_DRAW_VIEW.md`): each part
@@ -177,31 +180,31 @@ impl App {
     fn base(repo: Option<Box<dyn GitPort>>, config: crate::config::Config) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
-        let keymap = crate::keybindings::keymap::Keymap::from_overrides(&config.keys).0;
+        let keymap = keymap::Keymap::from_overrides(&config.keys).0;
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
         let authorship = git::authorship::Authorship::of(repo.as_deref());
         Self {
-            prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
-            sheets: crate::interface::state::sheet::Sheets::default(),
-            full_screens: crate::interface::state::full_screens::FullScreens::default(),
-            nav: crate::interface::state::nav::Nav::default(),
-            help: crate::interface::state::help::HelpState::default(),
+            prefs: state::prefs::Prefs::new(config, keymap, palette),
+            sheets: state::sheet::Sheets::default(),
+            full_screens: state::full_screens::FullScreens::default(),
+            nav: state::nav::Nav::default(),
+            help: state::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship,
-            theme: crate::theme::editor::ThemeEditor::new(theme_config),
-            right: crate::interface::state::right_pane::RightPane::new(),
+            theme: state::theme_editor::ThemeEditor::new(theme_config),
+            right: state::right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
-            hits: crate::interface::state::hit_areas::HitAreas::default(),
+            hits: state::hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
-            render: crate::interface::state::render_state::RenderState::default(),
+            render: state::render_state::RenderState::default(),
             new_branch_title: String::new(),
-            modal: crate::interface::state::modal::Modal::default(),
+            modal: state::modal::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
             watch_request: None,
@@ -263,6 +266,9 @@ impl App {
     /// Whatever was wrong with the configuration file, reported once, as an
     /// error toast.
     fn report_config_issues(&mut self, issues: &[String]) {
+        // What the file says about the keys is the keymap's to judge.
+        let mut issues = issues.to_vec();
+        issues.extend(keymap::Keymap::from_overrides(&self.prefs.config.keys).1);
         if issues.is_empty() {
             return;
         }
@@ -271,10 +277,7 @@ impl App {
             .file
             .as_deref()
             .map_or_else(String::new, |f| format!(" {}", f.display()));
-        self.report_error(AppError::ConfigIssues {
-            location,
-            issues: issues.to_vec(),
-        });
+        self.report_error(AppError::ConfigIssues { location, issues });
     }
 
     /// The app for a folder with no repository in it or above it: the welcome
@@ -296,8 +299,8 @@ impl App {
     }
 
     /// The help screen's content for the focused pane, from the live keymap.
-    pub(crate) fn help_lines(&self) -> Vec<crate::keybindings::hints::HelpLine> {
-        crate::keybindings::hints::help_lines(&self.prefs.keymap, &self.key_contexts())
+    pub(crate) fn help_lines(&self) -> Vec<hints::HelpLine> {
+        hints::help_lines(&self.prefs.keymap, &self.key_contexts())
     }
 
     /// `[ui] mouse`: should the terminal capture the mouse?
@@ -518,7 +521,7 @@ impl App {
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
-    pub fn dashboard(&self) -> &crate::interface::state::dashboard::Dashboard {
+    pub fn dashboard(&self) -> &state::dashboard::Dashboard {
         &self.sheets.dashboard
     }
 
@@ -791,19 +794,19 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![crate::interface::screens::row_lines::error_line(
+            vec![crate::ui::screens::row_lines::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = crate::interface::screens::row_lines::status_header(&self.repo_name, h);
-            let mut lines = vec![crate::interface::screens::row_lines::status_line(
+            let line = crate::ui::screens::row_lines::status_header(&self.repo_name, h);
+            let mut lines = vec![crate::ui::screens::row_lines::status_line(
                 &self.prefs.palette,
                 &line,
             )];
             if h.conflicts > 0 {
-                lines.push(crate::interface::screens::row_lines::error_line(
+                lines.push(crate::ui::screens::row_lines::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -815,21 +818,21 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                crate::interface::screens::row_lines::operation_line(
+                crate::ui::screens::row_lines::operation_line(
                     &self.prefs.palette,
                     &operation.label(),
                 ),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(crate::interface::screens::row_lines::busy_line(
+            out.push(crate::ui::screens::row_lines::busy_line(
                 &self.prefs.palette,
                 label,
             ));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(crate::interface::screens::row_lines::status_line(
+            out.push(crate::ui::screens::row_lines::status_line(
                 &self.prefs.palette,
                 note,
             ));
@@ -960,7 +963,7 @@ impl App {
             // A setting changed that only this loop can carry out.
             if let Some(crate::config::settings::TerminalRequest::Mouse(on)) =
                 self.take_terminal_request()
-                && let Err(error) = crate::interface::terminal::set_mouse(on)
+                && let Err(error) = crate::ui::terminal::set_mouse(on)
             {
                 self.report_notice(format!("cannot switch the mouse: {error}"));
             }

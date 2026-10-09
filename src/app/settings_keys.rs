@@ -1,9 +1,9 @@
 //! What the keys do in `App` for `settings_keys`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
+use crate::app::state::settings_hits::Click;
 use crate::config::settings::{SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped};
 use crate::config::{Config, Section};
-use crate::interface::state::settings_hits::Click;
 use crate::theme::color_picker::{self, PaletteDirection};
 use crate::theme::theme_config::{Preset, SchemeChoice, ThemeMode};
 use ratatui::crossterm::event::KeyModifiers;

@@ -3,6 +3,8 @@
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
+use crate::app::state::create_remote_form::{Consequences, CreateRemoteView, Form, FormKey, Step};
+use crate::app::state::popup::Popup;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::create_remote::CreateRemote;
 use crate::git::error::GitError;
@@ -11,10 +13,6 @@ use crate::git::host::{
     ssh_remote_url,
 };
 use crate::git::remote::RemoteOp;
-use crate::interface::state::create_remote_form::{
-    Consequences, CreateRemoteView, Form, FormKey, Step,
-};
-use crate::interface::state::popup::Popup;
 use color_eyre::Result;
 use ratatui::crossterm::event::KeyEvent;
 use std::path::PathBuf;
