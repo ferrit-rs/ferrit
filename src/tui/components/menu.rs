@@ -9,6 +9,7 @@ use crate::tui::components::branches;
 use crate::tui::components::diff::{MenuView, Mode};
 use crate::tui::components::panes::{BranchesTab, Pane};
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt, Popup};
+use crate::tui::event::Event;
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::select_list::SelectList;
 use crate::tui::widgets::text_input::TextInput;
@@ -285,7 +286,7 @@ impl App {
                 let path = file.path.clone();
                 let Some(repo) = &self.repo else { return };
                 let result = repo.take_side(&path, action == MenuAction::TakeOurs);
-                self.finish_apply(result);
+                self.apply(vec![Event::FinishAction(result)]);
             },
             MenuAction::Continue
             | MenuAction::Skip

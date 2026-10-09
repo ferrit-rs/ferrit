@@ -1,13 +1,19 @@
 //! What can sit over the panes: a popup, a question, a note, and the keys they take.
 
 use crate::git::apply::Granule;
+use crate::git::error::GitError;
 use crate::git::model::{CommitEntry, StashEntry};
+use crate::git::operation::Step;
+use crate::git::rebase::RebaseEdit;
+use crate::git::remote::RemoteRequest;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::diff::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use crate::tui::components::menu;
 use crate::tui::components::{branches, stash};
 use crate::tui::components::{commit_editor, create_remote, remote};
+use crate::tui::components::{commits, files};
+use crate::tui::event::{Env, Event};
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
 use crate::tui::widgets::tui_overlay::state::OverlayState;
@@ -584,6 +590,48 @@ pub(crate) fn draw_note(frame: &mut Frame<'_>, area: Rect, message: &str, palett
         )),
         dialog.footer,
     );
+}
+
+/// The question was answered yes: do what it asked. A branch delete refused for
+/// being unmerged re-opens the question one more time asking to force it, rather
+/// than reporting the refusal and stopping: `git branch -d` is offering a choice,
+/// not failing outright.
+pub(crate) fn confirm(action: ConfirmAction, env: &Env<'_>) -> Vec<Event> {
+    match action {
+        ConfirmAction::DiscardFile(path) => files::discard_file(env, &path),
+        ConfirmAction::DiscardGranule(granule) => files::discard_granule(env, granule),
+        ConfirmAction::DeleteBranch { name, force } => {
+            let Some(repo) = env.repo else {
+                return Vec::new();
+            };
+            match repo.delete_branch(&name, force) {
+                Ok(()) => vec![Event::Refresh],
+                Err(GitError::BranchNotMerged(_)) if !force => {
+                    vec![Event::Ask(ConfirmPrompt {
+                        message: format!(
+                            "'{name}' is not fully merged. Force delete? This may lose \
+                             commits with no other reference to them."
+                        ),
+                        action: ConfirmAction::DeleteBranch { name, force: true },
+                    })]
+                },
+                Err(e) => vec![Event::Report(e.into())],
+            }
+        },
+        ConfirmAction::DropStash { oid } => vec![Event::DropStash(oid)],
+        ConfirmAction::RestoreStash { oid, pop } => vec![Event::RestoreStash { oid, pop }],
+        ConfirmAction::DropCommit { hash } => {
+            commits::rebase_edit(env.repo, &hash, &RebaseEdit::Drop)
+        },
+        ConfirmAction::SquashCommit { hash } => {
+            commits::rebase_edit(env.repo, &hash, &RebaseEdit::Squash)
+        },
+        ConfirmAction::AbortOperation => vec![Event::OperationStep(Step::Abort)],
+        ConfirmAction::ConfigGlobal(resume) => vec![Event::ResumeGitConfigEdit(resume)],
+        ConfirmAction::InitRepo(dir) => vec![Event::InitRepo(dir)],
+        ConfirmAction::ConfigUnset(op) => vec![Event::ConfigUnset(op)],
+        ConfirmAction::ForcePush => vec![Event::StartRemote(RemoteRequest::force_push())],
+    }
 }
 
 #[cfg(test)]

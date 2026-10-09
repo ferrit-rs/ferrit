@@ -7,8 +7,9 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
-use crate::tui::components::{branches, commits, stash};
+use crate::tui::components::{branches, commits, files, popups, stash};
 use crate::tui::draw::FullScreen;
+use crate::tui::event::Event;
 use crate::tui::keymap::{Action, Context, KeyBinding};
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -44,7 +45,7 @@ impl App {
         // help overlay below.
         if self.modal.confirm().is_some() {
             match key.code {
-                KeyCode::Enter | KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.run_confirm(),
+                KeyCode::Enter | KeyCode::Char(KEY_CONFIRM_YES | 'Y') => self.answer_yes(),
                 KeyCode::Char(KEY_CONFIRM_NO | 'N') | KeyCode::Esc => {
                     self.modal.cancel_confirm();
                 },
@@ -336,7 +337,7 @@ impl App {
             Action::ContextMenu => self.open_context_menu(),
             Action::Back => self.go_back(),
             Action::Enter => self.enter_selected(),
-            Action::EnterDiff => self.enter_diff_mode(),
+            Action::EnterDiff => self.apply(files::enter_diff(&self.env())),
             Action::Refresh => self.request_refresh(),
             Action::Fetch => self.trigger_remote_op(RemoteOp::Fetch),
             Action::Pull => self.trigger_remote_op(RemoteOp::Pull),
@@ -361,17 +362,17 @@ impl App {
             | Action::ScrollBottom
             | Action::NextHunk
             | Action::PrevHunk => {},
-            Action::StageFile => self.stage_selected_file(),
-            Action::StageAll => self.stage_all_files(),
-            Action::Discard => self.discard_prompt(),
+            Action::StageFile => self.apply(files::stage_selected(&self.env())),
+            Action::StageAll => self.apply(files::stage_all(&self.env())),
+            Action::Discard => self.apply(files::discard_prompt(&self.env())),
             Action::StashPush => self.apply(stash::open_popup(&self.env())),
-            Action::LeaveDiff => self.leave_diff_mode(),
+            Action::LeaveDiff => self.apply(vec![Event::LeaveDiff]),
             Action::CursorDown => self.right.move_cursor(1),
             Action::CursorUp => self.right.move_cursor(-1),
             Action::CursorNextHunk => self.right.jump_cursor_hunk(1),
             Action::CursorPrevHunk => self.right.jump_cursor_hunk(-1),
             Action::ToggleSelection => self.right.toggle_anchor(),
-            Action::StageCursor => self.stage_diff_cursor(),
+            Action::StageCursor => self.apply(files::stage_cursor(&self.env())),
             Action::Checkout => self.apply(branches::checkout(&self.env())),
             Action::NewBranch => self.apply(branches::open_new_popup(&self.env())),
             Action::FastForward => self.apply(branches::fast_forward(&self.env())),
@@ -410,7 +411,7 @@ impl App {
         if !self.enter_commit_files() {
             self.toggle_files_dir();
             self.toggle_commit_dir();
-            self.enter_diff_mode();
+            self.apply(files::enter_diff(&self.env()));
         }
     }
 
@@ -438,4 +439,15 @@ const fn is_scroll(action: Action) -> bool {
             | Action::NextHunk
             | Action::PrevHunk
     )
+}
+
+impl App {
+    /// `y` while a question is up: run what it asked.
+    fn answer_yes(&mut self) {
+        let Some(prompt) = self.modal.take_confirm() else {
+            return;
+        };
+        let events = popups::confirm(prompt.action, &self.env());
+        self.apply(events);
+    }
 }

@@ -121,6 +121,7 @@ pub mod keymap;
 pub mod prefs;
 pub mod row_lines;
 pub mod terminal;
+pub mod view;
 pub mod widgets;
 
 pub(crate) use error::AppError;

@@ -11,10 +11,12 @@ use crate::git::port::GitPort;
 use crate::git::staging;
 use crate::theme::palette::Palette;
 use crate::tui::App;
+use crate::tui::components::diff::{Mode, RightPane};
 use crate::tui::components::panes::{Nav, PaneRows};
 use crate::tui::components::panes::{Pane, SelectionKey};
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::components::popups::Popup;
+use crate::tui::components::stash;
 use crate::tui::error::AppError;
 
 /// One change a component asks for.
@@ -68,6 +70,34 @@ pub(crate) enum Event {
     NewBranchTitle(String),
     /// A merge stopped on conflicts: name the files, as the refresh now lists them.
     MergeConflicted,
+    /// Put the line cursor on the file's first selectable line and take the keys.
+    EnterDiff {
+        /// Start on the worktree side (else on the staged one).
+        has_worktree_change: bool,
+    },
+    /// Give the keys back to the panes.
+    LeaveDiff,
+    /// Forget the start of a V-selection.
+    ClearAnchor,
+    /// Apply or pop a stash entry (needs the repository for writing).
+    RestoreStash {
+        /// The entry's oid.
+        oid: String,
+        /// Pop instead of apply.
+        pop: bool,
+    },
+    /// Drop a stash entry.
+    DropStash(String),
+    /// Run a network operation in the background.
+    StartRemote(crate::git::remote::RemoteRequest),
+    /// Carry on a merge, rebase, cherry-pick or revert, or abort it.
+    OperationStep(crate::git::operation::Step),
+    /// The first global git config write was confirmed: go on with the edit.
+    ResumeGitConfigEdit(crate::git::config_edit::GlobalResume),
+    /// `git init` in this folder.
+    InitRepo(std::path::PathBuf),
+    /// Unset a git config value.
+    ConfigUnset(crate::git::config_edit::ConfigOp),
 }
 
 /// What a component may read of the app to decide: the model, and nothing it
@@ -85,6 +115,8 @@ pub(crate) struct Env<'a> {
     pub(crate) modal_up: bool,
     /// `Name <email>` for `--author`, from ferrit's identity pick.
     pub(crate) author: Option<String>,
+    /// The right column: what it shows and where the line cursor is.
+    pub(crate) right: &'a RightPane,
     palette: &'a Palette,
 }
 
@@ -109,6 +141,7 @@ impl App {
             popup_up: self.modal.popup().is_some(),
             modal_up: self.modal.is_some(),
             author: self.authorship.author_arg(),
+            right: &self.right,
             palette: &self.prefs.palette,
         }
     }
@@ -153,6 +186,37 @@ impl App {
                     self.nav.drill_into_branch(branch, commits);
                 },
                 Event::NewBranchTitle(title) => self.new_branch_title = title,
+                Event::EnterDiff {
+                    has_worktree_change,
+                } => {
+                    if self.right.start_cursor(has_worktree_change) {
+                        self.nav.mode = Mode::Diff;
+                    }
+                },
+                Event::LeaveDiff => self.nav.mode = Mode::Nav,
+                Event::ClearAnchor => self.right.cursor.anchor = None,
+                Event::RestoreStash { oid, pop } => {
+                    let first_file = self.right.diff.first_stash_file(&oid);
+                    if let Some(repo) = &mut self.repo {
+                        let events = stash::restore(&oid, pop, repo.as_mut(), first_file);
+                        self.apply(events);
+                    }
+                },
+                Event::DropStash(oid) => {
+                    if let Some(repo) = &mut self.repo {
+                        let events = stash::drop_entry(&oid, repo.as_mut());
+                        self.apply(events);
+                    }
+                },
+                Event::StartRemote(request) => {
+                    if let Some(sender) = self.workers.sender.clone() {
+                        self.start_remote(request, sender);
+                    }
+                },
+                Event::OperationStep(step) => self.apply_operation_step(step),
+                Event::ResumeGitConfigEdit(resume) => self.resume_git_config_edit(resume),
+                Event::InitRepo(dir) => self.init_here(&dir),
+                Event::ConfigUnset(op) => self.confirm_git_config_unset(&op),
                 Event::MergeConflicted => {
                     let files = staging::conflicted_paths(&self.snapshot.files).join(", ");
                     self.modal.open_popup(Popup::Note(format!(
