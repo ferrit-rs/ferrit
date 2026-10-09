@@ -22,8 +22,8 @@ use super::fixture::{self, Fixture};
 use super::script::{Directive, Expect, Script, Step};
 use crate::config::{Config, ConfigLoad};
 use crate::tui::App;
+use crate::tui::draw;
 use crate::tui::keymap::KeyBinding;
-use crate::tui::screens;
 
 /// How long `async-key` waits for background work before giving up. A safety
 /// net for a hung script, never part of a passing run's timing.
@@ -127,7 +127,7 @@ impl Session {
         self.app.finish_animations();
         let app = &mut self.app;
         self.terminal
-            .draw(|f| screens::draw(f, app))
+            .draw(|f| draw::draw(f, app))
             .map_err(|e| format!("draw failed: {e}"))?;
         self.frame = frame_text(self.terminal.backend().buffer());
         Ok(())

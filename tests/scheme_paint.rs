@@ -18,7 +18,7 @@ use ferrit::git::error::GitError;
 use ferrit::theme::scheme::{ColorDepth, Scheme, contrast};
 use ferrit::theme::theme_config::{Base, SchemeChoice};
 use ferrit::tui::App;
-use ferrit::tui::screens as ui;
+use ferrit::tui::draw as ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

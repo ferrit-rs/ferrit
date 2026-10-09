@@ -16,8 +16,8 @@ use std::process::Command;
 
 use ferrit::git::config::{Scope, WriteScope};
 use ferrit::tui::App;
-use ferrit::tui::state::full_screens::FullScreen;
-use ferrit::tui::state::views::PopupView;
+use ferrit::tui::components::diff::PopupView;
+use ferrit::tui::draw::FullScreen;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn key(c: char) -> KeyEvent {

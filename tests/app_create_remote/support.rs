@@ -11,9 +11,9 @@ use std::time::Duration;
 use ferrit::git::host::CreateDraft;
 use ferrit::git::host::{GhProgram, Visibility};
 use ferrit::tui::App;
+use ferrit::tui::components::create_remote::{CreateRemoteView, Field};
+use ferrit::tui::components::diff::PopupView;
 use ferrit::tui::events::AppEvent;
-use ferrit::tui::state::create_remote_form::{CreateRemoteView, Field};
-use ferrit::tui::state::views::PopupView;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// A repository and a fake `gh` that logs its calls, adds `origin` like the

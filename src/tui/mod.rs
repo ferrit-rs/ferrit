@@ -5,30 +5,10 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
-pub mod askpass;
-pub mod branch;
-pub mod commit;
-pub mod context_menu;
-pub mod create_remote;
-pub mod dashboard;
-pub mod diff_query;
-pub mod dispatch;
-pub mod drill_nav;
+use crate::tui::components::keybar::HelpLine;
+use crate::tui::components::keybar::help_lines;
 pub mod events;
-pub mod git_config;
-pub mod git_config_edit;
-pub mod image_query;
-pub mod input;
-pub mod menu;
 pub mod mock;
-pub mod popup_keys;
-pub mod rebase;
-pub mod remote;
-pub mod settings_keys;
-pub mod sheet;
-pub mod staging;
-pub mod stash;
-pub mod welcome;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
@@ -48,8 +28,8 @@ use crate::git::error::GitResult;
 use crate::git::image::detect;
 use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
+use crate::tui::draw as ui;
 use crate::tui::events::{AppEvent, Events};
-use crate::tui::screens as ui;
 use terminal::Tui;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
@@ -62,15 +42,15 @@ const TOAST_TICK_MS: u64 = 250;
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
-    pub(crate) prefs: state::prefs::Prefs,
+    pub(crate) prefs: prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    pub(crate) sheets: state::sheet::Sheets,
+    pub(crate) sheets: components::dashboard::Sheets,
     /// The views that replace the panes: git config, welcome.
-    pub(crate) full_screens: state::full_screens::FullScreens,
+    pub(crate) full_screens: draw::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
-    pub nav: state::nav::Nav,
+    pub nav: components::panes::Nav,
     /// Whether the help overlay is up.
-    pub help: state::help::HelpState,
+    pub help: components::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
     /// (set by the renderer), so scroll keys can stop at the end.
     /// Text and focus state for the help command search.
@@ -82,7 +62,7 @@ pub struct App {
     pub(crate) repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
     pub(crate) authorship: git::authorship::Authorship,
-    pub theme: state::theme_editor::ThemeEditor,
+    pub theme: components::settings::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     pub(crate) snapshot: git::Snapshot,
@@ -92,19 +72,19 @@ pub struct App {
     pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: state::right_pane::RightPane,
+    pub(crate) right: components::diff::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: state::hit_areas::HitAreas,
+    pub(crate) hits: components::panes::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
-    pub(crate) render: state::render_state::RenderState,
+    pub(crate) render: draw::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
     pub(crate) new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    pub(crate) modal: state::modal::Modal,
+    pub(crate) modal: components::popups::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
@@ -125,14 +105,15 @@ pub struct App {
     pub(crate) status_note: Option<String>,
 }
 
-pub mod refresh;
 pub mod workers;
 
+pub mod components;
+pub mod draw;
 pub mod error;
-pub mod hints;
+pub mod input;
 pub mod keymap;
-pub mod screens;
-pub mod state;
+pub mod prefs;
+pub mod row_lines;
 pub mod terminal;
 pub mod widgets;
 
@@ -141,16 +122,16 @@ pub(crate) use error::AppError;
 #[cfg(test)]
 mod tests;
 
-use self::refresh::RefreshCompletion;
-use self::workers::{WorkerKind, run_worker};
-use state::diff_cursor::Mode;
-use state::full_screens::FullScreen;
-use state::pane::Pane;
-use state::pane_rows::PaneRows;
-use state::tree::{FileRow, drill_tree_rows};
-use state::views::DiffView;
+use crate::tui::workers::RefreshCompletion;
+use crate::tui::workers::{WorkerKind, run_worker};
+use components::diff::DiffView;
+use components::diff::Mode;
+use components::panes::Pane;
+use components::panes::PaneRows;
+use components::panes::{FileRow, drill_tree_rows};
+use draw::FullScreen;
 
-use crate::tui::screens::landed::Landed;
+use crate::tui::draw::Landed;
 
 impl App {
     /// Take in what a frame learned (`docs/PLAN_24_DRAW_VIEW.md`): each part
@@ -189,25 +170,25 @@ impl App {
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
         let authorship = git::authorship::Authorship::of(repo.as_deref());
         Self {
-            prefs: state::prefs::Prefs::new(config, keymap, palette),
-            sheets: state::sheet::Sheets::default(),
-            full_screens: state::full_screens::FullScreens::default(),
-            nav: state::nav::Nav::default(),
-            help: state::help::HelpState::default(),
+            prefs: prefs::Prefs::new(config, keymap, palette),
+            sheets: components::dashboard::Sheets::default(),
+            full_screens: draw::FullScreens::default(),
+            nav: components::panes::Nav::default(),
+            help: components::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship,
-            theme: state::theme_editor::ThemeEditor::new(theme_config),
-            right: state::right_pane::RightPane::new(),
+            theme: components::settings::ThemeEditor::new(theme_config),
+            right: components::diff::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
-            hits: state::hit_areas::HitAreas::default(),
+            hits: components::panes::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
-            render: state::render_state::RenderState::default(),
+            render: draw::RenderState::default(),
             new_branch_title: String::new(),
-            modal: state::modal::Modal::default(),
+            modal: components::popups::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
             watch_request: None,
@@ -302,8 +283,8 @@ impl App {
     }
 
     /// The help screen's content for the focused pane, from the live keymap.
-    pub(crate) fn help_lines(&self) -> Vec<hints::HelpLine> {
-        hints::help_lines(&self.prefs.keymap, &self.key_contexts())
+    pub(crate) fn help_lines(&self) -> Vec<HelpLine> {
+        help_lines(&self.prefs.keymap, &self.key_contexts())
     }
 
     /// `[ui] mouse`: should the terminal capture the mouse?
@@ -524,7 +505,7 @@ impl App {
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
-    pub fn dashboard(&self) -> &state::dashboard::Dashboard {
+    pub fn dashboard(&self) -> &components::dashboard::Dashboard {
         &self.sheets.dashboard
     }
 
@@ -797,16 +778,16 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![screens::row_lines::error_line(
+            vec![row_lines::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = screens::row_lines::status_header(&self.repo_name, h);
-            let mut lines = vec![screens::row_lines::status_line(&self.prefs.palette, &line)];
+            let line = row_lines::status_header(&self.repo_name, h);
+            let mut lines = vec![row_lines::status_line(&self.prefs.palette, &line)];
             if h.conflicts > 0 {
-                lines.push(screens::row_lines::error_line(
+                lines.push(row_lines::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -818,15 +799,15 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                screens::row_lines::operation_line(&self.prefs.palette, &operation.label()),
+                row_lines::operation_line(&self.prefs.palette, &operation.label()),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(screens::row_lines::busy_line(&self.prefs.palette, label));
+            out.push(row_lines::busy_line(&self.prefs.palette, label));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(screens::row_lines::status_line(&self.prefs.palette, note));
+            out.push(row_lines::status_line(&self.prefs.palette, note));
         }
         out
     }

@@ -14,9 +14,9 @@ use ferrit::config::Config;
 use ferrit::git::diff::parse_diff;
 use ferrit::theme::palette::Palette;
 use ferrit::tui::App;
+use ferrit::tui::components::panes::Pane;
 use ferrit::tui::mock::{mock_commits, mock_files};
-use ferrit::tui::screens::row_lines;
-use ferrit::tui::state::pane::Pane;
+use ferrit::tui::row_lines;
 use ferrit::tui::widgets::key_bar::KeyBar;
 use ratatui::style::Color;
 
@@ -98,7 +98,7 @@ fn a_frame_on_the_default_palette_paints_borders_in_its_idle_colour() {
     app.nav.focus = Pane::Files;
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal
-        .draw(|f| ferrit::tui::screens::draw(f, &mut app))
+        .draw(|f| ferrit::tui::draw::draw(f, &mut app))
         .unwrap();
     let buffer = terminal.backend().buffer();
     assert!(

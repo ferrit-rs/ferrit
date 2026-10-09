@@ -7,8 +7,8 @@ use crate::support::{
     Project, Shown, clear_name, open_form, press, ready_app, shown, type_text, wait_for_created,
 };
 use ferrit::git::host::{GhProgram, Visibility};
+use ferrit::tui::components::create_remote::Field;
 use ferrit::tui::events::AppEvent;
-use ferrit::tui::state::create_remote_form::Field;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 #[test]

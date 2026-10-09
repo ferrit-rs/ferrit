@@ -1,20 +1,23 @@
-//! The background work the app has in flight: the channel back to the event
-//! loop, the single-flight state of the refresh, diff and image workers, and
-//! the one network operation (fetch, pull, push, create) allowed at a time.
-//! The code that starts each of them stays in its own module (`remote`,
-//! `diff_query`, `image_query`, `App::request_refresh`); this is the state.
+//! The background work in flight and the result of a refresh.
 
+use crate::git;
+use crate::git::authorship::Authorship;
+use crate::git::diff::DiffOpts;
+use crate::git::error::GitError;
+use crate::git::port::GitPort;
+use crate::git::profile::Profile;
+use crate::git::remote::RemoteOp;
+use crate::tui::components::diff::DiffQueryState;
+use crate::tui::components::panes::commit_drill_files;
+use crate::tui::error::AppError;
 use crate::tui::events::AppEvent;
+use color_eyre::Result;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Instant;
-
-use crate::git::remote::RemoteOp;
-use crate::tui::error::AppError;
-use crate::tui::state::diff_query::DiffQueryState;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
 /// follow-up snapshot instead of queuing stale concurrent reads.
@@ -162,5 +165,63 @@ impl Workers {
         .copied()
         .unwrap_or("\u{25cf}\u{2219}\u{2219}");
         Some(format!("{label} {frame}"))
+    }
+}
+
+/// Snapshot plus any active drill-down data loaded in the same worker.
+/// A result whose error is shared between the Status line, the toast and the
+/// refresh bookkeeping, none of which can own it alone.
+pub(crate) type Shared<T> = Result<T, Arc<AppError>>;
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct RefreshCompletion {
+    pub(crate) snapshot: Shared<git::Snapshot>,
+    pub(crate) profile: Option<Profile>,
+    pub(crate) branch_log: Option<(String, Shared<Vec<git::model::CommitEntry>>)>,
+    pub(crate) commit_files: Option<(String, Shared<Vec<git::model::FileEntry>>)>,
+}
+
+impl RefreshCompletion {
+    /// Read the snapshot, and the drilled branch log and commit files when the
+    /// user is inside them, in one go (the worker's whole job).
+    pub(crate) fn load(
+        repo: &mut dyn GitPort,
+        branch: Option<String>,
+        commit: Option<String>,
+        opts: DiffOpts,
+    ) -> Self {
+        let snapshot = repo.snapshot().map_err(|error| Arc::new(error.into()));
+        let branch_log = branch.map(|name| {
+            let result = repo
+                .branch_log(&name)
+                .map_err(|error| Arc::new(error.into()));
+            (name, result)
+        });
+        let commit_files = commit.map(|hash| {
+            let result = repo
+                .commit_diff(&hash, opts)
+                .map(|diff| commit_drill_files(&diff))
+                .map_err(|error| Arc::new(error.into()));
+            (hash, result)
+        });
+        Self {
+            snapshot,
+            profile: Some(Authorship::profile_of(repo)),
+            branch_log,
+            commit_files,
+        }
+    }
+
+    /// The repository could not be opened: every part of the refresh fails
+    /// with that error.
+    pub(crate) fn failed(error: GitError, branch: Option<String>, commit: Option<String>) -> Self {
+        let error = Arc::new(AppError::from(error));
+        Self {
+            snapshot: Err(Arc::clone(&error)),
+            profile: None,
+            branch_log: branch.map(|name| (name, Err(Arc::clone(&error)))),
+            commit_files: commit.map(|hash| (hash, Err(error))),
+        }
     }
 }

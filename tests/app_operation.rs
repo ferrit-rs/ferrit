@@ -21,7 +21,7 @@ use std::path::Path;
 use std::process::Command;
 
 use ferrit::tui::App;
-use ferrit::tui::screens as ui;
+use ferrit::tui::draw as ui;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

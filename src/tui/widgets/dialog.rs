@@ -1,4 +1,4 @@
-use super::panel::Panel;
+use crate::tui::widgets::panel::Panel;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;

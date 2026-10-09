@@ -8,7 +8,7 @@
     reason = "unit test: a failed setup or a bad index is the assertion"
 )]
 
-use super::*;
+use crate::tui::*;
 use ratatui::crossterm::event::KeyCode;
 
 fn press(app: &mut App, code: KeyCode) {

@@ -4,7 +4,7 @@ use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, List, ListState};
 
-use super::scroll_bar::ScrollBar;
+use crate::tui::widgets::scroll_bar::ScrollBar;
 
 #[must_use]
 pub(crate) struct PaneList<'a> {

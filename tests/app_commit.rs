@@ -22,8 +22,8 @@ use std::path::Path;
 use std::process::Command;
 
 use ferrit::tui::App;
-use ferrit::tui::state::pane::Pane;
-use ferrit::tui::state::views::{DiffView, PopupView};
+use ferrit::tui::components::diff::{DiffView, PopupView};
+use ferrit::tui::components::panes::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -247,8 +247,7 @@ fn the_popup_actually_renders_its_title_text_and_footer() {
     type_text(&mut app, "feat: rendered");
 
     let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    term.draw(|f| ferrit::tui::screens::draw(f, &mut app))
-        .unwrap();
+    term.draw(|f| ferrit::tui::draw::draw(f, &mut app)).unwrap();
     let out = term.backend().to_string();
 
     assert!(out.contains("Commit"), "popup title shows:\n{out}");
@@ -321,8 +320,7 @@ fn empty_index_confirmation_uses_overlay_backdrop() {
     let mut app = App::open(dir.path()).unwrap();
     app.feed_key(char_key('c'));
     let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    term.draw(|f| ferrit::tui::screens::draw(f, &mut app))
-        .unwrap();
+    term.draw(|f| ferrit::tui::draw::draw(f, &mut app)).unwrap();
     let out = term.backend().to_string();
 
     assert!(out.contains("No files staged"), "heading shows:\n{out}");
@@ -459,8 +457,7 @@ fn counter_colour(dir: &Path, subject: &str) -> (bool, Option<Color>) {
     app.feed_key(char_key('c'));
     type_text(&mut app, subject);
     let mut term = Terminal::new(TestBackend::new(140, 40)).unwrap();
-    term.draw(|f| ferrit::tui::screens::draw(f, &mut app))
-        .unwrap();
+    term.draw(|f| ferrit::tui::draw::draw(f, &mut app)).unwrap();
     let buffer = term.backend().buffer();
     let label = format!(" {}/50 ", subject.chars().count());
     let width = usize::from(buffer.area.width);
@@ -513,9 +510,7 @@ fn a_too_long_subject_can_still_be_committed() {
 
 fn screen_text(app: &mut App) -> String {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal
-        .draw(|f| ferrit::tui::screens::draw(f, app))
-        .unwrap();
+    terminal.draw(|f| ferrit::tui::draw::draw(f, app)).unwrap();
     let buf = terminal.backend().buffer().clone();
     (0..buf.area.height)
         .map(|y| {

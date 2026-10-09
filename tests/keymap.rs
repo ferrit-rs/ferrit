@@ -11,8 +11,8 @@
 //! the old behaviour fails here.
 
 use ferrit::config::Config;
+use ferrit::tui::components::panes::Pane;
 use ferrit::tui::keymap::{Action, Context, KeyBinding, Keymap};
-use ferrit::tui::state::pane::Pane;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use Action as A;

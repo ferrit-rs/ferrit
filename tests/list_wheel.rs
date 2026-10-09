@@ -18,8 +18,8 @@ use std::fs;
 use std::path::Path;
 
 use ferrit::tui::App;
-use ferrit::tui::screens;
-use ferrit::tui::state::pane::Pane;
+use ferrit::tui::components::panes::Pane;
+use ferrit::tui::draw;
 use git2::{Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -56,7 +56,7 @@ fn repo_with_commits(tag: &str, count: usize) -> (TempDir, App) {
 
 fn frame(app: &mut App) -> String {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal.draw(|f| screens::draw(f, app)).unwrap();
+    terminal.draw(|f| draw::draw(f, app)).unwrap();
     terminal.backend().to_string()
 }
 

@@ -1,55 +1,51 @@
 # Architecture
 
 Ferrit is one crate with a thin binary (`src/main.rs`, a `clap` wrapper) over a library
-(`src/lib.rs`). `src/` has four parts and a leaf, each with one job:
+(`src/lib.rs`). `src/` has a backend, the interface, and two small leaves:
 
 ```
             main.rs  (clap, terminal setup)
                │
                ▼
-        ┌──────────────┐  reads the model, draws   ┌──────────────────────────┐
-        │ ui/          │ ────────────────────────► │ app/                     │
-        │ screens,     │                           │ the model (App + state/) │
-        │ widgets,     │                           │ what changes it (the     │
-        │ terminal     │                           │ handlers), keymap, hints │
-        └──────────────┘                           └────────────┬─────────────┘
-                                                                │ uses
-                                          ┌─────────────────────┼───────────────────┐
-                                          ▼                     ▼                   ▼
-                                  ┌──────────────┐      ┌──────────────┐     ┌──────────────┐
-                                  │ git/         │      │ config/      │     │ theme/       │
-                                  │ model, port, │      │ config.toml, │     │ palette,     │
-                                  │ fake, repo/  │      │ settings     │     │ scheme,      │
-                                  │ (git2)       │      │ rows         │     │ [theme]      │
-                                  └──────────────┘      └──────────────┘     └──────────────┘
+        ┌──────────────────────────────────────────────┐
+        │ tui/   the interface: App, and one file per  │
+        │        piece of it in components/            │
+        └───────┬─────────────────┬────────────────────┘
+                │ uses            │ uses
+                ▼                 ▼
+        ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+        │ git/         │   │ config/      │   │ theme/       │
+        │ model, port, │   │ config.toml, │   │ palette,     │
+        │ fake, repo/  │   │ settings     │   │ scheme,      │
+        │ (git2)       │   │ rows         │   │ [theme]      │
+        └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
 - `git/` is the backend and knows nothing of the rest. Inside it, the model and the
-  `GitPort` traits are the domain and `git/repo` is the adapter, so `app` never names
+  `GitPort` traits are the domain and `git/repo` is the adapter, so `tui` never names
   `Repo` except to build the app.
-- `app/` is the model (`App` and `app/state/`) and what changes it. `app/state/` is plain
-  data (where the cursor is, what popup is up, what the right pane shows) and does not
-  draw.
-- `ui/` only draws: the screens read `App`, the widgets are reusable pieces that know
-  nothing of git or `App`.
-- `config/` is `config.toml`; `theme/` is the leaf both `config` and `ui` use (colours).
+- `tui/` is everything the user sees and touches. `tui/mod.rs` holds `App` and the run
+  loop; `tui/components/` has one file per piece (a pane, a popup, a sheet, a screen): its
+  state, its keys and how it is drawn, so a feature is in one place. `tui/widgets/` are
+  reusable pieces that know nothing of git or `App`.
+- `config/` is `config.toml`; `theme/` is the leaf both `config` and `tui` use (colours).
 
 Rules that hold today, and that the tests and lints keep:
 
 - Only `git/repo` names `git2`, and nothing in `git` imports `ratatui` or `crossterm`
   (`git/image` draws the preview). Rows handed to
   the UI are owned model types (`git/model.rs`). `tests/layering.rs` checks it on the
-  sources, along with `app/` reaching `git/repo` only in `App::open` and `git init`, and
+  sources, along with `tui/` reaching `git/repo` only in `App::open` and `git init`, and
   `git` never reaching into `app`.
-- `ui/widgets/` knows nothing about git or `App`; `theme/` knows nothing of what is drawn
+- `tui/widgets/` knows nothing about git or `App`; `theme/` knows nothing of what is drawn
   with it.
-- `app/` reaches git only through the `GitPort` traits (`git/port.rs`). The real adapter is
-  `Repo`; tests can use `FakeGit` (`git/fake.rs`). `app/` names the concrete `Repo` in one
+- `tui/` reaches git only through the `GitPort` traits (`git/port.rs`). The real adapter is
+  `Repo`; tests can use `FakeGit` (`git/fake.rs`). `tui/` names the concrete `Repo` in one
   place, `App::open`, and for `git init`, which runs before any repository exists. A
   contract suite (`tests/fake_git_contract.rs`) runs the same scenarios on both so the fake
   cannot drift.
 - Errors keep their type up to the screen: `GitError`, `ConfigError`, `ImageError` and
-  `AppError` (`thiserror`), with no `Result<_, String>` in `app/` or `git/`. The only
+  `AppError` (`thiserror`), with no `Result<_, String>` in `tui/` or `git/`. The only
   `String`s are in view state that is already text (a diff note, a settings footer).
 - Every `git` process is built in one function (`git/exec.rs`), so the command log sees
   every command (`tests/git_exec.rs`).
@@ -65,13 +61,13 @@ Known gaps, each with a plan:
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
-- The handlers in `app/` still decide some things themselves (`create_remote`,
-  `git_config_edit`, `dashboard`, `settings_keys`, `popup_keys`, `commit`): the decision is
-  to move into the domain, as `git::staging`, `git::remote` and `git::branch` did, leaving
-  `App` only to run it and report. The screens read `App`'s fields (`pub(crate)`), which
-  couples `ui/screens` to `app`, which is the direction wanted (`ui` reads `app`); `app` still calls `ui` to draw in its run loop and to start the terminal.
+- The components still write their keys as `impl App` blocks (the model is `App`, the
+  files are the components). The next step is for a component to own its state and return
+  an event that `App` applies, as `git::staging`, `git::remote` and `git::commit` already
+  do for their decisions. `diff.rs` and `panes.rs` are over a thousand lines: they hold
+  the right column and the left column whole.
 - The library still exposes more than a library would: the integration tests reach into
-  most of `app` and `ui`, and `App`'s public fields force their types to be
+  most of `tui`, and `App`'s public fields force their types to be
   nameable. The test seams that can be separated (`replay`, `FakeGit`) are behind the
   `test-util` feature; `git` is documented and checked by `missing_docs`. `app::mock` is
   neither gated nor private, because the repo-free path of the production code reads its
@@ -107,19 +103,16 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 
 The rule: a folder is a flat list of files named after what they do, with a subfolder
 only for a feature that has several files, and nothing deeper than two folders
-(`tests/layering.rs`). A feature keeps its name across the roles it plays:
-`git/<x>.rs` the types and rules, `git/repo/` how `Repo` does it (one file per trait of
-the port, not per feature), `app/<x>.rs` what a key does with it, `app/state/<x>.rs` what
-the model keeps of it, `ui/screens/<x>.rs` how it is drawn.
+(`tests/layering.rs`). A feature keeps its name across the roles it plays: `git/<x>.rs`
+the types and rules, `git/repo/` how `Repo` does it (one file per trait of the port, not
+per feature), `tui/components/<x>.rs` everything the interface does with it.
 
 | Path | Holds |
 | --- | --- |
-| `src/app/mod.rs` | `App`, which owns the parts and orchestrates what reads several of them (the run loop, a refresh, the event match) |
-| `src/app/` | everything that writes the behaviour of `App` (`impl App`): `events`, routing a key or a click (`input`, `dispatch`), what a key does for each feature (`staging`, `branch`, `stash`, `rebase`, `commit`, `remote`, `create_remote`, `git_config`, `git_config_edit`, `welcome`, `askpass`, `dashboard`, `sheet`, `menu`, `context_menu`, `popup_keys`, `diff_query`, `image_query`, `drill_nav`, `settings_keys`), the background work (`workers`, `refresh`), `error`, `mock`, and the remappable bindings (`keymap`) with the key bar and help built from them (`hints`). A handler picks its target, calls the domain's decision (`git::staging`, `git::remote`, ...), then reports; no other folder writes an `impl App` (`tests/layering.rs`) |
-| `src/app/state/` | what the model remembers, one file per thing: the panes (`nav`, `pane_rows`, `right_pane` with its diff cursor, `hit_areas`, the drill-downs, the selection keys, the diff views, what the right pane loads), what can sit over them (`popup`, `confirm`, `modal`, the menus, the commit editor `commit_draft`, the create-remote form), the side sheets, `help`, `full_screens`, `render_state`, `prefs` (what is loaded and what it makes) and `theme_editor` |
-| `src/ui/screens/` | drawing only: reads `&App` and returns what the frame learned as a `Landed`; `row_lines` are the styled lines of git rows |
-| `src/ui/widgets/` | reusable widgets (donut, heat map, toast, drawer, ...) and `tui_overlay/` (vendored overlay code, with its upstream licence) |
-| `src/ui/terminal.rs` | the terminal lifecycle |
+| `src/tui/mod.rs` | `App` and the run loop; `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
+| `src/tui/components/` | one file per piece: `panes` (the five left panes, their state and drawing), `files`, `branches`, `commits`, `stash` (what a key does in each), `diff` (the right column: diff, image, line cursor), `commit_editor`, `create_remote`, `menu`, `popups` (popup, question, note), `help`, `command_log`, `keybar`, `dashboard` (+ `dashboard/`), `settings`, `git_config`, `welcome`, `remote` |
+| `src/tui/` (the rest) | `input` (routing a key or a click), `keymap`, `events`, `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines`, `terminal`, `error`, `mock` |
+| `src/tui/widgets/` | reusable widgets (donut, heat map, toast, drawer, ...) and `tui_overlay/` (vendored overlay code, with its upstream licence) |
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`) and `settings` (the rows of the settings sheet) |
 | `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`) and the colour picker |
 | `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `profile`, `identity`, `authorship` (commit identities) and `image/` (format detection, preview) |

@@ -16,7 +16,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ferrit::tui::App;
-use ferrit::tui::screens;
+use ferrit::tui::draw;
 use git2::{Repository, Signature};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -60,7 +60,7 @@ fn app_with_two_commits(tag: &str) -> (TempDir, App) {
 
 fn frame(app: &mut App) -> String {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal.draw(|f| screens::draw(f, app)).unwrap();
+    terminal.draw(|f| draw::draw(f, app)).unwrap();
     terminal.backend().to_string()
 }
 
@@ -139,13 +139,13 @@ fn clicking_the_right_pane_leaves_only_it_focused_with_its_own_key_bar() {
     let (_dir, mut app) = app_with_two_commits("right-click-focus");
     key(&mut app, KeyCode::Char('4')); // focus Commits
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal.draw(|f| screens::draw(f, &mut app)).unwrap();
+    terminal.draw(|f| draw::draw(f, &mut app)).unwrap();
     let focused_fg = border_fg(&terminal, "Commits");
     assert_ne!(focused_fg, border_fg(&terminal, "Files"));
 
     click(&mut app, 100, 10); // inside the right pane
     assert!(app.right_focused());
-    terminal.draw(|f| screens::draw(f, &mut app)).unwrap();
+    terminal.draw(|f| draw::draw(f, &mut app)).unwrap();
     let out = terminal.backend().to_string();
     assert!(out.contains("Switch view: tab"), "{out}");
     assert!(out.contains("Back: esc"), "{out}");

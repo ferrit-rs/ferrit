@@ -21,8 +21,8 @@ use std::fs;
 
 use ferrit::git::diff::DiffSide;
 use ferrit::tui::App;
-use ferrit::tui::state::pane::Pane;
-use ferrit::tui::state::views::DiffView;
+use ferrit::tui::components::diff::DiffView;
+use ferrit::tui::components::panes::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

@@ -1,6 +1,6 @@
 use ratatui_core::layout::{Constraint, Rect};
 
-use super::anchor::Anchor;
+use crate::tui::widgets::tui_overlay::anchor::Anchor;
 
 /// Resolve overlay placement from parent area, constraints, anchor, and offset.
 pub(super) fn resolve_rect(

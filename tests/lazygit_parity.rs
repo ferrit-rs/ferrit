@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ferrit::tui::App;
-use ferrit::tui::screens;
-use ferrit::tui::state::pane::Pane;
+use ferrit::tui::components::panes::Pane;
+use ferrit::tui::draw;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -91,7 +91,7 @@ impl Drop for Repo {
 
 fn frame(app: &mut App) -> String {
     let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
-    terminal.draw(|f| screens::draw(f, app)).unwrap();
+    terminal.draw(|f| draw::draw(f, app)).unwrap();
     terminal.backend().to_string()
 }
 
@@ -160,7 +160,7 @@ fn a_stash_shows_its_subject_and_stat_above_the_patch() {
 /// The foreground colour of the first cell of `text` where it appears on the frame.
 fn colour_of(app: &mut App, text: &str) -> Option<ratatui::style::Color> {
     let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
-    terminal.draw(|f| screens::draw(f, app)).unwrap();
+    terminal.draw(|f| draw::draw(f, app)).unwrap();
     let cells = &terminal.backend().buffer().content;
     let wanted: Vec<String> = text.chars().map(String::from).collect();
     (0..cells.len().saturating_sub(wanted.len())).find_map(|start| {
@@ -287,7 +287,7 @@ fn space_on_a_directory_stages_and_unstages_everything_under_it() {
 fn a_commit_shows_git_s_own_answer_under_the_command() {
     use ferrit::git::command_log;
     use ferrit::theme::palette::Palette;
-    use ferrit::tui::screens::row_lines;
+    use ferrit::tui::row_lines;
 
     let repo = Repo::new("commit-output");
     repo.commit("a.txt", "one\n", "init");

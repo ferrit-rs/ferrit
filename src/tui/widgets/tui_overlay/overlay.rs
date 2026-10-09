@@ -4,10 +4,10 @@ use ratatui_core::style::Color;
 use ratatui_core::widgets::{StatefulWidget, Widget};
 use ratatui_widgets::block::Block;
 
-use super::backdrop::Backdrop;
-use super::layout::resolve_rect;
-use super::state::{OverlayState, Phase};
-use super::{anchor::Anchor, slide::Slide};
+use crate::tui::widgets::tui_overlay::backdrop::Backdrop;
+use crate::tui::widgets::tui_overlay::layout::resolve_rect;
+use crate::tui::widgets::tui_overlay::state::{OverlayState, Phase};
+use crate::tui::widgets::tui_overlay::{anchor::Anchor, slide::Slide};
 
 /// Composable overlay widget for Ratatui.
 ///

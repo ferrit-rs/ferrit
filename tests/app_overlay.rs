@@ -20,8 +20,8 @@ use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
 use ferrit::tui::App;
-use ferrit::tui::state::full_screens::FullScreen;
-use ferrit::tui::state::pane::Pane;
+use ferrit::tui::components::panes::Pane;
+use ferrit::tui::draw::FullScreen;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn press(app: &mut App, code: KeyCode) {
