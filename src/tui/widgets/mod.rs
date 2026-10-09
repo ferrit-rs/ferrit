@@ -1,7 +1,10 @@
 //! Small reusable UI building blocks (`components/ui/*`).
 
-pub mod charts;
+pub mod chart_palette;
 pub mod chrome;
+pub mod donut;
+pub mod heatmap;
+pub mod share_bar;
 pub mod text_input;
 pub mod toast;
 pub mod tui_overlay;

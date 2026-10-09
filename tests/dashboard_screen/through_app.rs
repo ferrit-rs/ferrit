@@ -11,7 +11,7 @@ use ferrit::git::stats::{StatsOptions, Window};
 use ferrit::tui::App;
 use ferrit::tui::components::dashboard::Chrome;
 use ferrit::tui::draw as ui;
-use ferrit::tui::widgets::charts::ChartMode;
+use ferrit::tui::widgets::chart_palette::ChartMode;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

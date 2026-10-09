@@ -10,7 +10,7 @@ use crate::tui::error::AppError;
 use crate::tui::event::Event;
 use crate::tui::events::AppEvent;
 use crate::tui::scene::Scene;
-use crate::tui::widgets::charts::{ChartMode, ChartPalette, charts_mode_from_env};
+use crate::tui::widgets::chart_palette::{ChartMode, ChartPalette, charts_mode_from_env};
 use crate::tui::widgets::chrome::Drawer;
 use crate::tui::widgets::chrome::Panel;
 use crate::tui::widgets::chrome::ScrollBar;
