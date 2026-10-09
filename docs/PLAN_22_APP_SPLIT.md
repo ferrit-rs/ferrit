@@ -25,7 +25,8 @@ What differs from the sketch below, and why:
   click targets and keybar hits). `dispatch::run_action` was already a router but for five
   arms (`Back`, `Enter`, `Focus`, `NextPane`, `PrevPane`), which are now `go_back`,
   `enter_selected` and `focus_pane`.
-- **Not done: step 6, a `ViewState` for drawing.** `screens::draw` still takes `&mut App`.
+- **Not done: step 6, a `ViewState` for drawing. Now `PLAN_24_DRAW_VIEW.md`,** which settles the
+  design (a `Landed` value for what a frame learns, a `RenderState` for ratatui's mutable state). `screens::draw` still takes `&mut App`.
   `HitAreas` is what a draw function writes, so it can now be passed on its own, but the
   sheets and popups still read half of `App`. Left for a later phase.
 - Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 26 now (target was about 15; the rest are the singles listed below). The "about 100" in the first sketch was an over-estimate.

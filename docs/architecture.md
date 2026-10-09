@@ -52,7 +52,7 @@ Known gaps, each with a plan:
 - `domain/image` still imports `ratatui_image` for the preview protocol.
 - `App` is smaller (87 fields to 26) but not small. The create-remote flow and what the user
   is told are still loose on it, and `screens::draw` still takes `&mut App`
-  (`PLAN_22_APP_SPLIT.md`).
+  (`PLAN_24_DRAW_VIEW.md`).
 - The library exposes more than it needs to (`domain` is fully documented and checked by
   `missing_docs`; the rest is not): the integration tests reach into most of it,
   and `App`'s public fields force their types to be nameable. The test seams that can be
