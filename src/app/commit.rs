@@ -4,6 +4,7 @@ use crate::app::App;
 use crate::app::error::AppError;
 use crate::git;
 use crate::git::apply::ApplyDir;
+use crate::git::commit::{self, CommitKind, OpenPlan, Submitted};
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::state::commit_draft::{CommitDraft, DraftKey, RewordTarget};
 use crate::interface::state::pane::Pane;
@@ -57,62 +58,40 @@ impl App {
 
     /// `c` / `A` / `w`: open the commit editor. Amend / Reword pre-fill
     /// `HEAD`'s message; a plain commit restores a cancelled draft.
-    pub(crate) fn open_commit(&mut self, kind: git::commit::CommitKind) {
+    pub(crate) fn open_commit(&mut self, kind: CommitKind) {
         if self.modal.popup().is_some() {
             return;
         }
-        if self.repo.is_none() {
-            return;
-        }
-        match &kind {
-            git::commit::CommitKind::Normal
-                if !self
-                    .snapshot
-                    .files
-                    .iter()
-                    .any(|f| f.staged != git::model::Change::None) =>
-            {
+        let Some(repo) = &self.repo else { return };
+        match commit::plan_open(&kind, &self.snapshot.files, self.snapshot.commits.len()) {
+            OpenPlan::StageAllFirst => {
                 self.modal.open_popup(Popup::CommitAllConfirm);
                 self.render.commit.open();
-                return;
             },
-            git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
-                if self.snapshot.commits.is_empty() =>
-            {
-                self.report_error(AppError::NoCommitToAmend);
-                return;
+            OpenPlan::NoCommit => self.report_error(AppError::NoCommitToAmend),
+            OpenPlan::Edit => {
+                let prefill = commit::prefill(&kind, repo.as_ref(), &mut self.commit_draft);
+                self.open_commit_editor(kind, prefill.as_deref());
             },
-            _ => {},
         }
-
-        let prefill = match &kind {
-            git::commit::CommitKind::Amend | git::commit::CommitKind::Reword => {
-                let Some(repo) = &self.repo else { return };
-                repo.head_message().ok().flatten()
-            },
-            git::commit::CommitKind::Normal => self.new_commit_prefill(),
-            _ => self.commit_draft.take(),
-        };
-        self.open_commit_editor(kind, prefill.as_deref());
     }
 
-    /// What a new commit starts from: the draft a cancelled editor kept, else
-    /// the `commit.template` file, else nothing.
+    /// What a new commit starts from.
     fn new_commit_prefill(&mut self) -> Option<String> {
-        let template = || self.repo.as_ref()?.commit_template();
-        self.commit_draft.take().or_else(template)
+        let repo = self.repo.as_ref()?;
+        commit::prefill(&CommitKind::Normal, repo.as_ref(), &mut self.commit_draft)
     }
 
     /// Open the editor to reword the older commit `hash` (a rebase, not an
     /// amend), pre-filled with its message.
     pub(crate) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
-        self.open_commit_editor(git::commit::CommitKind::Reword, Some(message));
+        self.open_commit_editor(CommitKind::Reword, Some(message));
         if let Some(Popup::Commit(draft)) = self.modal.popup_mut() {
             draft.reword = Some(RewordTarget { hash, title });
         }
     }
 
-    fn open_commit_editor(&mut self, kind: git::commit::CommitKind, prefill: Option<&str>) {
+    fn open_commit_editor(&mut self, kind: CommitKind, prefill: Option<&str>) {
         let draft = CommitDraft::new(kind, self.prefs.config.commit.sign_off, prefill);
         self.modal.open_popup(Popup::Commit(draft));
         self.render.commit.open();
@@ -132,10 +111,7 @@ impl App {
                         self.render.commit.close();
                         self.request_refresh();
                         let prefill = self.new_commit_prefill();
-                        self.open_commit_editor(
-                            git::commit::CommitKind::Normal,
-                            prefill.as_deref(),
-                        );
+                        self.open_commit_editor(CommitKind::Normal, prefill.as_deref());
                     },
                     Some(Err(error)) => {
                         self.modal.close_popup();
@@ -179,34 +155,24 @@ impl App {
         let Some(Popup::Commit(draft)) = self.modal.popup() else {
             return;
         };
-        let message = draft.message();
-        if !matches!(draft.kind, git::commit::CommitKind::Fixup { .. }) && draft.summary.is_blank()
-        {
+        if draft.kind.needs_summary() && draft.summary.is_blank() {
             self.report_error(AppError::EmptyCommitMessage);
             return;
         }
-        if let Some(target) = &draft.reword {
-            let hash = target.hash.clone();
-            let Some(repo) = &self.repo else { return };
-            let result = repo.rebase_edit(&hash, &git::rebase::RebaseEdit::Reword(message));
-            // Like the new-branch popup: a refusal keeps the popup and the
-            // text for a retry; a stop or success closes it.
-            if let Err(error) = result {
-                self.report_error(error);
-                return;
-            }
-            self.modal.close_popup();
-            self.render.commit.close();
-            self.finish_operation(result);
-            return;
-        }
-        let opts = draft.opts(self.authorship.author_arg());
-        let kind = draft.kind.clone();
         let Some(repo) = &self.repo else { return };
-        let result = repo.commit(&kind, &message, opts);
-
+        let reword = draft.reword.as_ref().map(|target| target.hash.as_str());
+        let opts = draft.opts(self.authorship.author_arg());
+        let result = commit::submit(repo.as_ref(), &draft.kind, draft.message(), opts, reword);
         match result {
-            Ok(head) => {
+            // Like the new-branch popup: a refusal keeps the popup and the text
+            // for a retry; a stop or a success closes it.
+            Err(error) => self.report_error(error),
+            Ok(Submitted::Reworded(outcome)) => {
+                self.modal.close_popup();
+                self.render.commit.close();
+                self.finish_operation(Ok(outcome));
+            },
+            Ok(Submitted::Committed(head)) => {
                 self.commit_draft = None;
                 self.modal.close_popup();
                 self.render.commit.close();
@@ -218,10 +184,6 @@ impl App {
                 }
                 self.request_refresh();
             },
-            Err(git::error::GitError::NothingStaged) => {
-                self.report_error(git::error::GitError::NothingStaged);
-            },
-            Err(error) => self.report_error(error),
         }
     }
 }
