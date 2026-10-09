@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::app::config::Config;
-use ferrit::app::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
+use ferrit::config::Config;
+use ferrit::config::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
 use ferrit::theme::config::{Preset, SchemeChoice};
 
 struct Fixture {

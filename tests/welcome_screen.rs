@@ -10,8 +10,8 @@
 
 use std::path::Path;
 
-use ferrit::app::config::ConfigLoad;
 use ferrit::app::{App, screens as ui};
+use ferrit::config::ConfigLoad;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

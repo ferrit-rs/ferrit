@@ -11,11 +11,11 @@
 //! it, and the default palette is the one ferrit always had.
 
 use ferrit::app::App;
-use ferrit::app::config::Config;
 use ferrit::app::mock::{mock_commits, mock_files};
 use ferrit::app::pane::Pane;
 use ferrit::app::row_lines;
 use ferrit::components::ui::key_bar::KeyBar;
+use ferrit::config::Config;
 use ferrit::domain::git::diff::parse_diff;
 use ferrit::theme::palette::Palette;
 use ratatui::style::Color;

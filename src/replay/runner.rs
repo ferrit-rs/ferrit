@@ -20,9 +20,9 @@ use unicode_width::UnicodeWidthStr;
 use super::fake_gh;
 use super::fixture::{self, Fixture};
 use super::script::{Directive, Expect, Script, Step};
-use crate::app::config::{Config, ConfigLoad};
 use crate::app::keymap::KeyBinding;
 use crate::app::{App, screens};
+use crate::config::{Config, ConfigLoad};
 
 /// How long `async-key` waits for background work before giving up. A safety
 /// net for a hung script, never part of a passing run's timing.

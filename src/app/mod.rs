@@ -5,7 +5,6 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
-pub mod config;
 pub mod events;
 pub mod hints;
 pub mod keymap;
@@ -52,7 +51,7 @@ const TOAST_TICK_MS: u64 = 250;
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
-    prefs: prefs::Prefs,
+    prefs: crate::config::prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
     sheets: sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
@@ -106,7 +105,7 @@ pub struct App {
     /// filesystem watch at this root and clears it.
     watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
-    terminal_request: Option<settings::TerminalRequest>,
+    terminal_request: Option<crate::config::settings::TerminalRequest>,
     create_remote: create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
@@ -127,7 +126,6 @@ pub mod nav;
 pub mod pane;
 mod pane_rows;
 mod popup;
-mod prefs;
 pub mod refresh;
 mod render_state;
 pub(crate) mod right_pane;
@@ -183,7 +181,7 @@ use self::workers::{WorkerError, WorkerKind, run_worker};
 use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
 
 impl App {
-    fn base(repo: Option<Box<dyn GitPort>>, config: config::Config) -> Self {
+    fn base(repo: Option<Box<dyn GitPort>>, config: crate::config::Config) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
         let keymap = keymap::Keymap::from_overrides(&config.keys).0;
@@ -192,7 +190,7 @@ impl App {
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
         let authorship = authorship::Authorship::of(repo.as_deref());
         Self {
-            prefs: prefs::Prefs::new(config, keymap, palette),
+            prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
             sheets: sheet::Sheets::default(),
             full_screens: full_screens::FullScreens::default(),
             nav: nav::Nav::default(),
@@ -224,22 +222,22 @@ impl App {
     /// take one snapshot. Reads no config file and writes none: the seam tests
     /// and examples use. The binary uses `open_with` and `Config::load`.
     pub fn open(path: &Path) -> GitResult<Self> {
-        Self::open_with(path, config::ConfigLoad::default())
+        Self::open_with(path, crate::config::ConfigLoad::default())
     }
 
     /// The app on any git port, with the default configuration, after one
     /// snapshot. `open` is this with the real adapter; tests pass a
     /// `domain::git::fake::FakeGit`.
     pub fn with_git(git: Box<dyn GitPort>) -> Self {
-        let mut app = Self::base(Some(git), config::Config::default());
+        let mut app = Self::base(Some(git), crate::config::Config::default());
         app.refresh();
         app
     }
 
     /// Open the repo at or above `path` with a loaded configuration. Whatever
     /// was wrong with the file is reported once, as an error toast.
-    pub fn open_with(path: &Path, load: config::ConfigLoad) -> GitResult<Self> {
-        let config::ConfigLoad {
+    pub fn open_with(path: &Path, load: crate::config::ConfigLoad) -> GitResult<Self> {
+        let crate::config::ConfigLoad {
             config,
             file,
             issues,
@@ -259,7 +257,7 @@ impl App {
     pub fn open_or_welcome(
         path: &Path,
         explicit: bool,
-        load: config::ConfigLoad,
+        load: crate::config::ConfigLoad,
     ) -> GitResult<Self> {
         match Self::open_with(path, load.clone()) {
             Err(git::error::GitError::NotARepository(_)) if !explicit => {
@@ -289,8 +287,8 @@ impl App {
     /// The app for a folder with no repository in it or above it: the welcome
     /// screen, offering `git init`. No panes are drawn, so none of their data
     /// is needed. `dir` is made absolute for the question.
-    pub fn welcome(dir: &Path, load: config::ConfigLoad) -> Self {
-        let config::ConfigLoad {
+    pub fn welcome(dir: &Path, load: crate::config::ConfigLoad) -> Self {
+        let crate::config::ConfigLoad {
             config,
             file,
             issues,
@@ -321,7 +319,7 @@ impl App {
 
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
-        let mut app = Self::base(None, config::Config::default());
+        let mut app = Self::base(None, crate::config::Config::default());
         app.snapshot.header = mock::mock_header();
         app.snapshot.files = mock::mock_files();
         app.snapshot.branches = mock::mock_branches();
@@ -359,7 +357,7 @@ impl App {
     /// Used after a `git init` from the welcome screen
     /// (`docs/PLAN_16_START_WITHOUT_REPO.md`). On error nothing changes.
     pub fn attach_repository(&mut self, path: &Path) -> GitResult<()> {
-        let load = config::ConfigLoad {
+        let load = crate::config::ConfigLoad {
             config: self.prefs.config.clone(),
             file: self.prefs.file.clone(),
             issues: Vec::new(),
@@ -955,7 +953,8 @@ impl App {
                 }
             }
             // A setting changed that only this loop can carry out.
-            if let Some(settings::TerminalRequest::Mouse(on)) = self.take_terminal_request()
+            if let Some(crate::config::settings::TerminalRequest::Mouse(on)) =
+                self.take_terminal_request()
                 && let Err(error) = terminal::set_mouse(on)
             {
                 self.report_notice(format!("cannot switch the mouse: {error}"));

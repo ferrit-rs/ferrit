@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use ferrit::app::config::Config;
 use ferrit::app::{App, screens as ui};
+use ferrit::config::Config;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

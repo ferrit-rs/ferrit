@@ -5,10 +5,11 @@
 use super::landed::Landed;
 use crate::app::App;
 use crate::app::render_state::RenderState;
-use crate::app::settings::{Click, Kind, SaveState, SettingsHits, SettingsRow};
+use crate::app::settings::{Click, SettingsHits};
 use crate::components::ui::drawer::Drawer;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::components::ui::separator::Separator;
+use crate::config::settings::{Kind, SaveState, SettingsRow};
 use crate::theme::color_picker::{ColorPicker, grid_metrics, rgb};
 use crate::theme::config::{Preset, ThemeMode};
 use crate::theme::palette::Palette;

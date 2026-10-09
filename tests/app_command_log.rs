@@ -23,8 +23,8 @@ use std::fs;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use ferrit::app::App;
-use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::screens as ui;
+use ferrit::config::{Config, ConfigLoad};
 use ferrit::infra::git::Repo;
 use git2::Repository;
 use ratatui::Terminal;

@@ -4,6 +4,7 @@
 
 pub mod app;
 pub mod components;
+pub mod config;
 pub mod domain;
 pub mod infra;
 /// The scripted test harness behind `--replay` and `--fixture`. Test seam, only

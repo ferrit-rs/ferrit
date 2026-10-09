@@ -6,8 +6,8 @@ use clap::Parser;
 use color_eyre::Result;
 
 use ferrit::app::App;
-use ferrit::app::config::Config;
 use ferrit::app::terminal as tui;
+use ferrit::config::Config;
 
 /// The everyday git manager for the terminal: a full TUI for your repository, and
 /// an empty folder to GitHub without leaving it.

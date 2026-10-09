@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::{App, screens as ui};
+use ferrit::config::{Config, ConfigLoad};
 use ferrit::domain::git::error::GitError;
 use ferrit::theme::config::{Base, SchemeChoice};
 use ferrit::theme::scheme::{ColorDepth, Scheme, contrast};
@@ -313,7 +313,7 @@ fn the_theme_survives_a_save_with_the_rest_of_the_file() {
     fs::write(&file, "[from_the_future]\nanswer = 42\n").unwrap();
     let mut load = Config::load_from(&file);
     load.config.theme.base = Base::Light;
-    Config::save_sections(&file, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
+    Config::save_sections(&file, &load.config, &[ferrit::config::Section::Theme]).unwrap();
     let text = fs::read_to_string(&file).unwrap();
     assert!(text.contains("base = \"light\""), "{text}");
     assert!(text.contains("answer = 42"), "{text}");
@@ -525,7 +525,7 @@ fn a_saved_scheme_is_written_and_a_file_without_one_does_not_gain_one() {
     let file = repo.0.join("config.toml");
     let mut load = Config::load_from(&file);
     load.config.theme.scheme = Some(SchemeChoice::Terminal);
-    Config::save_sections(&file, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
+    Config::save_sections(&file, &load.config, &[ferrit::config::Section::Theme]).unwrap();
     assert!(
         fs::read_to_string(&file)
             .unwrap()
@@ -533,7 +533,7 @@ fn a_saved_scheme_is_written_and_a_file_without_one_does_not_gain_one() {
     );
     let other = repo.0.join("other.toml");
     let load = Config::load_from(&other);
-    Config::save_sections(&other, &load.config, &[ferrit::app::config::Section::Theme]).unwrap();
+    Config::save_sections(&other, &load.config, &[ferrit::config::Section::Theme]).unwrap();
     assert!(
         !fs::read_to_string(&other).unwrap().contains("scheme"),
         "a default config writes no scheme"

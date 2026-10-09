@@ -21,10 +21,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::app::config::error::ConfigError;
-use ferrit::app::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::app::pane::Pane;
 use ferrit::app::views::DiffView;
+use ferrit::config::error::ConfigError;
+use ferrit::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
 use ferrit::theme::config::{Preset, ThemeConfig};
 use git2::Repository;
 use ratatui::crossterm::event::{
@@ -300,7 +300,7 @@ fn only_main_reads_the_real_config_directory() {
     let mut files = Vec::new();
     rust_files(&root, &mut files);
     for file in files {
-        if file.ends_with("main.rs") || file.ends_with("app/config/mod.rs") {
+        if file.ends_with("main.rs") || file.ends_with("config/mod.rs") {
             continue;
         }
         let text = fs::read_to_string(&file).unwrap();
@@ -670,7 +670,7 @@ fn the_readme_example_is_a_valid_configuration() {
 
 // ------------------------------------------------ save_sections (phase 17)
 
-use ferrit::app::config::Section;
+use ferrit::config::Section;
 
 #[test]
 fn several_sections_are_written_in_one_save_and_read_back() {

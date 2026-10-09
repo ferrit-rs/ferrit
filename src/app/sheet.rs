@@ -4,9 +4,9 @@
 //! time. What a sheet shows and does with the keys is its own module
 //! (`settings`); this one only says which it is and opens and closes it.
 
-use super::settings::SettingsSheet;
 use super::{App, dashboard};
 use crate::components::tui_overlay::state::OverlayState;
+use crate::config::settings::SettingsSheet;
 
 /// The drawer and what it can hold. One drawer state means one animation and,
 /// by construction, one sheet at a time.

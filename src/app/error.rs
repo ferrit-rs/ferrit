@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::app::WorkerError;
-use crate::app::config::error::ConfigError;
 use crate::app::image_query::ImageError;
+use crate::config::error::ConfigError;
 use crate::domain::git::error::GitError;
 
 /// Errors surfaced by app actions. Every variant says what went wrong; there is

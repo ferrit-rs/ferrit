@@ -20,9 +20,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use ferrit::app::App;
-use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::events::AppEvent;
 use ferrit::app::pane::Pane;
+use ferrit::config::{Config, ConfigLoad};
 use ferrit::domain::git::stats::Window;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,

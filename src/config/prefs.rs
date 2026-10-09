@@ -6,29 +6,30 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::{config, keymap};
+use crate::app::keymap;
+use crate::config;
 use crate::domain::git::diff::DiffOpts;
 use crate::theme::palette::Palette;
 use crate::theme::scheme::ColorDepth;
 
-pub(super) struct Prefs {
+pub(crate) struct Prefs {
     /// Everything loaded from `config.toml`. Its `theme` is only the value read
     /// at startup: the theme being edited lives in `App.theme`.
-    pub(super) config: config::Config,
+    pub(crate) config: config::Config,
     /// The keys, with the user's `[keys]` applied.
-    pub(super) keymap: keymap::Keymap,
+    pub(crate) keymap: keymap::Keymap,
     /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
-    pub(super) file: Option<PathBuf>,
+    pub(crate) file: Option<PathBuf>,
     /// What the terminal can show; the painted theme is RGB and is approximated
     /// with 256 colours when it has no 24-bit colour. True colour until the
     /// binary has looked (`COLORTERM`); the library never reads the environment.
-    pub(super) color_depth: ColorDepth,
+    pub(crate) color_depth: ColorDepth,
     /// The colours everything is drawn with (`[theme]` in `config.toml`).
-    pub(super) palette: Palette,
+    pub(crate) palette: Palette,
 }
 
 impl Prefs {
-    pub(super) const fn new(
+    pub(crate) const fn new(
         config: config::Config,
         keymap: keymap::Keymap,
         palette: Palette,
@@ -45,17 +46,17 @@ impl Prefs {
 
 impl Prefs {
     /// `[ui] mouse`: should the terminal capture the mouse?
-    pub(super) const fn mouse_enabled(&self) -> bool {
+    pub(crate) const fn mouse_enabled(&self) -> bool {
         self.config.ui.mouse
     }
 
     /// `[ui] poll_secs` as a duration.
-    pub(super) const fn poll_interval(&self) -> Duration {
+    pub(crate) const fn poll_interval(&self) -> Duration {
         Duration::from_secs(self.config.ui.poll_secs)
     }
 
     /// `[diff]` as the options `git diff` / `git show` are run with.
-    pub(super) const fn diff_opts(&self) -> DiffOpts {
+    pub(crate) const fn diff_opts(&self) -> DiffOpts {
         DiffOpts {
             context: self.config.diff.context,
             ignore_whitespace: self.config.diff.ignore_whitespace,
