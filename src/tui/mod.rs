@@ -123,6 +123,7 @@ pub mod event;
 pub mod input;
 pub mod keymap;
 pub mod prefs;
+pub mod publish;
 pub mod row_lines;
 pub mod terminal;
 pub mod view;

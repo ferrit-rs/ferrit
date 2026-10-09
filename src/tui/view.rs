@@ -1,5 +1,8 @@
 //! The read-only questions the screens and the tests ask of `App`.
 
+use crate::git::create_remote::CreateRemote;
+use crate::tui::components::create_remote::Consequences;
+use crate::tui::components::create_remote::CreateRemoteView;
 use crate::tui::components::diff::CommandLogView;
 use crate::tui::components::diff::MenuView;
 use crate::tui::components::diff::PopupView;
@@ -268,5 +271,25 @@ impl App {
     /// The git config screen's state, for the screen that draws it and for tests.
     pub fn git_config(&self) -> &crate::tui::components::git_config::GitConfigScreen {
         &self.full_screens.git_config
+    }
+}
+
+impl App {
+    /// The creation's state, for the popups and for tests.
+    pub fn create_remote(&self) -> &CreateRemote {
+        &self.create_remote
+    }
+
+    /// What the renderer draws, or `None` when this popup is not up.
+    pub fn create_remote_view(&self) -> Option<CreateRemoteView<'_>> {
+        let Some(Popup::CreateRemote(step)) = self.modal.popup() else {
+            return None;
+        };
+        let aliases = self.create_remote.ssh_aliases();
+        Some(step.view(&Consequences {
+            first_commit: self.repo_has_no_commit(),
+            ssh_host: aliases.first().map(String::as_str),
+            branch: &self.snapshot.header.branch,
+        }))
     }
 }

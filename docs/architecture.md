@@ -61,11 +61,12 @@ Known gaps, each with a plan:
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
-- The components still write their keys as `impl App` blocks (the model is `App`, the
-  files are the components). The next step is for a component to own its state and return
-  an event that `App` applies, as `git::staging`, `git::remote` and `git::commit` already
-  do for their decisions. `diff.rs` and `panes.rs` are over a thousand lines: they hold
-  the right column and the left column whole.
+- A component decides from an `Env` (a read-only view of the model) and returns `Event`s;
+  `App::apply` (`tui/event.rs`) is the one place that changes the state. A component that
+  owns a lot of its own state (the settings sheet, the git config screen) is a struct over
+  the parts of the app it changes, borrowed for the call. Still written as `impl App`:
+  `dashboard`, `diff`, `panes` (the two columns hold the shared state), and `publish.rs`
+  (the create-a-repository flow across popups, workers and the repository).
 - The library still exposes more than a library would: the integration tests reach into
   most of `tui`, and `App`'s public fields force their types to be
   nameable. The test seams that can be separated (`replay`, `FakeGit`) are behind the
@@ -110,8 +111,9 @@ per feature), `tui/components/<x>.rs` everything the interface does with it.
 | Path | Holds |
 | --- | --- |
 | `src/tui/mod.rs` | `App` and the run loop; `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
+| `src/tui/event.rs` | `Event` (what a component asks), `Env` (what it may read), and `App::apply`, the one place that changes the state |
 | `src/tui/components/` | one file per piece: `panes` (the five left panes, their state and drawing), `files`, `branches`, `commits`, `stash` (what a key does in each), `diff` (the right column: diff, image, line cursor), `commit_editor`, `create_remote`, `menu`, `popups` (popup, question, note), `help`, `command_log`, `keybar`, `dashboard` (+ `dashboard/`), `settings`, `git_config`, `welcome`, `remote` |
-| `src/tui/` (the rest) | `input` (routing a key or a click), `keymap`, `events`, `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines`, `terminal`, `error`, `mock` |
+| `src/tui/` (the rest) | `input` (routing a key or a click), `view` (the read-only questions screens and tests ask), `publish` (creating the GitHub repository), `keymap`, `events`, `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines`, `terminal`, `error`, `mock` |
 | `src/tui/widgets/` | reusable widgets (donut, heat map, toast, drawer, ...) and `tui_overlay/` (vendored overlay code, with its upstream licence) |
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`) and `settings` (the rows of the settings sheet) |
 | `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`) and the colour picker |
