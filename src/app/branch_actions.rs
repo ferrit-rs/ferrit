@@ -138,7 +138,8 @@ impl App {
                 // The new branch is the checked-out one: select it, not the
                 // row the cursor was on (lazygit).
                 if self.nav.branch_drill.is_none() && self.nav.branches_tab == BranchesTab::Local {
-                    self.select_when_listed(Pane::Branches, SelectionKey::Branch(name));
+                    self.nav
+                        .select_when_listed(Pane::Branches, SelectionKey::Branch(name));
                 }
                 self.request_refresh();
             },

@@ -129,6 +129,7 @@ pub(crate) mod hit_areas;
 mod modal;
 pub mod nav;
 pub mod pane;
+mod pane_rows;
 mod popup;
 mod prefs;
 pub mod refresh;
@@ -176,6 +177,7 @@ use self::diff_cursor::{
 use self::drill::{BranchDrill, CommitDrill};
 use self::full_screens::FullScreen;
 use self::pane::{BranchesTab, PANES, Pane};
+use self::pane_rows::PaneRows;
 use self::popup::Popup;
 use self::refresh::RefreshCompletion;
 use self::render_state::RenderedDiff;
@@ -333,21 +335,7 @@ impl App {
 
     /// `[ui] mouse`: should the terminal capture the mouse?
     pub fn mouse_enabled(&self) -> bool {
-        self.prefs.config.ui.mouse
-    }
-
-    /// `[ui] poll_secs` as a duration.
-    pub(crate) fn poll_interval(&self) -> Duration {
-        Duration::from_secs(self.prefs.config.ui.poll_secs)
-    }
-
-    /// `[diff]` as the options `git diff` / `git show` are run with.
-    pub(crate) fn diff_opts(&self) -> DiffOpts {
-        DiffOpts {
-            context: self.prefs.config.diff.context,
-            ignore_whitespace: self.prefs.config.diff.ignore_whitespace,
-            rename_threshold: self.prefs.config.diff.rename_threshold,
-        }
+        self.prefs.mouse_enabled()
     }
 
     /// Where a settings save writes, if anywhere.
@@ -427,7 +415,7 @@ impl App {
             .commit_drill
             .as_ref()
             .map(|drill| drill.hash.clone());
-        let opts = self.diff_opts();
+        let opts = self.prefs.diff_opts();
         let Some(repo) = &mut self.repo else { return };
         let completion = Self::load_refresh(repo.as_mut(), branch, commit, opts);
         self.apply_refresh_result(completion);
@@ -457,7 +445,7 @@ impl App {
             .commit_drill
             .as_ref()
             .map(|drill| drill.hash.clone());
-        let opts = self.diff_opts();
+        let opts = self.prefs.diff_opts();
         self.workers.refresh.in_flight = true;
         thread::spawn(move || {
             let completion = run_worker(WorkerKind::Refresh, || match handle {
@@ -525,8 +513,13 @@ impl App {
         if let Some(profile) = completion.profile {
             self.authorship.profile = profile;
         }
-        let old_selection: [(Pane, usize, Option<SelectionKey>); 5] =
-            PANES.map(|pane| (pane, self.nav.selection[pane], self.selection_key(pane)));
+        let old_selection: [(Pane, usize, Option<SelectionKey>); 5] = PANES.map(|pane| {
+            (
+                pane,
+                self.nav.selection[pane],
+                self.rows().selection_key(pane),
+            )
+        });
         match completion.snapshot {
             Ok(snap) => {
                 self.snapshot = snap;
@@ -592,29 +585,24 @@ impl App {
             let last = self.row_count(pane).saturating_sub(1);
             let new_index = key
                 .as_ref()
-                .and_then(|key| self.find_selection_key(pane, key))
+                .and_then(|key| self.rows().find_selection_key(pane, key))
                 .unwrap_or(old_index);
             self.nav.selection[pane] = new_index.min(last);
         }
         let mut waiting = std::mem::take(&mut self.nav.select_when_listed);
-        waiting.retain(|(pane, key)| match self.find_selection_key(*pane, key) {
-            Some(index) => {
-                self.nav.selection[*pane] = index;
-                false
+        waiting.retain(
+            |(pane, key)| match self.rows().find_selection_key(*pane, key) {
+                Some(index) => {
+                    self.nav.selection[*pane] = index;
+                    false
+                },
+                None => true,
             },
-            None => true,
-        });
+        );
         self.nav.select_when_listed = waiting;
         self.workers.diff.refresh_requested = true;
         self.invalidate_image_query();
         self.update_right_pane();
-    }
-
-    /// After an action that created `key`'s row, select it in `pane` as soon as
-    /// a refresh lists it.
-    pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
-        self.nav.select_when_listed.retain(|(p, _)| *p != pane);
-        self.nav.select_when_listed.push((pane, key));
     }
 
     fn on_refresh_done(&mut self, completion: RefreshCompletion) {
@@ -662,7 +650,7 @@ impl App {
         };
         if let Some(&line) = diff.file_lines().get(*index) {
             self.right.scroll = line;
-            self.clamp_right_scroll();
+            self.right.clamp_scroll();
         }
     }
 
@@ -723,82 +711,6 @@ impl App {
         }
     }
 
-    /// Files pane rows, lazygit-style directory tree: single-child directory
-    /// chains folded, a root ("/") first only when it has two or more
-    /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
-    /// `self.snapshot.files` and `self.nav.collapsed_dirs` on every call; cheap at
-    /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
-    fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.snapshot.files, &self.nav.collapsed_dirs)
-    }
-
-    /// Same tree shape as `files_tree_rows`, over a drilled commit's own
-    /// changed files instead of the worktree's. Empty while not drilled.
-    fn commit_tree_rows(&self) -> Vec<FileRow> {
-        match &self.nav.commit_drill {
-            Some(drill) => drill_tree_rows(&drill.files, &drill.collapsed),
-            None => Vec::new(),
-        }
-    }
-
-    /// Line count of the current diff text, 0 for `None` / `Note`.
-    fn diff_line_count(&self) -> usize {
-        match &self.right.diff {
-            // Both columns share one scroll; the taller sets how far it goes.
-            DiffView::Files(f) => f
-                .unstaged
-                .text
-                .lines()
-                .count()
-                .max(f.staged.text.lines().count()),
-            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.text.lines().count(),
-            DiffView::BranchLog(log) => log.commits.iter().map(theme::branch_log_block_lines).sum(),
-            DiffView::None | DiffView::Note(_) => 0,
-        }
-    }
-
-    /// Largest first-visible line that still fills the viewport: the last diff
-    /// line lands at the bottom of the pane, never above it. Falls back to
-    /// "line count minus one screen" until the first draw sets a real height.
-    fn max_right_scroll(&self) -> usize {
-        self.diff_line_count()
-            .saturating_sub(self.right.viewport.max(1))
-    }
-
-    /// Clamp `right_scroll` into `0..=max_right_scroll()`.
-    fn clamp_right_scroll(&mut self) {
-        self.right.scroll = self.right.scroll.min(self.max_right_scroll());
-    }
-
-    /// Move the right-pane viewport by `delta` lines, clamped so it stops with
-    /// the last line at the bottom of the pane. `isize::MIN` / `isize::MAX`
-    /// snap to the top / bottom.
-    fn scroll_right(&mut self, delta: isize) {
-        let mag = delta.unsigned_abs();
-        self.right.scroll = if delta >= 0 {
-            self.right
-                .scroll
-                .saturating_add(mag)
-                .min(self.max_right_scroll())
-        } else {
-            self.right.scroll.saturating_sub(mag)
-        };
-    }
-
-    /// Is the right pane scrollable right now — a real diff, or a branch's
-    /// log preview? The scroll keys and the wheel are inert over an image, a
-    /// `Note`, and the mock bodies; without this, they leak through to the
-    /// left pane's own selection instead (moving the wrong thing).
-    fn right_is_diff(&self) -> bool {
-        matches!(
-            self.right.diff,
-            DiffView::Files(_)
-                | DiffView::Commit(..)
-                | DiffView::Stash(..)
-                | DiffView::BranchLog(_)
-        )
-    }
-
     /// Jump `right_scroll` to the next (`dir > 0`) or previous hunk / file
     /// header, lazygit's `]` / `[`. `diff --git` headers for a commit diff;
     /// a no-op on the Files split, which has two diffs and no single anchor
@@ -818,7 +730,7 @@ impl App {
         };
         if let Some(line) = target {
             self.right.scroll = line;
-            self.clamp_right_scroll();
+            self.right.clamp_scroll();
         }
     }
 
@@ -892,15 +804,13 @@ impl App {
 
     /// Set the right-pane scroll. Test and example helper.
     pub fn set_right_scroll(&mut self, line: usize) {
-        self.right.scroll = line;
-        self.clamp_right_scroll();
+        self.right.set_scroll(line);
     }
 
     /// Inner height of the right-pane diff box, written by `ui::draw_right_pane`
     /// each frame so the scroll clamp and page steps track the real size.
     pub fn set_right_viewport(&mut self, rows: usize) {
-        self.right.viewport = rows;
-        self.clamp_right_scroll();
+        self.right.set_viewport(rows);
     }
 
     /// Whole right-pane rect, written by `ui::draw_right_pane` each frame so a
@@ -949,28 +859,20 @@ impl App {
     /// A left pane's list scroll offset, read by `ui::draw_left_column`
     /// before it builds that pane's `ListState`.
     pub fn list_offset(&self, pane: Pane) -> usize {
-        self.hits.list_offset[pane]
+        self.hits.list_offset(pane)
     }
 
     /// A left pane's list scroll offset, written by `ui::draw_left_column`
     /// after `render_stateful_widget` so a click in a scrolled list maps to
     /// the right row.
     pub fn set_list_offset(&mut self, pane: Pane, offset: usize) {
-        self.hits.list_offset[pane] = offset;
+        self.hits.set_list_offset(pane, offset);
     }
 
     /// Whether a wheel scroll left `pane`'s view away from its selection. Read
-    /// by `ui::draw_left_column`; forgets a detachment the selection has left.
+    /// by `ui::draw_left_column`.
     pub fn view_detached(&self, pane: Pane) -> bool {
-        self.hits.view_detached_at[pane] == Some(self.nav.selection[pane])
-    }
-
-    /// Scroll `pane`'s list by `rows` (negative is up) and keep its selection
-    /// where it is, which may leave it off screen. `draw_left_column` clamps
-    /// the offset to the list's length on the next frame.
-    pub(super) fn scroll_list(&mut self, pane: Pane, rows: isize) {
-        self.hits.view_detached_at[pane] = Some(self.nav.selection[pane]);
-        self.hits.list_offset[pane] = self.hits.list_offset[pane].saturating_add_signed(rows);
+        self.hits.view_detached(pane, self.nav.selection[pane])
     }
 
     /// Feed one key to the handler. Integration-test seam; the running app
@@ -1090,117 +992,70 @@ impl App {
         self.update_right_pane();
     }
 
-    /// Selection cursor for a given pane.
-    pub fn selected(&self, pane: Pane) -> usize {
-        self.nav.selection[pane]
-    }
-
     /// Selectable row count for a pane, for clamping the cursor and deciding
     /// whether to draw a highlight.
     pub fn row_count(&self, pane: Pane) -> usize {
-        match pane {
-            Pane::Status => 0,
-            Pane::Files => self.files_tree_rows().len(),
-            Pane::Branches if self.nav.branches_tab == BranchesTab::Remotes => 0,
-            Pane::Branches => self
-                .nav
-                .branch_drill
-                .as_ref()
-                .map_or(self.snapshot.branches.len(), |drill| drill.commits.len()),
-            Pane::Commits => match &self.nav.commit_drill {
-                Some(_) => self.commit_tree_rows().len(),
-                None => self.snapshot.commits.len(),
-            },
-            Pane::Stash => self.snapshot.stashes.len(),
-        }
-    }
-
-    fn selection_key(&self, pane: Pane) -> Option<SelectionKey> {
-        match pane {
-            Pane::Status => None,
-            Pane::Files => selection_key_for_file_rows(
-                &self.files_tree_rows(),
-                &self.snapshot.files,
-                self.selected(pane),
-            ),
-            Pane::Branches if self.nav.branches_tab == BranchesTab::Remotes => None,
-            Pane::Branches => self.nav.branch_drill.as_ref().map_or_else(
-                || {
-                    self.snapshot
-                        .branches
-                        .get(self.selected(pane))
-                        .map(|entry| SelectionKey::Branch(entry.name.clone()))
-                },
-                |drill| {
-                    drill
-                        .commits
-                        .get(self.selected(pane))
-                        .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
-                },
-            ),
-            Pane::Commits => self.nav.commit_drill.as_ref().map_or_else(
-                || {
-                    self.snapshot
-                        .commits
-                        .get(self.selected(pane))
-                        .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
-                },
-                |drill| {
-                    selection_key_for_file_rows(
-                        &self.commit_tree_rows(),
-                        &drill.files,
-                        self.selected(pane),
-                    )
-                },
-            ),
-            Pane::Stash => self
-                .snapshot
-                .stashes
-                .get(self.selected(pane))
-                .map(|entry| SelectionKey::Stash(entry.oid.clone())),
-        }
-    }
-
-    fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
-        match (pane, key) {
-            (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                find_file_row_key(&self.files_tree_rows(), &self.snapshot.files, key)
-            },
-            (Pane::Branches, SelectionKey::Branch(name)) if self.nav.branch_drill.is_none() => self
-                .snapshot
-                .branches
-                .iter()
-                .position(|entry| entry.name == *name),
-            (Pane::Branches, SelectionKey::Commit(hash)) => self
-                .nav
-                .branch_drill
-                .as_ref()?
-                .commits
-                .iter()
-                .position(|entry| entry.full_hash == *hash),
-            (Pane::Commits, SelectionKey::Commit(hash)) if self.nav.commit_drill.is_none() => self
-                .snapshot
-                .commits
-                .iter()
-                .position(|entry| entry.full_hash == *hash),
-            (Pane::Commits, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                let drill = self.nav.commit_drill.as_ref()?;
-                find_file_row_key(&self.commit_tree_rows(), &drill.files, key)
-            },
-            (Pane::Stash, SelectionKey::Stash(oid)) => self
-                .snapshot
-                .stashes
-                .iter()
-                .position(|entry| entry.oid == *oid),
-            _ => None,
-        }
+        self.rows().row_count(pane)
     }
 
     /// `(current, total)` for the pane's `N of M` border counter, or `None`
     /// when the pane has no selectable rows.
     pub fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
-        let total = self.row_count(pane);
-        (total > 0).then(|| (self.selected(pane).min(total - 1) + 1, total))
+        self.rows().counter(pane)
+    }
+
+    /// Selection cursor for a given pane.
+    pub fn selected(&self, pane: Pane) -> usize {
+        self.nav.selected(pane)
+    }
+
+    pub fn file_lines(&self) -> Vec<Line<'static>> {
+        self.rows().file_lines()
+    }
+
+    pub fn file_display(&self, i: usize) -> String {
+        self.rows().file_display(i)
+    }
+
+    pub fn files_selection_is_dir(&self) -> bool {
+        self.rows().files_selection_is_dir()
+    }
+
+    pub fn branch_lines(&self) -> Vec<Line<'static>> {
+        self.rows()
+            .branch_lines(self.remote_branch_status().as_deref())
+    }
+
+    pub fn branches_title(&self) -> String {
+        self.rows().branches_title()
+    }
+
+    pub fn branches_drilled(&self) -> bool {
+        self.nav.branches_drilled()
+    }
+
+    pub fn commit_lines(&self) -> Vec<Line<'static>> {
+        self.rows().commit_lines()
+    }
+
+    pub fn commits_title(&self) -> String {
+        self.rows().commits_title()
+    }
+
+    pub fn commits_drilled(&self) -> bool {
+        self.nav.commits_drilled()
+    }
+
+    pub fn stash_lines(&self) -> Vec<Line<'static>> {
+        self.rows().stash_lines()
+    }
+
+    fn rows(&self) -> PaneRows<'_> {
+        PaneRows {
+            nav: &self.nav,
+            snapshot: &self.snapshot,
+            palette: &self.prefs.palette,
+        }
     }
 
     /// Status pane: lazygit's one-liner `ferrit -> main ↑2`, plus a conflict
@@ -1261,188 +1116,6 @@ impl App {
         self.last_error = Some(Arc::new(AppError::Notice(message.into())));
     }
 
-    /// Branches pane rows: the branch list, or one branch's own commit log
-    /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
-    /// own empty-state line.
-    pub fn branch_lines(&self) -> Vec<Line<'static>> {
-        if let Some(drill) = &self.nav.branch_drill {
-            if drill.commits.is_empty() {
-                return vec![Line::raw("no commits yet")];
-            }
-            return drill
-                .commits
-                .iter()
-                .map(|entry| theme::commit_line(&self.prefs.palette, entry))
-                .collect();
-        }
-        if self.nav.branches_tab == BranchesTab::Remotes {
-            if self.snapshot.remotes.is_empty() {
-                return vec![Line::raw("no remotes configured")];
-            }
-            return self
-                .snapshot
-                .remotes
-                .iter()
-                .map(|entry| theme::remote_line(&self.prefs.palette, entry))
-                .collect();
-        }
-        if self.snapshot.branches.is_empty() {
-            return vec![Line::raw("no local branches")];
-        }
-        self.snapshot
-            .branches
-            .iter()
-            .map(|branch| {
-                let operation = branch
-                    .is_head
-                    .then(|| self.remote_branch_status())
-                    .flatten();
-                theme::branch_line_with_status(&self.prefs.palette, branch, operation.as_deref())
-            })
-            .collect()
-    }
-
-    /// `[3] Local branches - Remotes - Tags`, or `[3] Commits (<branch>)`
-    /// while drilled into a branch's log (Enter on a branch, `Esc` to back
-    /// out; see `enter_branch_log`).
-    pub fn branches_title(&self) -> String {
-        match &self.nav.branch_drill {
-            Some(drill) => format!("[3] Commits ({})", drill.branch),
-            None => Pane::Branches.title().to_owned(),
-        }
-    }
-
-    /// Whether the Branches pane is drilled into one branch's own commit
-    /// log right now. `ui::draw_keybar` uses this to fall back to the
-    /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch
-    /// list row, not a commit row, so the Branches-specific hints would be
-    /// misleading while drilled in.
-    pub fn branches_drilled(&self) -> bool {
-        self.nav.branch_drill.is_some()
-    }
-
-    /// Is the selected Files row a directory (the root row included)?
-    pub fn files_selection_is_dir(&self) -> bool {
-        matches!(
-            self.files_tree_rows().get(self.selected(Pane::Files)),
-            Some(FileRow::Dir { .. })
-        )
-    }
-
-    /// Is the Commits pane showing one commit's changed files instead of the
-    /// commit list? The commit rewrite keys and their keybar apply only to the
-    /// list.
-    pub fn commits_drilled(&self) -> bool {
-        self.nav.commit_drill.is_some()
-    }
-
-    /// Commits pane rows: the commit list, or one commit's own changed-file
-    /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
-    /// shape `branch_lines` gives the Branches pane.
-    pub fn commit_lines(&self) -> Vec<Line<'static>> {
-        if let Some(drill) = &self.nav.commit_drill {
-            return self
-                .commit_tree_rows()
-                .iter()
-                .filter_map(|row| match row {
-                    FileRow::Dir {
-                        name,
-                        depth,
-                        expanded,
-                        ..
-                    } => Some(theme::dir_line(
-                        &self.prefs.palette,
-                        name,
-                        *depth,
-                        *expanded,
-                        StageState::None,
-                    )),
-                    FileRow::File { index, depth } => drill
-                        .files
-                        .get(*index)
-                        .map(|entry| theme::file_line(&self.prefs.palette, entry, *depth)),
-                })
-                .collect();
-        }
-        if self.snapshot.commits.is_empty() {
-            return vec![Line::raw("no commits yet")];
-        }
-        self.snapshot
-            .commits
-            .iter()
-            .map(|entry| theme::commit_line(&self.prefs.palette, entry))
-            .collect()
-    }
-
-    /// `[4] Commits - Reflog`, or `[4] Diff files (<hash> <summary>)` while
-    /// drilled into a commit's own changed-file tree (Enter on a commit,
-    /// `Esc` to back out; see `enter_commit_files`).
-    pub fn commits_title(&self) -> String {
-        match &self.nav.commit_drill {
-            Some(drill) => format!("[4] Diff files ({})", drill.title),
-            None => Pane::Commits.title().to_owned(),
-        }
-    }
-
-    /// Stash pane rows, or the empty-state line.
-    pub fn stash_lines(&self) -> Vec<Line<'static>> {
-        if self.snapshot.stashes.is_empty() {
-            return vec![Line::raw("(no stash entries)")];
-        }
-        self.snapshot
-            .stashes
-            .iter()
-            .map(|entry| theme::stash_line(&self.prefs.palette, entry))
-            .collect()
-    }
-
-    /// Porcelain-style `XY path` text for one Files tree row, or an empty
-    /// string for a directory row. Debug/probe helper; keyed by the same
-    /// row index `file_lines`/`row_count` use, not a flat index into
-    /// `self.snapshot.files`.
-    pub fn file_display(&self, i: usize) -> String {
-        match self.files_tree_rows().get(i) {
-            Some(&FileRow::File { index, .. }) => self
-                .snapshot
-                .files
-                .get(index)
-                .map(git::model::FileEntry::display)
-                .unwrap_or_default(),
-            _ => String::new(),
-        }
-    }
-
-    /// Files pane rows, or a single "working tree clean" line: a flat list,
-    /// or lazygit's directory tree once any changed file sits below the
-    /// repo root (`files_tree_rows`).
-    pub fn file_lines(&self) -> Vec<Line<'static>> {
-        if self.snapshot.files.is_empty() {
-            return vec![Line::raw("working tree clean")];
-        }
-        self.files_tree_rows()
-            .iter()
-            .filter_map(|row| match row {
-                FileRow::Dir {
-                    path,
-                    name,
-                    depth,
-                    expanded,
-                } => Some(theme::dir_line(
-                    &self.prefs.palette,
-                    name,
-                    *depth,
-                    *expanded,
-                    dir_stage_state(&self.snapshot.files, path),
-                )),
-                FileRow::File { index, depth } => self
-                    .snapshot
-                    .files
-                    .get(*index)
-                    .map(|entry| theme::file_line(&self.prefs.palette, entry, *depth)),
-            })
-            .collect()
-    }
-
     /// Worktree root to hand the filesystem watcher, or `None` for a bare
     /// repo (and for `App::mock`, which has no repo).
     fn watch_root(&self) -> Option<PathBuf> {
@@ -1476,7 +1149,7 @@ impl App {
     /// Bounded batches avoid repainting for every auto-repeat key while still
     /// guaranteeing regular redraws during sustained input.
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
-        let mut events = Events::new(self.watch_root().as_deref(), self.poll_interval())?;
+        let mut events = Events::new(self.watch_root().as_deref(), self.prefs.poll_interval())?;
         self.watch_error = watcher_error(&events);
         self.last_error = self.watch_error.clone();
         // A background fetch/pull/push (`start_remote_op`) needs its own
@@ -1530,7 +1203,7 @@ impl App {
                         let elapsed = overlay_tick.elapsed();
                         self.render.sheet.tick(elapsed);
                         self.render.help.tick(elapsed);
-                        self.tick_toast(elapsed);
+                        self.render.tick_toast(elapsed);
                         overlay_tick = Instant::now();
                         continue;
                     },
@@ -1582,7 +1255,7 @@ impl App {
             if self.render.help.is_animating() && help_was_animating {
                 self.render.help.tick(overlay_tick.elapsed());
             }
-            self.tick_toast(overlay_tick.elapsed());
+            self.render.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
         }
         if self.workers.remote_worker.is_some() {
@@ -1602,7 +1275,7 @@ impl App {
     /// slide, by `elapsed`, as the run loop does. Integration-test seam: a test has no loop to wait on.
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
-        self.tick_toast(elapsed);
+        self.render.tick_toast(elapsed);
         self.render.sheet.tick(elapsed);
         self.render.help.tick(elapsed);
     }
@@ -1621,22 +1294,7 @@ impl App {
         if self.modal.is_some() || self.help_is_open() {
             return false;
         }
-        match &mut self.render.toast {
-            Some(toast) if !toast.is_closing() => {
-                toast.dismiss();
-                true
-            },
-            _ => false,
-        }
-    }
-
-    fn tick_toast(&mut self, elapsed: Duration) {
-        if let Some(toast) = &mut self.render.toast {
-            toast.tick(elapsed);
-            if toast.is_closed() {
-                self.render.toast = None;
-            }
-        }
+        self.render.dismiss_toast()
     }
 }
 

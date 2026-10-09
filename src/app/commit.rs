@@ -376,7 +376,8 @@ impl App {
                 // The commit just made tops the list, and is the row selected
                 // once it shows up (lazygit).
                 if self.nav.commit_drill.is_none() {
-                    self.select_when_listed(Pane::Commits, SelectionKey::Commit(head));
+                    self.nav
+                        .select_when_listed(Pane::Commits, SelectionKey::Commit(head));
                 }
                 self.request_refresh();
             },

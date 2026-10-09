@@ -4,10 +4,12 @@
 //! changes them (`settings`), the binary sets the colour depth once.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use super::{config, keymap};
 use crate::components::ui::palette::Palette;
 use crate::components::ui::scheme::ColorDepth;
+use crate::domain::git::diff::DiffOpts;
 
 pub(super) struct Prefs {
     /// Everything loaded from `config.toml`. Its `theme` is only the value read
@@ -37,6 +39,27 @@ impl Prefs {
             file: None,
             color_depth: ColorDepth::TrueColor,
             palette,
+        }
+    }
+}
+
+impl Prefs {
+    /// `[ui] mouse`: should the terminal capture the mouse?
+    pub(super) const fn mouse_enabled(&self) -> bool {
+        self.config.ui.mouse
+    }
+
+    /// `[ui] poll_secs` as a duration.
+    pub(super) const fn poll_interval(&self) -> Duration {
+        Duration::from_secs(self.config.ui.poll_secs)
+    }
+
+    /// `[diff]` as the options `git diff` / `git show` are run with.
+    pub(super) const fn diff_opts(&self) -> DiffOpts {
+        DiffOpts {
+            context: self.config.diff.context,
+            ignore_whitespace: self.config.diff.ignore_whitespace,
+            rename_threshold: self.config.diff.rename_threshold,
         }
     }
 }

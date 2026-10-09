@@ -7,6 +7,7 @@ use ratatui::layout::Rect;
 use ratatui_image::picker::Picker;
 
 use super::diff_query::RightKey;
+use super::theme;
 use super::{DiffCursor, DiffView};
 
 pub(crate) struct RightPane {
@@ -44,5 +45,71 @@ impl RightPane {
             area: Rect::ZERO,
             cursor: DiffCursor::default(),
         }
+    }
+}
+
+impl RightPane {
+    /// Is the right pane scrollable right now: a real diff, or a branch's log
+    /// preview? The scroll keys and the wheel are inert over an image, a
+    /// `Note`, and the mock bodies; without this, they leak through to the
+    /// left pane's own selection instead (moving the wrong thing).
+    pub(super) const fn is_diff(&self) -> bool {
+        matches!(
+            self.diff,
+            DiffView::Files(_)
+                | DiffView::Commit(..)
+                | DiffView::Stash(..)
+                | DiffView::BranchLog(_)
+        )
+    }
+
+    /// Line count of the current diff text, 0 for `None` / `Note`.
+    fn diff_line_count(&self) -> usize {
+        match &self.diff {
+            // Both columns share one scroll; the taller sets how far it goes.
+            DiffView::Files(f) => f
+                .unstaged
+                .text
+                .lines()
+                .count()
+                .max(f.staged.text.lines().count()),
+            DiffView::Commit(_, d) | DiffView::Stash(_, d) => d.text.lines().count(),
+            DiffView::BranchLog(log) => log.commits.iter().map(theme::branch_log_block_lines).sum(),
+            DiffView::None | DiffView::Note(_) => 0,
+        }
+    }
+
+    /// Largest first-visible line that still fills the viewport: the last diff
+    /// line lands at the bottom of the pane, never above it. Falls back to
+    /// "line count minus one screen" until the first draw sets a real height.
+    fn max_scroll(&self) -> usize {
+        self.diff_line_count().saturating_sub(self.viewport.max(1))
+    }
+
+    /// Clamp the scroll into `0..=max_scroll()`.
+    pub(super) fn clamp_scroll(&mut self) {
+        self.scroll = self.scroll.min(self.max_scroll());
+    }
+
+    /// Move the viewport by `delta` lines, clamped so it stops with the last
+    /// line at the bottom of the pane. `isize::MIN` / `isize::MAX` snap to the
+    /// top / bottom.
+    pub(super) fn scroll_by(&mut self, delta: isize) {
+        let mag = delta.unsigned_abs();
+        self.scroll = if delta >= 0 {
+            self.scroll.saturating_add(mag).min(self.max_scroll())
+        } else {
+            self.scroll.saturating_sub(mag)
+        };
+    }
+
+    pub(super) fn set_scroll(&mut self, line: usize) {
+        self.scroll = line;
+        self.clamp_scroll();
+    }
+
+    pub(super) fn set_viewport(&mut self, rows: usize) {
+        self.viewport = rows;
+        self.clamp_scroll();
     }
 }

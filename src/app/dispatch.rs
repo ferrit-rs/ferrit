@@ -29,7 +29,7 @@ impl App {
         let binding = KeyBinding::from_event(key);
         let action = self.prefs.keymap.resolve(&self.key_contexts(), binding);
         if let Some(action) = action {
-            if is_scroll(action) && self.right_is_diff() {
+            if is_scroll(action) && self.right.is_diff() {
                 self.run_scroll(action);
                 return;
             }
@@ -43,14 +43,14 @@ impl App {
         let page =
             isize::try_from(self.right.viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
         match action {
-            Action::ScrollHalfDown => self.scroll_right(half),
-            Action::ScrollHalfUp => self.scroll_right(-half),
-            Action::ScrollLineDown => self.scroll_right(1),
-            Action::ScrollLineUp => self.scroll_right(-1),
-            Action::ScrollPageDown => self.scroll_right(page),
-            Action::ScrollPageUp => self.scroll_right(-page),
-            Action::ScrollBottom => self.scroll_right(isize::MAX),
-            Action::ScrollTop => self.scroll_right(isize::MIN),
+            Action::ScrollHalfDown => self.right.scroll_by(half),
+            Action::ScrollHalfUp => self.right.scroll_by(-half),
+            Action::ScrollLineDown => self.right.scroll_by(1),
+            Action::ScrollLineUp => self.right.scroll_by(-1),
+            Action::ScrollPageDown => self.right.scroll_by(page),
+            Action::ScrollPageUp => self.right.scroll_by(-page),
+            Action::ScrollBottom => self.right.scroll_by(isize::MAX),
+            Action::ScrollTop => self.right.scroll_by(isize::MIN),
             Action::NextHunk => self.jump_diff_anchor(1),
             Action::PrevHunk => self.jump_diff_anchor(-1),
             _ => {},

@@ -52,3 +52,26 @@ pub(crate) struct RenderedDiff {
     pub(super) width: usize,
     pub(super) text: Text<'static>,
 }
+
+impl RenderState {
+    /// Count the error toast's timeout and animation, and drop it once closed.
+    pub(super) fn tick_toast(&mut self, elapsed: Duration) {
+        if let Some(toast) = &mut self.toast {
+            toast.tick(elapsed);
+            if toast.is_closed() {
+                self.toast = None;
+            }
+        }
+    }
+
+    /// Start closing the toast. `true` when there was one to close.
+    pub(super) fn dismiss_toast(&mut self) -> bool {
+        match &mut self.toast {
+            Some(toast) if !toast.is_closing() => {
+                toast.dismiss();
+                true
+            },
+            _ => false,
+        }
+    }
+}

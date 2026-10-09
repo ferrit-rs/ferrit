@@ -108,7 +108,7 @@ impl App {
                     self.right.diff = DiffView::Note("loading diff...".into());
                     self.queue_diff_query(key, self.workers.diff.generation);
                 }
-                self.clamp_right_scroll();
+                self.right.clamp_scroll();
                 self.resync_diff_cursor();
             },
             Some(key) => {
@@ -144,7 +144,7 @@ impl App {
             return;
         };
         self.workers.diff.in_flight = true;
-        let opts = self.diff_opts();
+        let opts = self.prefs.diff_opts();
         thread::spawn(move || {
             let result = run_worker(WorkerKind::Diff, || {
                 handle.and_then(|repo| load(repo.as_ref(), &key, opts))
@@ -171,7 +171,7 @@ impl App {
                 Ok(result) => self.diff_view_from_query(&key, result),
                 Err(error) => DiffView::Note(error.to_string()),
             };
-            self.clamp_right_scroll();
+            self.right.clamp_scroll();
             self.resync_diff_cursor();
         }
         if let Some((next_key, next_generation)) = self.workers.diff.pending.take()
@@ -188,7 +188,7 @@ impl App {
     fn right_key_for(&self) -> Option<RightKey> {
         match self.nav.focus {
             Pane::Files => {
-                let rows = self.files_tree_rows();
+                let rows = self.rows().files_tree_rows();
                 match rows.get(self.selected(Pane::Files))? {
                     FileRow::File { index, .. } => Some(RightKey::File {
                         path: self.snapshot.files.get(*index)?.path.clone(),
@@ -246,7 +246,7 @@ impl App {
         let Some(repo) = &self.repo else {
             return DiffView::None;
         };
-        match load(repo.as_ref(), key, self.diff_opts()) {
+        match load(repo.as_ref(), key, self.prefs.diff_opts()) {
             Ok(result) => self.diff_view_from_query(key, result),
             Err(error) => DiffView::Note(error.to_string()),
         }

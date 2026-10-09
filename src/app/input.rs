@@ -238,15 +238,17 @@ impl App {
     pub(super) fn wheel(&mut self, ev: MouseEvent, step: isize) {
         let a = self.right.area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
-        if over_right && self.right_is_diff() {
-            self.scroll_right(step * isize::from(self.prefs.config.ui.wheel_step));
+        if over_right && self.right.is_diff() {
+            self.right
+                .scroll_by(step * isize::from(self.prefs.config.ui.wheel_step));
             return;
         }
         // Over a left pane the wheel scrolls that pane's view, wherever the
         // focus is, and leaves the focus, the selection and the right pane
         // alone (lazygit). Anywhere else there is nothing to scroll.
         if let Some(pane) = self.pane_at(ev.column, ev.row) {
-            self.scroll_list(pane, step * LIST_WHEEL_ROWS);
+            self.hits
+                .scroll_list(pane, self.nav.selection[pane], step * LIST_WHEEL_ROWS);
         }
     }
 

@@ -34,3 +34,27 @@ pub(crate) struct HitAreas {
     /// The settings sheet's clickable parts.
     pub(super) settings: SettingsHits,
 }
+
+impl HitAreas {
+    pub(super) fn list_offset(&self, pane: Pane) -> usize {
+        self.list_offset[pane]
+    }
+
+    pub(super) fn set_list_offset(&mut self, pane: Pane, offset: usize) {
+        self.list_offset[pane] = offset;
+    }
+
+    /// Whether a wheel scroll left `pane`'s view away from `selected`, its
+    /// selected row: the detachment ends when the selection moves.
+    pub(super) fn view_detached(&self, pane: Pane, selected: usize) -> bool {
+        self.view_detached_at[pane] == Some(selected)
+    }
+
+    /// Scroll `pane`'s list by `rows` (negative is up) and keep its selection
+    /// where it is, which may leave it off screen. `draw_left_column` clamps
+    /// the offset to the list's length on the next frame.
+    pub(super) fn scroll_list(&mut self, pane: Pane, selected: usize, rows: isize) {
+        self.view_detached_at[pane] = Some(selected);
+        self.list_offset[pane] = self.list_offset[pane].saturating_add_signed(rows);
+    }
+}

@@ -97,7 +97,8 @@ impl App {
         if matches!(result, Ok(StashOutcome::Done)) {
             self.nav.focus = Pane::Files;
             if let Some(path) = first_file {
-                self.select_when_listed(Pane::Files, SelectionKey::File(path));
+                self.nav
+                    .select_when_listed(Pane::Files, SelectionKey::File(path));
             }
         }
         self.request_refresh();

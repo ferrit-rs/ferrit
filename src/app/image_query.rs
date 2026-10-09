@@ -71,7 +71,7 @@ impl App {
             self.render.preview = Preview::None;
             return;
         }
-        let rows = self.files_tree_rows();
+        let rows = self.rows().files_tree_rows();
         let Some(FileRow::File { index, .. }) = rows.get(self.selected(Pane::Files)) else {
             self.invalidate_image_query();
             self.render.preview = Preview::None;

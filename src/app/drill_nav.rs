@@ -12,7 +12,7 @@ impl App {
         if self.nav.focus != Pane::Files {
             return;
         }
-        let rows = self.files_tree_rows();
+        let rows = self.rows().files_tree_rows();
         let Some(FileRow::Dir { path, .. }) = rows.get(self.selected(Pane::Files)) else {
             return;
         };
@@ -30,7 +30,7 @@ impl App {
         if self.nav.focus != Pane::Commits || self.nav.commit_drill.is_some() {
             return false;
         }
-        let opts = self.diff_opts();
+        let opts = self.prefs.diff_opts();
         let Some(repo) = &self.repo else {
             return false;
         };
@@ -65,7 +65,7 @@ impl App {
         if self.nav.focus != Pane::Commits || self.nav.commit_drill.is_none() {
             return;
         }
-        let rows = self.commit_tree_rows();
+        let rows = self.rows().commit_tree_rows();
         let Some(FileRow::Dir { path, .. }) = rows.get(self.selected(Pane::Commits)) else {
             return;
         };

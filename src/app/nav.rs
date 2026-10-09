@@ -45,3 +45,33 @@ pub struct Nav {
     /// (`docs/PLAN_6_STAGING.md`).
     pub(super) mode: Mode,
 }
+
+impl Nav {
+    /// Whether the Branches pane is drilled into one branch's own commit
+    /// log right now. `ui::draw_keybar` uses this to fall back to the
+    /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch
+    /// list row, not a commit row, so the Branches-specific hints would be
+    /// misleading while drilled in.
+    pub(super) fn branches_drilled(&self) -> bool {
+        self.branch_drill.is_some()
+    }
+
+    /// Is the Commits pane showing one commit's changed files instead of the
+    /// commit list? The commit rewrite keys and their keybar apply only to the
+    /// list.
+    pub(super) fn commits_drilled(&self) -> bool {
+        self.commit_drill.is_some()
+    }
+
+    /// Selection cursor for a given pane.
+    pub(super) fn selected(&self, pane: Pane) -> usize {
+        self.selection[pane]
+    }
+
+    /// After an action that created `key`'s row, select it in `pane` as soon as
+    /// a refresh lists it.
+    pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
+        self.select_when_listed.retain(|(p, _)| *p != pane);
+        self.select_when_listed.push((pane, key));
+    }
+}

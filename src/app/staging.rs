@@ -12,7 +12,7 @@ impl App {
     /// The `FileEntry` behind the Files pane's current selection, or `None`
     /// on a directory row or an empty pane.
     pub(super) fn selected_file(&self) -> Option<&git::model::FileEntry> {
-        let rows = self.files_tree_rows();
+        let rows = self.rows().files_tree_rows();
         let FileRow::File { index, .. } = rows.get(self.selected(Pane::Files))? else {
             return None;
         };
@@ -41,7 +41,7 @@ impl App {
         } else if self.right.cursor.line >= self.right.scroll + viewport {
             self.right.scroll = self.right.cursor.line + 1 - viewport;
         }
-        self.clamp_right_scroll();
+        self.right.clamp_scroll();
     }
 
     /// `Enter` / `l` on a Files-pane file row (`Mode::Nav`): focus the diff
@@ -241,7 +241,11 @@ impl App {
         if self.nav.focus != Pane::Files {
             return;
         }
-        let directory = match self.files_tree_rows().get(self.selected(Pane::Files)) {
+        let directory = match self
+            .rows()
+            .files_tree_rows()
+            .get(self.selected(Pane::Files))
+        {
             Some(FileRow::Dir { path, .. }) => Some(path.clone()),
             _ => None,
         };
