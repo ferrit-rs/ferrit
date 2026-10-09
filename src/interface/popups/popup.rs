@@ -1,14 +1,14 @@
 //! What a popup can be.
 
+use crate::git::actions::askpass;
 use crate::git::actions::create_remote;
-use crate::git::actions::{askpass, commit};
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::popups::{context_menu, menu};
+use crate::interface::popups::{commit_draft, context_menu, menu};
 
 /// Modal state that owns all input while it is up, the same idea as
 /// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
 pub(crate) enum Popup {
-    Commit(commit::CommitDraft),
+    Commit(commit_draft::CommitDraft),
     CommitAllConfirm,
     /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
     /// here, unlike the commit popup, where `Enter` inserts a newline —

@@ -1,67 +1,17 @@
-//! Commit editor state and actions, following lazygit's summary/description
-//! editor: `c` opens it; Tab switches fields; Enter confirms summary.
+//! Opening the commit editor and making the commit. The editor itself (its
+//! state, its keys) is `interface::popups::commit_draft`.
 
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::git;
 use crate::git::apply::ApplyDir;
 use crate::interface::components::tui_overlay::state::OverlayState;
-use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::selection::SelectionKey;
 use crate::interface::panes::views::CommitPopupView;
+use crate::interface::popups::commit_draft::{CommitDraft, DraftKey, RewordTarget};
 use crate::interface::popups::popup::Popup;
-use ratatui::crossterm::event::KeyCode;
-use ratatui::crossterm::event::KeyEvent;
-use ratatui::crossterm::event::KeyModifiers;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CommitField {
-    Summary,
-    Description,
-}
-
-/// The older commit a reword popup will rewrite with `git rebase -i`, instead
-/// of amending `HEAD`.
-pub(crate) struct RewordTarget {
-    pub(crate) hash: String,
-    pub(crate) title: String,
-}
-
-pub(crate) struct CommitDraft {
-    pub(crate) summary: TextInput,
-    pub(crate) description: TextInput,
-    pub(crate) focus: CommitField,
-    pub(crate) kind: git::commit::CommitKind,
-    /// `Some` when rewording a commit other than `HEAD`.
-    pub(crate) reword: Option<RewordTarget>,
-    pub(crate) sign_off: bool,
-    pub(crate) no_verify: bool,
-    history_index: Option<usize>,
-    saved_summary: String,
-}
-
-impl CommitDraft {
-    fn message(&self) -> String {
-        let summary = self.summary.text();
-        let description = self.description.text();
-        if description.is_empty() {
-            summary
-        } else {
-            format!("{summary}\n\n{description}")
-        }
-    }
-
-    fn set_message(&mut self, message: &str) {
-        let (summary, description) = message
-            .split_once('\n')
-            .map_or((message, ""), |(summary, rest)| {
-                (summary, rest.trim_start_matches('\n'))
-            });
-        self.summary = TextInput::from_text(summary);
-        self.description = TextInput::from_text(description);
-    }
-}
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 impl App {
     /// The commit popup as data, without any animation state.
@@ -78,41 +28,7 @@ impl App {
         let Some(Popup::Commit(draft)) = self.modal.popup() else {
             return None;
         };
-        let author = draft.reword.is_none().then_some(author);
-        let hints = match (draft.reword.is_some(), draft.focus) {
-            (false, CommitField::Summary) => {
-                "Enter: commit | Tab: description | ↑/↓: history | Ctrl-O/N/A: options | Esc: cancel"
-            },
-            (false, CommitField::Description) => {
-                "Enter: newline | Tab: summary | Meta/Ctrl-Enter: commit | Ctrl-O/N/A: options | Esc: cancel"
-            },
-            // A rebase reword has no sign-off / no-verify to toggle.
-            (true, CommitField::Summary) => {
-                "Enter: reword | Tab: description | ↑/↓: history | Esc: cancel"
-            },
-            (true, CommitField::Description) => {
-                "Enter: newline | Tab: summary | Meta/Ctrl-Enter: reword | Esc: cancel"
-            },
-        };
-        Some(CommitPopupView {
-            title: draft
-                .reword
-                .as_ref()
-                .map_or_else(|| draft.kind.title(), |target| target.title.as_str()),
-            input: &draft.summary,
-            description: Some(&draft.description),
-            summary_focused: draft.focus == CommitField::Summary,
-            overlay_state: overlay,
-            lines: draft.summary.lines(),
-            cursor: draft.summary.cursor(),
-            // A rebase reword runs the amend itself: neither toggle applies.
-            toggles: draft
-                .reword
-                .is_none()
-                .then_some((draft.sign_off, draft.no_verify)),
-            author,
-            hints,
-        })
+        Some(draft.view(author, overlay))
     }
 
     /// Replace the identities git knows globally. Integration-test seam: the
@@ -178,7 +94,7 @@ impl App {
             git::commit::CommitKind::Normal => self.new_commit_prefill(),
             _ => self.commit_draft.take(),
         };
-        self.open_commit_editor(kind, prefill);
+        self.open_commit_editor(kind, prefill.as_deref());
     }
 
     /// What a new commit starts from: the draft a cancelled editor kept, else
@@ -191,27 +107,14 @@ impl App {
     /// Open the editor to reword the older commit `hash` (a rebase, not an
     /// amend), pre-filled with its message.
     pub(crate) fn open_reword_editor(&mut self, hash: String, title: String, message: &str) {
-        self.open_commit_editor(git::commit::CommitKind::Reword, Some(message.to_owned()));
+        self.open_commit_editor(git::commit::CommitKind::Reword, Some(message));
         if let Some(Popup::Commit(draft)) = self.modal.popup_mut() {
             draft.reword = Some(RewordTarget { hash, title });
         }
     }
 
-    fn open_commit_editor(&mut self, kind: git::commit::CommitKind, prefill: Option<String>) {
-        let mut draft = CommitDraft {
-            summary: TextInput::default(),
-            description: TextInput::default(),
-            focus: CommitField::Summary,
-            kind,
-            reword: None,
-            sign_off: self.prefs.config.commit.sign_off,
-            no_verify: false,
-            history_index: None,
-            saved_summary: String::new(),
-        };
-        if let Some(prefill) = prefill {
-            draft.set_message(&prefill);
-        }
+    fn open_commit_editor(&mut self, kind: git::commit::CommitKind, prefill: Option<&str>) {
+        let draft = CommitDraft::new(kind, self.prefs.config.commit.sign_off, prefill);
         self.modal.open_popup(Popup::Commit(draft));
         self.render.commit.open();
     }
@@ -230,7 +133,10 @@ impl App {
                         self.render.commit.close();
                         self.request_refresh();
                         let prefill = self.new_commit_prefill();
-                        self.open_commit_editor(git::commit::CommitKind::Normal, prefill);
+                        self.open_commit_editor(
+                            git::commit::CommitKind::Normal,
+                            prefill.as_deref(),
+                        );
                     },
                     Some(Err(error)) => {
                         self.modal.close_popup();
@@ -253,91 +159,19 @@ impl App {
         let Some(Popup::Commit(draft)) = self.modal.popup_mut() else {
             return;
         };
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let meta = key
-            .modifiers
-            .intersects(KeyModifiers::SUPER | KeyModifiers::ALT);
-        let mut commit = false;
-        let mut cancel = false;
-
-        if draft.focus == CommitField::Summary && !ctrl && !meta {
-            match key.code {
-                KeyCode::Up => {
-                    let idx = draft.history_index.map_or(0, |i| i.saturating_add(1));
-                    if let Some(entry) = self.snapshot.commits.get(idx) {
-                        if draft.history_index.is_none() {
-                            draft.saved_summary = draft.summary.text();
-                        }
-                        draft.history_index = Some(idx);
-                        draft.summary = TextInput::from_text(&entry.summary);
-                        return;
-                    }
-                },
-                KeyCode::Down => {
-                    if let Some(idx) = draft.history_index {
-                        if idx == 0 {
-                            draft.history_index = None;
-                            draft.summary = TextInput::from_text(&draft.saved_summary);
-                        } else if let Some(entry) = self.snapshot.commits.get(idx - 1) {
-                            draft.history_index = Some(idx - 1);
-                            draft.summary = TextInput::from_text(&entry.summary);
-                        }
-                        return;
-                    }
-                },
-                _ => {},
-            }
-        }
-
-        match key.code {
-            KeyCode::Esc => cancel = true,
-            KeyCode::Tab | KeyCode::BackTab => {
-                draft.focus = match draft.focus {
-                    CommitField::Summary => CommitField::Description,
-                    CommitField::Description => CommitField::Summary,
-                };
+        match draft.on_key(key, &self.snapshot.commits) {
+            DraftKey::Edited => {},
+            DraftKey::CycleAuthor => self.cycle_author(),
+            DraftKey::Commit => self.do_commit(),
+            DraftKey::Cancel => {
+                // A reword of an older commit is not a half-written new commit:
+                // its text must not come back as the next `c`'s draft.
+                if draft.reword.is_none() {
+                    self.commit_draft = Some(draft.message());
+                }
+                self.modal.close_popup();
+                self.render.commit.close();
             },
-            KeyCode::Enter if ctrl || meta => commit = true,
-            KeyCode::Char('s') if ctrl => commit = true,
-            KeyCode::Char('o') if ctrl && draft.reword.is_none() => {
-                draft.sign_off = !draft.sign_off;
-            },
-            KeyCode::Char('n') if ctrl && draft.reword.is_none() => {
-                draft.no_verify = !draft.no_verify;
-            },
-            KeyCode::Char('a') if ctrl && draft.reword.is_none() => self.cycle_author(),
-            KeyCode::Enter if draft.focus == CommitField::Summary => commit = true,
-            KeyCode::Enter => {
-                draft
-                    .description
-                    .handle_key_event(key, TextInputMode::MultiLine);
-            },
-            _ => match draft.focus {
-                CommitField::Summary => {
-                    draft
-                        .summary
-                        .handle_key_event(key, TextInputMode::SingleLine);
-                },
-                CommitField::Description => {
-                    draft
-                        .description
-                        .handle_key_event(key, TextInputMode::MultiLine);
-                },
-            },
-        }
-
-        if cancel {
-            // A reword of an older commit is not a half-written new commit:
-            // its text must not come back as the next `c`'s draft.
-            if let Some(Popup::Commit(draft)) = self.modal.popup()
-                && draft.reword.is_none()
-            {
-                self.commit_draft = Some(draft.message());
-            }
-            self.modal.close_popup();
-            self.render.commit.close();
-        } else if commit {
-            self.do_commit();
         }
     }
 
@@ -367,11 +201,7 @@ impl App {
             self.finish_operation(result);
             return;
         }
-        let opts = git::commit::CommitOpts {
-            sign_off: draft.sign_off,
-            no_verify: draft.no_verify,
-            author: self.authorship.author_arg(),
-        };
+        let opts = draft.opts(self.authorship.author_arg());
         let kind = draft.kind.clone();
         let Some(repo) = &self.repo else { return };
         let result = repo.commit(&kind, &message, opts);
