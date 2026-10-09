@@ -15,7 +15,6 @@ pub mod terminal;
 pub mod theme;
 pub mod theme_config;
 
-use std::fmt::Write as _;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
@@ -809,16 +808,7 @@ impl App {
             )]
         } else {
             let h = &self.snapshot.header;
-            let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
-            if h.ahead > 0 {
-                let _ = write!(line, " \u{2191}{}", h.ahead);
-            }
-            if h.behind > 0 {
-                let _ = write!(line, " \u{2193}{}", h.behind);
-            }
-            if h.upstream.is_some() && h.ahead == 0 && h.behind == 0 {
-                line.push_str(" \u{2713}");
-            }
+            let line = theme::status_header(&self.repo_name, h);
             let mut lines = vec![theme::status_line(&self.prefs.palette, &line)];
             if h.conflicts > 0 {
                 lines.push(theme::error_line(
@@ -921,30 +911,23 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
-            let was_animating = self.render.sheet.is_animating();
-            let help_was_animating = self.render.help.is_animating();
-            let toast_animating = self.render.toast.as_ref().is_some_and(Toast::is_animating);
-            let remote_animating = self.workers.remote_busy.is_some();
+            let animating = self.render.animating();
             // Frames while something animates; a slower tick while a toast is up,
             // so it can time out without waiting for a key.
-            let timeout =
-                (was_animating || help_was_animating || toast_animating || remote_animating)
-                    .then_some(Duration::from_millis(16))
-                    .or_else(|| {
-                        self.render
-                            .toast
-                            .is_some()
-                            .then_some(Duration::from_millis(TOAST_TICK_MS))
-                    });
+            let timeout = (animating.any() || self.workers.remote_busy.is_some())
+                .then_some(Duration::from_millis(16))
+                .or_else(|| {
+                    self.render
+                        .toast
+                        .is_some()
+                        .then_some(Duration::from_millis(TOAST_TICK_MS))
+                });
             let batch = if let Some(timeout) = timeout {
                 match events.next_batch_timeout(timeout) {
                     Err(error) => return Err(error),
                     Ok(Some(batch)) => batch,
                     Ok(None) => {
-                        let elapsed = overlay_tick.elapsed();
-                        self.render.sheet.tick(elapsed);
-                        self.render.help.tick(elapsed);
-                        self.render.tick_toast(elapsed);
+                        self.render.tick(overlay_tick.elapsed());
                         overlay_tick = Instant::now();
                         continue;
                     },
@@ -959,12 +942,7 @@ impl App {
                         self.on_key(key);
                     },
                     AppEvent::Input(Event::Mouse(m)) => {
-                        let toast_consumed = self
-                            .render
-                            .toast
-                            .as_mut()
-                            .is_some_and(|toast| toast.on_mouse(m));
-                        if toast_consumed {
+                        if self.render.toast_mouse(m) {
                             self.mouse_pointer.request(false);
                         } else {
                             self.on_mouse(m);
@@ -990,24 +968,11 @@ impl App {
                 self.watch_error = watcher_error(&events);
                 self.last_error = self.watch_error.clone();
             }
-            if self.render.sheet.is_animating() && was_animating {
-                self.render.sheet.tick(overlay_tick.elapsed());
-            }
-            if self.render.help.is_animating() && help_was_animating {
-                self.render.help.tick(overlay_tick.elapsed());
-            }
-            self.render.tick_toast(overlay_tick.elapsed());
+            self.render
+                .tick_after_batch(overlay_tick.elapsed(), animating);
             overlay_tick = Instant::now();
         }
-        if self.workers.remote_worker.is_some() {
-            self.workers
-                .remote_cancel
-                .store(true, std::sync::atomic::Ordering::Release);
-            if let Some(worker) = self.workers.remote_worker.take() {
-                let _ = worker.join();
-            }
-            self.workers.remote_busy = None;
-        }
+        self.workers.stop_remote();
         self.sheets.dashboard.stop_and_join();
         Ok(())
     }
@@ -1016,9 +981,7 @@ impl App {
     /// slide, by `elapsed`, as the run loop does. Integration-test seam: a test has no loop to wait on.
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
-        self.render.tick_toast(elapsed);
-        self.render.sheet.tick(elapsed);
-        self.render.help.tick(elapsed);
+        self.render.tick(elapsed);
     }
 
     /// Let the settings sheet's slide end now. Integration-test seam for the

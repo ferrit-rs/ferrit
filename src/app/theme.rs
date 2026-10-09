@@ -2,6 +2,7 @@
 //! The colours come from the `Palette` each builder is handed (the app's own,
 //! `App::palette`), so a theme changes them all in one place.
 
+use std::fmt::Write as _;
 use std::ops::Range;
 use std::sync::OnceLock;
 
@@ -16,9 +17,9 @@ use crate::components::ui::palette::Palette;
 use crate::domain::git::command_log::{CommandKind, CommandRecord};
 use crate::domain::git::diff::{Diff, DiffStat};
 use crate::domain::git::model::FileEntry;
-use crate::domain::git::model::RemoteEntry;
 use crate::domain::git::model::{BranchEntry, CommitEntry, StashEntry};
 use crate::domain::git::model::{Change, CommitRefKind, PushState};
+use crate::domain::git::model::{RemoteEntry, StatusHeader};
 
 /// Prefixes of diff metadata lines (file/commit headers), never source code.
 const META: &[&str] = &[
@@ -764,6 +765,22 @@ pub fn stat_line(p: &Palette, stat: DiffStat) -> Line<'static> {
         ));
     }
     Line::from(spans)
+}
+
+/// The Status pane's first line: `ferrit -> main ↑2`, with a tick when the
+/// branch is level with its upstream.
+pub fn status_header(repo_name: &str, h: &StatusHeader) -> String {
+    let mut line = format!("{repo_name} \u{2192} {}", h.branch);
+    if h.ahead > 0 {
+        let _ = write!(line, " \u{2191}{}", h.ahead);
+    }
+    if h.behind > 0 {
+        let _ = write!(line, " \u{2193}{}", h.behind);
+    }
+    if h.upstream.is_some() && h.ahead == 0 && h.behind == 0 {
+        line.push_str(" \u{2713}");
+    }
+    line
 }
 
 /// Repo status header line: highlight the ahead/behind arrows.

@@ -111,3 +111,15 @@ pub(super) fn run_worker<T>(
         WorkerError { worker, detail }
     })
 }
+
+impl Workers {
+    /// Ask the network operation in flight to stop, and wait for it.
+    pub(super) fn stop_remote(&mut self) {
+        if let Some(worker) = self.remote_worker.take() {
+            self.remote_cancel
+                .store(true, std::sync::atomic::Ordering::Release);
+            let _ = worker.join();
+            self.remote_busy = None;
+        }
+    }
+}

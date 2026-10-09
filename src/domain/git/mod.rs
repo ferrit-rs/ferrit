@@ -1,4 +1,7 @@
-//! Headless Git adapter. Nothing under `domain::git` imports `ratatui`.
+//! The git types and pure logic (model, diff parsing, statistics, hosting rules)
+//! and the `GitPort` traits. Nothing under `domain::git` imports `ratatui` or
+//! `git2`; the code that reads with `git2` or runs `git` for each module here
+//! is the module of the same name in `crate::infra::git`.
 //!
 //! See `docs/PLAN_2_GIT_BACKEND.md`: Status, Files, Branches, Commits, Stash
 //! and blob reads are all wired to real `git2` reads (G0..G6). Since

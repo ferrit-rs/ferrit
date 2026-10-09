@@ -10,6 +10,8 @@ use ratatui::text::Text;
 use std::ops::Range;
 use std::time::Duration;
 
+use ratatui::crossterm::event::MouseEvent;
+
 use super::diff_query::RightKey;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::toast::Toast;
@@ -73,5 +75,56 @@ impl RenderState {
             },
             _ => false,
         }
+    }
+}
+
+/// Which of the animated things were moving at one instant.
+#[derive(Clone, Copy)]
+pub(super) struct Animating {
+    sheet: bool,
+    help: bool,
+    toast: bool,
+}
+
+impl Animating {
+    pub(super) const fn any(self) -> bool {
+        self.sheet || self.help || self.toast
+    }
+}
+
+impl RenderState {
+    pub(super) fn animating(&self) -> Animating {
+        Animating {
+            sheet: self.sheet.is_animating(),
+            help: self.help.is_animating(),
+            toast: self.toast.as_ref().is_some_and(Toast::is_animating),
+        }
+    }
+
+    /// Advance every animation and the toast's timeout by `elapsed`.
+    pub(super) fn tick(&mut self, elapsed: Duration) {
+        self.sheet.tick(elapsed);
+        self.help.tick(elapsed);
+        self.tick_toast(elapsed);
+    }
+
+    /// The same at the end of a batch of events: a sheet or the help that began
+    /// to animate during the batch waits for its first frame, so only the ones
+    /// already moving (`was`) advance.
+    pub(super) fn tick_after_batch(&mut self, elapsed: Duration, was: Animating) {
+        if self.sheet.is_animating() && was.sheet {
+            self.sheet.tick(elapsed);
+        }
+        if self.help.is_animating() && was.help {
+            self.help.tick(elapsed);
+        }
+        self.tick_toast(elapsed);
+    }
+
+    /// Give a mouse event to the toast. `true` when it consumed it.
+    pub(super) fn toast_mouse(&mut self, event: MouseEvent) -> bool {
+        self.toast
+            .as_mut()
+            .is_some_and(|toast| toast.on_mouse(event))
     }
 }
