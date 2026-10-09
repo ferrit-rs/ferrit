@@ -111,7 +111,7 @@ per feature), `tui/components/<x>.rs` everything the interface does with it.
 
 | Path | Holds |
 | --- | --- |
-| `src/tui/mod.rs` | `App` and the run loop; `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
+| `src/tui/mod.rs` | `App` and the run loop (`api.rs` holds what tests and examples ask of it); `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
 | `src/tui/event.rs` | `Event` (what a component asks), `Env` (what it may read), and `App::apply`, the one place that changes the state |
 | `src/tui/components/` | one file per piece: `panes/` (the five left panes: `nav`, `rows`, `tree`, `drills`, `hit_areas`, `keys`, `draw`), `files`, `branches`, `commits`, `stash` (what a key does in each), `diff/` (the right column: `right_pane` with its line cursor, `views`, `queries`, `draw`), `commit_editor`, `create_remote`, `menu`, `popups` (popup, question, note), `help`, `command_log`, `keybar`, `dashboard` (+ `dashboard/`), `settings`, `git_config/` (`keys`, `screen`, `draw`), `welcome`, `remote` |
 | `src/tui/` (the rest) | `input` (routing a key or a click), `scene` (what drawing may read of `App`: references to its state; drawing takes a `Scene`, never `App`), `view` (the read-only questions screens and tests ask), `publish` (creating the GitHub repository), `loading` (the diff and the image preview, off the UI thread), `keymap`, `events`, `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines`, `terminal`, `error`, `mock` |

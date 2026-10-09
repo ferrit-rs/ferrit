@@ -8,6 +8,7 @@
     reason = "unit test: a failed setup or a bad index is the assertion"
 )]
 
+use crate::git::image::preview::Preview;
 use crate::tui::*;
 use ratatui::crossterm::event::KeyCode;
 
