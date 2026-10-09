@@ -9,7 +9,7 @@
 //! through `git2`, the same split `apply.rs`/`commit.rs` already make.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::branch`.
+//! `git2` or runs `git` is `crate::git::repo::branches`.
 
 use super::error::GitResult;
 use super::port::GitPort;

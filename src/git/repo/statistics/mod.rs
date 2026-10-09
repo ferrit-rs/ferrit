@@ -16,9 +16,9 @@ use crate::git::stats::{
     WorkState,
 };
 
-use super::status;
+use super::read;
 
-mod branches;
+mod branch_health;
 mod churn;
 
 pub(super) fn repo_stats(
@@ -32,7 +32,7 @@ pub(super) fn repo_stats(
 
     // Only the commits on the main branch: its tip is the one start. With no main
     // branch to name, HEAD's own history is all there is (an unborn HEAD has none).
-    let main = branches::main_branch(repo);
+    let main = branch_health::main_branch(repo);
     let mut walk = repo.revwalk().map_err(read_error)?;
     match &main {
         Some((_, tip)) => walk.push(*tip).map_err(read_error)?,
@@ -93,7 +93,7 @@ pub(super) fn repo_stats(
         }
     }
 
-    let (main_branch, branch_health) = branches::health(repo, opts.now)?;
+    let (main_branch, branch_health) = branch_health::health(repo, opts.now)?;
     let start = first.map_or(opts.now, |f| cutoff.map_or(f, |c| c.max(f)));
     let granularity = Granularity::for_span_days((opts.now - start).max(0) / DAY);
     let series = if times.is_empty() {
@@ -160,9 +160,9 @@ pub(super) fn repo_stats(
             commits: times.len(),
             authors: author_stats.len(),
             local_branches: branch_health.len(),
-            remote_branches: branches::count_refs(repo, "refs/remotes/"),
+            remote_branches: branch_health::count_refs(repo, "refs/remotes/"),
             remotes: repo.remotes().map_or(0, |r| r.len()),
-            tags: branches::count_refs(repo, "refs/tags/"),
+            tags: branch_health::count_refs(repo, "refs/tags/"),
             stashes: work.stashes,
             first_commit: first,
             last_commit: last,
@@ -177,7 +177,7 @@ pub(super) fn repo_stats(
         branches: branch_health,
         main_branch,
         work,
-        since_tag: branches::since_tag(repo),
+        since_tag: branch_health::since_tag(repo),
         shallow: repo.is_shallow(),
         sampled,
     })
@@ -187,7 +187,7 @@ pub(super) fn repo_stats(
 /// worktree to read) gives the default.
 fn work_state(repo: &Repository) -> WorkState {
     let stashes = repo.reflog("refs/stash").map_or(0, |log| log.len());
-    let (Ok(files), Ok(header)) = (status::files(repo), status::header(repo)) else {
+    let (Ok(files), Ok(header)) = (read::files(repo), read::header(repo)) else {
         return WorkState {
             stashes,
             ..WorkState::default()

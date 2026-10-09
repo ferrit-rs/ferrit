@@ -1,18 +1,16 @@
 //! The `git2` and subprocess half of `crate::git::apply`: the types are there.
 
+use super::read::{stderr, workdir};
+use crate::git::apply::{ApplyDir, ApplyTarget, transform_body};
+use crate::git::error::{GitError, GitResult};
+use crate::git::exec;
+use git2::Repository;
 use std::collections::BTreeSet;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use git2::Repository;
-
-use super::diff::{stderr, workdir};
-use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
-
-use crate::git::apply::{ApplyDir, ApplyTarget, transform_body};
-
+// --- apply ---
 /// `git -C <workdir> <...args>`, run to completion. One owned `Command` built
 /// up by the caller (rather than a match returning different builder chains)
 /// so a conditional flag never fights the borrow checker over a temporary.

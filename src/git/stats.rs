@@ -17,11 +17,11 @@
 //! renames before the grouping.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::stats`.
+//! `git2` or runs `git` is `crate::git::repo::statistics`.
 
 pub(crate) mod authors;
 
-pub mod branches;
+pub mod branch_health;
 
 pub mod kind;
 
@@ -29,7 +29,7 @@ pub mod series;
 
 pub mod share;
 
-use self::branches::{BranchHealth, TagSince};
+use self::branch_health::{BranchHealth, TagSince};
 use self::kind::Kind;
 use self::series::{Bucket, Granularity};
 use self::share::Share;
@@ -239,7 +239,7 @@ pub struct RepoStats {
     pub kinds: Vec<KindStat>,
     /// `None` when `git log` failed or was not asked for (`StatsOptions::churn`).
     pub hot_files: Option<HotFiles>,
-    /// See `branches::health` for the order.
+    /// See `branch_health::health` for the order.
     pub branches: Vec<BranchHealth>,
     /// Name of the main branch; `None` when HEAD's own branch is all there is.
     pub main_branch: Option<String>,

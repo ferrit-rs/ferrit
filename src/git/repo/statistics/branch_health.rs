@@ -5,7 +5,7 @@ use git2::{BranchType, Oid, Repository};
 
 use crate::git::error::GitResult;
 
-use crate::git::stats::branches::{BranchHealth, STALE_SECONDS, TagSince, VsMain};
+use crate::git::stats::branch_health::{BranchHealth, STALE_SECONDS, TagSince, VsMain};
 
 /// The main branch: `origin/HEAD` (any remote) if set, else
 /// `init.defaultBranch`, else the first of `main`, `master`. Named and

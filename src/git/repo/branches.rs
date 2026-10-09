@@ -1,17 +1,15 @@
 //! The `git2` and subprocess half of `crate::git::branch`: the types are there.
 
+use super::read::{stderr, workdir};
+use crate::git::branch::MergeOutcome;
+use crate::git::error::{GitError, GitResult};
+use crate::git::exec;
 use crate::git::repo::read_error;
+use git2::{BranchType, Repository};
 use std::path::Path;
 use std::process::Command;
 
-use git2::{BranchType, Repository};
-
-use super::diff::{stderr, workdir};
-use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
-
-use crate::git::branch::MergeOutcome;
-
+// --- branch ---
 /// `git -C <workdir> <...args>`, run to completion, mapping a non-zero exit
 /// to `err(stderr)`. Same shape as `apply.rs::run_git`, kept separate: the
 /// two modules map failure to different `GitError` variants, and threading

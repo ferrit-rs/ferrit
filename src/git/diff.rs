@@ -8,7 +8,7 @@
 //! `Range`s over one owned `String`, exactly like gitu's public `Diff`.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::diff`.
+//! `git2` or runs `git` is `crate::git::repo::read`.
 
 use std::io::Write as _;
 use std::path::Path;

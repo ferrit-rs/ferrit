@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use super::Repo;
-use super::diff::stderr;
+use super::read::stderr;
 use crate::git::error::{GitError, GitResult};
 use crate::git::exec;
 

@@ -6,7 +6,7 @@
 //! No `ratatui` import, same rule as the rest of `git::`.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::commit`.
+//! `git2` or runs `git` is `crate::git::repo::history`.
 
 use super::error::GitResult;
 use super::port::GitPort;

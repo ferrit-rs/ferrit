@@ -1,26 +1,21 @@
 //! The `git2` and subprocess adapter behind the `GitPort` traits (`crate::git::port`).
-//! `Repo` opens a repository and answers the traits; each submodule is the
-//! implementation half of the domain module of the same name, which holds the
-//! types. Nothing outside this module and `crate::git::fake` names `Repo`
-//! except the composition root (`App::open`).
+//! `Repo` opens a repository and answers the traits. The submodules follow the
+//! traits, not the domain files: `read` (`GitRead`: status, log, diffs, blobs),
+//! `index` (`GitIndex`: stage, apply, discard), `history` (`GitHistory`:
+//! commit, rebase, merge state), `branches`, `stashes`, `remotes` (fetch, pull,
+//! push, `gh`), `gitconfig` and `statistics`. Nothing outside this module and
+//! `crate::git::fake` names `Repo` except the composition root (`App::open`).
 
-pub(crate) mod apply;
-pub(crate) mod blob;
-pub(crate) mod branch;
-pub(crate) mod commit;
-pub(crate) mod config;
-pub(crate) mod diff;
-pub(crate) mod host;
+pub(crate) mod branches;
+pub(crate) mod gitconfig;
+pub(crate) mod history;
+pub(crate) mod index;
 mod init;
-pub(crate) mod log;
-pub(crate) mod operation;
 pub(crate) mod port_impl;
-pub(crate) mod rebase;
-pub(crate) mod refs;
-pub(crate) mod remote;
-pub(crate) mod stash;
-pub(crate) mod stats;
-pub(crate) mod status;
+pub(crate) mod read;
+pub(crate) mod remotes;
+pub(crate) mod stashes;
+pub(crate) mod statistics;
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -244,7 +239,7 @@ impl Repo {
         opts: &StatsOptions,
         cancel: &AtomicBool,
     ) -> GitResult<RepoStats> {
-        stats::repo_stats(&self.inner, window, opts, cancel)
+        statistics::repo_stats(&self.inner, window, opts, cancel)
     }
 
     /// Re-read every wired pane in one go. Partial failure fails the whole call.
@@ -252,13 +247,13 @@ impl Repo {
     /// `&mut self`: reading the stash list needs `&mut git2::Repository`.
     pub fn snapshot(&mut self) -> GitResult<Snapshot> {
         Ok(Snapshot {
-            header: status::header(&self.inner)?,
-            files: status::files(&self.inner)?,
-            branches: refs::branches(&self.inner)?,
-            commits: log::commits(&self.inner, COMMITS_LIMIT)?,
-            stashes: stash::stashes(&mut self.inner)?,
-            remotes: remote::remotes(&self.inner)?,
-            operation: operation::current(&self.inner),
+            header: read::header(&self.inner)?,
+            files: read::files(&self.inner)?,
+            branches: read::branches(&self.inner)?,
+            commits: read::commits(&self.inner, COMMITS_LIMIT)?,
+            stashes: stashes::stashes(&mut self.inner)?,
+            remotes: remotes::remotes(&self.inner)?,
+            operation: history::current(&self.inner),
         })
     }
 
@@ -270,61 +265,61 @@ impl Repo {
 
     /// Raw bytes of `path` at `rev`. Feeds the right-pane image preview.
     pub fn blob_bytes(&self, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
-        blob::blob_bytes(&self.inner, path, rev)
+        read::blob_bytes(&self.inner, path, rev)
     }
 
     /// One file's diff (`git diff [--cached] -- <path>`), parsed. Untracked
     /// files come back via `--no-index` as all-additions.
     pub fn file_diff(&self, path: &Path, side: DiffSide, opts: DiffOpts) -> GitResult<Diff> {
-        diff::file_diff(&self.inner, path, side, opts)
+        read::file_diff(&self.inner, path, side, opts)
     }
 
     /// One commit's diff against its first parent (`git show <hash>`), parsed.
     pub fn commit_diff(&self, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
-        diff::commit_diff(&self.inner, hash, opts)
+        read::commit_diff(&self.inner, hash, opts)
     }
 
     /// One local branch's own commit history, newest first, bounded by
     /// `COMMITS_LIMIT`. Feeds the Branches pane's Enter-to-drill-down log
     /// (`docs/PLAN_2_GIT_BACKEND.md`, G7).
     pub fn branch_log(&self, branch: &str) -> GitResult<Vec<CommitEntry>> {
-        log::commits_for(&self.inner, branch, COMMITS_LIMIT)
+        read::commits_for(&self.inner, branch, COMMITS_LIMIT)
     }
 
     /// Stage or unstage a whole file. No patch: `git add` / `git restore
     /// --staged`. See `docs/PLAN_6_STAGING.md`.
     pub fn stage_file(&self, path: &Path, dir: ApplyDir) -> GitResult<()> {
-        apply::stage_file(&self.inner, path, dir)
+        index::stage_file(&self.inner, path, dir)
     }
 
     /// Stage or unstage every changed file (`a`): `git add -A` / `git
     /// restore --staged .`.
     pub fn stage_all(&self, dir: ApplyDir) -> GitResult<()> {
-        apply::stage_all(&self.inner, dir)
+        index::stage_all(&self.inner, dir)
     }
 
     /// Stage everything except `excluded` (paths that must stay unstaged).
     pub fn stage_all_except(&self, excluded: &[std::path::PathBuf]) -> GitResult<()> {
-        apply::stage_all_except(&self.inner, excluded)
+        index::stage_all_except(&self.inner, excluded)
     }
 
     /// Does the file still contain merge conflict markers?
     pub fn has_conflict_markers(&self, path: &Path) -> GitResult<bool> {
-        apply::has_conflict_markers(&self.inner, path)
+        index::has_conflict_markers(&self.inner, path)
     }
 
     /// Discard a whole file's worktree change, never the index. `untracked`
     /// picks `git clean` (nothing to restore *to*) over `git restore
     /// --worktree`.
     pub fn discard_file(&self, path: &Path, untracked: bool) -> GitResult<()> {
-        apply::discard_file(&self.inner, path, untracked)
+        index::discard_file(&self.inner, path, untracked)
     }
 
     /// Stage / unstage / discard one hunk. `patch` is `file.header.start
     /// .. hunk.body.end` over a `Diff::text`; the caller slices it so this
     /// module never re-runs the diff.
     pub fn apply_hunk(&self, patch: &str, dir: ApplyDir, target: ApplyTarget) -> GitResult<()> {
-        apply::apply_hunk(&self.inner, patch, dir, target)
+        index::apply_hunk(&self.inner, patch, dir, target)
     }
 
     /// Stage / unstage / discard a set of body lines within one hunk.
@@ -338,7 +333,7 @@ impl Repo {
         dir: ApplyDir,
         target: ApplyTarget,
     ) -> GitResult<()> {
-        apply::apply_lines(
+        index::apply_lines(
             &self.inner,
             file_header,
             hunk_header,
@@ -351,91 +346,91 @@ impl Repo {
 
     /// Run `git commit`. See `docs/PLAN_7_COMMIT.md`.
     pub fn commit(&self, kind: &CommitKind, message: &str, opts: CommitOpts) -> GitResult<String> {
-        commit::commit(&self.inner, kind, message, opts)
+        history::commit(&self.inner, kind, message, opts)
     }
 
     /// `git remote set-url <name> <url>`: where a remote points, rewritten.
     pub fn set_remote_url(&self, name: &str, url: &str) -> GitResult<()> {
-        host::set_remote_url(&self.inner, name, url)
+        remotes::set_remote_url(&self.inner, name, url)
     }
 
     /// Whether the current branch has a commit; a new repository has none.
     pub fn has_commits(&self) -> bool {
-        commit::has_commits(&self.inner)
+        history::has_commits(&self.inner)
     }
 
     /// The first commit of a repository with none: an empty `README.md`.
     /// `Ok(false)` when there is already a commit. See
     /// `docs/PLAN_15_CREATE_REMOTE.md`.
     pub fn initial_commit(&self, author: Option<String>) -> GitResult<bool> {
-        commit::initial_commit(&self.inner, author)
+        history::initial_commit(&self.inner, author)
     }
 
     /// The `commit.template` file's message, comments removed (`None`: no
     /// template, or an empty one).
     pub fn commit_template(&self) -> Option<String> {
-        commit::template(&self.inner)
+        history::template(&self.inner)
     }
 
     /// `HEAD`'s current message, for pre-filling the Amend / Reword popup.
     pub fn head_message(&self) -> GitResult<Option<String>> {
-        commit::head_message(&self.inner)
+        history::head_message(&self.inner)
     }
 
     /// Count of paths staged relative to `HEAD`; the commit popup's
     /// precondition.
     pub fn staged_count(&self) -> GitResult<usize> {
-        commit::staged_count(&self.inner)
+        history::staged_count(&self.inner)
     }
 
     /// `git checkout <name>`. See `docs/PLAN_8_BRANCHES.md`.
     pub fn checkout(&self, name: &str) -> GitResult<()> {
-        branch::checkout(&self.inner, name)
+        branches::checkout(&self.inner, name)
     }
 
     /// `git checkout -b <name>` from the current `HEAD`.
     pub fn create_branch(&self, name: &str) -> GitResult<()> {
-        branch::create_branch(&self.inner, name)
+        branches::create_branch(&self.inner, name)
     }
 
     /// `git branch -d <name>` (`-D` when `force`).
     pub fn delete_branch(&self, name: &str, force: bool) -> GitResult<()> {
-        branch::delete_branch(&self.inner, name, force)
+        branches::delete_branch(&self.inner, name, force)
     }
 
     /// Fast-forward `name` to its upstream, checked out or not.
     pub fn fast_forward(&self, name: &str) -> GitResult<()> {
-        branch::fast_forward(&self.inner, name)
+        branches::fast_forward(&self.inner, name)
     }
 
     /// `git checkout -b <name> <hash> --no-track`; `hash` may be a ref.
     pub fn create_branch_at(&self, name: &str, hash: &str) -> GitResult<()> {
-        branch::create_branch_at(&self.inner, name, hash)
+        branches::create_branch_at(&self.inner, name, hash)
     }
 
     /// `git branch -m <old> <new>`.
     pub fn rename_branch(&self, old: &str, new: &str) -> GitResult<()> {
-        branch::rename_branch(&self.inner, old, new)
+        branches::rename_branch(&self.inner, old, new)
     }
 
     /// `git merge --no-ff <name>`: always a merge commit.
     pub fn merge_branch_no_ff(&self, name: &str) -> GitResult<MergeOutcome> {
-        branch::merge_branch_no_ff(&self.inner, name)
+        branches::merge_branch_no_ff(&self.inner, name)
     }
 
     /// `git merge --squash <name>`, then a commit when `commit` is set.
     pub fn merge_squash(&self, name: &str, commit: bool) -> GitResult<()> {
-        branch::merge_squash(&self.inner, name, commit)
+        branches::merge_squash(&self.inner, name, commit)
     }
 
     /// Take one side of a conflicted file whole (`checkout --ours|--theirs`).
     pub fn take_side(&self, path: &Path, ours: bool) -> GitResult<()> {
-        apply::take_side(&self.inner, path, ours)
+        index::take_side(&self.inner, path, ours)
     }
 
     /// `git merge <name>` into the current branch.
     pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
-        branch::merge_branch(&self.inner, name)
+        branches::merge_branch(&self.inner, name)
     }
 
     /// Create the repository on GitHub through `gh` and add it as `origin`
@@ -447,7 +442,7 @@ impl Repo {
         req: &CreateRequest,
         cancel: &AtomicBool,
     ) -> GitResult<CreatedRepo> {
-        host::create_repo(&self.inner, gh, req, cancel)
+        remotes::create_repo(&self.inner, gh, req, cancel)
     }
 
     /// Point this handle's `git config` calls at `global` as the global file
@@ -471,7 +466,7 @@ impl Repo {
     /// Every git config value with its scope and origin.
     /// See `docs/PLAN_14_GIT_CONFIG.md`.
     pub fn config(&self) -> GitResult<ConfigView> {
-        config::read(&self.inner, &self.config_envs())
+        gitconfig::read(&self.inner, &self.config_envs())
     }
 
     /// `git config <scope> <key> <value>`; git validates a typed value.
@@ -482,7 +477,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::set(&self.inner, &self.config_envs(), scope, key, value, kind)
+        gitconfig::set(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// `git config --add`: one more value for a multi-valued key.
@@ -493,7 +488,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::add(&self.inner, &self.config_envs(), scope, key, value, kind)
+        gitconfig::add(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// `git config --replace-all`: every value of the key in `scope` becomes this one.
@@ -504,7 +499,7 @@ impl Repo {
         value: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::replace_all(&self.inner, &self.config_envs(), scope, key, value, kind)
+        gitconfig::replace_all(&self.inner, &self.config_envs(), scope, key, value, kind)
     }
 
     /// Change one value of a multi-valued key (`--fixed-value`), leaving the others.
@@ -516,7 +511,7 @@ impl Repo {
         old: &str,
         kind: ValueKind,
     ) -> GitResult<()> {
-        config::replace_value(
+        gitconfig::replace_value(
             &self.inner,
             &self.config_envs(),
             scope,
@@ -529,85 +524,85 @@ impl Repo {
 
     /// Remove one value of a multi-valued key, leaving the others.
     pub fn config_unset_value(&self, scope: WriteScope, key: &str, old: &str) -> GitResult<()> {
-        config::unset_value(&self.inner, &self.config_envs(), scope, key, old)
+        gitconfig::unset_value(&self.inner, &self.config_envs(), scope, key, old)
     }
 
     /// `git config --unset-all`: drop the key from `scope` only.
     pub fn config_unset(&self, scope: WriteScope, key: &str) -> GitResult<()> {
-        config::unset(&self.inner, &self.config_envs(), scope, key)
+        gitconfig::unset(&self.inner, &self.config_envs(), scope, key)
     }
 
     /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.
     pub fn stash_push(&self, message: &str) -> GitResult<()> {
-        stash::push(&self.inner, message, false)
+        stashes::push(&self.inner, message, false)
     }
 
     /// Like `stash_push` but the index stays staged (`--keep-index`).
     pub fn stash_push_keeping_index(&self, message: &str) -> GitResult<()> {
-        stash::push(&self.inner, message, true)
+        stashes::push(&self.inner, message, true)
     }
 
     /// Give the stash entry with this oid a new message; it becomes `stash@{0}`.
     pub fn stash_rename(&mut self, oid: &str, message: &str) -> GitResult<()> {
-        stash::rename(&mut self.inner, oid, message)
+        stashes::rename(&mut self.inner, oid, message)
     }
 
     /// `git stash apply` for the entry with this oid; the entry stays.
     pub fn stash_apply(&mut self, oid: &str) -> GitResult<StashOutcome> {
-        stash::apply(&mut self.inner, oid)
+        stashes::apply(&mut self.inner, oid)
     }
 
     /// `git stash pop` for the entry with this oid.
     pub fn stash_pop(&mut self, oid: &str) -> GitResult<StashOutcome> {
-        stash::pop(&mut self.inner, oid)
+        stashes::pop(&mut self.inner, oid)
     }
 
     /// `git stash drop` for the entry with this oid.
     pub fn stash_drop(&mut self, oid: &str) -> GitResult<()> {
-        stash::drop_entry(&mut self.inner, oid)
+        stashes::drop_entry(&mut self.inner, oid)
     }
 
     /// The entry's stat and patch under `header`, for the right pane.
     pub fn stash_diff(&self, oid: &str, header: &str, opts: DiffOpts) -> GitResult<Diff> {
-        diff::stash_diff(&self.inner, oid, header, opts)
+        read::stash_diff(&self.inner, oid, header, opts)
     }
 
     /// Reword, drop, edit, squash or fixup the commit `hash` with one
     /// `git rebase -i`. See `docs/PLAN_11_REBASE.md`.
     pub fn rebase_edit(&self, hash: &str, edit: &RebaseEdit) -> GitResult<OperationOutcome> {
-        rebase::rebase_edit(&self.inner, hash, edit)
+        history::rebase_edit(&self.inner, hash, edit)
     }
 
     /// Fold every `fixup!` / `squash!` commit after `hash`'s parent into its
     /// target.
     pub fn autosquash(&self, hash: &str) -> GitResult<OperationOutcome> {
-        rebase::autosquash(&self.inner, hash)
+        history::autosquash(&self.inner, hash)
     }
 
     /// The full message of a commit, for pre-filling a reword.
     pub fn commit_message(&self, hash: &str) -> GitResult<String> {
-        rebase::commit_message(&self.inner, hash)
+        history::commit_message(&self.inner, hash)
     }
 
     /// Continue, skip or abort the operation git is stopped in.
     pub fn operation_step(&self, step: Step) -> GitResult<OperationOutcome> {
-        operation::step(&self.inner, step)
+        history::step(&self.inner, step)
     }
 
     /// The merge, rebase, cherry-pick or revert git is stopped in, if any.
     pub fn operation(&self) -> Option<model::Operation> {
-        operation::current(&self.inner)
+        history::current(&self.inner)
     }
 
     /// Configured remotes, alphabetical. See `docs/PLAN_9_REMOTE.md`.
     pub fn remotes(&self) -> GitResult<Vec<RemoteEntry>> {
-        remote::remotes(&self.inner)
+        remotes::remotes(&self.inner)
     }
 
     /// `git fetch <remote>`, or every remote when `remote` is `None`. Slow:
     /// run off the main thread, see `docs/PLAN_9_REMOTE.md` "Approach part 2".
     pub fn fetch(&self, remote: Option<&str>) -> GitResult<String> {
-        remote::fetch(&self.inner, remote)
+        remotes::fetch(&self.inner, remote)
     }
 
     pub(crate) fn fetch_cancellable(
@@ -615,23 +610,23 @@ impl Repo {
         remote: Option<&str>,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        remote::fetch_cancellable(&self.inner, remote, cancel)
+        remotes::fetch_cancellable(&self.inner, remote, cancel)
     }
 
     /// `git pull`, honouring the user's `pull.rebase`/`pull.ff` config. Slow,
     /// same as `fetch`.
     pub fn pull(&self) -> GitResult<String> {
-        remote::pull(&self.inner)
+        remotes::pull(&self.inner)
     }
 
     pub(crate) fn pull_cancellable(&self, cancel: &AtomicBool) -> GitResult<String> {
-        remote::pull_cancellable(&self.inner, cancel)
+        remotes::pull_cancellable(&self.inner, cancel)
     }
 
     /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
     /// `Some`. Slow, same as `fetch`.
     pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
-        remote::push(&self.inner, set_upstream)
+        remotes::push(&self.inner, set_upstream)
     }
 
     pub(crate) fn push_cancellable(
@@ -642,7 +637,7 @@ impl Repo {
         set_upstream_current: bool,
         cancel: &AtomicBool,
     ) -> GitResult<String> {
-        remote::push_cancellable(
+        remotes::push_cancellable(
             &self.inner,
             set_upstream,
             upstream_branch,

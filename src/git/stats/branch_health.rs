@@ -2,7 +2,7 @@
 //! `HEAD`. All types are plain owned values; no `git2` type escapes.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::stats::branches`.
+//! `git2` or runs `git` is `crate::git::repo::statistics::branches`.
 
 /// A local branch whose tip is older than this (and is not checked out) is stale.
 pub(crate) const STALE_SECONDS: i64 = 60 * 86_400;

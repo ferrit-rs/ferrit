@@ -7,7 +7,7 @@
 //! subprocess per action, no long-lived patch-builder state.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::apply`.
+//! `git2` or runs `git` is `crate::git::repo::index`.
 
 use std::collections::HashSet;
 

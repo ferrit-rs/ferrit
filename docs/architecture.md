@@ -102,7 +102,7 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 The rule: a domain is a flat list of files named after what they do, with a folder
 only for a feature that has several files, and nothing deeper than two folders
 (`tests/layering.rs`). A feature keeps its name across the roles it plays:
-`git/<x>.rs` the types and rules, `git/repo/<x>.rs` how `Repo` does it,
+`git/<x>.rs` the types and rules, `git/repo/` how `Repo` does it (one file per trait of the port, not per feature),
 `git/keys/<x>.rs` what a key does with it, `interface/screens/<x>.rs` how it is drawn,
 `interface/state/<x>.rs` what the interface keeps of it.
 
@@ -120,7 +120,7 @@ only for a feature that has several files, and nothing deeper than two folders
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`), `prefs` (what is loaded and what it makes: keymap, palette, diff options) and `settings` (the rows of the settings sheet and what changing one does); `keys` is the settings sheet's keys and clicks |
 | `src/theme/` | how ferrit looks, and nothing else: `palette`, the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`), the colour picker and the theme editor state |
 | `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `profile/` (commit identities) and `image/` (format detection, preview) |
-| `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, and for each `git/<x>.rs` the code that reads with `git2` or runs `git` |
+| `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, in files that follow the traits of `git/port.rs` (`read`, `index`, `history`, `branches`, `stashes`, `remotes`, `gitconfig`, `statistics`) |
 | `src/interface/components/ui/` | widgets (donut, heat map, toast, drawer, ...) |
 | `src/interface/components/tui_overlay/` | vendored overlay code, with its upstream licence |
 | `src/replay/` | the scripted test harness (see ADR 2) |

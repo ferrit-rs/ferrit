@@ -4,7 +4,7 @@
 //! `docs/PLAN_14_GIT_CONFIG.md`.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::config`.
+//! `git2` or runs `git` is `crate::git::repo::gitconfig`.
 
 use std::path::PathBuf;
 

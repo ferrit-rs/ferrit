@@ -1,17 +1,15 @@
 //! The `git2` and subprocess half of `crate::git::stash`: the types are there.
 
-use crate::git::repo::read_error;
-use std::process::Output;
-
-use git2::Repository;
-
-use super::diff::{stderr, workdir};
+use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
 use crate::git::exec;
 use crate::git::model::StashEntry;
-
+use crate::git::repo::read_error;
 use crate::git::stash::StashOutcome;
+use git2::Repository;
+use std::process::Output;
 
+// --- stash ---
 /// Read the stash list. `git2::Repository::stash_foreach` needs `&mut`, so
 /// this is the one read in `Repo::snapshot()` that borrows mutably.
 pub(super) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {

@@ -7,7 +7,7 @@
 //! The target is typed as `name` or `owner/name`; there is no separate owner.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::host`.
+//! `git2` or runs `git` is `crate::git::repo::remotes`.
 
 use crate::git::process::{REMOTE_TIMEOUT, run_child};
 use std::ffi::{OsStr, OsString};

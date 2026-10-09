@@ -12,7 +12,7 @@ use super::charts::NO_COMMITS;
 use super::text::{MIN_WHOLE, compact, figure, figure_columns, plural, relative_time};
 use super::{Ctx, note};
 use crate::git::stats::HotFiles;
-use crate::git::stats::branches::BranchHealth;
+use crate::git::stats::branch_health::BranchHealth;
 use crate::git::stats::share::{Share, fold, shares};
 use crate::interface::components::ui::cut::{cut_end, cut_middle};
 use crate::interface::components::ui::share_bar::{percent_label, single_bar, stacked_bar};

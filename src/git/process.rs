@@ -1,6 +1,6 @@
 //! Running a child process to completion with a timeout and a cancel flag:
 //! piped output, stdin closed, its own process group, recorded in the command
-//! log. Shared by git's network commands (`crate::git::repo::remote`) and by
+//! log. Shared by git's network commands (`crate::git::repo::remotes`) and by
 //! `gh` (`host`). No `git2` here, only `std::process`.
 
 use std::io::{self, Read};

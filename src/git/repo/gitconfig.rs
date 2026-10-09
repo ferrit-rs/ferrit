@@ -1,16 +1,14 @@
 //! The `git2` and subprocess half of `crate::git::config`: the types are there.
 
+use super::read::{stderr, workdir};
+use crate::git::config::{ConfigView, ValueKind, WriteScope, parse};
+use crate::git::error::{GitError, GitResult};
+use crate::git::exec;
+use git2::Repository;
 use std::ffi::OsStr;
 use std::path::Path;
 
-use git2::Repository;
-
-use super::diff::{stderr, workdir};
-use crate::git::error::{GitError, GitResult};
-use crate::git::exec;
-
-use crate::git::config::{ConfigView, ValueKind, WriteScope, parse};
-
+// --- config ---
 pub(super) fn read(repo: &Repository, envs: &[(&str, &OsStr)]) -> GitResult<ConfigView> {
     let mut cmd = exec::git(workdir(repo)?);
     cmd.args(["config", "--list", "--show-origin", "--show-scope", "-z"]);
