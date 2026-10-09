@@ -64,3 +64,14 @@ impl ConfirmPrompt {
         }
     }
 }
+
+impl ConfirmPrompt {
+    /// Ask before deleting a branch (`force` on the second ask, after git
+    /// refused an unmerged one).
+    pub(crate) fn delete_branch(name: String) -> Self {
+        Self {
+            message: format!("delete branch {name}?"),
+            action: ConfirmAction::DeleteBranch { name, force: false },
+        }
+    }
+}

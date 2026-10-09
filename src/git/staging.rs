@@ -44,6 +44,17 @@ where
         .collect()
 }
 
+/// Every changed path reported as conflicted (either side), for the
+/// merge-conflict note.
+#[must_use]
+pub fn conflicted_paths(files: &[FileEntry]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|file| file.is_conflicted())
+        .map(|file| file.path.display().to_string())
+        .collect()
+}
+
 /// Run a `Granule` through the matching call of the port.
 pub fn apply_granule(
     repo: &dyn GitPort,

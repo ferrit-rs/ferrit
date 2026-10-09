@@ -82,7 +82,7 @@ impl App {
             Action::Focus(pane) => self.focus_pane(pane),
             Action::NextPane => self.focus_pane(self.pane_offset(1)),
             Action::PrevPane => self.focus_pane(self.pane_offset(PANES.len() - 1)),
-            Action::ToggleBranchesTab => self.toggle_branches_tab(),
+            Action::ToggleBranchesTab => self.nav.toggle_branches_tab(),
             Action::SelectDown => self.select_down(),
             Action::SelectUp => self.select_up(),
             // Only meaningful over a real diff; anywhere else they do nothing.

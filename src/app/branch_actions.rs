@@ -1,64 +1,30 @@
-//! Branches-pane actions: checkout, create, delete, fast-forward, merge.
+//! Branches-pane actions: checkout, create, delete, fast-forward, merge. Each
+//! picks the branch (`PaneRows`), makes the call (`git::branch`) and reports.
 
-use super::menu::{MenuAction, MenuItem, MenuState};
-use super::{App, git};
+use super::App;
+use super::menu::MenuState;
+use crate::git::branch::{self, MergeKind, MergeOutcome};
 use crate::git::error::GitResult;
+use crate::git::staging;
 use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::panes::drill::BranchDrill;
 use crate::interface::panes::pane::{BranchesTab, Pane};
 use crate::interface::panes::selection::SelectionKey;
-use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::confirm::ConfirmPrompt;
 use crate::interface::popups::popup::Popup;
 
-/// How a merge is done: the choices of the `M` menu.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MergeKind {
-    Regular,
-    NoFf,
-    Squash,
-    SquashCommit,
-}
-
 impl App {
-    /// `Ctrl-Right` / `Ctrl-Left`, Branches focused: switch its own Local
-    /// branches / Remotes tab. A no-op while drilled into a branch's log —
-    /// there is only one tab's worth of content to show there.
-    pub(super) fn toggle_branches_tab(&mut self) {
-        if self.nav.focus != Pane::Branches || self.nav.branch_drill.is_some() {
-            return;
-        }
-        self.nav.branches_tab = match self.nav.branches_tab {
-            BranchesTab::Local => BranchesTab::Remotes,
-            BranchesTab::Remotes => BranchesTab::Local,
-        };
-    }
-
-    /// Enter on the Branches pane: lazygit's branch -> log drill-down. Swaps
-    /// the pane's own branch list for the selected branch's commit history,
-    /// in place — focus stays on Branches, only its rows and title change
-    /// (`branches_title`). Read only, no checkout. `Esc` backs out (`on_key`).
+    /// Enter on the Branches pane: lazygit's branch -> log drill-down. Read
+    /// only, no checkout. `Esc` backs out (`on_key`).
     pub(super) fn enter_branch_log(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() {
             return;
         }
         let Some(repo) = &self.repo else { return };
-        let return_index = self.selected(Pane::Branches);
-        let Some(branch) = self.snapshot.branches.get(return_index) else {
+        let Some(name) = self.rows().selected_branch().map(|b| b.name.clone()) else {
             return;
         };
-        let name = branch.name.clone();
         match repo.branch_log(&name) {
-            Ok(commits) => {
-                self.nav.branch_drill = Some(BranchDrill {
-                    branch: name,
-                    commits,
-                    return_index,
-                });
-                self.nav.selection[Pane::Branches] = 0;
-            },
+            Ok(commits) => self.nav.drill_into_branch(name, commits),
             Err(e) => self.report_error(e),
         }
     }
@@ -75,46 +41,30 @@ impl App {
 
     /// `<space>` on the Branches pane (`Mode::Nav`): checkout the selected
     /// branch. `refresh()` picks up the new `HEAD`, branches, and files (a
-    /// checkout changes the working tree too). No-op while drilled into a
-    /// branch's log, where the selected row is a commit, not a branch.
+    /// checkout changes the working tree too).
     pub(super) fn checkout_selected_branch(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() {
             return;
         }
-        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
+        let Some(name) = self.rows().selected_branch().map(|b| b.name.clone()) else {
             return;
         };
-        let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
         let result = repo.checkout(&name);
         self.finish_branch_action(result);
     }
 
-    /// The branch `n` starts from: the selected one (lazygit), or `None` when
-    /// the list has no row (a detached `HEAD`), which falls back to `HEAD`.
-    fn new_branch_base(&self) -> Option<String> {
-        let entry = self.snapshot.branches.get(self.selected(Pane::Branches))?;
-        Some(entry.name.clone())
-    }
-
     /// `n` (Nav, Branches focused): open the new-branch popup, named from
     /// the selected branch once submitted.
     pub(super) fn open_new_branch_popup(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.modal.popup().is_some()
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() || self.modal.popup().is_some() {
             return;
         }
         self.new_branch_title = format!(
             "New branch name (branch is off of '{}')",
-            self.new_branch_base()
-                .as_deref()
-                .unwrap_or(&self.snapshot.header.branch)
+            self.rows()
+                .selected_branch()
+                .map_or(self.snapshot.header.branch.as_str(), |b| b.name.as_str())
         );
         self.modal
             .open_popup(Popup::NewBranch(TextInput::default()));
@@ -123,14 +73,14 @@ impl App {
     /// `Enter` in the new-branch popup: `git checkout -b <name>` from
     /// the selected branch, without tracking it. Success closes the popup and refreshes; failure (a bad
     /// name, or one already taken) keeps the popup open with the typed
-    /// text so the user can fix it and retry — the message surfaces in
+    /// text so the user can fix it and retry: the message surfaces in
     /// the Status pane rather than a second popup layered on this one.
     pub(super) fn do_create_branch(&mut self) {
         let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
             return;
         };
         let name = buf.text();
-        let base = self.new_branch_base();
+        let base = self.rows().selected_branch().map(|b| b.name.clone());
         let Some(repo) = &self.repo else { return };
         let result = match base {
             Some(base) => repo.create_branch_at(&name, &format!("refs/heads/{base}")),
@@ -153,18 +103,14 @@ impl App {
 
     /// `d` (Nav, Branches focused): ask before deleting the selected
     /// branch. The currently checked-out branch skips the confirm
-    /// entirely — `git` refuses to delete it either way, so its own
-    /// message goes straight to `last_error`, the same "explain, do
-    /// nothing" path an invalid discard already takes, rather than
-    /// opening a confirm for an outcome that is already certain.
+    /// entirely: `git` refuses to delete it either way, so its own
+    /// message goes straight to the Status line rather than opening a
+    /// confirm for an outcome that is already certain.
     pub(super) fn delete_branch_prompt(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() {
             return;
         }
-        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.rows().selected_branch() else {
             return;
         };
         let name = entry.name.clone();
@@ -174,45 +120,22 @@ impl App {
             self.finish_branch_action(result);
             return;
         }
-        self.modal.ask(ConfirmPrompt {
-            message: format!("delete branch {name}?"),
-            action: ConfirmAction::DeleteBranch { name, force: false },
-        });
+        self.modal.ask(ConfirmPrompt::delete_branch(name));
     }
 
     /// `u` (Nav, Branches focused): fast-forward the selected branch to
-    /// its upstream, checked out or not (`Repo::fast_forward` picks the
-    /// mechanism). No confirm: exactly as reversible as any other git
-    /// command, the reflog has your back the same way it does from a
-    /// shell.
+    /// its upstream, checked out or not. No confirm: exactly as reversible as
+    /// any other git command, the reflog has your back.
     pub(super) fn fast_forward_selected_branch(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() {
             return;
         }
-        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
+        let Some(name) = self.rows().selected_branch().map(|b| b.name.clone()) else {
             return;
         };
-        let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
         let result = repo.fast_forward(&name);
         self.finish_branch_action(result);
-    }
-
-    /// Every changed path currently reported as conflicted (staged or
-    /// worktree side), for the merge-conflict note's message.
-    pub(super) fn conflicted_paths(&self) -> Vec<String> {
-        self.snapshot
-            .files
-            .iter()
-            .filter(|f| {
-                f.staged == git::model::Change::Conflicted
-                    || f.worktree == git::model::Change::Conflicted
-            })
-            .map(|f| f.path.display().to_string())
-            .collect()
     }
 
     /// `M` (Nav, Branches focused): open the Merge menu for the selected
@@ -220,56 +143,17 @@ impl App {
     /// there is nothing to choose between, so it merges straight away (git
     /// answers "Already up to date").
     pub(super) fn merge_selected_branch(&mut self) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-            || self.modal.is_some()
-        {
+        if !self.nav.on_local_branches() || self.modal.is_some() {
             return;
         }
-        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
+        let Some(entry) = self.rows().selected_branch() else {
             return;
         };
         if entry.is_head {
             self.merge_selected_branch_with(MergeKind::Regular);
             return;
         }
-        let item = |label, shortcut, action, hint| MenuItem {
-            label,
-            shortcut,
-            action,
-            hint,
-        };
-        self.modal.open_popup(Popup::Menu(MenuState {
-            title: "Merge".to_owned(),
-            items: vec![
-                item(
-                    "Merge (fast-forward when possible)",
-                    'm',
-                    MenuAction::MergeFf,
-                    "Fast-forward when history allows, else a merge commit.",
-                ),
-                item(
-                    "Merge with --no-ff",
-                    'n',
-                    MenuAction::MergeNoFf,
-                    "Always create a merge commit.",
-                ),
-                item(
-                    "Squash, leave changes staged",
-                    's',
-                    MenuAction::SquashStaged,
-                    "Stage the branch's changes without committing.",
-                ),
-                item(
-                    "Squash and commit",
-                    'c',
-                    MenuAction::SquashCommit,
-                    "Squash the branch's changes into one new commit.",
-                ),
-            ],
-            selected: 0,
-        }));
+        self.modal.open_popup(Popup::Menu(MenuState::merge()));
     }
 
     /// Merge the selected branch into the current one the way `kind` says.
@@ -277,32 +161,19 @@ impl App {
     /// renders `Change::Conflicted`, so the conflicted paths are visible
     /// without a dedicated flow.
     pub(super) fn merge_selected_branch_with(&mut self, kind: MergeKind) {
-        if self.nav.focus != Pane::Branches
-            || self.nav.branch_drill.is_some()
-            || self.nav.branches_tab == BranchesTab::Remotes
-        {
+        if !self.nav.on_local_branches() {
             return;
         }
-        let Some(entry) = self.snapshot.branches.get(self.selected(Pane::Branches)) else {
+        let Some(name) = self.rows().selected_branch().map(|b| b.name.clone()) else {
             return;
         };
-        let name = entry.name.clone();
         let Some(repo) = &self.repo else { return };
-        let result = match kind {
-            MergeKind::Regular => repo.merge_branch(&name),
-            MergeKind::NoFf => repo.merge_branch_no_ff(&name),
-            MergeKind::Squash => repo
-                .merge_squash(&name, false)
-                .map(|()| git::branch::MergeOutcome::Merged),
-            MergeKind::SquashCommit => repo
-                .merge_squash(&name, true)
-                .map(|()| git::branch::MergeOutcome::Merged),
-        };
+        let result = branch::merge(repo.as_ref(), &name, kind);
         self.request_refresh();
         match result {
-            Ok(git::branch::MergeOutcome::Merged) => {},
-            Ok(git::branch::MergeOutcome::Conflicted) => {
-                let files = self.conflicted_paths().join(", ");
+            Ok(MergeOutcome::Merged) => {},
+            Ok(MergeOutcome::Conflicted) => {
+                let files = staging::conflicted_paths(&self.snapshot.files).join(", ");
                 self.modal.open_popup(Popup::Note(format!(
                     "merge conflict in {files}. Fix the files and stage them with <space>, \
                      then press m and choose Continue, or Abort."

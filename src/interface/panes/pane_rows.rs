@@ -8,7 +8,7 @@ use ratatui::text::Line;
 use super::nav::Nav;
 use super::row_lines;
 use crate::git::Snapshot;
-use crate::git::model::FileEntry;
+use crate::git::model::{BranchEntry, FileEntry};
 use crate::interface::panes::pane::{BranchesTab, Pane};
 use crate::interface::panes::selection::{
     SelectionKey, find_file_row_key, selection_key_for_file_rows,
@@ -316,6 +316,13 @@ impl PaneRows<'_> {
 }
 
 impl<'a> PaneRows<'a> {
+    /// The branch under the cursor on the Branches pane's local list.
+    pub(crate) fn selected_branch(&self) -> Option<&'a BranchEntry> {
+        self.snapshot
+            .branches
+            .get(self.nav.selection[Pane::Branches])
+    }
+
     /// The `FileEntry` behind the Files pane's current selection, or `None` on
     /// a directory row or an empty pane.
     pub(crate) fn selected_file(&self) -> Option<&'a FileEntry> {

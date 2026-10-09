@@ -182,3 +182,40 @@ impl Nav {
         }
     }
 }
+
+impl Nav {
+    /// Is the Branches pane focused and showing its list of local branches?
+    /// Not while drilled into a branch's log, where the selected row is a
+    /// commit, nor on its Remotes tab.
+    pub(crate) fn on_local_branches(&self) -> bool {
+        self.focus == Pane::Branches
+            && self.branch_drill.is_none()
+            && self.branches_tab == BranchesTab::Local
+    }
+
+    /// `Ctrl-Right` / `Ctrl-Left`, Branches focused: switch its own Local
+    /// branches / Remotes tab. A no-op while drilled into a branch's log, which
+    /// has only one tab's worth of content.
+    pub(crate) fn toggle_branches_tab(&mut self) {
+        if self.focus != Pane::Branches || self.branch_drill.is_some() {
+            return;
+        }
+        self.branches_tab = match self.branches_tab {
+            BranchesTab::Local => BranchesTab::Remotes,
+            BranchesTab::Remotes => BranchesTab::Local,
+        };
+    }
+
+    /// Swap the Branches pane's list for `branch`'s commit history, in place:
+    /// focus stays on Branches, only its rows and title change. `Esc` backs
+    /// out to `return_index`.
+    pub(crate) fn drill_into_branch(&mut self, branch: String, commits: Vec<CommitEntry>) {
+        let return_index = self.selection[Pane::Branches];
+        self.branch_drill = Some(BranchDrill {
+            branch,
+            commits,
+            return_index,
+        });
+        self.selection[Pane::Branches] = 0;
+    }
+}

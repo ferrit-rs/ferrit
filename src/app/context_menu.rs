@@ -9,9 +9,9 @@
 //! | Stash | stash keeping the index, rename the entry |
 //! | Files (a conflicted file) | take ours, take theirs |
 
-use super::branch_actions::MergeKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, git};
+use crate::git::branch::MergeKind;
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::{BranchesTab, Pane};

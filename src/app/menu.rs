@@ -185,3 +185,45 @@ impl App {
         }
     }
 }
+
+impl MenuState {
+    /// The `M` menu: the ways to merge the selected branch into the current one.
+    pub(crate) fn merge() -> Self {
+        let item = |label, shortcut, action, hint| MenuItem {
+            label,
+            shortcut,
+            action,
+            hint,
+        };
+        Self {
+            title: "Merge".to_owned(),
+            items: vec![
+                item(
+                    "Merge (fast-forward when possible)",
+                    'm',
+                    MenuAction::MergeFf,
+                    "Fast-forward when history allows, else a merge commit.",
+                ),
+                item(
+                    "Merge with --no-ff",
+                    'n',
+                    MenuAction::MergeNoFf,
+                    "Always create a merge commit.",
+                ),
+                item(
+                    "Squash, leave changes staged",
+                    's',
+                    MenuAction::SquashStaged,
+                    "Stage the branch's changes without committing.",
+                ),
+                item(
+                    "Squash and commit",
+                    'c',
+                    MenuAction::SquashCommit,
+                    "Squash the branch's changes into one new commit.",
+                ),
+            ],
+            selected: 0,
+        }
+    }
+}
