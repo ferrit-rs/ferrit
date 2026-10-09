@@ -82,6 +82,10 @@ pub(crate) enum Event {
     WelcomeSelected(usize),
     /// Leave the program.
     Quit,
+    /// Slide the side sheet out.
+    CloseSheet,
+    /// The mouse pointer leaves a clickable thing.
+    HidePointer,
     /// Choose a value on the git config screen's menu.
     PickConfigValue(usize),
     /// Open the create-a-repository flow.
@@ -218,6 +222,8 @@ impl App {
                 Event::LeaveDiff => self.nav.mode = Mode::Nav,
                 Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
                 Event::Quit => self.should_quit = true,
+                Event::CloseSheet => self.render.sheet.close(),
+                Event::HidePointer => self.mouse_pointer.request(false),
                 Event::PickConfigValue(index) => self.pick_config_value(index),
                 Event::OpenCreateRemote => self.open_create_remote(),
                 Event::SubmitNewBranch(name) => {

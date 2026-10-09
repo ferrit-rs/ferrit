@@ -7,10 +7,13 @@ use crate::tui::components::popups::PopupKind;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
 use std::ops::Range;
 
+use crate::config::Config;
+use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::diff::DiffSide;
 use crate::tui::App;
 use crate::tui::components::diff::{CommitPopupView, Mode};
 use crate::tui::components::popups::Popup;
+use crate::tui::components::settings;
 
 impl App {
     /// Cursor state for the right-pane render: `(side, cursor line, V-select
@@ -227,5 +230,36 @@ impl App {
             author: None,
             hints: "Push: Enter | Cancel: Esc",
         })
+    }
+}
+
+impl App {
+    /// The settings sheet's state, for the screen that draws it and for tests.
+    pub fn settings(&self) -> &SettingsSheet {
+        &self.sheets.settings
+    }
+
+    /// The live configuration: what ferrit is using now, saved or not.
+    #[doc(hidden)]
+    pub fn live_config(&self) -> &Config {
+        &self.prefs.config
+    }
+
+    /// The row's value when it is a choice: the index among its names.
+    #[must_use]
+    pub fn choice_index(&self, row: SettingsRow) -> Option<usize> {
+        settings::choice_index(&self.theme, row)
+    }
+
+    /// The row's value when it is a toggle.
+    #[must_use]
+    pub fn toggle_value(&self, row: SettingsRow) -> bool {
+        settings::toggle_value(&self.prefs.config, row)
+    }
+
+    /// The row's value when it is a number.
+    #[must_use]
+    pub fn number_value(&self, row: SettingsRow) -> u64 {
+        settings::number_value(&self.prefs.config, row)
     }
 }

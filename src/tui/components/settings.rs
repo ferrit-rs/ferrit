@@ -14,7 +14,9 @@ use crate::theme::theme_config::{
     ThemeMode,
 };
 use crate::tui::App;
+use crate::tui::draw::RenderedDiff;
 use crate::tui::draw::{Landed, RenderState};
+use crate::tui::event::Event;
 use crate::tui::widgets::drawer::Drawer;
 use crate::tui::widgets::scroll_bar::ScrollBar;
 use crate::tui::widgets::separator::Separator;
@@ -26,75 +28,82 @@ use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use std::path::Path;
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
 
-impl App {
-    /// The sheet's state, for the screen that draws it and for tests.
-    pub fn settings(&self) -> &SettingsSheet {
-        &self.sheets.settings
-    }
-
+/// The settings sheet's state and the parts of the app it changes, borrowed for
+/// as long as the sheet decides. It changes only these; what else follows (a
+/// refresh, the sheet closing) it asks for in `events`.
+pub(crate) struct Settings<'a> {
     /// The live configuration: what ferrit is using now, saved or not.
-    #[doc(hidden)]
-    pub fn live_config(&self) -> &Config {
-        &self.prefs.config
-    }
+    pub(crate) config: &'a mut Config,
+    /// The theme being edited.
+    pub(crate) theme: &'a mut ThemeEditor,
+    /// The colours everything is drawn with.
+    pub(crate) palette: &'a mut Palette,
+    /// The sheet's own state: the highlighted row and the footer.
+    pub(crate) sheet: &'a mut SettingsSheet,
+    /// The `config.toml` a change is saved to.
+    pub(crate) file: Option<&'a Path>,
+    /// What only the run loop can carry out for the last change.
+    pub(crate) terminal_request: &'a mut Option<TerminalRequest>,
+    /// The cached syntax-coloured diff, which a change of base makes stale.
+    pub(crate) diff_cache: &'a mut Option<RenderedDiff>,
+    /// What the change asks of the rest of the app.
+    pub(crate) events: Vec<Event>,
+}
 
-    /// The row's value when it is a choice: the index among its names. For the
-    /// accent, `None` when a custom colour is set (none of the presets).
-    #[must_use]
-    pub fn choice_index(&self, row: SettingsRow) -> Option<usize> {
-        match row {
-            SettingsRow::Theme => Some(match self.theme.config.effective_scheme() {
-                SchemeChoice::Terminal => 0,
-                SchemeChoice::Dark => 1,
-                SchemeChoice::Light => 2,
-            }),
-            SettingsRow::Accent => {
-                if self.theme.config.accent.is_some() {
-                    None
-                } else {
-                    Preset::ALL
-                        .iter()
-                        .position(|p| *p == self.theme.config.preset)
-                }
-            },
-            _ => None,
-        }
+/// The row's value when it is a choice: the index among its names. For the
+/// accent, `None` when a custom colour is set (none of the presets).
+pub(crate) fn choice_index(theme: &ThemeEditor, row: SettingsRow) -> Option<usize> {
+    match row {
+        SettingsRow::Theme => Some(match theme.config.effective_scheme() {
+            SchemeChoice::Terminal => 0,
+            SchemeChoice::Dark => 1,
+            SchemeChoice::Light => 2,
+        }),
+        SettingsRow::Accent => {
+            if theme.config.accent.is_some() {
+                None
+            } else {
+                Preset::ALL.iter().position(|p| *p == theme.config.preset)
+            }
+        },
+        _ => None,
     }
+}
 
-    /// The row's value when it is a toggle.
-    #[must_use]
-    pub fn toggle_value(&self, row: SettingsRow) -> bool {
-        match row {
-            SettingsRow::Mouse => self.prefs.config.ui.mouse,
-            SettingsRow::IgnoreWhitespace => self.prefs.config.diff.ignore_whitespace,
-            SettingsRow::SignOff => self.prefs.config.commit.sign_off,
-            SettingsRow::ShowReads => self.prefs.config.log.show_reads,
-            _ => false,
-        }
+/// The row's value when it is a toggle.
+pub(crate) const fn toggle_value(config: &Config, row: SettingsRow) -> bool {
+    match row {
+        SettingsRow::Mouse => config.ui.mouse,
+        SettingsRow::IgnoreWhitespace => config.diff.ignore_whitespace,
+        SettingsRow::SignOff => config.commit.sign_off,
+        SettingsRow::ShowReads => config.log.show_reads,
+        _ => false,
     }
+}
 
-    /// The row's value when it is a number.
-    #[must_use]
-    pub fn number_value(&self, row: SettingsRow) -> u64 {
-        match row {
-            SettingsRow::WheelStep => u64::from(self.prefs.config.ui.wheel_step),
-            SettingsRow::DiffContext => u64::from(self.prefs.config.diff.context),
-            _ => 0,
-        }
+/// The row's value when it is a number.
+pub(crate) fn number_value(config: &Config, row: SettingsRow) -> u64 {
+    match row {
+        SettingsRow::WheelStep => u64::from(config.ui.wheel_step),
+        SettingsRow::DiffContext => u64::from(config.diff.context),
+        _ => 0,
     }
+}
 
+impl Settings<'_> {
     /// Change `row` one step: `up` is `→` (or `Space`, which goes the same way).
     /// A toggle flips, a choice moves to the next or previous name (wrapping),
     /// a number moves by one unit (the refresh interval along its scale) and
     /// stops at its ends. The change applies at once and is saved at once.
-    pub fn change_setting(&mut self, row: SettingsRow, up: bool) {
+    pub(crate) fn change_setting(&mut self, row: SettingsRow, up: bool) {
         match row {
             SettingsRow::Theme => {
-                let current = self.choice_index(row).unwrap_or(0);
+                let current = choice_index(self.theme, row).unwrap_or(0);
                 let next = if up { current + 1 } else { current + 2 } % 3;
                 // `set_choice` applies and saves it.
                 self.set_choice(row, next);
@@ -111,28 +120,27 @@ impl App {
                 self.theme_changed();
             },
             SettingsRow::Mouse => {
-                self.prefs.config.ui.mouse = !self.prefs.config.ui.mouse;
-                self.terminal_request = Some(TerminalRequest::Mouse(self.prefs.config.ui.mouse));
+                self.config.ui.mouse = !self.config.ui.mouse;
+                *self.terminal_request = Some(TerminalRequest::Mouse(self.config.ui.mouse));
             },
             SettingsRow::WheelStep => {
-                let value = stepped(self.number_value(row), up, 1, 50);
-                self.prefs.config.ui.wheel_step = u8::try_from(value).unwrap_or(50);
+                let value = stepped(number_value(self.config, row), up, 1, 50);
+                self.config.ui.wheel_step = u8::try_from(value).unwrap_or(50);
             },
             SettingsRow::DiffContext => {
-                let value = stepped(self.number_value(row), up, 0, 200);
-                self.prefs.config.diff.context = u32::try_from(value).unwrap_or(200);
-                self.request_refresh();
+                let value = stepped(number_value(self.config, row), up, 0, 200);
+                self.config.diff.context = u32::try_from(value).unwrap_or(200);
+                self.events.push(Event::Refresh);
             },
             SettingsRow::IgnoreWhitespace => {
-                self.prefs.config.diff.ignore_whitespace =
-                    !self.prefs.config.diff.ignore_whitespace;
-                self.request_refresh();
+                self.config.diff.ignore_whitespace = !self.config.diff.ignore_whitespace;
+                self.events.push(Event::Refresh);
             },
             SettingsRow::SignOff => {
-                self.prefs.config.commit.sign_off = !self.prefs.config.commit.sign_off;
+                self.config.commit.sign_off = !self.config.commit.sign_off;
             },
             SettingsRow::ShowReads => {
-                self.prefs.config.log.show_reads = !self.prefs.config.log.show_reads;
+                self.config.log.show_reads = !self.config.log.show_reads;
             },
         }
         self.save_settings(row.section());
@@ -145,11 +153,11 @@ impl App {
         let palette = self.theme.config.palette();
         // The cached diff holds syntax colours, which follow the base only: an
         // accent change must not make every click re-highlight the diff.
-        if palette.light != self.prefs.palette.light {
-            self.render.diff_cache = None;
+        if palette.light != self.palette.light {
+            *self.diff_cache = None;
         }
-        self.prefs.palette = palette;
-        self.prefs.config.theme = self.theme.config.clone();
+        *self.palette = palette;
+        self.config.theme = self.theme.config.clone();
     }
 
     /// Write `section` of the live config to `config.toml`. No file (tests, a
@@ -157,24 +165,18 @@ impl App {
     /// file that cannot be written, or is not TOML, is reported in the sheet's
     /// footer and the setting still applies for this run.
     pub(crate) fn save_settings(&mut self, section: Section) {
-        let Some(path) = self.prefs.file.clone() else {
-            self.sheets.settings.save = SaveState::Idle;
+        let Some(path) = self.file else {
+            self.sheet.save = SaveState::Idle;
             return;
         };
-        self.sheets.settings.save =
-            match Config::save_sections(&path, &self.prefs.config, &[section]) {
-                Ok(()) => SaveState::Saved,
-                Err(error) => SaveState::Failed(error.to_string()),
-            };
-    }
-
-    /// What the run loop has to do for the last change, once.
-    pub(crate) fn take_terminal_request(&mut self) -> Option<TerminalRequest> {
-        self.terminal_request.take()
+        self.sheet.save = match Config::save_sections(path, self.config, &[section]) {
+            Ok(()) => SaveState::Saved,
+            Err(error) => SaveState::Failed(error.to_string()),
+        };
     }
 
     /// Set a choice row to the name at `index` (a click on a radio).
-    pub fn set_choice(&mut self, row: SettingsRow, index: usize) {
+    pub(crate) fn set_choice(&mut self, row: SettingsRow, index: usize) {
         match row {
             SettingsRow::Theme => {
                 self.theme.config.scheme = Some(match index {
@@ -204,23 +206,23 @@ impl App {
 
     fn selected_row(&self) -> SettingsRow {
         SettingsRow::ALL
-            .get(self.sheets.settings.selected)
+            .get(self.sheet.selected)
             .copied()
             .unwrap_or(SettingsRow::Theme)
     }
 
     /// The sheet is about to open: back on the rows, at the top, the selected row
     /// scrolled into view.
-    pub(crate) fn prepare_settings_sheet(&mut self) {
+    pub(crate) fn prepare(&mut self) {
         self.theme.mode = ThemeMode::Idle;
-        self.sheets.settings.scroll = 0;
-        self.sheets.settings.follow = true;
+        self.sheet.scroll = 0;
+        self.sheet.follow = true;
     }
 
     /// Every key while the sheet is up. It owns the keyboard: `↑` `↓` move
     /// between rows, `←` `→` and `Space` change the value, `Enter` opens the
     /// colour picker on the accent, `Esc` goes back (picker) or closes.
-    pub(crate) fn settings_key(&mut self, key: KeyEvent) {
+    pub(crate) fn key(&mut self, key: KeyEvent) {
         match self.theme.mode {
             ThemeMode::Palette => self.picker_key(key),
             ThemeMode::EditingRgb => self.rgb_key(key),
@@ -235,14 +237,14 @@ impl App {
         let last = SettingsRow::ALL.len() - 1;
         let row = self.selected_row();
         match key.code {
-            KeyCode::Esc => self.close_sheet(),
+            KeyCode::Esc => self.events.push(Event::CloseSheet),
             KeyCode::Up | KeyCode::Char('k') => {
-                self.sheets.settings.selected = self.sheets.settings.selected.saturating_sub(1);
-                self.sheets.settings.follow = true;
+                self.sheet.selected = self.sheet.selected.saturating_sub(1);
+                self.sheet.follow = true;
             },
             KeyCode::Down | KeyCode::Char('j') => {
-                self.sheets.settings.selected = (self.sheets.settings.selected + 1).min(last);
-                self.sheets.settings.follow = true;
+                self.sheet.selected = (self.sheet.selected + 1).min(last);
+                self.sheet.follow = true;
             },
             KeyCode::Left | KeyCode::Char('h') => self.change_setting(row, false),
             KeyCode::Right | KeyCode::Char('l' | ' ') => self.change_setting(row, true),
@@ -251,14 +253,14 @@ impl App {
                 self.sync_theme_picker_selection();
             },
             KeyCode::PageUp => {
-                self.sheets.settings.scroll = self.sheets.settings.scroll.saturating_sub(10);
+                self.sheet.scroll = self.sheet.scroll.saturating_sub(10);
             },
             KeyCode::PageDown => {
-                self.sheets.settings.scroll = self.sheets.settings.scroll.saturating_add(10);
+                self.sheet.scroll = self.sheet.scroll.saturating_add(10);
             },
             KeyCode::Home | KeyCode::End => {
-                self.sheets.settings.selected = if key.code == KeyCode::Home { 0 } else { last };
-                self.sheets.settings.follow = true;
+                self.sheet.selected = if key.code == KeyCode::Home { 0 } else { last };
+                self.sheet.follow = true;
             },
             _ => {},
         }
@@ -292,34 +294,28 @@ impl App {
 
     /// The mouse while the sheet is up: a click sets the value it lands on, the
     /// wheel scrolls, a click outside closes it.
-    pub(crate) fn settings_mouse(&mut self, ev: MouseEvent) {
-        self.mouse_pointer.request(false);
+    pub(crate) fn mouse(&mut self, ev: MouseEvent, hits: &SettingsHits, overlay: Option<Rect>) {
+        self.events.push(Event::HidePointer);
         let point = Position::new(ev.column, ev.row);
         match ev.kind {
             MouseEventKind::ScrollUp => {
-                self.sheets.settings.scroll =
-                    self.sheets.settings.scroll.saturating_sub(WHEEL_ROWS);
+                self.sheet.scroll = self.sheet.scroll.saturating_sub(WHEEL_ROWS);
             },
             MouseEventKind::ScrollDown => {
-                self.sheets.settings.scroll =
-                    self.sheets.settings.scroll.saturating_add(WHEEL_ROWS);
+                self.sheet.scroll = self.sheet.scroll.saturating_add(WHEEL_ROWS);
             },
             MouseEventKind::Down(MouseButton::Left) => {
-                let grid = self.hits.settings.color_grid;
+                let grid = hits.color_grid;
                 if grid.contains(point) {
                     let metrics = grid_metrics(self.theme.picker_display);
                     let column = usize::from(ev.column.saturating_sub(grid.x)) / metrics.cell_width;
-                    let row = self.hits.settings.color_grid_first_row
-                        + usize::from(ev.row.saturating_sub(grid.y));
+                    let row =
+                        hits.color_grid_first_row + usize::from(ev.row.saturating_sub(grid.y));
                     self.select_theme_picker_cell(column, row);
-                } else if let Some(&(_, row, click)) = self
-                    .hits
-                    .settings
-                    .parts
-                    .iter()
-                    .find(|(area, ..)| area.contains(point))
+                } else if let Some(&(_, row, click)) =
+                    hits.parts.iter().find(|(area, ..)| area.contains(point))
                 {
-                    self.sheets.settings.selected =
+                    self.sheet.selected =
                         SettingsRow::ALL.iter().position(|r| *r == row).unwrap_or(0);
                     match click {
                         Click::Row => {},
@@ -327,13 +323,8 @@ impl App {
                         Click::Flip => self.change_setting(row, true),
                         Click::Step(up) => self.change_setting(row, up),
                     }
-                } else if !self
-                    .render
-                    .sheet
-                    .overlay_rect()
-                    .is_some_and(|rect| rect.contains(point))
-                {
-                    self.close_sheet();
+                } else if !overlay.is_some_and(|rect| rect.contains(point)) {
+                    self.events.push(Event::CloseSheet);
                 }
             },
             _ => {},

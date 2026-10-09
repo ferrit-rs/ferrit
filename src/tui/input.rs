@@ -82,7 +82,12 @@ impl App {
 
         if !self.render.sheet.is_closed() {
             match self.sheets.kind {
-                Sheet::Settings => self.settings_key(key),
+                Sheet::Settings => {
+                    let mut settings = self.settings_ctx();
+                    settings.key(key);
+                    let events = settings.events;
+                    self.apply(events);
+                },
                 Sheet::Dashboard => self.dashboard_key(key),
             }
             return;
@@ -151,7 +156,14 @@ impl App {
 
         if !self.render.sheet.is_closed() {
             match self.sheets.kind {
-                Sheet::Settings => self.settings_mouse(ev),
+                Sheet::Settings => {
+                    let hits = self.hits.settings.clone();
+                    let overlay = self.render.sheet.overlay_rect();
+                    let mut settings = self.settings_ctx();
+                    settings.mouse(ev, &hits, overlay);
+                    let events = settings.events;
+                    self.apply(events);
+                },
                 Sheet::Dashboard => self.dashboard_mouse(ev),
             }
             return;

@@ -255,7 +255,7 @@ impl App {
     pub(crate) fn open_sheet(&mut self, sheet: Sheet) {
         self.sheets.kind = sheet;
         match sheet {
-            Sheet::Settings => self.prepare_settings_sheet(),
+            Sheet::Settings => self.settings_ctx().prepare(),
             Sheet::Dashboard => self.prepare_dashboard_sheet(),
         }
         self.render.sheet.open();

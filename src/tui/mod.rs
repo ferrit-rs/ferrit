@@ -5,6 +5,7 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+use crate::config::settings::SettingsRow;
 use crate::git::commit::CommitKind;
 use crate::tui::components::askpass;
 use crate::tui::components::commit_editor;
@@ -12,6 +13,7 @@ use crate::tui::components::diff::CommitPopupView;
 use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
 use crate::tui::components::popups::Popup;
+use crate::tui::components::settings::Settings;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
 pub mod events;
 pub mod mock;
@@ -945,7 +947,7 @@ impl App {
             }
             // A setting changed that only this loop can carry out.
             if let Some(crate::config::settings::TerminalRequest::Mouse(on)) =
-                self.take_terminal_request()
+                self.terminal_request.take()
                 && let Err(error) = terminal::set_mouse(on)
             {
                 self.report_notice(format!("cannot switch the mouse: {error}"));
@@ -1085,5 +1087,38 @@ impl App {
             Ok(()) => {},
             Err(error) => self.report_error(error),
         }
+    }
+}
+
+impl App {
+    /// The settings sheet, with the parts of the app it changes.
+    pub(crate) fn settings_ctx(&mut self) -> Settings<'_> {
+        Settings {
+            config: &mut self.prefs.config,
+            theme: &mut self.theme,
+            palette: &mut self.prefs.palette,
+            sheet: &mut self.sheets.settings,
+            file: self.prefs.file.as_deref(),
+            terminal_request: &mut self.terminal_request,
+            diff_cache: &mut self.render.diff_cache,
+            events: Vec::new(),
+        }
+    }
+
+    /// Change a setting as the sheet does: applied at once, saved at once.
+    /// Integration-test seam.
+    pub fn change_setting(&mut self, row: SettingsRow, up: bool) {
+        let mut settings = self.settings_ctx();
+        settings.change_setting(row, up);
+        let events = settings.events;
+        self.apply(events);
+    }
+
+    /// Set a choice row to the name at `index`, as a click on a radio does.
+    pub fn set_choice(&mut self, row: SettingsRow, index: usize) {
+        let mut settings = self.settings_ctx();
+        settings.set_choice(row, index);
+        let events = settings.events;
+        self.apply(events);
     }
 }
