@@ -46,67 +46,64 @@ const TOAST_TICK_MS: u64 = 250;
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
-    pub(crate) prefs: prefs::Prefs,
+    prefs: prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
-    pub(crate) sheets: components::dashboard::Sheets,
+    sheets: components::dashboard::Sheets,
     /// The views that replace the panes: git config, welcome.
-    pub(crate) full_screens: draw::FullScreens,
+    full_screens: draw::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
     pub nav: components::panes::nav::Nav,
     /// Whether the help overlay is up.
     pub help: components::help::HelpState,
-    /// First visible line of the help screen, and how many lines it shows
-    /// (set by the renderer), so scroll keys can stop at the end.
-    /// Text and focus state for the help command search.
-    pub(crate) should_quit: bool,
+    should_quit: bool,
 
     /// `None` in `App::mock()`; otherwise the open repository.
-    pub(crate) repo: Option<Box<dyn GitPort>>,
+    repo: Option<Box<dyn GitPort>>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
-    pub(crate) repo_name: String,
+    repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
-    pub(crate) authorship: git::identity::Authorship,
+    authorship: git::identity::Authorship,
     pub theme: components::settings::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
-    pub(crate) snapshot: git::Snapshot,
+    snapshot: git::Snapshot,
     /// Last `refresh()` failure, shown in the Status pane. Never a panic.
-    pub(crate) last_error: Option<Arc<AppError>>,
+    last_error: Option<Arc<AppError>>,
     /// Optional worktree watcher failure; polling remains active as fallback.
-    pub(crate) watch_error: Option<Arc<AppError>>,
+    watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: components::diff::right_pane::RightPane,
+    right: components::diff::right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: components::panes::hit_areas::HitAreas,
+    hits: components::panes::hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
-    pub(crate) mouse_pointer: MousePointer,
+    mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
-    pub(crate) render: draw::RenderState,
+    render: draw::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
-    pub(crate) new_branch_title: String,
+    new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    pub(crate) modal: components::popups::Modal,
+    modal: components::popups::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
-    pub(crate) commit_draft: Option<String>,
+    commit_draft: Option<String>,
     /// Background work in flight: the event channel, the refresh, diff and
     /// image workers, and the one network operation at a time.
-    pub(crate) workers: workers::Workers,
+    workers: workers::Workers,
     /// Set when the app was rebuilt on a new repository: `run` points the
     /// filesystem watch at this root and clears it.
-    pub(crate) watch_request: Option<PathBuf>,
+    watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
-    pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
-    pub(crate) create_remote: CreateRemoteState,
+    terminal_request: Option<crate::config::settings::TerminalRequest>,
+    create_remote: CreateRemoteState,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
     /// case, not a repurposing of that one field with a colour flag.
-    pub(crate) status_note: Option<String>,
+    status_note: Option<String>,
 }
 
 pub mod workers;

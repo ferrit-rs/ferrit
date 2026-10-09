@@ -1,10 +1,13 @@
 //! Creating the GitHub repository: the form, `gh`, what follows.
 
 use crate::git::host::{
-    CreateDraft, GhProgram, HostError, Visibility, parse_target, validate_description,
+    CreateDraft, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
+    validate_description,
 };
 use crate::git::ssh_config::read_github_aliases;
 use crate::theme::palette::Palette;
+use crate::tui::components::popups::{Modal, Popup};
+use crate::tui::error::AppError;
 use crate::tui::widgets::chrome::Dialog;
 use crate::tui::widgets::chrome::KeyBar;
 use crate::tui::widgets::chrome::Panel;
@@ -17,6 +20,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// The creation's own state on `App`.
 #[derive(Debug, Default)]
@@ -54,6 +58,123 @@ impl CreateRemoteState {
             std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/config"))
         });
         path.map_or_else(Vec::new, |path| read_github_aliases(&path))
+    }
+
+    /// The answer of the `gh` check the popup waits for. Only that check
+    /// counts; `gh` ready opens the form, anything else says what to do.
+    pub(crate) fn gh_checked(
+        &self,
+        modal: &mut Modal,
+        generation: u64,
+        status: GhStatus,
+        repo_name: &str,
+    ) {
+        let waiting = matches!(
+            modal.popup(),
+            Some(Popup::CreateRemote(Step::Checking { generation: g })) if *g == generation
+        );
+        if !waiting {
+            return;
+        }
+        modal.open_popup(match status {
+            GhStatus::Ready => {
+                let draft = self
+                    .draft
+                    .clone()
+                    .unwrap_or_else(|| CreateDraft::new(sanitize_name(repo_name)));
+                Popup::CreateRemote(Step::Form(Form::from_draft(&draft, None)))
+            },
+            GhStatus::Missing => Popup::Note(
+                "gh is required: https://cli.github.com. Install it, then try again.".to_owned(),
+            ),
+            GhStatus::SignedOut => Popup::Note(
+                "gh is not signed in: run `gh auth login` in a shell, then try again.".to_owned(),
+            ),
+        });
+    }
+
+    /// The form reopened on the name after a refusal, every field as typed.
+    pub(crate) fn reopen_form(&self, modal: &mut Modal, error: String) {
+        let Some(draft) = &self.draft else {
+            return;
+        };
+        if modal.popup().is_none() {
+            modal.open_popup(Popup::CreateRemote(Step::Form(Form::from_draft(
+                draft,
+                Some(error),
+            ))));
+        }
+    }
+
+    /// Every key while the popup is up. A confirmed creation comes back as the
+    /// draft to start.
+    pub(crate) fn key(&mut self, modal: &mut Modal, key: KeyEvent) -> Option<CreateDraft> {
+        let Some(Popup::CreateRemote(step)) = modal.popup_mut() else {
+            return None;
+        };
+        match step.key(key) {
+            FormKey::None => {},
+            FormKey::Close => self.close(modal),
+            FormKey::Continue => {
+                let Some(Popup::CreateRemote(Step::Form(form))) = modal.take_popup() else {
+                    return None;
+                };
+                match form.validate() {
+                    Ok(_) => modal.open_popup(Popup::CreateRemote(Step::Confirm(form))),
+                    Err(reason) => modal.open_popup(Popup::CreateRemote(Step::Form(
+                        form.with_error(reason.to_string()),
+                    ))),
+                }
+            },
+            FormKey::Back => {
+                if let Some(Popup::CreateRemote(Step::Confirm(form))) = modal.take_popup() {
+                    modal.open_popup(Popup::CreateRemote(Step::Form(form)));
+                }
+            },
+            FormKey::Create => {
+                if let Some(Popup::CreateRemote(Step::Confirm(form))) = modal.take_popup() {
+                    return Some(form.draft());
+                }
+            },
+        }
+        None
+    }
+
+    /// `Esc`: nothing was created. The typed fields are kept for next time; a
+    /// check still running is abandoned.
+    fn close(&mut self, modal: &mut Modal) {
+        match modal.take_popup() {
+            Some(Popup::CreateRemote(Step::Form(form) | Step::Confirm(form))) => {
+                self.draft = Some(form.draft());
+            },
+            Some(Popup::CreateRemote(Step::Checking { .. })) => self.generation += 1,
+            Some(other) => modal.open_popup(other),
+            None => {},
+        }
+    }
+
+    /// The repository exists: the draft is spent, and the web URL is kept for
+    /// the push that follows. Returns the ssh host chosen when it started.
+    pub(crate) fn created(&mut self, url: &str) -> String {
+        self.draft = None;
+        self.error = None;
+        self.web_url = Some(url.to_owned());
+        std::mem::take(&mut self.ssh_host)
+    }
+
+    /// The failure of the push that followed a creation says the repository
+    /// exists and how to retry; any other failure is left as it is.
+    pub(crate) fn explain_push(&mut self, failure: AppError) -> AppError {
+        if !std::mem::take(&mut self.pushing_after) {
+            return failure;
+        }
+        match &self.web_url {
+            Some(url) => AppError::PushAfterCreation {
+                source: Arc::new(failure),
+                url: url.clone(),
+            },
+            None => failure,
+        }
     }
 }
 

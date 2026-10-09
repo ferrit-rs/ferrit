@@ -289,9 +289,9 @@ impl App {
         // line; eventless callers refresh synchronously, then set it here.
         self.request_refresh();
         let message = match message {
-            Err(error) => Err(self.explain_push_after_creation(error)),
+            Err(error) => Err(self.create_remote.explain_push(error)),
             ok => {
-                self.create_remote_push_done();
+                self.create_remote.pushing_after = false;
                 ok
             },
         };
