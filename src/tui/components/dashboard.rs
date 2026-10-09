@@ -1,23 +1,25 @@
 //! The dashboard sheet: statistics, its state, its keys, and how it is drawn.
 
 use crate::config::settings::SettingsSheet;
+use crate::git::Snapshot;
 use crate::git::port::GitPort;
 use crate::git::stats::{NUMSTAT_CAP, RepoStats, StatsOptions, WALK_CAP, Window};
 use crate::tui::App;
 use crate::tui::components::dashboard::text::{date, thousands, window_label};
 use crate::tui::draw::{Landed, RenderState, unix_now};
 use crate::tui::error::AppError;
+use crate::tui::event::Event;
 use crate::tui::events::AppEvent;
-use crate::tui::keymap::{Action, Context, KeyBinding};
 use crate::tui::widgets::chart_palette::{ChartMode, ChartPalette, charts_mode_from_env};
 use crate::tui::widgets::drawer::Drawer;
 use crate::tui::widgets::panel::Panel;
 use crate::tui::widgets::scroll_bar::ScrollBar;
-use crate::tui::widgets::tui_overlay::state::OverlayState;
 use crate::tui::workers::{WorkerKind, run_worker};
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
+use ratatui::crossterm::event::MouseButton;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use ratatui::layout::Position;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -26,98 +28,101 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
 
-impl App {
-    /// A fingerprint of what the statistics depend on that the snapshot already
-    /// tells: the checked-out branch, the newest commit, every branch's tip time
-    /// and counts, the stash count. When it moves, the cache is dropped.
-    fn refs_fingerprint(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.snapshot.header.branch.hash(&mut hasher);
-        self.snapshot
-            .commits
-            .first()
-            .map(|c| &c.full_hash)
-            .hash(&mut hasher);
-        for branch in &self.snapshot.branches {
-            (&branch.name, branch.tip_time, branch.ahead, branch.behind).hash(&mut hasher);
-        }
-        self.snapshot.stashes.len().hash(&mut hasher);
-        hasher.finish()
+/// A fingerprint of what the statistics depend on that the snapshot already
+/// tells: the checked-out branch, the newest commit, every branch's tip time and
+/// counts, the stash count. When it moves, the cache is dropped.
+fn refs_fingerprint(snapshot: &Snapshot) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    snapshot.header.branch.hash(&mut hasher);
+    snapshot
+        .commits
+        .first()
+        .map(|c| &c.full_hash)
+        .hash(&mut hasher);
+    for branch in &snapshot.branches {
+        (&branch.name, branch.tip_time, branch.ahead, branch.behind).hash(&mut hasher);
     }
+    snapshot.stashes.len().hash(&mut hasher);
+    hasher.finish()
+}
 
-    /// `D`: show the dashboard over the panes, computing what is not cached.
-    pub fn open_dashboard(&mut self) {
-        self.open_sheet(Sheet::Dashboard);
-    }
+/// What the dashboard needs of the app to ask for statistics.
+pub(crate) struct StatsCtx<'a> {
+    /// What the last refresh looked like.
+    pub(crate) snapshot: &'a Snapshot,
+    /// The repository, if there is one; a worker opens its own handle on it.
+    pub(crate) repo: Option<&'a dyn GitPort>,
+    /// The way back onto the event channel, once the run loop has one.
+    pub(crate) sender: Option<mpsc::Sender<AppEvent>>,
+    /// The dashboard is up (sliding in or in): an error is shown only then.
+    pub(crate) open: bool,
+}
 
+impl Dashboard {
     /// The sheet is about to open: at the top, no old error, statistics asked for.
-    pub(crate) fn prepare_dashboard_sheet(&mut self) {
-        self.sheets.dashboard.error = None;
-        self.sheets.dashboard.scroll = 0;
-        self.ensure_stats(false);
+    pub(crate) fn prepare(&mut self, ctx: &StatsCtx<'_>) {
+        self.error = None;
+        self.scroll = 0;
+        self.ensure_stats(false, ctx);
     }
 
     /// The renderer's word on how far the page scrolls: keep the offset in it.
-    pub(crate) fn clamp_dashboard_scroll(&mut self, max: usize) {
-        self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.min(max);
-    }
-
-    /// Back to the panes. A running computation is told to stop; its result, if
-    /// it still arrives, is kept only when it is good.
-    pub fn close_dashboard(&mut self) {
-        self.close_sheet();
-        self.sheets.dashboard.cancel_running();
+    pub(crate) fn clamp_scroll(&mut self, max: usize) {
+        self.scroll = self.scroll.min(max);
     }
 
     /// Make sure the current window has statistics, or is on its way to have
     /// them. `force` recomputes even when the cache is fresh (`r`).
-    fn ensure_stats(&mut self, force: bool) {
-        let fingerprint = self.refs_fingerprint();
-        if fingerprint != self.sheets.dashboard.fingerprint {
-            self.sheets.dashboard.cache = std::array::from_fn(|_| None);
-            self.sheets.dashboard.fingerprint = fingerprint;
+    fn ensure_stats(&mut self, force: bool, ctx: &StatsCtx<'_>) {
+        let fingerprint = refs_fingerprint(ctx.snapshot);
+        if fingerprint != self.fingerprint {
+            self.cache = std::array::from_fn(|_| None);
+            self.fingerprint = fingerprint;
         }
-        let slot = self.sheets.dashboard.window;
-        let cached = self.sheets.dashboard.cached();
-        if !force && cached.is_some_and(|c| !c.churn_pending) {
+        let slot = self.window;
+        if !force && self.cached().is_some_and(|c| !c.churn_pending) {
             return;
         }
-        if !force && self.sheets.dashboard.in_flight == Some(slot) {
+        if !force && self.in_flight == Some(slot) {
             return;
         }
         if force {
-            self.sheets.dashboard.store(slot, None);
+            self.store(slot, None);
         }
-        self.sheets.dashboard.cancel_running();
-        self.sheets.dashboard.generation += 1;
-        self.sheets.dashboard.cancel = Arc::new(AtomicBool::new(false));
-        self.sheets.dashboard.in_flight = Some(slot);
-        self.sheets.dashboard.error = None;
+        self.cancel_running();
+        self.generation += 1;
+        self.cancel = Arc::new(AtomicBool::new(false));
+        self.in_flight = Some(slot);
+        self.error = None;
 
-        let Some(repo) = self.repo_handle() else {
-            self.sheets.dashboard.in_flight = None;
+        let Some(repo) = ctx.repo.and_then(|repo| repo.reopen().ok()) else {
+            self.in_flight = None;
             return;
         };
-        let generation = self.sheets.dashboard.generation;
-        let window = self.sheets.dashboard.window();
-        let cancel = Arc::clone(&self.sheets.dashboard.cancel);
-        let Some(sender) = self.workers.sender.clone() else {
+        let generation = self.generation;
+        let window = self.window();
+        let cancel = Arc::clone(&self.cancel);
+        let Some(sender) = ctx.sender.clone() else {
             // No event loop (`App::mock`, a test without `run()`): do it now.
             for full in [false, true] {
                 let result = read_stats(repo.as_ref(), window, full, &cancel);
-                self.on_stats_done(StatsCompletion {
-                    generation,
-                    window,
-                    full,
-                    result,
-                });
+                self.on_done(
+                    StatsCompletion {
+                        generation,
+                        window,
+                        full,
+                        result,
+                    },
+                    ctx.open,
+                );
             }
             return;
         };
-        self.sheets.dashboard.worker = Some(thread::spawn(move || {
+        self.worker = Some(thread::spawn(move || {
             for full in [false, true] {
                 if cancel.load(Ordering::Acquire) {
                     break;
@@ -139,9 +144,9 @@ impl App {
 
     /// `AppEvent::StatsDone` arrived. A stale generation is dropped; a good
     /// result is cached whether or not the screen is still up, an error only
-    /// shows when it is.
-    pub(crate) fn on_stats_done(&mut self, completion: StatsCompletion) {
-        if completion.generation != self.sheets.dashboard.generation {
+    /// shows when it is (`open`).
+    pub(crate) fn on_done(&mut self, completion: StatsCompletion, open: bool) {
+        if completion.generation != self.generation {
             return;
         }
         let Some(slot) = WINDOWS.iter().position(|w| *w == completion.window) else {
@@ -149,139 +154,81 @@ impl App {
         };
         match completion.result {
             Ok(stats) => {
-                self.sheets.dashboard.store(
+                self.store(
                     slot,
                     Some(Cached {
                         stats: *stats,
                         churn_pending: !completion.full,
                     }),
                 );
-                self.sheets.dashboard.error = None;
+                self.error = None;
             },
             Err(message) => {
-                if self.dashboard_is_open() {
-                    self.sheets.dashboard.error = Some(message.to_string());
+                if open {
+                    self.error = Some(message.to_string());
                 }
             },
         }
-        if completion.full || self.sheets.dashboard.error.is_some() {
-            if let Some(worker) = self.sheets.dashboard.worker.take() {
+        if completion.full || self.error.is_some() {
+            if let Some(worker) = self.worker.take() {
                 let _ = worker.join();
             }
-            self.sheets.dashboard.in_flight = None;
+            self.in_flight = None;
         }
     }
 
     /// Every key while the dashboard is up (after the popups, a pending
-    /// confirmation and the help overlay, which own input before it).
-    pub(crate) fn dashboard_key(&mut self, key: KeyEvent) {
-        // The key that opens the dashboard closes it, whatever it is bound to.
-        let toggles = self
-            .prefs
-            .keymap
-            .resolve(&[Context::Global], KeyBinding::from_event(key))
-            == Some(Action::Dashboard);
+    /// confirmation and the help overlay, which own input before it). `toggles`
+    /// is whether the key is the one that opens the dashboard, which closes it
+    /// whatever it is bound to.
+    pub(crate) fn key(&mut self, key: KeyEvent, toggles: bool, ctx: &StatsCtx<'_>) -> Vec<Event> {
         if toggles {
-            self.close_dashboard();
-            return;
+            return vec![Event::CloseDashboard];
         }
         match key.code {
-            KeyCode::Esc | KeyCode::Char('q') => self.close_dashboard(),
-            KeyCode::Char('?') => self.open_help(),
-            KeyCode::Char('t') => self.cycle_window(true),
-            KeyCode::Char('T') => self.cycle_window(false),
-            KeyCode::Char('r') => self.ensure_stats(true),
-            KeyCode::Char('n') => {
-                self.sheets.dashboard.show_counts = !self.sheets.dashboard.show_counts;
-            },
-            KeyCode::Char('k') | KeyCode::Up => {
-                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_sub(1);
-            },
-            KeyCode::Char('j') | KeyCode::Down => {
-                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_add(1);
-            },
-            KeyCode::PageUp => {
-                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_sub(PAGE);
-            },
-            KeyCode::PageDown => {
-                self.sheets.dashboard.scroll = self.sheets.dashboard.scroll.saturating_add(PAGE);
-            },
-            KeyCode::Home => self.sheets.dashboard.scroll = 0,
-            KeyCode::End => self.sheets.dashboard.scroll = usize::MAX,
+            KeyCode::Esc | KeyCode::Char('q') => return vec![Event::CloseDashboard],
+            KeyCode::Char('?') => return vec![Event::OpenHelp],
+            KeyCode::Char('t') => self.cycle_window(true, ctx),
+            KeyCode::Char('T') => self.cycle_window(false, ctx),
+            KeyCode::Char('r') => self.ensure_stats(true, ctx),
+            KeyCode::Char('n') => self.show_counts = !self.show_counts,
+            KeyCode::Char('k') | KeyCode::Up => self.scroll = self.scroll.saturating_sub(1),
+            KeyCode::Char('j') | KeyCode::Down => self.scroll = self.scroll.saturating_add(1),
+            KeyCode::PageUp => self.scroll = self.scroll.saturating_sub(PAGE),
+            KeyCode::PageDown => self.scroll = self.scroll.saturating_add(PAGE),
+            KeyCode::Home => self.scroll = 0,
+            KeyCode::End => self.scroll = usize::MAX,
             _ => {},
         }
+        Vec::new()
     }
 
-    /// The wheel scrolls three rows a notch; a left click outside the drawer closes
-    /// it (the panes behind are dimmed and not clickable).
-    pub(crate) fn dashboard_mouse(&mut self, ev: MouseEvent) {
-        let point = ratatui::layout::Position::new(ev.column, ev.row);
+    /// The wheel scrolls three rows a notch; a left click outside the drawer
+    /// closes it (the panes behind are dimmed and not clickable).
+    pub(crate) fn mouse(&mut self, ev: MouseEvent, overlay: Option<Rect>) -> Vec<Event> {
+        let point = Position::new(ev.column, ev.row);
         match ev.kind {
-            MouseEventKind::Down(ratatui::crossterm::event::MouseButton::Left)
-                if !self
-                    .render
-                    .sheet
-                    .overlay_rect()
-                    .is_some_and(|rect| rect.contains(point)) =>
+            MouseEventKind::Down(MouseButton::Left)
+                if !overlay.is_some_and(|rect| rect.contains(point)) =>
             {
-                self.close_dashboard();
+                return vec![Event::CloseDashboard];
             },
-            MouseEventKind::ScrollUp => {
-                self.sheets.dashboard.scroll =
-                    self.sheets.dashboard.scroll.saturating_sub(WHEEL_ROWS);
-            },
-            MouseEventKind::ScrollDown => {
-                self.sheets.dashboard.scroll =
-                    self.sheets.dashboard.scroll.saturating_add(WHEEL_ROWS);
-            },
+            MouseEventKind::ScrollUp => self.scroll = self.scroll.saturating_sub(WHEEL_ROWS),
+            MouseEventKind::ScrollDown => self.scroll = self.scroll.saturating_add(WHEEL_ROWS),
             _ => {},
         }
+        Vec::new()
     }
 
-    fn cycle_window(&mut self, forward: bool) {
+    fn cycle_window(&mut self, forward: bool, ctx: &StatsCtx<'_>) {
         let count = WINDOWS.len();
-        self.sheets.dashboard.window = if forward {
-            (self.sheets.dashboard.window + 1) % count
+        self.window = if forward {
+            (self.window + 1) % count
         } else {
-            (self.sheets.dashboard.window + count - 1) % count
+            (self.window + count - 1) % count
         };
-        self.sheets.dashboard.scroll = 0;
-        self.ensure_stats(false);
-    }
-}
-
-impl App {
-    /// Open `sheet` in the drawer, ready for its first frame.
-    pub(crate) fn open_sheet(&mut self, sheet: Sheet) {
-        self.sheets.kind = sheet;
-        match sheet {
-            Sheet::Settings => self.settings_ctx().prepare(),
-            Sheet::Dashboard => self.prepare_dashboard_sheet(),
-        }
-        self.render.sheet.open();
-    }
-
-    /// Slide the drawer out.
-    pub(crate) fn close_sheet(&mut self) {
-        self.render.sheet.close();
-    }
-
-    /// Whether the dashboard is up: sliding in or in, not on its way out.
-    #[must_use]
-    pub fn dashboard_is_open(&self) -> bool {
-        self.dashboard_open_in(&self.render.sheet)
-    }
-
-    /// `dashboard_is_open` for a drawer animation held elsewhere: drawing owns the
-    /// render state while it runs, so it asks with its own.
-    pub(crate) fn dashboard_open_in(&self, drawer: &OverlayState) -> bool {
-        self.sheets.kind == Sheet::Dashboard && !drawer.is_closed() && !drawer.is_closing()
-    }
-
-    /// Whether a sheet is on screen or sliding.
-    #[must_use]
-    pub fn sheet_is_open(&self) -> bool {
-        !self.render.sheet.is_closed()
+        self.scroll = 0;
+        self.ensure_stats(false, ctx);
     }
 }
 

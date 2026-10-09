@@ -96,7 +96,16 @@ impl App {
                     let events = settings.events;
                     self.apply(events);
                 },
-                Sheet::Dashboard => self.dashboard_key(key),
+                Sheet::Dashboard => {
+                    let toggles = self
+                        .prefs
+                        .keymap
+                        .resolve(&[Context::Global], KeyBinding::from_event(key))
+                        == Some(Action::Dashboard);
+                    let events =
+                        self.with_dashboard(|dashboard, ctx| dashboard.key(key, toggles, ctx));
+                    self.apply(events);
+                },
             }
             return;
         }
@@ -175,7 +184,11 @@ impl App {
                     let events = settings.events;
                     self.apply(events);
                 },
-                Sheet::Dashboard => self.dashboard_mouse(ev),
+                Sheet::Dashboard => {
+                    let overlay = self.render.sheet.overlay_rect();
+                    let events = self.sheets.dashboard.mouse(ev, overlay);
+                    self.apply(events);
+                },
             }
             return;
         }

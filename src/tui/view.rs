@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::diff::DiffSide;
 use crate::tui::App;
+use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::{CommitPopupView, Mode};
 use crate::tui::components::popups::Popup;
 use crate::tui::components::settings;
@@ -291,5 +292,25 @@ impl App {
             ssh_host: aliases.first().map(String::as_str),
             branch: &self.snapshot.header.branch,
         }))
+    }
+}
+
+impl App {
+    /// Whether the dashboard is up: sliding in or in, not on its way out.
+    #[must_use]
+    pub fn dashboard_is_open(&self) -> bool {
+        self.dashboard_open_in(&self.render.sheet)
+    }
+
+    /// `dashboard_is_open` for a drawer animation held elsewhere: drawing owns the
+    /// render state while it runs, so it asks with its own.
+    pub(crate) fn dashboard_open_in(&self, drawer: &OverlayState) -> bool {
+        self.sheets.kind == Sheet::Dashboard && !drawer.is_closed() && !drawer.is_closing()
+    }
+
+    /// Whether a sheet is on screen or sliding.
+    #[must_use]
+    pub fn sheet_is_open(&self) -> bool {
+        !self.render.sheet.is_closed()
     }
 }

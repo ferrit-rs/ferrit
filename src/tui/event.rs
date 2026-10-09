@@ -11,6 +11,7 @@ use crate::git::port::GitPort;
 use crate::git::staging;
 use crate::theme::palette::Palette;
 use crate::tui::App;
+use crate::tui::components::dashboard::{Dashboard, Sheet, StatsCompletion, StatsCtx};
 use crate::tui::components::diff::{Mode, RightPane};
 use crate::tui::components::menu::{self, NameKind};
 use crate::tui::components::panes::{Nav, PaneRows};
@@ -85,6 +86,10 @@ pub(crate) enum Event {
     Quit,
     /// Slide the side sheet out.
     CloseSheet,
+    /// Back from the dashboard to the panes, telling its computation to stop.
+    CloseDashboard,
+    /// Open the help screen.
+    OpenHelp,
     /// Show the git config screen.
     ShowGitConfig,
     /// Leave the git config screen.
@@ -228,6 +233,8 @@ impl App {
                 Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
                 Event::Quit => self.should_quit = true,
                 Event::CloseSheet => self.render.sheet.close(),
+                Event::CloseDashboard => self.close_dashboard(),
+                Event::OpenHelp => self.open_help(),
                 Event::ShowGitConfig => self.full_screens.active = FullScreen::GitConfig,
                 Event::HideGitConfig => self.full_screens.active = FullScreen::None,
                 Event::HidePointer => self.mouse_pointer.request(false),
@@ -339,5 +346,50 @@ impl App {
             },
             Err(e) => self.report_error(e),
         }
+    }
+}
+
+impl App {
+    /// `D`: show the dashboard over the panes, computing what is not cached.
+    pub fn open_dashboard(&mut self) {
+        self.open_sheet(Sheet::Dashboard);
+    }
+
+    /// Back to the panes. A running computation is told to stop; its result, if
+    /// it still arrives, is kept only when it is good.
+    pub fn close_dashboard(&mut self) {
+        self.render.sheet.close();
+        self.sheets.dashboard.cancel_running();
+    }
+
+    /// Open `sheet` in the drawer, ready for its first frame.
+    pub(crate) fn open_sheet(&mut self, sheet: Sheet) {
+        self.sheets.kind = sheet;
+        match sheet {
+            Sheet::Settings => self.settings_ctx().prepare(),
+            Sheet::Dashboard => self.with_dashboard(Dashboard::prepare),
+        }
+        self.render.sheet.open();
+    }
+
+    /// Run `f` on the dashboard with what it needs of the app.
+    pub(crate) fn with_dashboard<R>(
+        &mut self,
+        f: impl FnOnce(&mut Dashboard, &StatsCtx<'_>) -> R,
+    ) -> R {
+        let open = self.dashboard_is_open();
+        let ctx = StatsCtx {
+            snapshot: &self.snapshot,
+            repo: self.repo.as_deref(),
+            sender: self.workers.sender.clone(),
+            open,
+        };
+        f(&mut self.sheets.dashboard, &ctx)
+    }
+
+    /// `AppEvent::StatsDone` arrived.
+    pub(crate) fn on_stats_done(&mut self, completion: StatsCompletion) {
+        let open = self.dashboard_is_open();
+        self.sheets.dashboard.on_done(completion, open);
     }
 }

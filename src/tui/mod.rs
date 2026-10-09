@@ -169,7 +169,7 @@ impl App {
             self.help.set_rows(rows);
         }
         if let Some(max) = landed.dashboard_max_scroll {
-            self.clamp_dashboard_scroll(max);
+            self.sheets.dashboard.clamp_scroll(max);
         }
     }
 
