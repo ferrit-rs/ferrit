@@ -5,7 +5,7 @@ use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 
 /// Vertical scrollbar shared by pane lists and scrollable previews.
 #[must_use]
-pub struct ScrollBar {
+pub(crate) struct ScrollBar {
     content_length: usize,
     viewport_length: usize,
     position: usize,
@@ -13,7 +13,7 @@ pub struct ScrollBar {
 }
 
 impl ScrollBar {
-    pub fn new(content_length: usize, viewport_length: usize, position: usize) -> Self {
+    pub(crate) fn new(content_length: usize, viewport_length: usize, position: usize) -> Self {
         Self {
             content_length,
             viewport_length,
@@ -22,13 +22,13 @@ impl ScrollBar {
         }
     }
 
-    pub fn style(mut self, style: Style) -> Self {
+    pub(crate) fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
     /// Draw only when content exceeds viewport. `area` is the scrollbar track.
-    pub fn render(self, frame: &mut Frame<'_>, area: Rect) {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, area: Rect) {
         if self.content_length <= self.viewport_length {
             return;
         }

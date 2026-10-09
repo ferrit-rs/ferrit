@@ -32,14 +32,14 @@ const FULL_HEIGHT: u16 = 9;
 const LABEL_EVERY: u16 = 4;
 
 /// The weekday of a unix day number, Monday = 0 to Sunday = 6 (day 0 was a Thursday).
-pub fn weekday(day: i64) -> i64 {
+pub(crate) fn weekday(day: i64) -> i64 {
     (day + 3).rem_euclid(7)
 }
 
 /// The three quartile cut-offs (nearest rank) of the non-zero `counts`.
 ///
 /// Zeros are ignored. With no non-zero count every cut-off is 0.
-pub fn thresholds(counts: &[u32]) -> [u32; 3] {
+pub(crate) fn thresholds(counts: &[u32]) -> [u32; 3] {
     let mut sorted: Vec<u32> = counts.iter().copied().filter(|&c| c > 0).collect();
     sorted.sort_unstable();
     let n = sorted.len();
@@ -51,7 +51,7 @@ pub fn thresholds(counts: &[u32]) -> [u32; 3] {
 }
 
 /// The level of `count`, 0 for no commit, 1 to 4 by the quartile `thresholds`.
-pub fn level(count: u32, thresholds: [u32; 3]) -> usize {
+pub(crate) fn level(count: u32, thresholds: [u32; 3]) -> usize {
     if count == 0 {
         return 0;
     }
@@ -69,7 +69,7 @@ fn glyph(level: usize, density: bool) -> &'static str {
 
 /// The `less ■ ■ ■ ■ ■ more` legend line, every level in its own style; `less`
 /// and `more` are `label`.
-pub fn legend(styles: [Style; 5], density: bool, label: Style) -> Line<'static> {
+pub(crate) fn legend(styles: [Style; 5], density: bool, label: Style) -> Line<'static> {
     let mut spans = vec![Span::styled("less", label)];
     for (level, style) in styles.into_iter().enumerate() {
         spans.push(Span::raw(" "));
@@ -80,7 +80,7 @@ pub fn legend(styles: [Style; 5], density: bool, label: Style) -> Line<'static> 
 }
 
 /// Week columns drawn in a panel `width` cells wide (the title says how many).
-pub fn weeks_shown(width: u16) -> u16 {
+pub(crate) fn weeks_shown(width: u16) -> u16 {
     (width.saturating_sub(GUTTER) / CELL).min(MAX_WEEKS)
 }
 
@@ -90,7 +90,7 @@ pub fn weeks_shown(width: u16) -> u16 {
 /// not flatten the others. Days after `today` stay blank. The header labels every
 /// fourth column `W1`, `W5`, ... counting weeks from the oldest one shown.
 #[derive(Debug, Clone)]
-pub struct HeatMap<'a> {
+pub(crate) struct HeatMap<'a> {
     counts: &'a [(i64, u32)],
     today: i64,
     styles: [Style; 5],
@@ -100,7 +100,7 @@ pub struct HeatMap<'a> {
 impl<'a> HeatMap<'a> {
     /// `counts` are `(unix day, commits)`, in any order; a repeated day is summed.
     /// `styles[0]` styles a quiet day, `styles[1..]` the four buckets.
-    pub fn new(counts: &'a [(i64, u32)], today: i64, styles: [Style; 5]) -> Self {
+    pub(crate) fn new(counts: &'a [(i64, u32)], today: i64, styles: [Style; 5]) -> Self {
         Self {
             counts,
             today,
@@ -111,7 +111,7 @@ impl<'a> HeatMap<'a> {
 
     /// Draw the level as a glyph (`· ░ ▒ ▓ █`) instead of a coloured `■`.
     #[must_use]
-    pub const fn density(mut self, density: bool) -> Self {
+    pub(crate) const fn density(mut self, density: bool) -> Self {
         self.density = density;
         self
     }

@@ -1,6 +1,6 @@
 # Plan: phase 23, test support and a narrow public API
 
-**Status: done, except narrowing the rest of the public surface (see the last bullet).** Fourth and last slice of the architecture clean-up. It makes the test
+**Status: done.** Fourth and last slice of the architecture clean-up. It makes the test
 suite easy to read and extend, and makes the library surface say what is public on purpose.
 
 What differs from the sketch below, and why:
@@ -46,11 +46,25 @@ What differs from the sketch below, and why:
   fact was not obvious it was read from the code first (what `WorkState.changed` counts, that
   `FileEntry.binary` is not filled yet, that `push_default_current` only tests `push.default`).
   CI runs clippy with `-D warnings`, so a new public item in `domain` without a doc fails the build.
-- **Not done:** `pub(crate)` for most of the rest of the library. Most modules are public because a type of theirs appears in
-  a public signature (`App.help`, `App.theme`, the `*Completion` events), and `unnameable_types`
-  is a warning here; making them private is a design change of `App`'s public surface, not a
-  visibility sweep. Measured: 194 of the missing docs are in `domain/git`, 48 of them in
-  `model.rs`.
+- **The module surface is narrowed.** A script listed the `pub mod` that no test, example or
+  `main.rs` names (39 of 98), made them `pub(crate)`, and let the compiler say what that
+  broke. 28 stayed public because a type of theirs is in a public signature of `App`
+  (`App.help`, `App.nav`, `App.theme`, the `*Completion` events, `OverlayState`, `Identity`...:
+  `unnameable_types` is a warning here, hence an error in CI). The rest went crate-private:
+  the 17 `infra::git` submodules (only `Repo` is public there), `app::{hit_areas, right_pane,
+  sheet}`, `components::ui::{cut, donut, drawer, heatmap, ...}`, `domain::git::process`,
+  `domain::image::detect`, and others; 140 `pub` items inside them became `pub(crate)`, as
+  the `unreachable_pub` lint required. `pub mod` went from 98 to 76. The vendored
+  `components::tui_overlay` and `domain::profile` were put back as they were: the first keeps
+  its upstream API (`UPSTREAM.md`), the second is a public field of `App`.
+- **It found dead code, and the dead code went.** With the modules crate-private, rustc could
+  see what nothing uses. `components::ui::radio_card` (231 lines, a whole widget nobody
+  constructed) is deleted; `Separator` lost four unused builder methods and a field; `Dialog`'s
+  `DialogAreas::outer`, never read, is gone. This is the part a public module hid: an unused
+  item looks used when it is exported.
+- **Not done:** `#![warn(missing_docs)]` outside `domain` (404 items in `app` and `components`).
+  Those are the types of the tests' view of the library; documenting them as an API would be
+  inventing one.
 
 ## Goal
 

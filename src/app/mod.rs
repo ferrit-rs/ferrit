@@ -579,12 +579,12 @@ pub struct App {
 mod authorship;
 mod full_screens;
 pub mod help;
-pub mod hit_areas;
+pub(crate) mod hit_areas;
 mod modal;
 pub mod nav;
 mod prefs;
 mod render_state;
-pub mod right_pane;
+pub(crate) mod right_pane;
 pub mod theme_editor;
 mod tree;
 mod welcome;
@@ -609,7 +609,7 @@ mod popups;
 mod rebase_actions;
 mod remote;
 pub mod settings;
-pub mod sheet;
+pub(crate) mod sheet;
 mod staging;
 mod stash_actions;
 

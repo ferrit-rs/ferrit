@@ -30,11 +30,11 @@ use crate::domain::image::preview::Preview;
 pub mod dashboard;
 mod dashboard_sheet;
 mod diff;
-pub mod git_config;
+pub(crate) mod git_config;
 mod landed;
 mod popups;
 mod settings;
-pub mod welcome;
+pub(crate) mod welcome;
 
 /// What the terminal gets: the screen, then the theme's paint pass over it, which
 /// turns the unset and the ANSI colours of the frame into the theme's own

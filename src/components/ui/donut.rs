@@ -15,9 +15,9 @@ use ratatui::widgets::Widget;
 use ratatui::widgets::canvas::{Canvas, Painter, Shape};
 
 /// Smallest area (columns) that draws a ring; below it use a share bar.
-pub const MIN_WIDTH: u16 = 12;
+pub(crate) const MIN_WIDTH: u16 = 12;
 /// Smallest area (rows) that draws a ring; below it use a share bar.
-pub const MIN_HEIGHT: u16 = 6;
+pub(crate) const MIN_HEIGHT: u16 = 6;
 
 /// Inner radius as a share of the outer one: the ring is a quarter of the radius thick.
 const INNER: f64 = 0.75;
@@ -28,7 +28,7 @@ const HALF_GAP: f64 = 0.6;
 
 /// One slice of the donut: its weight and its colour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Slice {
+pub(crate) struct Slice {
     /// Share of the whole, in any unit; only the ratio to the other weights counts.
     pub weight: u64,
     /// Colour of every cell that this slice covers the most.
@@ -38,18 +38,18 @@ pub struct Slice {
 /// The donut widget. Draws nothing when there is no weight or the area is too small.
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct Donut<'a> {
+pub(crate) struct Donut<'a> {
     slices: &'a [Slice],
 }
 
 impl<'a> Donut<'a> {
-    pub fn new(slices: &'a [Slice]) -> Self {
+    pub(crate) fn new(slices: &'a [Slice]) -> Self {
         Self { slices }
     }
 }
 
 /// True when `area` is big enough for a ring (`MIN_WIDTH` x `MIN_HEIGHT`).
-pub fn fits(area: Rect) -> bool {
+pub(crate) fn fits(area: Rect) -> bool {
     area.width >= MIN_WIDTH && area.height >= MIN_HEIGHT
 }
 
@@ -57,7 +57,7 @@ pub fn fits(area: Rect) -> bool {
 /// wraps into one turn). A boundary belongs to the next slice. `None` when the
 /// total weight is zero.
 #[allow(clippy::cast_precision_loss)] // weights are counts, far below 2^53
-pub fn slice_at(angle: f64, slices: &[Slice]) -> Option<usize> {
+pub(crate) fn slice_at(angle: f64, slices: &[Slice]) -> Option<usize> {
     let total: u64 = slices.iter().map(|s| s.weight).sum();
     if total == 0 {
         return None;

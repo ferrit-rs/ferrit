@@ -22,7 +22,7 @@ use ratatui_image::picker::{Picker, ProtocolType};
 
 /// Outcome of [`pick`]: the `Picker` to render with, plus the context that
 /// produced it so `FERRIT_DEBUG` can report it.
-pub struct Detected {
+pub(crate) struct Detected {
     /// The picker to render images with.
     pub picker: Picker,
     host: Host,
@@ -35,7 +35,7 @@ pub struct Detected {
 ///
 /// Call once, before entering the alternate screen: `from_query_stdio` reads
 /// and writes stdio for a moment, same as the ratatui-image examples.
-pub fn pick() -> Option<Detected> {
+pub(crate) fn pick() -> Option<Detected> {
     let over = Override::read();
     if over.disabled {
         return None;
@@ -79,7 +79,7 @@ pub fn pick() -> Option<Detected> {
 impl Detected {
     /// One-line report of what [`pick`] settled on, for the Status pane when
     /// `FERRIT_DEBUG` is set. `None` when it is not.
-    pub fn debug_line(&self) -> Option<String> {
+    pub(crate) fn debug_line(&self) -> Option<String> {
         std::env::var_os("FERRIT_DEBUG")?;
         let fs = self.picker.font_size();
         let tail = if self.forced.is_some() {

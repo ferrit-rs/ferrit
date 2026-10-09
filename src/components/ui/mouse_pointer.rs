@@ -3,7 +3,7 @@ use std::io::{self, Write};
 /// Sets the terminal's native mouse pointer shape for hoverable controls.
 /// Terminals without OSC 22 support ignore these sequences.
 #[derive(Debug, Default)]
-pub struct MousePointer {
+pub(crate) struct MousePointer {
     /// What the hover logic last asked for.
     wanted: bool,
     /// What the terminal is currently showing.
@@ -13,14 +13,14 @@ pub struct MousePointer {
 impl MousePointer {
     /// Record whether the pointer is over an interactive target. Nothing is
     /// written until `sync`.
-    pub fn request(&mut self, hovered: bool) {
+    pub(crate) fn request(&mut self, hovered: bool) {
         self.wanted = hovered;
     }
 
     /// Show a pointing hand while the last `request` was `true`, restoring
     /// the terminal default when the pointer leaves the target. Writes only
     /// on a change.
-    pub fn sync(&mut self) -> io::Result<()> {
+    pub(crate) fn sync(&mut self) -> io::Result<()> {
         if self.is_hand == self.wanted {
             return Ok(());
         }
@@ -30,7 +30,7 @@ impl MousePointer {
     }
 
     /// Reset OSC 22 state when Ferrit starts or restores the terminal.
-    pub fn reset_terminal() -> io::Result<()> {
+    pub(crate) fn reset_terminal() -> io::Result<()> {
         Self::write_shape(false)
     }
 

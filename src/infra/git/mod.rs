@@ -4,23 +4,23 @@
 //! types. Nothing outside this module and `crate::domain::git::fake` names `Repo`
 //! except the composition root (`App::open`).
 
-pub mod apply;
-pub mod blob;
-pub mod branch;
-pub mod commit;
-pub mod config;
-pub mod diff;
-pub mod host;
+pub(crate) mod apply;
+pub(crate) mod blob;
+pub(crate) mod branch;
+pub(crate) mod commit;
+pub(crate) mod config;
+pub(crate) mod diff;
+pub(crate) mod host;
 mod init;
-pub mod log;
-pub mod operation;
-pub mod port_impl;
-pub mod rebase;
-pub mod refs;
-pub mod remote;
-pub mod stash;
-pub mod stats;
-pub mod status;
+pub(crate) mod log;
+pub(crate) mod operation;
+pub(crate) mod port_impl;
+pub(crate) mod rebase;
+pub(crate) mod refs;
+pub(crate) mod remote;
+pub(crate) mod stash;
+pub(crate) mod stats;
+pub(crate) mod status;
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;

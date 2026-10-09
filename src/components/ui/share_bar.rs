@@ -42,7 +42,7 @@ fn run(glyph: &str, cells: u16, style: Style) -> Option<Span<'static>> {
 }
 
 /// One share as `━` (in `fg`) followed by the dim `─` track, exactly `width` cells.
-pub fn single_bar(fraction: f64, width: u16, fg: Color) -> Vec<Span<'static>> {
+pub(crate) fn single_bar(fraction: f64, width: u16, fg: Color) -> Vec<Span<'static>> {
     let filled = filled_cells(fraction, width);
     [
         run(FULL, filled, Style::new().fg(fg)),
@@ -102,7 +102,7 @@ fn split_cells(parts: &[(u64, Color)], width: u16) -> Vec<u16> {
 
 /// One 100 % line split between `parts` (weight, colour), exactly `width`
 /// cells. A zero total gives a dim `─` line.
-pub fn stacked_bar(parts: &[(u64, Color)], width: u16) -> Line<'static> {
+pub(crate) fn stacked_bar(parts: &[(u64, Color)], width: u16) -> Line<'static> {
     let cells = split_cells(parts, width);
     if cells.iter().all(|&c| c == 0) {
         return Line::from(run(EMPTY, width, dim()).into_iter().collect::<Vec<_>>());
@@ -119,7 +119,7 @@ pub fn stacked_bar(parts: &[(u64, Color)], width: u16) -> Line<'static> {
 /// The figure next to a bar: percentage first (`41 %  (124)`), or the count
 /// first (`124  (41 %)`) when `show_counts`. `percent` is `None` for a share
 /// under 1 %; `None` with a zero count means there is no whole, shown as `–`.
-pub fn percent_label(percent: Option<u8>, count: u64, show_counts: bool) -> String {
+pub(crate) fn percent_label(percent: Option<u8>, count: u64, show_counts: bool) -> String {
     if percent.is_none() && count == 0 {
         return "–".to_owned();
     }
@@ -132,7 +132,7 @@ pub fn percent_label(percent: Option<u8>, count: u64, show_counts: bool) -> Stri
 }
 
 /// Right-aligns `label` in a field of `width` characters (never truncates).
-pub fn pad_label(label: &str, width: usize) -> String {
+pub(crate) fn pad_label(label: &str, width: usize) -> String {
     format!("{label:>width$}")
 }
 

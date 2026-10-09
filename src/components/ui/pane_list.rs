@@ -7,7 +7,7 @@ use ratatui::widgets::{Block, List, ListState};
 use super::scroll_bar::ScrollBar;
 
 #[must_use]
-pub struct PaneList<'a> {
+pub(crate) struct PaneList<'a> {
     items: Vec<Line<'static>>,
     block: Block<'a>,
     selected: Option<usize>,
@@ -18,7 +18,7 @@ pub struct PaneList<'a> {
 }
 
 impl<'a> PaneList<'a> {
-    pub fn new(items: Vec<Line<'static>>, block: Block<'a>) -> Self {
+    pub(crate) fn new(items: Vec<Line<'static>>, block: Block<'a>) -> Self {
         Self {
             items,
             block,
@@ -30,34 +30,34 @@ impl<'a> PaneList<'a> {
         }
     }
 
-    pub fn selected(mut self, selected: Option<usize>) -> Self {
+    pub(crate) fn selected(mut self, selected: Option<usize>) -> Self {
         self.selected = selected;
         self
     }
 
-    pub fn offset(mut self, offset: usize) -> Self {
+    pub(crate) fn offset(mut self, offset: usize) -> Self {
         self.offset = offset;
         self
     }
 
     /// The view was scrolled on its own: keep `offset` (down to the last full
     /// page) even when `selected` is off screen, and draw no highlight then.
-    pub fn detached(mut self, detached: bool) -> Self {
+    pub(crate) fn detached(mut self, detached: bool) -> Self {
         self.detached = detached;
         self
     }
 
-    pub fn highlight_style(mut self, style: Style) -> Self {
+    pub(crate) fn highlight_style(mut self, style: Style) -> Self {
         self.highlight_style = style;
         self
     }
 
-    pub fn scrollbar_style(mut self, style: Style) -> Self {
+    pub(crate) fn scrollbar_style(mut self, style: Style) -> Self {
         self.scrollbar_style = style;
         self
     }
 
-    pub fn render(self, frame: &mut Frame<'_>, area: Rect) -> usize {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, area: Rect) -> usize {
         let viewport_height = self.block.inner(area).height as usize;
         let row_count = self.items.len();
         let offset = if self.detached {

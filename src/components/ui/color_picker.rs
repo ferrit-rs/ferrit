@@ -1,7 +1,7 @@
 //! Composable color picker views and selected-color preview.
 
 #[path = "color_picker_spectrum.rs"]
-pub mod color_picker_spectrum;
+pub(crate) mod color_picker_spectrum;
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -34,21 +34,21 @@ const PALETTE: [(&str, Color); PALETTE_LENGTH] = [
 ];
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ColorPickerDisplay {
+pub(crate) enum ColorPickerDisplay {
     Palette,
     #[default]
     Spectrum,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ColorPickerGridMetrics {
+pub(crate) struct ColorPickerGridMetrics {
     pub columns: usize,
     pub rows: usize,
     pub cell_width: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum PaletteDirection {
+pub(crate) enum PaletteDirection {
     Left,
     Right,
     Up,
@@ -56,7 +56,7 @@ pub enum PaletteDirection {
 }
 
 /// Composite picker. Parent owns selection and applies colors returned by its input handler.
-pub struct ColorPicker {
+pub(crate) struct ColorPicker {
     value: Color,
     selected: usize,
     active: bool,
@@ -64,7 +64,7 @@ pub struct ColorPicker {
 }
 
 impl ColorPicker {
-    pub fn new(value: Color) -> Self {
+    pub(crate) fn new(value: Color) -> Self {
         Self {
             value,
             selected: nearest_index(value, ColorPickerDisplay::Palette),
@@ -74,24 +74,24 @@ impl ColorPicker {
     }
 
     #[must_use]
-    pub fn selected(mut self, selected: usize) -> Self {
+    pub(crate) fn selected(mut self, selected: usize) -> Self {
         self.selected = selected;
         self
     }
 
     #[must_use]
-    pub fn active(mut self, active: bool) -> Self {
+    pub(crate) fn active(mut self, active: bool) -> Self {
         self.active = active;
         self
     }
 
     #[must_use]
-    pub fn display(mut self, display: ColorPickerDisplay) -> Self {
+    pub(crate) fn display(mut self, display: ColorPickerDisplay) -> Self {
         self.display = display;
         self
     }
 
-    pub fn lines(self) -> Vec<Line<'static>> {
+    pub(crate) fn lines(self) -> Vec<Line<'static>> {
         let mut lines = vec![Line::styled(
             "Pick a color",
             Style::new().add_modifier(Modifier::BOLD),
@@ -110,17 +110,17 @@ impl ColorPicker {
 }
 
 /// Named swatch view, reusable without the composite picker.
-pub struct ColorPickerPalette {
+pub(crate) struct ColorPickerPalette {
     selected: usize,
     active: bool,
 }
 
 impl ColorPickerPalette {
-    pub fn new(selected: usize, active: bool) -> Self {
+    pub(crate) fn new(selected: usize, active: bool) -> Self {
         Self { selected, active }
     }
 
-    pub fn lines(self) -> Vec<Line<'static>> {
+    pub(crate) fn lines(self) -> Vec<Line<'static>> {
         let mut lines = Vec::with_capacity(PALETTE_ROWS);
         for row in 0..PALETTE_ROWS {
             let mut spans = Vec::new();
@@ -162,16 +162,16 @@ impl ColorPickerPalette {
 }
 
 /// Displays the current value as a color chip and hexadecimal code.
-pub struct ColorPickerPreview {
+pub(crate) struct ColorPickerPreview {
     value: Color,
 }
 
 impl ColorPickerPreview {
-    pub fn new(value: Color) -> Self {
+    pub(crate) fn new(value: Color) -> Self {
         Self { value }
     }
 
-    pub fn lines(self) -> Vec<Line<'static>> {
+    pub(crate) fn lines(self) -> Vec<Line<'static>> {
         let (r, g, b) = rgb(self.value);
         vec![Line::from(vec![
             Span::styled("Selected: ", Style::new().fg(Color::Gray)),
@@ -185,14 +185,14 @@ impl ColorPickerPreview {
     }
 }
 
-pub fn color_at(display: ColorPickerDisplay, selected: usize) -> Option<Color> {
+pub(crate) fn color_at(display: ColorPickerDisplay, selected: usize) -> Option<Color> {
     match display {
         ColorPickerDisplay::Palette => PALETTE.get(selected).map(|(_, color)| *color),
         ColorPickerDisplay::Spectrum => color_picker_spectrum::color_at(selected),
     }
 }
 
-pub fn grid_metrics(display: ColorPickerDisplay) -> ColorPickerGridMetrics {
+pub(crate) fn grid_metrics(display: ColorPickerDisplay) -> ColorPickerGridMetrics {
     match display {
         ColorPickerDisplay::Palette => ColorPickerGridMetrics {
             columns: PALETTE_COLUMNS,
@@ -207,12 +207,16 @@ pub fn grid_metrics(display: ColorPickerDisplay) -> ColorPickerGridMetrics {
     }
 }
 
-pub fn selection_at(display: ColorPickerDisplay, column: usize, row: usize) -> Option<usize> {
+pub(crate) fn selection_at(
+    display: ColorPickerDisplay,
+    column: usize,
+    row: usize,
+) -> Option<usize> {
     let metrics = grid_metrics(display);
     (column < metrics.columns && row < metrics.rows).then_some(row * metrics.columns + column)
 }
 
-pub fn move_selection(
+pub(crate) fn move_selection(
     selected: usize,
     direction: PaletteDirection,
     display: ColorPickerDisplay,
@@ -237,7 +241,7 @@ pub fn move_selection(
     }
 }
 
-pub fn nearest_index(color: Color, display: ColorPickerDisplay) -> usize {
+pub(crate) fn nearest_index(color: Color, display: ColorPickerDisplay) -> usize {
     let palette: Vec<Color> = match display {
         ColorPickerDisplay::Palette => PALETTE.iter().map(|(_, color)| *color).collect(),
         ColorPickerDisplay::Spectrum => color_picker_spectrum::all_colors(),
@@ -255,7 +259,7 @@ pub fn nearest_index(color: Color, display: ColorPickerDisplay) -> usize {
         .map_or(0, |(index, _)| index)
 }
 
-pub fn rgb(color: Color) -> (u8, u8, u8) {
+pub(crate) fn rgb(color: Color) -> (u8, u8, u8) {
     match color {
         Color::Rgb(r, g, b) => (r, g, b),
         Color::Green => (0, 255, 0),

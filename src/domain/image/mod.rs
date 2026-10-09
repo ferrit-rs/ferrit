@@ -10,5 +10,5 @@
 //! `docs/BUG_IMAGE_PREVIEW.md` for the terminal-detection bug this split grew
 //! out of.
 
-pub mod detect;
+pub(crate) mod detect;
 pub mod preview;

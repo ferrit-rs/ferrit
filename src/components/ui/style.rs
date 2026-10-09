@@ -9,7 +9,7 @@ fn fg(color: Color) -> Style {
     Style::new().fg(color)
 }
 
-pub fn confirm_line(message: &str, p: &Palette) -> Line<'static> {
+pub(crate) fn confirm_line(message: &str, p: &Palette) -> Line<'static> {
     Line::from(vec![
         Span::styled(message.to_owned(), fg(p.warn).add_modifier(Modifier::BOLD)),
         Span::raw("   "),
@@ -22,7 +22,7 @@ pub fn confirm_line(message: &str, p: &Palette) -> Line<'static> {
     ])
 }
 
-pub fn keybar_line(raw: &str, p: &Palette) -> Line<'static> {
+pub(crate) fn keybar_line(raw: &str, p: &Palette) -> Line<'static> {
     let mut spans = Vec::new();
     for (i, segment) in raw.split(" | ").enumerate() {
         if i > 0 {

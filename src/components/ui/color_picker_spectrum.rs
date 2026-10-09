@@ -27,17 +27,17 @@ const SHADE_LEVELS: [(f32, f32); SPECTRUM_ROWS] = [
     (1.0, 1.0),
 ];
 
-pub struct ColorPickerSpectrum {
+pub(crate) struct ColorPickerSpectrum {
     selected: usize,
     active: bool,
 }
 
 impl ColorPickerSpectrum {
-    pub fn new(selected: usize, active: bool) -> Self {
+    pub(crate) fn new(selected: usize, active: bool) -> Self {
         Self { selected, active }
     }
 
-    pub fn lines(self) -> Vec<Line<'static>> {
+    pub(crate) fn lines(self) -> Vec<Line<'static>> {
         (0..SPECTRUM_ROWS)
             .map(|row| {
                 let spans: Vec<Span<'static>> = (0..SPECTRUM_COLUMNS)

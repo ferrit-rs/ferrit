@@ -22,9 +22,9 @@ use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git::config::{Scope, WriteScope, display_value};
 
 /// Full markers from this width.
-pub const WIDE: u16 = 100;
+pub(crate) const WIDE: u16 = 100;
 /// Compact markers from this width; under it none.
-pub const NARROW: u16 = 60;
+pub(crate) const NARROW: u16 = 60;
 /// Cells the full marker may take.
 const MARKER_WIDE: usize = 26;
 /// Cells the compact marker may take.
@@ -36,7 +36,7 @@ const KEY_MIN: usize = 12;
 
 /// What the screen draws, all of it given.
 #[derive(Debug)]
-pub struct View<'a> {
+pub(crate) struct View<'a> {
     pub rows: &'a [ConfigRow],
     pub selected: usize,
     /// The first item (a row or a section rule) of the last frame.
@@ -276,7 +276,7 @@ fn scrolled(items: &[Item<'_>], selected: usize, offset: usize, height: usize) -
 
 /// Draw the screen into `area`. Returns the offset it settled on, for the app
 /// to keep.
-pub fn draw(frame: &mut Frame<'_>, area: Rect, view: &View<'_>) -> usize {
+pub(crate) fn draw(frame: &mut Frame<'_>, area: Rect, view: &View<'_>) -> usize {
     frame.render_widget(Clear, area);
     let mut panel = Panel::new()
         .title(title(view))

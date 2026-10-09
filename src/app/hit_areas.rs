@@ -10,7 +10,7 @@ use super::settings::SettingsHits;
 use super::{Pane, hints};
 
 #[derive(Default)]
-pub struct HitAreas {
+pub(crate) struct HitAreas {
     /// Each left pane's bordered rect, for routing a click to the pane it
     /// landed in.
     pub(super) left: EnumMap<Pane, Rect>,

@@ -55,11 +55,12 @@ Known gaps, each with a plan:
   `Landed` value (where each pane landed, for the mouse), and the animations, the toast, the
   image protocol and the diff cache live in a `RenderState` that `draw` takes out of `App` for
   the length of the frame (`PLAN_24_DRAW_VIEW.md`).
-- The library exposes more than it needs to (`domain` is fully documented and checked by
-  `missing_docs`; the rest is not): the integration tests reach into most of it,
-  and `App`'s public fields force their types to be nameable. The test seams that can be
-  separated (`replay`, `FakeGit`) are behind the `test-util` feature; `app::mock` is not,
-  because the repo-free path of the production code reads its sample text
+- The library still exposes more than a library would: the integration tests reach into
+  most of `app` and `components`, and `App`'s public fields force their types to be
+  nameable. What nothing outside the crate used is `pub(crate)` (76 `pub mod` left, from 98);
+  the test seams that can be separated (`replay`, `FakeGit`) are behind the `test-util`
+  feature; `domain` is fully documented and checked by `missing_docs`. `app::mock` is neither
+  gated nor private, because the repo-free path of the production code reads its sample text
   (`PLAN_23_TEST_SUPPORT.md`).
 
 ## One key press

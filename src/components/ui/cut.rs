@@ -3,7 +3,7 @@
 use unicode_width::UnicodeWidthStr;
 
 /// `text` cut to `width` cells with a trailing `…`.
-pub fn cut_end(text: &str, width: usize) -> String {
+pub(crate) fn cut_end(text: &str, width: usize) -> String {
     if UnicodeWidthStr::width(text) <= width {
         return text.to_owned();
     }
@@ -17,7 +17,7 @@ pub fn cut_end(text: &str, width: usize) -> String {
 
 /// `text` cut in the middle (`src/app/…/mod.rs`): the end of a path is the part
 /// that tells files apart, so it keeps the larger share.
-pub fn cut_middle(text: &str, width: usize) -> String {
+pub(crate) fn cut_middle(text: &str, width: usize) -> String {
     if UnicodeWidthStr::width(text) <= width {
         return text.to_owned();
     }

@@ -12,7 +12,7 @@ use crate::components::tui_overlay::state::OverlayState;
 
 /// Right-side drawer shell. Returns its inner area for caller-owned content.
 #[must_use]
-pub struct Drawer<'state, 'title> {
+pub(crate) struct Drawer<'state, 'title> {
     state: &'state mut OverlayState,
     title: Line<'title>,
     width: Constraint,
@@ -20,7 +20,7 @@ pub struct Drawer<'state, 'title> {
 }
 
 impl<'state, 'title> Drawer<'state, 'title> {
-    pub fn new<T: Into<Line<'title>>>(state: &'state mut OverlayState, title: T) -> Self {
+    pub(crate) fn new<T: Into<Line<'title>>>(state: &'state mut OverlayState, title: T) -> Self {
         Self {
             state,
             title: title.into(),
@@ -29,18 +29,18 @@ impl<'state, 'title> Drawer<'state, 'title> {
         }
     }
 
-    pub fn width(mut self, width: Constraint) -> Self {
+    pub(crate) fn width(mut self, width: Constraint) -> Self {
         self.width = width;
         self
     }
 
-    pub fn border_style(mut self, style: Style) -> Self {
+    pub(crate) fn border_style(mut self, style: Style) -> Self {
         self.border_style = style;
         self
     }
 
     /// Draw backdrop and frame, then return the area for drawer body widgets.
-    pub fn render(self, frame: &mut Frame<'_>, area: Rect) -> Option<Rect> {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, area: Rect) -> Option<Rect> {
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .border_style(self.border_style)

@@ -7,14 +7,14 @@ use ratatui::widgets::Paragraph;
 /// Render selectable rows with a full-width style on the active row.
 /// Selection movement remains owned by the parent app.
 #[must_use]
-pub struct SelectList<'a> {
+pub(crate) struct SelectList<'a> {
     items: &'a [Line<'static>],
     selected: usize,
     selection_style: Style,
 }
 
 impl<'a> SelectList<'a> {
-    pub fn new(items: &'a [Line<'static>], selected: usize) -> Self {
+    pub(crate) fn new(items: &'a [Line<'static>], selected: usize) -> Self {
         Self {
             items,
             selected,
@@ -22,12 +22,12 @@ impl<'a> SelectList<'a> {
         }
     }
 
-    pub fn selection_style(mut self, style: Style) -> Self {
+    pub(crate) fn selection_style(mut self, style: Style) -> Self {
         self.selection_style = style;
         self
     }
 
-    pub fn render(self, frame: &mut Frame<'_>, area: Rect) {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, area: Rect) {
         let lines = self
             .items
             .iter()

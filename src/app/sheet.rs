@@ -11,7 +11,7 @@ use crate::components::tui_overlay::state::OverlayState;
 /// The drawer and what it can hold. One drawer state means one animation and,
 /// by construction, one sheet at a time.
 #[derive(Default)]
-pub struct Sheets {
+pub(crate) struct Sheets {
     /// Which sheet the drawer holds while it is not closed.
     pub(super) kind: Sheet,
     pub(super) settings: SettingsSheet,
@@ -21,7 +21,7 @@ pub struct Sheets {
 /// What the drawer holds. Kept while it slides out, so the last frames of the
 /// close are still the sheet that was up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Sheet {
+pub(crate) enum Sheet {
     /// Ferrit's own settings, opened by a click on the author's name.
     #[default]
     Settings,

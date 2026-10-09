@@ -9,7 +9,7 @@ use ratatui_image::picker::Picker;
 use super::diff_query::RightKey;
 use super::{DiffCursor, DiffView};
 
-pub struct RightPane {
+pub(crate) struct RightPane {
     /// Terminal graphics backend for the image preview. Starts on half-blocks
     /// (works everywhere); `detect_graphics()` upgrades it to sixel / kitty /
     /// iterm2 when the real terminal supports one.

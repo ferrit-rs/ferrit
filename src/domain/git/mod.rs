@@ -26,7 +26,7 @@ pub mod host;
 pub mod model;
 pub mod operation;
 pub mod port;
-pub mod process;
+pub(crate) mod process;
 pub mod rebase;
 pub mod ssh_config;
 pub mod stash;

@@ -7,8 +7,7 @@ use ratatui::widgets::Clear;
 
 /// Rendered regions inside a dialog shell.
 #[derive(Debug, Clone, Copy)]
-pub struct DialogAreas {
-    pub outer: Rect,
+pub(crate) struct DialogAreas {
     pub body: Rect,
     /// Empty rectangle when this dialog has no footer region.
     pub footer: Rect,
@@ -17,7 +16,7 @@ pub struct DialogAreas {
 /// Centered, bordered overlay shell. Render body and footer widgets into the
 /// returned areas to compose dialogs without coupling them to app state.
 #[must_use]
-pub struct Dialog<'a> {
+pub(crate) struct Dialog<'a> {
     title: Line<'a>,
     width: u16,
     height: u16,
@@ -26,7 +25,7 @@ pub struct Dialog<'a> {
 }
 
 impl<'a> Dialog<'a> {
-    pub fn new<T: Into<Line<'a>>>(title: T) -> Self {
+    pub(crate) fn new<T: Into<Line<'a>>>(title: T) -> Self {
         Self {
             title: title.into(),
             width: u16::MAX,
@@ -36,7 +35,7 @@ impl<'a> Dialog<'a> {
         }
     }
 
-    pub fn size(mut self, width: u16, height: u16) -> Self {
+    pub(crate) fn size(mut self, width: u16, height: u16) -> Self {
         self.width = width;
         self.height = height;
         self
@@ -45,25 +44,25 @@ impl<'a> Dialog<'a> {
     /// Size the shell to its content rows plus borders, clamped to the
     /// available terminal area at render time. `footer_rows == 0` omits the
     /// footer region. Use this for dialogs whose content determines height.
-    pub fn fit_content(mut self, width: u16, body_rows: u16, footer_rows: u16) -> Self {
+    pub(crate) fn fit_content(mut self, width: u16, body_rows: u16, footer_rows: u16) -> Self {
         self.width = width;
         self.height = body_rows.saturating_add(footer_rows).saturating_add(2);
         self.footer_rows = (footer_rows > 0).then_some(footer_rows);
         self
     }
 
-    pub fn footer_rows(mut self, rows: u16) -> Self {
+    pub(crate) fn footer_rows(mut self, rows: u16) -> Self {
         self.footer_rows = Some(rows);
         self
     }
 
-    pub fn border_style(mut self, style: Style) -> Self {
+    pub(crate) fn border_style(mut self, style: Style) -> Self {
         self.border_style = style;
         self
     }
 
     /// Clear the overlay area, draw its shell, and return child regions.
-    pub fn render(self, frame: &mut Frame<'_>, area: Rect) -> DialogAreas {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, area: Rect) -> DialogAreas {
         let width = self.width.min(area.width);
         let height = self.height.min(area.height);
         let outer = Rect {
@@ -87,10 +86,6 @@ impl<'a> Dialog<'a> {
                 .into(),
             None => (inner, Rect::default()),
         };
-        DialogAreas {
-            outer,
-            body,
-            footer,
-        }
+        DialogAreas { body, footer }
     }
 }

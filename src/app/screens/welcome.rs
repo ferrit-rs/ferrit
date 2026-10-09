@@ -25,7 +25,7 @@ const PAD: usize = 2;
 
 /// What the screen draws.
 #[derive(Debug)]
-pub struct View<'a> {
+pub(crate) struct View<'a> {
     pub dir: &'a Path,
     /// The highlighted row: 0 is `git init`, 1 is quit.
     pub selected: usize,
@@ -61,7 +61,7 @@ fn choice(selected: bool, key: &str, text: &str, width: usize, palette: &Palette
 }
 
 /// Draw the dialog centred in `area`.
-pub fn draw(frame: &mut Frame<'_>, area: Rect, view: &View<'_>) {
+pub(crate) fn draw(frame: &mut Frame<'_>, area: Rect, view: &View<'_>) {
     frame.render_widget(Clear, area);
     let accent = Style::new().fg(view.accent).add_modifier(Modifier::BOLD);
     let dialog = Dialog::new(Line::styled(" ferrit ", accent))
