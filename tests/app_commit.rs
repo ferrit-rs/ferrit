@@ -21,7 +21,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use ferrit::app::{App, DiffView, Pane, PopupView};
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
+use ferrit::app::views::{DiffView, PopupView};
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

@@ -19,8 +19,9 @@ mod common;
 use common::{TempDir, commit_all, configure_identity};
 use std::fs;
 
+use ferrit::app::App;
 use ferrit::app::config::{Config, ConfigLoad};
-use ferrit::app::{App, Pane};
+use ferrit::app::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;

@@ -15,23 +15,19 @@ pub mod terminal;
 pub mod theme;
 pub mod theme_config;
 
-use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::ops::Range;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::mouse_pointer::MousePointer;
 use crate::components::ui::palette::Palette;
 use crate::components::ui::toast::Toast;
 use crate::domain::profile::Profile;
 use crate::domain::profile::settings::Settings;
 use color_eyre::Result;
-use enum_map::Enum;
 use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -50,466 +46,13 @@ use crate::domain::git::port::GitPort;
 use crate::domain::image::detect;
 use crate::domain::image::preview::{self, Preview};
 
-/// What the right pane shows behind the image preview. A second cached,
-/// rebuilt-on-nav value alongside `preview`, not a replacement: an image
-/// selection still wins. See `docs/PLAN_3_DIFF_VIEW.md`.
-#[derive(Debug, Clone, Default)]
-pub enum DiffView {
-    /// Status / Stash focused: no real diff, the mock text shows.
-    #[default]
-    None,
-    /// Read failed, or nothing to show. A dim single line, never a panic.
-    Note(String),
-    /// Files pane: one file's `git diff`, both sides at once (lazygit's own
-    /// Unstaged Changes / Staged Changes split).
-    Files(FilesDiff),
-    /// Commits pane, or a drilled branch's log: one commit's metadata and
-    /// `git show` diff.
-    Commit(git::model::CommitEntry, git::diff::Diff),
-    /// Stash pane: the selected entry's `git stash show -p`, scrolled and
-    /// rendered like a commit diff (`docs/PLAN_10_STASH.md`).
-    Stash(git::model::StashEntry, git::diff::Diff),
-    /// Branches pane, not drilled in: the selected branch's own log, shown
-    /// passively (no Enter needed), lazygit's live branch -> log preview.
-    BranchLog(BranchLog),
-}
-
-/// A Files-pane selection's two sides at once, lazygit's own Unstaged
-/// Changes / Staged Changes split: a file half-staged shows real content in
-/// both, a file entirely on one side shows an empty diff on the other.
-#[derive(Debug, Clone)]
-pub struct FilesDiff {
-    pub unstaged: git::diff::Diff,
-    pub staged: git::diff::Diff,
-}
-
-/// Read-only view of an editor popup for `ui::draw_commit_popup`
-/// (`docs/PLAN_7_COMMIT.md`), reused as-is for the new-branch popup
-/// (`docs/PLAN_8_BRANCHES.md`) — same shape, different title/footer.
-/// Borrows the draft's lines, so it is cheap to build fresh every frame
-/// rather than cached.
-pub struct CommitPopupView<'a> {
-    pub title: &'a str,
-    /// Commit subject, or the whole single-field input for another popup.
-    pub input: &'a TextInput,
-    /// Commit body editor; absent for the new-branch input.
-    pub description: Option<&'a TextInput>,
-    pub summary_focused: bool,
-    pub overlay_state: Option<&'a mut OverlayState>,
-    /// Compatibility view of the component's text lines.
-    pub lines: &'a [String],
-    /// `(row, character column)` cursor position.
-    pub cursor: (usize, usize),
-    /// `Some((sign_off, no_verify))` for the commit popup's toggle line;
-    /// `None` for the new-branch popup, which has nothing to toggle.
-    pub toggles: Option<(bool, bool)>,
-    /// The commit popup's author line (`author: Name <email>`); `None` for the
-    /// other popups and for a reword, which keeps the commit's own author.
-    pub author: Option<String>,
-    /// Footer key hints, e.g. `"Commit: Ctrl-S | ... | Cancel: Esc"`.
-    pub hints: &'static str,
-}
-
-/// The one active popup, ready for rendering. Explicit variants keep popup
-/// precedence in one `match` instead of chaining `if let` checks.
-pub enum PopupView<'a> {
-    Commit(CommitPopupView<'a>),
-    /// The "stage everything?" question. Carries the backdrop's animation only when
-    /// the view is for drawing (`popup_view_with`).
-    CommitAllConfirm(Option<&'a mut OverlayState>),
-    NewBranch(CommitPopupView<'a>),
-    Stash(CommitPopupView<'a>),
-    Name(CommitPopupView<'a>),
-    CommandLog(CommandLogView),
-    Menu(MenuView),
-    Upstream(CommitPopupView<'a>),
-    Askpass(CommitPopupView<'a>),
-    CreateRemote(create_remote::CreateRemoteView<'a>),
-    Note(&'a str),
-}
-
-/// The `@` viewer's render data: every recorded command and how far the view
-/// is scrolled up from the newest.
-#[derive(Debug)]
-pub struct CommandLogView {
-    pub records: Vec<git::command_log::CommandRecord>,
-    pub from_bottom: usize,
-}
-
-/// A menu's render data: the title, one line per row, and the highlighted
-/// row.
-#[derive(Debug)]
-pub struct MenuView {
-    pub title: String,
-    pub rows: Vec<String>,
-    pub selected: usize,
-    /// What the highlighted row does; empty when the menu has no hints.
-    pub hint: &'static str,
-}
-
 /// `Operation::noun` as a function pointer for `Option::map_or`.
 fn operation_noun(operation: git::model::Operation) -> &'static str {
     operation.noun()
 }
 
-/// A branch's own commit log for the passive `DiffView::BranchLog` preview.
-#[derive(Debug, Clone)]
-pub struct BranchLog {
-    pub branch: String,
-    pub commits: Vec<git::model::CommitEntry>,
-}
-
-/// Snapshot plus any active drill-down data loaded in the same worker.
-/// A result whose error is shared between the Status line, the toast and the
-/// refresh bookkeeping, none of which can own it alone.
-type Shared<T> = Result<T, Arc<AppError>>;
-
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct RefreshCompletion {
-    pub(crate) snapshot: Shared<git::Snapshot>,
-    pub(crate) profile: Option<Profile>,
-    pub(crate) branch_log: Option<(String, Shared<Vec<git::model::CommitEntry>>)>,
-    pub(crate) commit_files: Option<(String, Shared<Vec<git::model::FileEntry>>)>,
-}
-
-pub(crate) struct RenderedDiff {
-    key: Option<RightKey>,
-    source: String,
-    focus: Option<Range<usize>>,
-    width: usize,
-    text: Text<'static>,
-}
-
-/// State for the Branches pane's Enter-to-drill-down (lazygit's branch ->
-/// log): the pane itself swaps its branch list for one branch's commit list,
-/// in place, rather than moving focus elsewhere. Distinct from the passive
-/// `DiffView::BranchLog` preview, which needs no Enter at all.
-struct BranchDrill {
-    branch: String,
-    commits: Vec<git::model::CommitEntry>,
-    /// The branch-list cursor to restore when `Esc` backs out.
-    return_index: usize,
-}
-
-/// State for the Commits pane's Enter-to-drill-down: the pane swaps its
-/// commit list for that commit's own changed-file tree, in place, the same
-/// shape `BranchDrill` gives the Branches pane one level up. Read only, no
-/// staging; `Esc` backs out.
-struct CommitDrill {
-    hash: String,
-    /// `"<short_hash> <summary>"`, for `App::commits_title`.
-    title: String,
-    /// One synthetic `FileEntry` per file the commit's diff touched, same
-    /// index order as the underlying `git::diff::Diff::files`/`file_lines()` so a
-    /// selected row's scroll target is a plain index lookup.
-    files: Vec<git::model::FileEntry>,
-    /// The commit-list cursor to restore when `Esc` backs out.
-    return_index: usize,
-    /// Directory rows the user collapsed in this drill; starts empty, so a
-    /// commit opens fully expanded whatever the Files pane has collapsed.
-    collapsed: HashSet<PathBuf>,
-}
-
-/// Where keystrokes go while a Files diff is up. `Nav` is phase 1..5
-/// behaviour unchanged; `Diff` is `docs/PLAN_6_STAGING.md`'s "focus the diff
-/// to stage within it", scoped to the Files pane — the only one with
-/// anything to stage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum Mode {
-    #[default]
-    Nav,
-    Diff,
-}
-
-/// The right-pane diff cursor, meaningful only in `Mode::Diff`. `line` and
-/// `anchor` are indices into `side`'s own `Diff::text` lines: the Files
-/// split always shows at most one file per side, so there is no "flatten
-/// every file's hunks" step, just the diff's own line numbering.
-#[derive(Debug, Clone, Default)]
-struct DiffCursor {
-    side: DiffSide,
-    line: usize,
-    /// V-select anchor. `None` is a single line, `Some(a)` is the range
-    /// `a..=line` (order-independent: whichever end moves).
-    anchor: Option<usize>,
-    /// Content hash of the hunk the cursor sits in (header + body text), so
-    /// a background refresh can re-find the same hunk even if surrounding
-    /// hunks changed line count. gitu hashes the same way for its `Item.id`.
-    hunk_id: u64,
-}
-
-/// What `<space>` / `d` act on in `Mode::Diff`: the whole hunk under the
-/// cursor, or a V-selected subset of its `+`/`-` lines.
-enum Granule {
-    Hunk {
-        patch: String,
-    },
-    Lines {
-        file_header: String,
-        hunk_header: String,
-        hunk_body: String,
-        lines: Vec<usize>,
-    },
-}
-
-/// One hunk's body as global (whole-`Diff::text`) line indices, plus which
-/// of those lines are selectable (`+`/`-`; context is read but never
-/// chosen). Built fresh per diff-mode operation from the current `Diff` —
-/// cheap at working-tree sizes, the same "no cache" choice `files_tree_rows`
-/// already makes.
-struct HunkLines {
-    hunk_index: usize,
-    lines: Range<usize>,
-    selectable: Vec<usize>,
-}
-
-/// A pending confirmation: a `d` discard (phase 6) or a branch delete
-/// (`docs/PLAN_8_BRANCHES.md`), the first *other* thing that needed a
-/// yes/no gate — generalized from phase 6's `DiscardPrompt`, which was
-/// exactly this shape with `action` fixed to a discard. `PLAN_0_GENERAL.md`:
-/// "anything that loses work asks first". `y` runs `action`, `n` / `Esc`
-/// cancels; nothing else can happen while it is up, same as the help
-/// overlay.
-struct ConfirmPrompt {
-    message: String,
-    action: ConfirmAction,
-}
-
-enum ConfirmAction {
-    /// The whole file's worktree change (`d` in `Mode::Nav`, Files focused).
-    DiscardFile(PathBuf),
-    /// A hunk or a line selection (`d` in `Mode::Diff`, worktree side).
-    DiscardGranule(Granule),
-    /// `d` in `Mode::Nav`, Branches focused: `git branch -d` / `-D`. `force`
-    /// is `false` on the first confirm, `true` on the second one offered
-    /// after an unmerged-branch refusal (`App::run_confirm`).
-    DeleteBranch { name: String, force: bool },
-    /// Abort the merge, rebase, cherry-pick or revert in progress (`m` menu).
-    AbortOperation,
-    /// `d` on the Commits pane: drop that commit with `git rebase -i`.
-    DropCommit { hash: String },
-    /// `s` on the Commits pane: squash that commit into the one below.
-    SquashCommit { hash: String },
-    /// `d` on the Stash pane: `git stash drop`, resolved by oid.
-    DropStash { oid: String },
-    /// `<space>` (apply) or `g` (pop) on the Stash pane: confirmed first, like
-    /// drop, since both mutate the working tree with no undo.
-    RestoreStash { oid: String, pop: bool },
-    /// Push a branch known to be behind its upstream, using a lease guard.
-    ForcePush,
-    /// First write to the global git config of this session: once confirmed,
-    /// the edit that asked carries on (`app::git_config_edit`).
-    ConfigGlobal(git_config_edit::GlobalResume),
-    /// `d` on the git config screen: unset one value.
-    ConfigUnset(git_config_edit::ConfigOp),
-    /// `i` on the welcome screen: `git init` in this folder.
-    InitRepo(PathBuf),
-}
-
-/// Body-line ranges (global `diff.text` line indices) for every hunk of a
-/// single-file `Diff`, plus which of those lines are selectable.
-fn hunk_lines_for(diff: &git::diff::Diff) -> Vec<HunkLines> {
-    let Some(file) = diff.files.first() else {
-        return Vec::new();
-    };
-    let lines: Vec<&str> = diff.text.lines().collect();
-    let headers = diff.hunk_lines();
-    file.hunks
-        .iter()
-        .enumerate()
-        .map(|(hunk_index, hunk)| {
-            let body_start = headers.get(hunk_index).map_or(0, |&l| l + 1);
-            let body_len = diff
-                .text
-                .get(hunk.body.clone())
-                .unwrap_or_default()
-                .lines()
-                .count();
-            let range = body_start..body_start + body_len;
-            let selectable = range
-                .clone()
-                .filter(|&l| {
-                    matches!(
-                        lines.get(l).and_then(|s| s.as_bytes().first()),
-                        Some(b'+' | b'-')
-                    )
-                })
-                .collect();
-            HunkLines {
-                hunk_index,
-                lines: range,
-                selectable,
-            }
-        })
-        .collect()
-}
-
-/// Every selectable line across every hunk of `diff`, in order. `j` / `k` in
-/// `Mode::Diff` step through this list, skipping context lines entirely.
-fn selectable_lines(diff: &git::diff::Diff) -> Vec<usize> {
-    hunk_lines_for(diff)
-        .into_iter()
-        .flat_map(|hl| hl.selectable)
-        .collect()
-}
-
-/// The content id of whichever hunk contains global line `line`, or `None`
-/// if it falls outside every hunk (should not happen for a selectable
-/// line). Used to keep `DiffCursor::hunk_id` pointing at the hunk the
-/// cursor is actually on whenever it moves, so `resync_diff_cursor` (which
-/// runs after *every* key, not just a stage) does not mistake "moved to a
-/// different hunk" for "the old hunk vanished" and snap back to it.
-fn hunk_id_at(diff: &git::diff::Diff, line: usize) -> Option<u64> {
-    let hl = hunk_lines_for(diff)
-        .into_iter()
-        .find(|hl| hl.lines.contains(&line))?;
-    Some(hunk_content_id(diff, hl.hunk_index))
-}
-
-/// Stable id for hunk `hunk_index` of `diff`: a hash of its header + body
-/// text, so a background refresh can re-find the same hunk even once
-/// staging moved a *different* hunk out from under it (gitu's `Item.id`).
-fn hunk_content_id(diff: &git::diff::Diff, hunk_index: usize) -> u64 {
-    use std::hash::{Hash as _, Hasher as _};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    if let Some(hunk) = diff.files.first().and_then(|f| f.hunks.get(hunk_index)) {
-        diff.text
-            .get(hunk.header.start..hunk.body.end)
-            .unwrap_or_default()
-            .hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
-/// A view that takes the whole terminal in place of the five panes: the git
-/// config editor (`docs/PLAN_14_GIT_CONFIG.md`) and the welcome screen. (The
-/// dashboard was one until phase 19: it is a sheet now, `app::sheet`.)
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum FullScreen {
-    #[default]
-    None,
-    GitConfig,
-    /// No repository: ferrit started in a folder that is not one
-    /// (`docs/PLAN_16_START_WITHOUT_REPO.md`).
-    Welcome,
-}
-
-/// Modal state that owns all input while it is up, the same idea as
-/// `show_help` today but richer (`docs/PLAN_7_COMMIT.md`).
-enum Popup {
-    Commit(commit::CommitDraft),
-    CommitAllConfirm,
-    /// New-branch name input (`docs/PLAN_8_BRANCHES.md`). `Enter` *submits*
-    /// here, unlike the commit popup, where `Enter` inserts a newline —
-    /// the only behavioural difference from reusing `TextInput` outright.
-    NewBranch(TextInput),
-    /// A one-line name or message with a purpose: rename a branch or a stash,
-    /// a branch at a commit, a stash keeping the index (`app::context_menu`).
-    Name(context_menu::NameTarget, TextInput),
-    /// Stash message input, `s` on Files (`docs/PLAN_10_STASH.md`). `Enter`
-    /// submits; an empty message lets git write its own.
-    Stash(TextInput),
-    /// `P` with no upstream: edit `<remote> <branch>` before first push.
-    Upstream(TextInput),
-    /// A passphrase, password or host-key question from ssh/git during a
-    /// remote op (`app::askpass`).
-    Askpass(askpass::AskpassPrompt),
-    /// A list of actions to pick from (`app::menu`): the `m` menu for an
-    /// operation stopped mid-way, and later the `x` menu.
-    Menu(menu::MenuState),
-    /// `@`: every recorded `git` command, newest last (`docs/PLAN_12_POLISH.md`
-    /// P0). `from_bottom` is how many rows the view is scrolled up from the
-    /// newest entry; the renderer clamps it to what fits.
-    CommandLog {
-        from_bottom: usize,
-    },
-    /// Creating the GitHub repository: the `gh` check, the form, the last
-    /// question (`app::create_remote`).
-    CreateRemote(create_remote::Step),
-    /// A dismissible message: a commit failure, "empty commit message", a
-    /// branch-op failure, or a merge conflict.
-    Note(String),
-}
-
-/// `(discriminant, diff text)` for cheap "did the right pane actually change"
-/// checks: `String` equality on a few KB, no hashing.
-/// The five left panes, in top-to-bottom screen order.
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Enum)]
-pub enum Pane {
-    Status,
-    /// Where ferrit opens, like lazygit.
-    #[default]
-    Files,
-    Branches,
-    Commits,
-    Stash,
-}
-
-/// Which of the Branches pane's own two real tabs is showing (the third,
-/// Tags, is still an inert label — `Pane::title`). `Remotes` has no
-/// selection cursor of its own; it is `Repo::remotes()` rendered plainly,
-/// same as the Local tab's list was for the entirety of phase 2 before
-/// phase 8 made it actionable. `docs/PLAN_9_REMOTE.md`.
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-enum BranchesTab {
-    #[default]
-    Local,
-    Remotes,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum SelectionKey {
-    File(PathBuf),
-    Directory(PathBuf),
-    Branch(String),
-    Commit(String),
-    Stash(String),
-}
-
 /// How often the run loop wakes while an error toast is up, to count its timeout.
 const TOAST_TICK_MS: u64 = 250;
-
-/// Panes in order. Index into this is also the index into `App::selection`.
-pub const PANES: [Pane; 5] = [
-    Pane::Status,
-    Pane::Files,
-    Pane::Branches,
-    Pane::Commits,
-    Pane::Stash,
-];
-
-impl Pane {
-    /// Position in `PANES`, for the focus-cycling arithmetic in `pane_offset`.
-    /// The variant order is the `PANES` order, so the discriminant is it.
-    pub fn index(self) -> usize {
-        self as usize
-    }
-
-    /// Bordered-box title, lazygit style: `[N] Tab - Tab - Tab`. The extra tab
-    /// names are inert labels for now; only the first is a real view.
-    pub fn title(self) -> &'static str {
-        match self {
-            Self::Status => "[1] Status",
-            Self::Files => "[2] Files - Worktrees - Submodules",
-            Self::Branches => "[3] Local branches - Remotes - Tags",
-            Self::Commits => "[4] Commits - Reflog",
-            Self::Stash => "[5] Stash",
-        }
-    }
-
-    /// Contextual title for the right pane when this left pane has focus,
-    /// matching what lazygit shows there.
-    pub fn right_title(self) -> &'static str {
-        match self {
-            Self::Status => " Status ",
-            Self::Files => " Unstaged changes ",
-            Self::Branches => " Log ",
-            Self::Commits => " Patch ",
-            Self::Stash => " Stash ",
-        }
-    }
-}
 
 pub struct App {
     /// The configuration and what it makes: keymap, palette, colour depth.
@@ -577,18 +120,26 @@ pub struct App {
 }
 
 mod authorship;
-mod full_screens;
+mod confirm;
+mod diff_cursor;
+mod drill;
+pub mod full_screens;
 pub mod help;
 pub(crate) mod hit_areas;
 mod modal;
 pub mod nav;
+pub mod pane;
+mod popup;
 mod prefs;
+pub mod refresh;
 mod render_state;
 pub(crate) mod right_pane;
+pub mod selection;
 pub mod theme_editor;
 mod tree;
+pub mod views;
 mod welcome;
-mod workers;
+pub mod workers;
 
 mod askpass;
 mod branch_actions;
@@ -618,7 +169,21 @@ pub(crate) use error::AppError;
 #[cfg(test)]
 mod tests;
 
-use diff_query::RightKey;
+use self::confirm::{ConfirmAction, ConfirmPrompt};
+use self::diff_cursor::{
+    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
+};
+use self::drill::{BranchDrill, CommitDrill};
+use self::full_screens::FullScreen;
+use self::pane::{BranchesTab, PANES, Pane};
+use self::popup::Popup;
+use self::refresh::RefreshCompletion;
+use self::render_state::RenderedDiff;
+use self::selection::{SelectionKey, find_file_row_key, selection_key_for_file_rows};
+use self::views::{
+    BranchLog, CommandLogView, CommitPopupView, DiffView, FilesDiff, MenuView, PopupView,
+};
+use self::workers::{WorkerError, WorkerKind, run_worker};
 use tree::{FileRow, StageState, commit_drill_files, dir_stage_state, drill_tree_rows, tree_rows};
 
 impl App {
@@ -2075,74 +1640,11 @@ impl App {
     }
 }
 
-fn selection_key_for_file_rows(
-    rows: &[FileRow],
-    files: &[git::model::FileEntry],
-    selected: usize,
-) -> Option<SelectionKey> {
-    match rows.get(selected)? {
-        FileRow::Dir { path, .. } => Some(SelectionKey::Directory(path.clone())),
-        FileRow::File { index, .. } => files
-            .get(*index)
-            .map(|entry| SelectionKey::File(entry.path.clone())),
-    }
-}
-
-fn find_file_row_key(
-    rows: &[FileRow],
-    files: &[git::model::FileEntry],
-    key: &SelectionKey,
-) -> Option<usize> {
-    rows.iter().position(|row| match (row, key) {
-        (FileRow::Dir { path, .. }, SelectionKey::Directory(wanted)) => path == wanted,
-        (FileRow::File { index, .. }, SelectionKey::File(wanted)) => {
-            files.get(*index).is_some_and(|entry| entry.path == *wanted)
-        },
-        _ => false,
-    })
-}
-
-/// Which background worker a panic came from; its lowercase name is how the
-/// message calls it.
-#[derive(Debug, Clone, Copy, strum::Display)]
-#[strum(serialize_all = "lowercase")]
-pub(super) enum WorkerKind {
-    Refresh,
-    Diff,
-    Image,
-    Remote,
-    Stats,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("{worker} worker panicked: {detail}")]
-pub struct WorkerError {
-    worker: WorkerKind,
-    detail: String,
-}
-
 /// The Status line for a filesystem watcher that could not start, if any.
 fn watcher_error(events: &Events) -> Option<Arc<AppError>> {
     events.watch_error().map(|detail| {
         Arc::new(AppError::WatcherUnavailable {
             detail: detail.to_owned(),
         })
-    })
-}
-
-/// Run worker logic behind a panic boundary so completion events can release
-/// single-flight state even when a repository operation unexpectedly panics.
-pub(super) fn run_worker<T>(
-    worker: WorkerKind,
-    work: impl FnOnce() -> T,
-) -> std::result::Result<T, WorkerError> {
-    catch_unwind(AssertUnwindSafe(work)).map_err(|payload| {
-        let detail = payload
-            .downcast_ref::<String>()
-            .map(String::as_str)
-            .or_else(|| payload.downcast_ref::<&'static str>().copied())
-            .unwrap_or("non-string panic payload")
-            .to_owned();
-        WorkerError { worker, detail }
     })
 }

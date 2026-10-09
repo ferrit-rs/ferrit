@@ -10,7 +10,8 @@
 //! flows run against a real repository in `app_commit.rs` and `app_stage.rs`.
 //! See `docs/PLAN_21_GIT_PORT.md`.
 
-use ferrit::app::{App, Pane};
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::fake::FakeGit;
 use ferrit::domain::git::model::Change;

@@ -20,7 +20,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::Path;
 
-use ferrit::app::{App, Pane};
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

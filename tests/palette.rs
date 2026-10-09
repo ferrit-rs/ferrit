@@ -10,10 +10,11 @@
 //! (`docs/PLAN_12_POLISH.md` P5): a builder handed another palette paints with
 //! it, and the default palette is the one ferrit always had.
 
+use ferrit::app::App;
 use ferrit::app::config::Config;
 use ferrit::app::mock::{mock_commits, mock_files};
+use ferrit::app::pane::Pane;
 use ferrit::app::theme;
-use ferrit::app::{App, Pane};
 use ferrit::components::ui::key_bar::KeyBar;
 use ferrit::components::ui::palette::Palette;
 use ferrit::domain::git::diff::parse_diff;

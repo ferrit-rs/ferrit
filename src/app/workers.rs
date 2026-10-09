@@ -4,16 +4,17 @@
 //! The code that starts each of them stays in its own module (`remote`,
 //! `diff_query`, `image_query`, `App::request_refresh`); this is the state.
 
+use crate::app::events::AppEvent;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
 use super::AppError;
 use super::diff_query::DiffQueryState;
-use super::events::{AppEvent, RemoteOp};
+use super::events::RemoteOp;
 
 /// One snapshot worker at a time. Bursty filesystem events collapse into one
 /// follow-up snapshot instead of queuing stale concurrent reads.
@@ -73,4 +74,40 @@ impl Workers {
             refresh_failure: None,
         }
     }
+}
+
+/// Which background worker a panic came from; its lowercase name is how the
+/// message calls it.
+#[derive(Debug, Clone, Copy, strum::Display)]
+#[strum(serialize_all = "lowercase")]
+pub(super) enum WorkerKind {
+    Refresh,
+    Diff,
+    Image,
+    Remote,
+    Stats,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{worker} worker panicked: {detail}")]
+pub struct WorkerError {
+    pub(super) worker: WorkerKind,
+    pub(super) detail: String,
+}
+
+/// Run worker logic behind a panic boundary so completion events can release
+/// single-flight state even when a repository operation unexpectedly panics.
+pub(super) fn run_worker<T>(
+    worker: WorkerKind,
+    work: impl FnOnce() -> T,
+) -> Result<T, WorkerError> {
+    catch_unwind(AssertUnwindSafe(work)).map_err(|payload| {
+        let detail = payload
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| payload.downcast_ref::<&'static str>().copied())
+            .unwrap_or("non-string panic payload")
+            .to_owned();
+        WorkerError { worker, detail }
+    })
 }

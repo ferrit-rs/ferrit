@@ -20,7 +20,8 @@ use std::time::Duration;
 
 use common::TempDir;
 use ferrit::app::config::ConfigLoad;
-use ferrit::app::{App, Pane, screens as ui};
+use ferrit::app::pane::Pane;
+use ferrit::app::{App, screens as ui};
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::fake::FakeGit;
 use ferrit::domain::git::model::Change;

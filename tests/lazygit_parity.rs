@@ -15,7 +15,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use ferrit::app::{App, Pane, screens};
+use ferrit::app::pane::Pane;
+use ferrit::app::{App, screens};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

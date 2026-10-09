@@ -7,8 +7,9 @@
     reason = "throwaway example: prints to stdout, panics on failed setup"
 )]
 //! Throwaway: render one frame to stdout so a layout change is eyeballable.
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
 use ferrit::app::screens as ui;
-use ferrit::app::{App, Pane};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 

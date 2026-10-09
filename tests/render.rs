@@ -18,8 +18,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::mpsc;
 
+use ferrit::app::App;
 use ferrit::app::events::RemoteOp;
-use ferrit::app::{App, Pane};
+use ferrit::app::pane::Pane;
 use ferrit::app::{mock, screens as ui};
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;

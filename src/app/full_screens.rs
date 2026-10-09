@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use super::{FullScreen, git_config};
+use super::git_config;
 
 #[derive(Default)]
 pub(super) struct FullScreens {
@@ -16,4 +16,17 @@ pub(super) struct FullScreens {
     pub(super) welcome_dir: Option<PathBuf>,
     /// The highlighted row of the welcome screen: 0 is `git init`, 1 is quit.
     pub(super) welcome_selected: usize,
+}
+
+/// A view that takes the whole terminal in place of the five panes: the git
+/// config editor (`docs/PLAN_14_GIT_CONFIG.md`) and the welcome screen. (The
+/// dashboard was one until phase 19: it is a sheet now, `app::sheet`.)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FullScreen {
+    #[default]
+    None,
+    GitConfig,
+    /// No repository: ferrit started in a folder that is not one
+    /// (`docs/PLAN_16_START_WITHOUT_REPO.md`).
+    Welcome,
 }

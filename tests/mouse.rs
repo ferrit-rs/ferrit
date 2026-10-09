@@ -3,7 +3,8 @@
 //! terminal) plus the `set_left_area` / `set_list_offset` test seams stand
 //! in for a real frame. See `docs/PLAN_5_CLICK_BEHAVIOR.md` milestone C1.
 
-use ferrit::app::{App, Pane};
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };

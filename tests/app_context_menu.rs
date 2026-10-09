@@ -19,8 +19,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use ferrit::app::App;
+use ferrit::app::pane::Pane;
 use ferrit::app::screens as ui;
-use ferrit::app::{App, Pane};
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

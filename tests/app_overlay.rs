@@ -15,8 +15,10 @@
 use std::fs;
 use std::time::Duration;
 
+use ferrit::app::App;
 use ferrit::app::config::ConfigLoad;
-use ferrit::app::{App, FullScreen, Pane};
+use ferrit::app::full_screens::FullScreen;
+use ferrit::app::pane::Pane;
 use ferrit::domain::git::error::GitError;
 use ferrit::domain::git::fake::FakeGit;
 use ferrit::domain::git::model::Change;

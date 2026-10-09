@@ -5,13 +5,14 @@
 //! them. They are kept apart so drawing can read `&App` and take only these as
 //! `&mut` (`docs/PLAN_24_DRAW_VIEW.md`).
 
+use crate::domain::image::preview::Preview;
+use ratatui::text::Text;
+use std::ops::Range;
 use std::time::Duration;
 
+use super::diff_query::RightKey;
 use crate::components::tui_overlay::state::OverlayState;
 use crate::components::ui::toast::Toast;
-use crate::domain::image::preview::Preview;
-
-use super::RenderedDiff;
 
 pub(super) struct RenderState {
     /// The help dialog.
@@ -42,4 +43,12 @@ impl Default for RenderState {
             diff_cache: None,
         }
     }
+}
+
+pub(crate) struct RenderedDiff {
+    pub(super) key: Option<RightKey>,
+    pub(super) source: String,
+    pub(super) focus: Option<Range<usize>>,
+    pub(super) width: usize,
+    pub(super) text: Text<'static>,
 }

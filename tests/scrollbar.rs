@@ -20,8 +20,9 @@ mod common;
 use common::{TempDir, commit_all};
 use std::fs;
 
+use ferrit::app::App;
 use ferrit::app::mock;
-use ferrit::app::{App, Pane};
+use ferrit::app::pane::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

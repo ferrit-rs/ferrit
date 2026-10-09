@@ -19,10 +19,11 @@ use common::{TempDir, commit_all, configure_identity};
 use std::collections::BTreeSet;
 use std::fs;
 
+use ferrit::app::App;
 use ferrit::app::config::{Config, ConfigLoad};
 use ferrit::app::hints::{Bar, HelpLine, filter_help_lines, help_lines, keybar_layout};
 use ferrit::app::keymap::{Action, Context, Keymap};
-use ferrit::app::{App, Pane};
+use ferrit::app::pane::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
