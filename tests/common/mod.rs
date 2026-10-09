@@ -28,8 +28,7 @@ impl TempDir {
             .unwrap()
             .as_nanos();
         let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let mut path = std::env::temp_dir();
-        path.push(format!(
+        let path = std::env::temp_dir().join(format!(
             "ferrit-{tag}-{}-{nanos}-{count}",
             std::process::id()
         ));
