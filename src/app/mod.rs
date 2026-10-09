@@ -25,8 +25,6 @@ use std::time::{Duration, Instant};
 use crate::components::ui::mouse_pointer::MousePointer;
 use crate::components::ui::palette::Palette;
 use crate::components::ui::toast::Toast;
-use crate::domain::profile::Profile;
-use crate::domain::profile::settings::Settings;
 use color_eyre::Result;
 use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -40,7 +38,7 @@ use crate::app::terminal::Tui;
 use crate::components::ui::text_input::{TextInput, TextInputMode};
 use crate::domain::git;
 use crate::domain::git::apply::{ApplyDir, ApplyTarget};
-use crate::domain::git::diff::{DiffOpts, DiffSide};
+use crate::domain::git::diff::DiffSide;
 use crate::domain::git::error::GitResult;
 use crate::domain::git::port::GitPort;
 use crate::domain::image::detect;
@@ -195,25 +193,7 @@ impl App {
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
-        let git_user_name = repo.as_ref().and_then(|repo| repo.user_name());
-        let (global_identities, repository_identity, effective_identity, identity_source) =
-            repo.as_ref().map_or_else(
-                || {
-                    (
-                        Vec::new(),
-                        None,
-                        None,
-                        crate::domain::profile::settings::IdentitySource::Unset,
-                    )
-                },
-                |repo| repo.identity_settings(),
-            );
-        let profile = Profile::new(Settings {
-            global_identities,
-            repository_identity,
-            effective_identity,
-            identity_source,
-        });
+        let authorship = authorship::Authorship::of(repo.as_deref());
         Self {
             prefs: prefs::Prefs::new(config, keymap, palette),
             sheets: sheet::Sheets::default(),
@@ -223,7 +203,7 @@ impl App {
             should_quit: false,
             repo,
             repo_name,
-            authorship: authorship::Authorship::new(profile, git_user_name),
+            authorship,
             theme: theme_editor::ThemeEditor::new(theme_config),
             right: right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
@@ -404,19 +384,10 @@ impl App {
     /// Re-read the wired panes. On error keep the old snapshot and stash the
     /// message; never propagate, never panic. No-op without a repo.
     pub fn refresh(&mut self) {
-        let branch = self
-            .nav
-            .branch_drill
-            .as_ref()
-            .map(|drill| drill.branch.clone());
-        let commit = self
-            .nav
-            .commit_drill
-            .as_ref()
-            .map(|drill| drill.hash.clone());
+        let (branch, commit) = self.nav.drill_targets();
         let opts = self.prefs.diff_opts();
         let Some(repo) = &mut self.repo else { return };
-        let completion = Self::load_refresh(repo.as_mut(), branch, commit, opts);
+        let completion = RefreshCompletion::load(repo.as_mut(), branch, commit, opts);
         self.apply_refresh_result(completion);
     }
 
@@ -434,30 +405,13 @@ impl App {
         let Some(handle) = self.reopen_repo() else {
             return;
         };
-        let branch = self
-            .nav
-            .branch_drill
-            .as_ref()
-            .map(|drill| drill.branch.clone());
-        let commit = self
-            .nav
-            .commit_drill
-            .as_ref()
-            .map(|drill| drill.hash.clone());
+        let (branch, commit) = self.nav.drill_targets();
         let opts = self.prefs.diff_opts();
         self.workers.refresh.in_flight = true;
         thread::spawn(move || {
             let completion = run_worker(WorkerKind::Refresh, || match handle {
-                Ok(mut repo) => Self::load_refresh(repo.as_mut(), branch, commit, opts),
-                Err(error) => {
-                    let error = Arc::new(AppError::from(error));
-                    RefreshCompletion {
-                        snapshot: Err(Arc::clone(&error)),
-                        profile: None,
-                        branch_log: branch.map(|name| (name, Err(Arc::clone(&error)))),
-                        commit_files: commit.map(|hash| (hash, Err(error))),
-                    }
-                },
+                Ok(mut repo) => RefreshCompletion::load(repo.as_mut(), branch, commit, opts),
+                Err(error) => RefreshCompletion::failed(error, branch, commit),
             })
             .unwrap_or_else(|error| RefreshCompletion {
                 snapshot: Err(Arc::new(error.into())),
@@ -467,45 +421,6 @@ impl App {
             });
             let _ = sender.send(AppEvent::RefreshDone(Box::new(completion)));
         });
-    }
-
-    fn load_refresh(
-        repo: &mut dyn GitPort,
-        branch: Option<String>,
-        commit: Option<String>,
-        opts: DiffOpts,
-    ) -> RefreshCompletion {
-        let snapshot = repo
-            .snapshot()
-            .map_err(|error| Arc::new(AppError::from(error)));
-        let branch_log = branch.map(|name| {
-            let result = repo
-                .branch_log(&name)
-                .map_err(|error| Arc::new(AppError::from(error)));
-            (name, result)
-        });
-        let commit_files = commit.map(|hash| {
-            let result = repo
-                .commit_diff(&hash, opts)
-                .map(|diff| commit_drill_files(&diff))
-                .map_err(|error| Arc::new(AppError::from(error)));
-            (hash, result)
-        });
-        RefreshCompletion {
-            snapshot,
-            profile: Some({
-                let (global_identities, repository_identity, effective_identity, identity_source) =
-                    repo.identity_settings();
-                Profile::new(Settings {
-                    global_identities,
-                    repository_identity,
-                    effective_identity,
-                    identity_source,
-                })
-            }),
-            branch_log,
-            commit_files,
-        }
     }
 
     fn apply_refresh_result(&mut self, completion: RefreshCompletion) {

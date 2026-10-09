@@ -53,6 +53,15 @@ pub struct Nav {
 }
 
 impl Nav {
+    /// The branch and the commit the user is drilled into, if any: what a
+    /// refresh has to re-read besides the snapshot.
+    pub(super) fn drill_targets(&self) -> (Option<String>, Option<String>) {
+        (
+            self.branch_drill.as_ref().map(|drill| drill.branch.clone()),
+            self.commit_drill.as_ref().map(|drill| drill.hash.clone()),
+        )
+    }
+
     /// Whether the Branches pane is drilled into one branch's own commit
     /// log right now. `ui::draw_keybar` uses this to fall back to the
     /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch

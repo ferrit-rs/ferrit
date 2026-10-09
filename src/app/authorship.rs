@@ -4,8 +4,9 @@
 //! ferrit makes (the popup, a fixup, the first commit of a new repository)
 //! reads the pick from here.
 
+use crate::domain::git::port::{GitPort, GitRead};
 use crate::domain::profile::Profile;
-use crate::domain::profile::settings::Identity;
+use crate::domain::profile::settings::{Identity, IdentitySource, Settings};
 
 pub(super) struct Authorship {
     /// The identities git knows, refreshed with the repository.
@@ -17,6 +18,34 @@ pub(super) struct Authorship {
 }
 
 impl Authorship {
+    /// The authorship of a session over `repo`, or of the repo-free one.
+    pub(super) fn of(repo: Option<&dyn GitPort>) -> Self {
+        let profile = repo.map_or_else(
+            || {
+                Profile::new(Settings {
+                    global_identities: Vec::new(),
+                    repository_identity: None,
+                    effective_identity: None,
+                    identity_source: IdentitySource::Unset,
+                })
+            },
+            Self::profile_of,
+        );
+        Self::new(profile, repo.and_then(GitRead::user_name))
+    }
+
+    /// The identities git knows for `repo`.
+    pub(super) fn profile_of(repo: &dyn GitPort) -> Profile {
+        let (global_identities, repository_identity, effective_identity, identity_source) =
+            repo.identity_settings();
+        Profile::new(Settings {
+            global_identities,
+            repository_identity,
+            effective_identity,
+            identity_source,
+        })
+    }
+
     pub(super) fn new(profile: Profile, git_user_name: Option<String>) -> Self {
         Self {
             profile,
