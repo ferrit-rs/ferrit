@@ -175,6 +175,7 @@ let_underscore_lock = "deny"
 unit_bindings = "deny"
 macro_use_extern_crate = "deny"
 unused_lifetimes = "deny"
+dead_code = "deny"               # an unused function, field or variant is an error, not a warning
 single_use_lifetimes = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"

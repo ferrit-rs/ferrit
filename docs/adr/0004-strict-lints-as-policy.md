@@ -10,6 +10,9 @@ reviewers, so they should be strict from the start.
 ## Decision
 
 - `unsafe_code = "forbid"`.
+- `dead_code = "deny"`: an unused function, field or variant fails the build by itself, with or
+  without `-D warnings`. It only sees what is not exported: a `pub` item of a public module
+  counts as used. `.dev-tools/dead-code.sh` compiles a copy as a binary only to see those too.
 - Clippy `all`, `pedantic`, `nursery` and `cargo` at warn, with a curated deny list
   (`unwrap_used`, `expect_used`, `panic`, `indexing_slicing`, `print_stdout`,
   `pub_use`, `exit`, ...) and a short, commented list of allowed lints that fight the
