@@ -32,7 +32,7 @@ pub(crate) enum NameKind {
     },
     StashKeepIndex,
     /// A git config value being typed (`app::git_config_edit`).
-    ConfigValue(git::actions::git_config_edit::ConfigOp),
+    ConfigValue(git::keys::git_config_edit::ConfigOp),
     /// The key of a config entry about to be added.
     ConfigKey,
 }

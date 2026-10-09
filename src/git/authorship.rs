@@ -4,9 +4,9 @@
 //! ferrit makes (the popup, a fixup, the first commit of a new repository)
 //! reads the pick from here.
 
+use crate::git::identity::{Identity, IdentitySource, Settings};
 use crate::git::port::{GitPort, GitRead};
 use crate::git::profile::Profile;
-use crate::git::profile::settings::{Identity, IdentitySource, Settings};
 
 pub(crate) struct Authorship {
     /// The identities git knows, refreshed with the repository.

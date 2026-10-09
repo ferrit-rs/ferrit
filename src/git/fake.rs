@@ -18,12 +18,12 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
 use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{BranchEntry, Change, CommitEntry, FileEntry, PushState, RemoteEntry};
 use crate::git::operation::{OperationOutcome, Step};
 use crate::git::port::{
     GitBranches, GitConfig, GitHistory, GitIndex, GitPort, GitRead, GitRemote, GitStash,
 };
-use crate::git::profile::settings::{Identity, IdentitySource};
 use crate::git::rebase::RebaseEdit;
 use crate::git::stash::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};

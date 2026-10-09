@@ -1,6 +1,6 @@
 //! What a popup can be.
 
-use crate::git::actions::askpass;
+use crate::git::keys::askpass;
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::popups::create_remote_form;
 use crate::interface::popups::{commit_draft, context_menu, menu};

@@ -1,7 +1,7 @@
 //! The key-bar question and what a yes does.
 
-use crate::git::actions::git_config_edit;
 use crate::git::apply::Granule;
+use crate::git::keys::git_config_edit;
 use crate::git::model::{CommitEntry, StashEntry};
 use std::path::{Path, PathBuf};
 

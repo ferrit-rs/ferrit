@@ -4,16 +4,16 @@
 
 use super::landed::Landed;
 use crate::app::App;
+use crate::config::keys::{Click, SettingsHits};
 use crate::config::settings::{Kind, SaveState, SettingsRow};
-use crate::config::settings_sheet::{Click, SettingsHits};
 use crate::interface::components::ui::drawer::Drawer;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::interface::components::ui::separator::Separator;
 use crate::interface::render_state::RenderState;
 use crate::theme::color_picker::{ColorPicker, grid_metrics, rgb};
-use crate::theme::config::{Preset, ThemeMode};
 use crate::theme::palette::Palette;
 use crate::theme::scheme::ColorDepth;
+use crate::theme::theme_config::{Preset, ThemeMode};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};

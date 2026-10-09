@@ -59,7 +59,7 @@ pub struct App {
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     pub(crate) repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
-    pub(crate) authorship: git::profile::authorship::Authorship,
+    pub(crate) authorship: git::authorship::Authorship,
     pub theme: crate::theme::editor::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
@@ -95,7 +95,7 @@ pub struct App {
     pub(crate) watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
     pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
-    pub(crate) create_remote: git::actions::create_remote::CreateRemote,
+    pub(crate) create_remote: git::keys::create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -159,7 +159,7 @@ impl App {
         let repo_name = repo
             .as_ref()
             .map_or_else(|| "ferrit".to_owned(), |repo| repo.name());
-        let authorship = git::profile::authorship::Authorship::of(repo.as_deref());
+        let authorship = git::authorship::Authorship::of(repo.as_deref());
         Self {
             prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
             sheets: crate::interface::sheets::sheet::Sheets::default(),
@@ -184,7 +184,7 @@ impl App {
             workers: workers::Workers::new(),
             watch_request: None,
             terminal_request: None,
-            create_remote: git::actions::create_remote::CreateRemote::default(),
+            create_remote: git::keys::create_remote::CreateRemote::default(),
             status_note: None,
         }
     }

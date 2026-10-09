@@ -14,9 +14,9 @@
 
 #![warn(missing_docs)]
 
-pub mod actions;
 pub mod apply;
 pub mod askpass;
+pub(crate) mod authorship;
 pub mod blob;
 pub mod branch;
 pub mod command_log;
@@ -29,7 +29,9 @@ pub(crate) mod exec;
 #[cfg(feature = "test-util")]
 pub mod fake;
 pub mod host;
+pub mod identity;
 pub mod image;
+pub mod keys;
 pub mod model;
 pub mod operation;
 pub mod port;

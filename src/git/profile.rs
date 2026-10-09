@@ -1,8 +1,6 @@
 //! The git identities the author label and Ferrit's commits use.
 
-pub mod settings;
-
-use self::settings::Settings;
+use super::identity::Settings;
 
 /// The identities git knows for this repository.
 #[derive(Debug, Clone, Default)]
@@ -17,4 +15,3 @@ impl Profile {
         Self { settings }
     }
 }
-pub(crate) mod authorship;

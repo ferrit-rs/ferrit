@@ -14,8 +14,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use crate::git::actions::git_config::ConfigRow;
 use crate::git::config::{Scope, WriteScope, display_value};
+use crate::git::keys::git_config::ConfigRow;
 use crate::interface::components::ui::cut::cut_end;
 use crate::interface::components::ui::panel::Panel;
 use crate::interface::components::ui::scroll_bar::ScrollBar;

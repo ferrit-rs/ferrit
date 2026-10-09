@@ -206,7 +206,7 @@ fn a_click_on_a_radio_a_checkbox_and_an_arrow_sets_that_value() {
     click(&mut app, x, y);
     assert_eq!(
         Config::load_from(&fx.file()).config.theme.preset,
-        ferrit::theme::config::Preset::Purple
+        ferrit::theme::theme_config::Preset::Purple
     );
 
     let (x, y) = find(&mut app, "Context lines");
@@ -352,7 +352,7 @@ fn the_theme_row_offers_terminal_dark_and_light_and_a_click_picks_one() {
     );
     assert_eq!(
         Config::load_from(&fx.file()).config.theme.scheme,
-        Some(ferrit::theme::config::SchemeChoice::Terminal)
+        Some(ferrit::theme::theme_config::SchemeChoice::Terminal)
     );
 
     let (x, y) = find(&mut app, "( ) Light");

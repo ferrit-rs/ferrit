@@ -177,7 +177,7 @@ fn draw_panes(
     draw_keybar(frame, keybar, app, render, landed);
 
     if render.sheet.is_closed() {
-        landed.settings_hits = Some(crate::config::settings_sheet::SettingsHits::default());
+        landed.settings_hits = Some(crate::config::keys::SettingsHits::default());
     } else {
         match app.sheets.kind {
             Sheet::Settings => settings::draw(frame, area, app, &palette, render, landed),

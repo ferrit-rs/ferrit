@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use crate::git::actions::git_config;
+use crate::git::keys::git_config;
 
 #[derive(Default)]
 pub(crate) struct FullScreens {

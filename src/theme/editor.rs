@@ -6,7 +6,7 @@
 use ratatui::style::Color;
 
 use crate::theme::color_picker::{self, ColorPickerDisplay, PaletteDirection};
-use crate::theme::config::{
+use crate::theme::theme_config::{
     RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, ThemeConfig, ThemeMode,
 };
 

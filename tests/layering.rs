@@ -5,7 +5,7 @@
 )]
 //! The dependency rule, checked on the sources. Inside `git`, only `git/repo`
 //! (the adapter) names `git2`, and nothing but `git/image` (which draws the
-//! preview) and `git/actions` (the glue with `App`, keys in and errors out)
+//! preview) and `git/keys` (the glue with `App`, keys in and errors out)
 //! knows the terminal or the app. `app` reaches the adapter only where it builds
 //! the app (`App::open`) and starts a repository (`git init`), and the adapter
 //! does not reach into `app`. See `docs/architecture.md` and
@@ -62,9 +62,9 @@ fn only_the_adapter_names_git2() {
 
 #[test]
 fn the_git_code_knows_nothing_about_the_terminal() {
-    let offenders = files_with_code_except("git", &["git/image", "git/actions"], "ratatui");
+    let offenders = files_with_code_except("git", &["git/image", "git/keys"], "ratatui");
     assert!(offenders.is_empty(), "ratatui used in {offenders:?}");
-    let offenders = files_with_code_except("git", &["git/image", "git/actions"], "crossterm");
+    let offenders = files_with_code_except("git", &["git/image", "git/keys"], "crossterm");
     assert!(offenders.is_empty(), "crossterm used in {offenders:?}");
 }
 
@@ -77,13 +77,13 @@ fn only_the_composition_root_and_git_init_name_the_adapter() {
     offenders.sort();
     assert_eq!(
         offenders,
-        ["app/mod.rs", "git/actions/welcome.rs"],
+        ["app/mod.rs", "git/keys/welcome.rs"],
         "everything else goes through the GitPort traits"
     );
 }
 
 #[test]
-fn the_git_domain_does_not_reach_into_the_app_except_through_its_actions() {
-    let offenders = files_with_code_except("git", &["git/actions"], "crate::app");
+fn the_git_domain_does_not_reach_into_the_app_except_through_its_keys() {
+    let offenders = files_with_code_except("git", &["git/keys"], "crate::app");
     assert!(offenders.is_empty(), "git uses app in {offenders:?}");
 }

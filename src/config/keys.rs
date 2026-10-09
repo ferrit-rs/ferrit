@@ -11,7 +11,7 @@ use crate::app::App;
 use crate::config::settings::{SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped};
 use crate::config::{Config, Section};
 use crate::theme::color_picker::{self, PaletteDirection};
-use crate::theme::config::{Preset, SchemeChoice, ThemeMode};
+use crate::theme::theme_config::{Preset, SchemeChoice, ThemeMode};
 use ratatui::crossterm::event::KeyModifiers;
 
 const RGB_CHANNEL_STEP: i16 = 8;

@@ -2,11 +2,11 @@
 
 use super::error::AppError;
 use crate::git;
+use crate::git::authorship::Authorship;
 use crate::git::diff::DiffOpts;
 use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::profile::Profile;
-use crate::git::profile::authorship::Authorship;
 use crate::interface::panes::tree::commit_drill_files;
 use color_eyre::Result;
 use std::sync::Arc;

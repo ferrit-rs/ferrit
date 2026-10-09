@@ -36,9 +36,9 @@ use crate::git::config::{ConfigView, ValueKind, WriteScope};
 use crate::git::diff::{Diff, DiffOpts, DiffSide};
 use crate::git::error::{GitError, GitResult};
 use crate::git::host::{CreateRequest, CreatedRepo, GhProgram};
+use crate::git::identity::{Identity, IdentitySource};
 use crate::git::model::{self, CommitEntry, RemoteEntry};
 use crate::git::operation::{OperationOutcome, Step};
-use crate::git::profile::settings::{Identity, IdentitySource};
 use crate::git::rebase::RebaseEdit;
 use crate::git::stash::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
@@ -666,7 +666,7 @@ impl Repo {
 #[cfg(test)]
 mod identity_tests {
     use super::unique_identities;
-    use crate::git::profile::settings::Identity;
+    use crate::git::identity::Identity;
 
     #[test]
     fn removes_duplicate_identity_pairs_and_preserves_first_seen_order() {

@@ -28,7 +28,7 @@ pub mod error;
 pub(crate) mod prefs;
 pub mod settings;
 
-use crate::theme::config::ThemeConfig;
+use crate::theme::theme_config::ThemeConfig;
 use error::ConfigError;
 
 const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file when it saves a\n\
@@ -407,4 +407,4 @@ fn collect_unknown(file: &toml::Table, known: &toml::Table, prefix: &str, out: &
         }
     }
 }
-pub mod settings_sheet;
+pub mod keys;
