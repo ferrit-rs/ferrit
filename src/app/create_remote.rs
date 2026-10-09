@@ -1,73 +1,26 @@
-//! Creating the GitHub repository from ferrit (`docs/PLAN_15_CREATE_REMOTE.md`,
-//! R2, R3): the draft the user typed, the popups that fill it (the `gh`
-//! check, the form, the last question), the background `gh repo create`, and
-//! what happens when it answers.
-//!
-//! The creation takes the same slot as fetch, pull and push (`remote_busy`),
-//! so one network operation runs at a time, the Status pane shows it, and quit
-//! cancels it the way it cancels them.
-
-use std::path::PathBuf;
-use std::sync::Arc;
+//! What the keys do in `App` for `create_remote`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
+use crate::git::create_remote::CreateRemote;
 use crate::git::error::GitError;
 use crate::git::host::{
     self, CreateDraft, CreateRequest, GhProgram, GhStatus, parse_target, sanitize_name,
     ssh_remote_url,
 };
 use crate::git::remote::RemoteOp;
-use crate::git::ssh_config::read_github_aliases;
 use crate::interface::state::create_remote_form::{
     Consequences, CreateRemoteView, Form, FormKey, Step,
 };
 use crate::interface::state::popup::Popup;
 use color_eyre::Result;
 use ratatui::crossterm::event::KeyEvent;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
-
-/// The creation's own state on `App`.
-#[derive(Debug, Default)]
-pub struct CreateRemote {
-    /// The last draft, until a creation succeeds.
-    pub draft: Option<CreateDraft>,
-    /// Why the last creation was refused, for the form to show.
-    pub error: Option<String>,
-    /// The web URL of the repository just created.
-    pub web_url: Option<String>,
-    gh: GhProgram,
-    /// Bumped each time the check starts or is abandoned.
-    generation: u64,
-    /// The push in flight is the one that follows a creation.
-    pushing_after: bool,
-    /// The ssh config the host aliases are read from; `None` is
-    /// `~/.ssh/config`. A test points it elsewhere.
-    ssh_config: Option<PathBuf>,
-    /// The SSH host chosen when the creation started (the user's own alias, or
-    /// none), used once `gh` has made the repository.
-    ssh_host: String,
-}
-
-impl CreateRemote {
-    /// Keep the `gh` program a test or the replay injected when the app is
-    /// rebuilt on a new repository (`App::attach_repository`).
-    pub(crate) fn carry_program_from(&mut self, previous: &Self) {
-        self.gh = previous.gh.clone();
-        self.ssh_config.clone_from(&previous.ssh_config);
-    }
-
-    /// The GitHub aliases of the ssh config, in the order it lists them.
-    fn ssh_aliases(&self) -> Vec<String> {
-        let path = self.ssh_config.clone().or_else(|| {
-            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/config"))
-        });
-        path.map_or_else(Vec::new, |path| read_github_aliases(&path))
-    }
-}
 
 impl App {
     /// The creation's state, for the popups and for tests.

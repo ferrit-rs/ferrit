@@ -2,7 +2,5 @@
 //! help screen built from them (`hints`). Routing a key to the part of the app
 //! that owns it is `app::input` and `app::dispatch`.
 
-pub mod dispatch;
 pub mod hints;
-pub mod input;
 pub mod keymap;

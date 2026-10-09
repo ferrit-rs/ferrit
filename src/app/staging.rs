@@ -1,8 +1,4 @@
-//! Staging, unstaging and discarding, from the keys that ask for them: pick
-//! what the key acts on (`PaneRows`, `RightPane`, `git::staging`), call the
-//! port, then refresh and tell the user how it went.
-
-use std::ops::Range;
+//! What the keys do in `App` for `staging`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::app::error::AppError;
@@ -16,6 +12,7 @@ use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
 use crate::interface::state::diff_cursor::Mode;
 use crate::interface::state::pane::Pane;
 use crate::interface::state::tree::FileRow;
+use std::ops::Range;
 
 impl App {
     /// `Enter` / `l` on a Files-pane file row (`Mode::Nav`): focus the diff

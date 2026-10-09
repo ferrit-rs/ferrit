@@ -1,32 +1,14 @@
-//! The credential popup: a passphrase, password or host-key question that
-//! ssh or git asked during a fetch, pull or push, answered here instead of
-//! on the terminal the TUI owns (`git::askpass`,
-//! `docs/PLAN_9_REMOTE.md`, "Credentials").
+//! What the keys do in `App` for `askpass`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git::askpass;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::state::askpass::AskpassPrompt;
 use crate::interface::state::popup::Popup;
 use crate::interface::state::views::CommitPopupView;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use std::sync::mpsc;
-
-/// One pending question and where its answer goes. `typed` holds the real
-/// text; `shown` is what the popup draws, dots when the answer is secret.
-pub(crate) struct AskpassPrompt {
-    prompt: String,
-    typed: TextInput,
-    shown: TextInput,
-    secret: bool,
-    reply: mpsc::Sender<Option<String>>,
-}
-
-impl AskpassPrompt {
-    fn reply(&self, answer: Option<String>) {
-        let _ = self.reply.send(answer);
-    }
-}
 
 impl App {
     /// A git child asked `prompt`. Open the popup, unless another popup is

@@ -5,8 +5,7 @@
 )]
 //! The dependency rule, checked on the sources. Inside `git`, only `git/repo`
 //! (the adapter) names `git2`, and nothing but `git/image` (which draws the
-//! preview) and `git/keys` (the glue with `App`, keys in and errors out)
-//! knows the terminal or the app. `app` reaches the adapter only where it builds
+//! preview) knows the terminal, and `git` never reaches into `app`. `app` reaches the adapter only where it builds
 //! the app (`App::open`) and starts a repository (`git init`), and the adapter
 //! does not reach into `app`. See `docs/architecture.md` and
 //! `docs/PLAN_21_GIT_PORT.md`.
@@ -62,9 +61,9 @@ fn only_the_adapter_names_git2() {
 
 #[test]
 fn the_git_code_knows_nothing_about_the_terminal() {
-    let offenders = files_with_code_except("git", &["git/image", "git/keys"], "ratatui");
+    let offenders = files_with_code_except("git", &["git/image"], "ratatui");
     assert!(offenders.is_empty(), "ratatui used in {offenders:?}");
-    let offenders = files_with_code_except("git", &["git/image", "git/keys"], "crossterm");
+    let offenders = files_with_code_except("git", &["git/image"], "crossterm");
     assert!(offenders.is_empty(), "crossterm used in {offenders:?}");
 }
 
@@ -77,14 +76,14 @@ fn only_the_composition_root_and_git_init_name_the_adapter() {
     offenders.sort();
     assert_eq!(
         offenders,
-        ["app/mod.rs", "git/keys/welcome.rs"],
+        ["app/mod.rs", "app/welcome.rs"],
         "everything else goes through the GitPort traits"
     );
 }
 
 #[test]
-fn the_git_domain_does_not_reach_into_the_app_except_through_its_keys() {
-    let offenders = files_with_code_except("git", &["git/keys"], "crate::app");
+fn the_git_domain_does_not_know_the_app() {
+    let offenders = files_with_code("git", "crate::app");
     assert!(offenders.is_empty(), "git uses app in {offenders:?}");
 }
 
@@ -102,4 +101,23 @@ fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
         .map(|path| path.display().to_string())
         .collect();
     assert!(too_deep.is_empty(), "too deep: {too_deep:?}");
+}
+
+/// The behaviour of `App` is written in `app/` and nowhere else: a domain
+/// defines its own types and rules and never an `impl App`.
+#[test]
+fn impl_app_is_only_written_in_app() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let offenders: Vec<String> = rust_files(&root)
+        .into_iter()
+        .filter(|path| !path.starts_with(root.join("app")))
+        .filter(|path| {
+            fs::read_to_string(path)
+                .unwrap()
+                .lines()
+                .any(|line| line.starts_with("impl App"))
+        })
+        .map(|path| path.strip_prefix(&root).unwrap().display().to_string())
+        .collect();
+    assert!(offenders.is_empty(), "impl App outside app/: {offenders:?}");
 }

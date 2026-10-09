@@ -1,43 +1,17 @@
-//! The settings sheet's rows and what changing one does
-//! (`docs/PLAN_17_SETTINGS.md`): ferrit's own settings, nothing of git's. A
-//! change applies at once to the live `Config`, and is saved at once to
-//! `config.toml` (only its own section, through `Config::save_sections`), so the
-//! next start finds the sheet as it was left.
-
-use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::{Position, Rect};
+//! What the keys do in `App` for `settings_keys`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::config::settings::{SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped};
 use crate::config::{Config, Section};
+use crate::interface::state::settings_hits::Click;
 use crate::theme::color_picker::{self, PaletteDirection};
 use crate::theme::theme_config::{Preset, SchemeChoice, ThemeMode};
 use ratatui::crossterm::event::KeyModifiers;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Position;
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
-
-/// What a click on a part of a row does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Click {
-    /// Just highlight the row.
-    Row,
-    /// A radio: set the choice at this index.
-    Choice(usize),
-    /// A checkbox: flip it.
-    Flip,
-    /// The `‹` (down) or `›` (up) around a number.
-    Step(bool),
-}
-
-/// Where the sheet's clickable parts landed on the last frame.
-#[derive(Debug, Clone, Default)]
-pub struct SettingsHits {
-    pub color_grid: Rect,
-    pub color_grid_first_row: usize,
-    /// Narrowest last: a part of a row comes before the row's whole line.
-    pub parts: Vec<(Rect, SettingsRow, Click)>,
-}
 
 impl App {
     /// The sheet's state, for the screen that draws it and for tests.

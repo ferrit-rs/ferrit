@@ -31,10 +31,10 @@ except to build the app.
 Rules that hold today, and that the tests and lints keep:
 
 - Only `git/repo` names `git2`, and nothing in `git` imports `ratatui` or `crossterm`
-  (`git/image` draws the preview, and `git/keys` is the glue with the keys). Rows handed to
+  (`git/image` draws the preview). Rows handed to
   the UI are owned model types (`git/model.rs`). `tests/layering.rs` checks it on the
   sources, along with `app/` reaching `git/repo` only in `App::open` and `git init`, and
-  `git` reaching into `app` only through `git/keys`.
+  `git` never reaching into `app`.
 - `interface/components/` knows nothing about git or `App`; `theme/` knows nothing of what is drawn
   with it.
 - `app/` reaches git only through the `GitPort` traits (`git/port.rs`). The real adapter is
@@ -103,17 +103,16 @@ The rule: a domain is a flat list of files named after what they do, with a fold
 only for a feature that has several files, and nothing deeper than two folders
 (`tests/layering.rs`). A feature keeps its name across the roles it plays:
 `git/<x>.rs` the types and rules, `git/repo/` how `Repo` does it (one file per trait of the port, not per feature),
-`git/keys/<x>.rs` what a key does with it, `interface/screens/<x>.rs` how it is drawn,
+`app/<x>.rs` what a key does with it, `interface/screens/<x>.rs` how it is drawn,
 `interface/state/<x>.rs` what the interface keeps of it.
 
 
 | Path | Holds |
 | --- | --- |
 | `src/app/mod.rs` | `App`, which owns the parts below and orchestrates what reads several of them (the run loop, a refresh, the event match); a behaviour that touches one part lives in that part |
-| `src/app/` | `App` and what only `App` can do: the run loop and the event match (`mod.rs`, `events.rs`), the background work in flight (`workers.rs`, `refresh.rs`), the errors shown to the user (`error.rs`), the repo-free sample (`mock.rs`) |
+| `src/app/` | `App` and everything that writes its behaviour (`impl App`): the run loop and the event match (`mod.rs`, `events.rs`), routing a key or a click (`input`, `dispatch`), what a key does for each feature (`staging`, `branch`, `stash`, `rebase`, `commit`, `remote`, `create_remote`, `git_config`, `git_config_edit`, `welcome`, `askpass`, `dashboard`, `sheet`, `menu`, `context_menu`, `popup_keys`, `diff_query`, `image_query`, `drill_nav`, `settings_keys`), the background work in flight (`workers`, `refresh`), the errors shown to the user (`error`), and the repo-free sample (`mock`). A key handler picks its target in the domains, calls the domain's decision (`git::staging`, `git::remote`, ...), then reports; no other folder writes an `impl App` (`tests/layering.rs`) |
 | `src/keybindings/` | the remappable bindings (`keymap`), the key bar and help built from them (`hints`), and routing a key or a click to its owner (`input`, `dispatch`) |
 
-| `src/git/keys/` | what a key does to the repository, one file per feature (`staging`, `branch`, `stash`, `rebase`, `commit`, `remote`, `create_remote`, `git_config`, `git_config_edit`, `welcome`, `askpass`): pick the target, call `git::<feature>`, report. These are the only files of `git/` that know `App` |
 | `src/interface/screens/` | drawing only: reads `&App` and returns what the frame learned as a `Landed`; `row_lines` are the styled lines of git rows |
 | `src/interface/state/` | what the interface remembers, one file per thing: the panes (`nav`, `pane_rows`, `right_pane` with its diff cursor and cached render, `hit_areas`, the drill-downs, the selection keys, the diff views, what the right pane loads in `diff_query` / `image_query`), what can sit over them (`popup`, `confirm`, `modal`, the menus, the commit editor `commit_draft`, the create-remote form, the popup keys), the side sheets (`sheet`, `dashboard`), `help`, `full_screens` and `render_state` |
 | `src/interface/terminal.rs` | the terminal lifecycle |

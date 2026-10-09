@@ -1,5 +1,4 @@
-//! Branches-pane actions: checkout, create, delete, fast-forward, merge. Each
-//! picks the branch (`PaneRows`), makes the call (`git::branch`) and reports.
+//! What the keys do in `App` for `branch`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git::branch::{self, MergeKind, MergeOutcome};

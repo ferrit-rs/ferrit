@@ -9,14 +9,8 @@
 //! | Stash | stash keeping the index, rename the entry |
 //! | Files (a conflicted file) | take ours, take theirs |
 
-use super::menu::{MenuAction, MenuItem, MenuState};
-use crate::app::App;
+use super::menu::{MenuAction, MenuItem};
 use crate::git;
-use crate::git::branch::MergeKind;
-use crate::interface::components::ui::text_input::TextInput;
-use crate::interface::state::diff_cursor::Mode;
-use crate::interface::state::pane::{BranchesTab, Pane};
-use crate::interface::state::popup::Popup;
 
 /// What a name popup will do with the text typed into it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,7 +26,7 @@ pub(crate) enum NameKind {
     },
     StashKeepIndex,
     /// A git config value being typed (`app::git_config_edit`).
-    ConfigValue(git::keys::git_config_edit::ConfigOp),
+    ConfigValue(git::config_edit::ConfigOp),
     /// The key of a config entry about to be added.
     ConfigKey,
 }
@@ -59,243 +53,11 @@ impl NameTarget {
     }
 }
 
-fn item(label: &'static str, shortcut: char, action: MenuAction) -> MenuItem {
+pub(crate) fn item(label: &'static str, shortcut: char, action: MenuAction) -> MenuItem {
     MenuItem {
         label,
         shortcut,
         action,
         hint: "",
-    }
-}
-
-impl App {
-    /// `x` or a right-click: the menu for the selected row, or a note that it
-    /// has nothing extra. Inert while a popup or a confirm is up.
-    pub(crate) fn open_context_menu(&mut self) {
-        if self.modal.is_some() || self.repo.is_none() {
-            return;
-        }
-        let index = self.selected(self.nav.focus);
-        let (title, mut items) = match self.nav.focus {
-            Pane::Files if self.nav.mode == Mode::Nav => match self.rows().selected_file() {
-                Some(file)
-                    if file.staged == git::model::Change::Conflicted
-                        || file.worktree == git::model::Change::Conflicted =>
-                {
-                    (
-                        format!("{} (conflict)", file.path.display()),
-                        vec![
-                            item("Take ours", 'o', MenuAction::TakeOurs),
-                            item("Take theirs", 't', MenuAction::TakeTheirs),
-                        ],
-                    )
-                },
-                _ => (String::new(), Vec::new()),
-            },
-            Pane::Branches
-                if self.nav.branch_drill.is_none()
-                    && self.nav.branches_tab == BranchesTab::Local =>
-            {
-                match self.snapshot.branches.get(index) {
-                    Some(branch) => (
-                        branch.name.clone(),
-                        vec![
-                            item("Rename branch", 'r', MenuAction::RenameBranch),
-                            item("Merge with --no-ff", 'n', MenuAction::MergeNoFf),
-                        ],
-                    ),
-                    None => (String::new(), Vec::new()),
-                }
-            },
-            Pane::Commits if self.nav.commit_drill.is_none() => {
-                match self.snapshot.commits.get(index) {
-                    Some(commit) => (
-                        commit.short_hash.clone(),
-                        vec![item(
-                            "New branch from this commit",
-                            'b',
-                            MenuAction::BranchFromCommit,
-                        )],
-                    ),
-                    None => (String::new(), Vec::new()),
-                }
-            },
-            Pane::Stash => {
-                let mut items = vec![item(
-                    "Stash, keeping the index",
-                    'i',
-                    MenuAction::StashKeepIndex,
-                )];
-                if self.snapshot.stashes.get(index).is_some() {
-                    items.push(item("Rename stash", 'r', MenuAction::RenameStash));
-                }
-                ("Stash".to_owned(), items)
-            },
-            _ => (String::new(), Vec::new()),
-        };
-        // A repository with no remote can be published: optional, any time.
-        let publishable = self.snapshot.remotes.is_empty()
-            && (self.nav.focus == Pane::Status
-                || (self.nav.focus == Pane::Branches && self.nav.branch_drill.is_none()));
-        if publishable {
-            items.push(MenuItem {
-                label: "Create a repository on GitHub",
-                shortcut: 'g',
-                action: MenuAction::CreateRemote,
-                hint: "G from anywhere. Needs gh. Private by default; asks again before creating.",
-            });
-        }
-        if items.is_empty() {
-            return;
-        }
-        let title = if title.is_empty() {
-            "Repository".to_owned()
-        } else {
-            title
-        };
-        self.modal.open_popup(Popup::Menu(MenuState {
-            title,
-            items,
-            selected: 0,
-        }));
-    }
-
-    /// Run a menu action that belongs to the `x` menu, on the row it was opened
-    /// for (the selection has not moved: a menu is modal).
-    pub(crate) fn run_context_action(&mut self, action: MenuAction) {
-        let index = self.selected(self.nav.focus);
-        match action {
-            MenuAction::RenameBranch => {
-                let Some(branch) = self.snapshot.branches.get(index) else {
-                    return;
-                };
-                let from = branch.name.clone();
-                let input = TextInput::from_text(&from);
-                self.open_name(
-                    NameKind::RenameBranch { from },
-                    "Rename branch".to_owned(),
-                    input,
-                );
-            },
-            MenuAction::MergeNoFf => self.merge_selected_branch_with(MergeKind::NoFf),
-            MenuAction::MergeFf => self.merge_selected_branch_with(MergeKind::Regular),
-            MenuAction::SquashStaged => self.merge_selected_branch_with(MergeKind::Squash),
-            MenuAction::SquashCommit => self.merge_selected_branch_with(MergeKind::SquashCommit),
-            MenuAction::BranchFromCommit => {
-                let Some(commit) = self.snapshot.commits.get(index) else {
-                    return;
-                };
-                let hash = commit.full_hash.clone();
-                let title = format!("New branch from {}", commit.short_hash);
-                self.open_name(NameKind::BranchAt { hash }, title, TextInput::default());
-            },
-            MenuAction::StashKeepIndex => {
-                if self.snapshot.files.is_empty() {
-                    self.report_error(git::error::GitError::NothingToStash);
-                    return;
-                }
-                self.open_name(
-                    NameKind::StashKeepIndex,
-                    "Stash, keeping the index".to_owned(),
-                    TextInput::default(),
-                );
-            },
-            MenuAction::RenameStash => {
-                let Some(entry) = self.snapshot.stashes.get(index) else {
-                    return;
-                };
-                let oid = entry.oid.clone();
-                let input = TextInput::from_text(&entry.message);
-                self.open_name(
-                    NameKind::RenameStash { oid },
-                    "Rename stash".to_owned(),
-                    input,
-                );
-            },
-            MenuAction::TakeOurs | MenuAction::TakeTheirs => {
-                let Some(file) = self.rows().selected_file() else {
-                    return;
-                };
-                let path = file.path.clone();
-                let Some(repo) = &self.repo else { return };
-                let result = repo.take_side(&path, action == MenuAction::TakeOurs);
-                self.finish_apply(result);
-            },
-            MenuAction::Continue
-            | MenuAction::Skip
-            | MenuAction::Abort
-            | MenuAction::ConfigValue(_)
-            | MenuAction::CreateRemote => {},
-        }
-    }
-
-    pub(crate) fn open_name(&mut self, kind: NameKind, title: String, input: TextInput) {
-        self.modal
-            .open_popup(Popup::Name(NameTarget { kind, title }, input));
-    }
-
-    /// `Enter` in a name popup. Success closes it and refreshes; a refusal
-    /// (a taken name, an empty message) keeps the popup and the text for a
-    /// retry, the same rule as the new-branch popup.
-    pub(crate) fn submit_name(&mut self) {
-        let Some(Popup::Name(target, input)) = self.modal.popup() else {
-            return;
-        };
-        let kind = target.kind.clone();
-        let text = input.text();
-        if matches!(kind, NameKind::ConfigKey | NameKind::ConfigValue(_)) {
-            // A value keeps its spaces; a refusal keeps the popup for a retry.
-            if self.submit_git_config_name(&kind, &text) {
-                self.modal.close_popup();
-            }
-            return;
-        }
-        let name = text.trim();
-        let Some(repo) = &mut self.repo else { return };
-        let result = match &kind {
-            NameKind::RenameBranch { from } if name == from => {
-                self.modal.close_popup();
-                return;
-            },
-            NameKind::RenameBranch { from } => repo.rename_branch(from, name),
-            NameKind::BranchAt { hash } => repo.create_branch_at(name, hash),
-            NameKind::RenameStash { .. } if name.is_empty() => {
-                self.report_notice("a stash needs a message");
-                return;
-            },
-            NameKind::RenameStash { oid } => repo.stash_rename(oid, name),
-            NameKind::StashKeepIndex => repo.stash_push_keeping_index(name),
-            // Handled above: a config value keeps its spaces.
-            NameKind::ConfigKey | NameKind::ConfigValue(_) => return,
-        };
-        match result {
-            Ok(()) => {
-                self.modal.close_popup();
-                self.request_refresh();
-            },
-            Err(e @ git::error::GitError::NothingToStash) => {
-                self.modal.close_popup();
-                self.report_error(e);
-            },
-            Err(e) => self.report_error(e),
-        }
-    }
-
-    /// A right-click on a row: focus that pane, move its selection there, then
-    /// open its menu. Off any row it does nothing. (A left click also toggles a
-    /// directory; this one must not.)
-    pub(crate) fn right_click(&mut self, column: u16, row: u16) {
-        if self.modal.is_some() || self.help.open {
-            return;
-        }
-        let Some(pane) = self.pane_at(column, row) else {
-            return;
-        };
-        self.nav.right_focused = false;
-        self.nav.mode = Mode::Nav;
-        if self.click_pane(pane, row) {
-            self.update_right_pane();
-            self.open_context_menu();
-        }
     }
 }

@@ -1,11 +1,10 @@
-//! Files/Commits pane directory-tree drill navigation (expand/collapse, drill into a commit's files).
-
-use std::collections::HashSet;
+//! What the keys do in `App` for `drill_nav`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::interface::state::drill::CommitDrill;
 use crate::interface::state::pane::Pane;
 use crate::interface::state::tree::{FileRow, commit_drill_files};
+use std::collections::HashSet;
 
 impl App {
     /// Enter on a directory row in the Files pane: toggle it collapsed or

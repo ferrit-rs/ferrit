@@ -1,16 +1,12 @@
-//! The welcome screen: ferrit started in a folder with no repository
-//! (`docs/PLAN_16_START_WITHOUT_REPO.md`). It says so and offers `git init`,
-//! after a question that names the folder. Nothing is created without the yes.
-
-use std::path::{Path, PathBuf};
+//! What the keys do in `App` for `welcome`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git;
 use crate::interface::state::confirm::{ConfirmAction, ConfirmPrompt};
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
+use std::path::{Path, PathBuf};
 
-/// The rows of the screen, in order: `git init`, then quit.
 const WELCOME_ROWS: usize = 2;
 
 impl App {

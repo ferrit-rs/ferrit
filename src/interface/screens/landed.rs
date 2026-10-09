@@ -7,8 +7,8 @@
 
 use ratatui::layout::Rect;
 
-use crate::config::keys::SettingsHits;
 use crate::interface::state::pane::Pane;
+use crate::interface::state::settings_hits::SettingsHits;
 use crate::keybindings::hints;
 
 /// `None` and empty mean "this frame did not touch it": the previous value stays.

@@ -5,8 +5,30 @@
 //! snapshot, which left pane is focused, and one selection cursor per pane.
 //! `App::mock()` is the repo-free path the render tests use.
 
+pub mod askpass;
+pub mod branch;
+pub mod commit;
+pub mod context_menu;
+pub mod create_remote;
+pub mod dashboard;
+pub mod diff_query;
+pub mod dispatch;
+pub mod drill_nav;
 pub mod events;
+pub mod git_config;
+pub mod git_config_edit;
+pub mod image_query;
+pub mod input;
+pub mod menu;
 pub mod mock;
+pub mod popup_keys;
+pub mod rebase;
+pub mod remote;
+pub mod settings_keys;
+pub mod sheet;
+pub mod staging;
+pub mod stash;
+pub mod welcome;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
@@ -95,7 +117,7 @@ pub struct App {
     pub(crate) watch_request: Option<PathBuf>,
     /// A change the run loop has to carry out in the terminal, once.
     pub(crate) terminal_request: Option<crate::config::settings::TerminalRequest>,
-    pub(crate) create_remote: git::keys::create_remote::CreateRemote,
+    pub(crate) create_remote: git::create_remote::CreateRemote,
     /// A background fetch/pull/push's success line ("Fetched origin", "3
     /// commits pushed"), shown in the Status pane until the next remote op
     /// or the next `refresh()`. `last_error`'s sibling for the non-error
@@ -184,7 +206,7 @@ impl App {
             workers: workers::Workers::new(),
             watch_request: None,
             terminal_request: None,
-            create_remote: git::keys::create_remote::CreateRemote::default(),
+            create_remote: git::create_remote::CreateRemote::default(),
             status_note: None,
         }
     }

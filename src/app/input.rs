@@ -1,4 +1,4 @@
-//! Keyboard and mouse input dispatch.
+//! What the keys do in `App` for `input`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::interface::state::diff_cursor::Mode;
@@ -16,8 +16,6 @@ use ratatui::layout::Position;
 
 const KEY_CONFIRM_YES: char = 'y';
 const KEY_CONFIRM_NO: char = 'n';
-
-/// Rows a wheel tick scrolls a left pane's list: lazygit's `scrollHeight`.
 const LIST_WHEEL_ROWS: isize = 2;
 
 impl App {

@@ -1,5 +1,4 @@
-//! Opening the commit editor and making the commit. The editor itself (its
-//! state, its keys) is `interface::popups::commit_draft`.
+//! What the keys do in `App` for `commit`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::app::error::AppError;

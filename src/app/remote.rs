@@ -1,4 +1,4 @@
-//! Fetch / pull / push: background remote ops and their completion.
+//! What the keys do in `App` for `remote`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::app::error::AppError;

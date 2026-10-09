@@ -1,6 +1,4 @@
-//! Commits-pane history rewrites: reword, drop, squash, fixup and edit the
-//! selected commit, each as one `git rebase -i`. See
-//! `docs/PLAN_11_REBASE.md` R4.
+//! What the keys do in `App` for `rebase`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git;

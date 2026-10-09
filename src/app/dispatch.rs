@@ -1,9 +1,4 @@
-//! Turns a key into an `Action` through the keymap and runs it. What used to
-//! be three stages of `on_key` (the `Mode::Diff` cursor keys, the right-pane
-//! scroll block, then the main `match`) is one lookup over contexts, most
-//! specific first. See `docs/PLAN_12_POLISH.md` P2.
-
-use ratatui::crossterm::event::KeyEvent;
+//! What the keys do in `App` for `dispatch`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git;
@@ -11,6 +6,7 @@ use crate::git::remote::RemoteOp;
 use crate::interface::state::diff_cursor::Mode;
 use crate::interface::state::pane::{PANES, Pane};
 use crate::keybindings::keymap::{Action, Context, KeyBinding};
+use ratatui::crossterm::event::KeyEvent;
 
 impl App {
     /// The contexts a key is looked up in, most specific first: the diff
@@ -161,7 +157,6 @@ impl App {
     }
 }
 
-/// Actions that scroll or jump the right pane instead of changing selection.
 const fn is_scroll(action: Action) -> bool {
     matches!(
         action,

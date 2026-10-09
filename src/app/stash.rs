@@ -1,5 +1,4 @@
-//! Stash actions: `s` on Files opens a message popup, Stash-pane keys apply,
-//! pop and drop the selected entry. See `docs/PLAN_10_STASH.md`.
+//! What the keys do in `App` for `stash`: the glue between the interface, the git code and the app's state.
 
 use crate::app::App;
 use crate::git;

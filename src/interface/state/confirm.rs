@@ -1,7 +1,6 @@
 //! The key-bar question and what a yes does.
 
 use crate::git::apply::Granule;
-use crate::git::keys::git_config_edit;
 use crate::git::model::{CommitEntry, StashEntry};
 use std::path::{Path, PathBuf};
 
@@ -41,9 +40,9 @@ pub(crate) enum ConfirmAction {
     ForcePush,
     /// First write to the global git config of this session: once confirmed,
     /// the edit that asked carries on (`app::git_config_edit`).
-    ConfigGlobal(git_config_edit::GlobalResume),
+    ConfigGlobal(crate::git::config_edit::GlobalResume),
     /// `d` on the git config screen: unset one value.
-    ConfigUnset(git_config_edit::ConfigOp),
+    ConfigUnset(crate::git::config_edit::ConfigOp),
     /// `i` on the welcome screen: `git init` in this folder.
     InitRepo(PathBuf),
 }
