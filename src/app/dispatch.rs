@@ -27,7 +27,7 @@ impl App {
     /// selection may have moved.
     pub(super) fn dispatch_key(&mut self, key: KeyEvent) {
         let binding = KeyBinding::from_event(key);
-        let action = self.keymap.resolve(&self.key_contexts(), binding);
+        let action = self.prefs.keymap.resolve(&self.key_contexts(), binding);
         if let Some(action) = action {
             if is_scroll(action) && self.right_is_diff() {
                 self.run_scroll(action);

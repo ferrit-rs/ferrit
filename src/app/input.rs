@@ -108,7 +108,7 @@ impl App {
     pub(super) fn on_mouse(&mut self, ev: MouseEvent) {
         // `[ui] mouse = false` never enables mouse capture; a terminal that
         // sends events anyway still gets no reaction from ferrit.
-        if !self.config.ui.mouse {
+        if !self.prefs.config.ui.mouse {
             return;
         }
         if matches!(ev.kind, MouseEventKind::Moved) {
@@ -239,7 +239,7 @@ impl App {
         let a = self.right.area;
         let over_right = ev.column >= a.x && ev.column < a.x.saturating_add(a.width);
         if over_right && self.right_is_diff() {
-            self.scroll_right(step * isize::from(self.config.ui.wheel_step));
+            self.scroll_right(step * isize::from(self.prefs.config.ui.wheel_step));
             return;
         }
         // Over a left pane the wheel scrolls that pane's view, wherever the

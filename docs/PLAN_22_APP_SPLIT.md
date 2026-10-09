@@ -1,6 +1,6 @@
 # Plan: phase 22, break up `App`
 
-**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms, `Nav`, `Authorship`, `Sheets` and `FullScreens` done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
+**Status: in progress (`HelpState`, `ThemeEditor`, `git::Snapshot`, `RightPane`, `Modal`, `Workers`, `HitAreas` and the `dispatch` arms, `Nav`, `Authorship`, `Sheets`, `FullScreens` and `Prefs` done; the `ViewState` for drawing is open).** Third slice of the architecture clean-up. Needs phase 20 (typed
 errors) and phase 21 (git port) first: sub-states are then testable against `FakeGit`.
 
 What differs from the sketch below, and why:
@@ -28,7 +28,7 @@ What differs from the sketch below, and why:
 - **Not done: step 6, a `ViewState` for drawing.** `screens::draw` still takes `&mut App`.
   `HitAreas` is what a draw function writes, so it can now be passed on its own, but the
   sheets and popups still read half of `App`. Left for a later phase.
-- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 30 now (target was about 15; the rest are the loose groups listed below). The "about 100" in the first sketch was an over-estimate.
+- Count (fields of `pub struct App`, counted the same way before and after): 87 at the start of the phase, 26 now (target was about 15; the rest are the singles listed below). The "about 100" in the first sketch was an over-estimate.
 
 ## Goal
 
@@ -227,11 +227,16 @@ that the types it exposes are small and named.
   the git config editor's state and the welcome screen's folder and row. Nine fields became
   two; the 120-odd call sites were renamed by script and the compiler found no collision.
 
-## What is left on `App` (30 fields)
+- **`Prefs`** (`prefs.rs`) holds the loaded `config.toml`, the keymap built from it, the file a
+  save writes to, the terminal's colour depth and the palette: five fields that change together
+  when the settings sheet saves.
 
-Configuration (`config`, `keymap`, `config_file`, `color_depth`, `palette`), the create-remote
-flow (`create_remote`), the two overlay animations (`commit_overlay`, `toast`), and a few
-singles (`repo`, `repo_name`, `status_note`, `last_error`, `watch_error`, `should_quit`,
-`mouse_pointer`, `commit_draft`, `new_branch_title`, `watch_request`, `terminal_request`).
-A `Look` group (config, keymap, palette, colour depth) is the next cohesive cut; past that,
-what remains is `App` doing its job as the root of the state.
+## What is left on `App` (26 fields)
+
+The create-remote flow (`create_remote`), what the user is told (`last_error`, `watch_error`,
+`status_note`, `toast`, `commit_overlay`), the run loop's requests (`should_quit`,
+`watch_request`, `terminal_request`), and a few singles (`repo`, `repo_name`, `mouse_pointer`,
+`commit_draft`, `new_branch_title`). Grouping what the user is told into one `Feedback` value
+is possible but would touch the toast and Status line code for little clarity; what remains is
+`App` doing its job as the root of the state. The bigger open item is `screens::draw`, which
+still takes `&mut App`.

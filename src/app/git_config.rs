@@ -222,6 +222,7 @@ impl App {
         }
         // The key that opens the screen closes it, whatever it is bound to.
         let toggles = self
+            .prefs
             .keymap
             .resolve(&[Context::Global], KeyBinding::from_event(key))
             == Some(Action::GitConfig);

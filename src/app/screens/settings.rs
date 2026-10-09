@@ -130,7 +130,7 @@ fn row_line(app: &App, row: SettingsRow, selected: bool, palette: &Palette) -> R
 
 fn footer(app: &App, palette: &Palette) -> Line<'static> {
     let idle = Style::new().fg(palette.idle);
-    let path = app.config_file.as_ref().map(|p| p.display().to_string());
+    let path = app.prefs.file.as_ref().map(|p| p.display().to_string());
     let line = match (&app.settings().save, path) {
         (SaveState::Failed(why), _) => {
             return Line::styled(format!("Not saved: {why}"), Style::new().fg(palette.warn));
@@ -139,12 +139,12 @@ fn footer(app: &App, palette: &Palette) -> Line<'static> {
         (SaveState::Saved, Some(path)) => format!("Saved \u{b7} {path}"),
         (SaveState::Idle, Some(path)) => format!("Saved as you change it \u{b7} {path}"),
     };
-    let line = if app.config.ui.mouse {
+    let line = if app.prefs.config.ui.mouse {
         line
     } else {
         format!("Mouse is off: keyboard only \u{b7} {line}")
     };
-    let line = if app.color_depth == ColorDepth::TrueColor {
+    let line = if app.prefs.color_depth == ColorDepth::TrueColor {
         line
     } else {
         format!("256 colours: approximated \u{b7} {line}")

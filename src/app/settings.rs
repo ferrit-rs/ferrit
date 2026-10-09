@@ -171,7 +171,7 @@ impl App {
     /// The live configuration: what ferrit is using now, saved or not.
     #[doc(hidden)]
     pub fn live_config(&self) -> &Config {
-        &self.config
+        &self.prefs.config
     }
 
     /// The row's value when it is a choice: the index among its names. For the
@@ -201,10 +201,10 @@ impl App {
     #[must_use]
     pub fn toggle_value(&self, row: SettingsRow) -> bool {
         match row {
-            SettingsRow::Mouse => self.config.ui.mouse,
-            SettingsRow::IgnoreWhitespace => self.config.diff.ignore_whitespace,
-            SettingsRow::SignOff => self.config.commit.sign_off,
-            SettingsRow::ShowReads => self.config.log.show_reads,
+            SettingsRow::Mouse => self.prefs.config.ui.mouse,
+            SettingsRow::IgnoreWhitespace => self.prefs.config.diff.ignore_whitespace,
+            SettingsRow::SignOff => self.prefs.config.commit.sign_off,
+            SettingsRow::ShowReads => self.prefs.config.log.show_reads,
             _ => false,
         }
     }
@@ -213,8 +213,8 @@ impl App {
     #[must_use]
     pub fn number_value(&self, row: SettingsRow) -> u64 {
         match row {
-            SettingsRow::WheelStep => u64::from(self.config.ui.wheel_step),
-            SettingsRow::DiffContext => u64::from(self.config.diff.context),
+            SettingsRow::WheelStep => u64::from(self.prefs.config.ui.wheel_step),
+            SettingsRow::DiffContext => u64::from(self.prefs.config.diff.context),
             _ => 0,
         }
     }
@@ -243,24 +243,29 @@ impl App {
                 self.theme_changed();
             },
             SettingsRow::Mouse => {
-                self.config.ui.mouse = !self.config.ui.mouse;
-                self.terminal_request = Some(TerminalRequest::Mouse(self.config.ui.mouse));
+                self.prefs.config.ui.mouse = !self.prefs.config.ui.mouse;
+                self.terminal_request = Some(TerminalRequest::Mouse(self.prefs.config.ui.mouse));
             },
             SettingsRow::WheelStep => {
                 let value = stepped(self.number_value(row), up, 1, 50);
-                self.config.ui.wheel_step = u8::try_from(value).unwrap_or(50);
+                self.prefs.config.ui.wheel_step = u8::try_from(value).unwrap_or(50);
             },
             SettingsRow::DiffContext => {
                 let value = stepped(self.number_value(row), up, 0, 200);
-                self.config.diff.context = u32::try_from(value).unwrap_or(200);
+                self.prefs.config.diff.context = u32::try_from(value).unwrap_or(200);
                 self.request_refresh();
             },
             SettingsRow::IgnoreWhitespace => {
-                self.config.diff.ignore_whitespace = !self.config.diff.ignore_whitespace;
+                self.prefs.config.diff.ignore_whitespace =
+                    !self.prefs.config.diff.ignore_whitespace;
                 self.request_refresh();
             },
-            SettingsRow::SignOff => self.config.commit.sign_off = !self.config.commit.sign_off,
-            SettingsRow::ShowReads => self.config.log.show_reads = !self.config.log.show_reads,
+            SettingsRow::SignOff => {
+                self.prefs.config.commit.sign_off = !self.prefs.config.commit.sign_off;
+            },
+            SettingsRow::ShowReads => {
+                self.prefs.config.log.show_reads = !self.prefs.config.log.show_reads;
+            },
         }
         self.save_settings(row.section());
     }
@@ -272,11 +277,11 @@ impl App {
         let palette = self.theme.config.palette();
         // The cached diff holds syntax colours, which follow the base only: an
         // accent change must not make every click re-highlight the diff.
-        if palette.light != self.palette.light {
+        if palette.light != self.prefs.palette.light {
             self.right.rendered = None;
         }
-        self.palette = palette;
-        self.config.theme = self.theme.config.clone();
+        self.prefs.palette = palette;
+        self.prefs.config.theme = self.theme.config.clone();
     }
 
     /// Write `section` of the live config to `config.toml`. No file (tests, a
@@ -284,14 +289,15 @@ impl App {
     /// file that cannot be written, or is not TOML, is reported in the sheet's
     /// footer and the setting still applies for this run.
     pub(super) fn save_settings(&mut self, section: Section) {
-        let Some(path) = self.config_file.clone() else {
+        let Some(path) = self.prefs.file.clone() else {
             self.sheets.settings.save = SaveState::Idle;
             return;
         };
-        self.sheets.settings.save = match Config::save_sections(&path, &self.config, &[section]) {
-            Ok(()) => SaveState::Saved,
-            Err(error) => SaveState::Failed(error.to_string()),
-        };
+        self.sheets.settings.save =
+            match Config::save_sections(&path, &self.prefs.config, &[section]) {
+                Ok(()) => SaveState::Saved,
+                Err(error) => SaveState::Failed(error.to_string()),
+            };
     }
 
     /// What the run loop has to do for the last change, once.

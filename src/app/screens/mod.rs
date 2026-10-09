@@ -40,7 +40,7 @@ pub mod welcome;
 pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
     draw(frame, app);
     if let Some(scheme) = app.theme.config.scheme() {
-        scheme.paint(frame.buffer_mut(), app.color_depth);
+        scheme.paint(frame.buffer_mut(), app.prefs.color_depth);
     }
 }
 
@@ -798,7 +798,7 @@ fn command_log_rows(app: &App, screen_height: u16) -> u16 {
     if app.is_mock() {
         return 2;
     }
-    let newest = command_log::recent(1, app.config.log.show_reads)
+    let newest = command_log::recent(1, app.prefs.config.log.show_reads)
         .last()
         .map_or(0, |record| {
             theme::command_lines(&app.palette(), record).len()
@@ -809,7 +809,7 @@ fn command_log_rows(app: &App, screen_height: u16) -> u16 {
 
 /// The two newest commands' lines, each command followed by git's answer.
 fn command_log_lines(app: &App) -> Vec<Line<'static>> {
-    command_log::recent(2, app.config.log.show_reads)
+    command_log::recent(2, app.prefs.config.log.show_reads)
         .iter()
         .flat_map(|record| theme::command_lines(&app.palette(), record))
         .collect()
@@ -857,7 +857,7 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         KeyBar::confirm(message, &palette).render(frame, area);
         return;
     }
-    let layout = hints::keybar_layout(&app.keymap, bar, usize::from(area.width));
+    let layout = hints::keybar_layout(&app.prefs.keymap, bar, usize::from(area.width));
     KeyBar::hints(&layout.text, &palette).render(frame, area);
     app.set_keybar_hits(area, layout.hits);
 }

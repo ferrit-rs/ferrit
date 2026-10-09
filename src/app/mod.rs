@@ -510,6 +510,8 @@ impl Pane {
 }
 
 pub struct App {
+    /// The configuration and what it makes: keymap, palette, colour depth.
+    prefs: prefs::Prefs,
     /// The side drawer and the sheets it holds: settings, dashboard.
     sheets: sheet::Sheets,
     /// The views that replace the panes: git config, welcome.
@@ -530,16 +532,6 @@ pub struct App {
     /// Who commits are by: the identities git knows and ferrit's pick.
     authorship: authorship::Authorship,
     pub theme: theme_editor::ThemeEditor,
-    /// The `config.toml` a save writes to; `None` for `App::open` and the mock.
-    config_file: Option<PathBuf>,
-    /// What the terminal can show; the painted theme is RGB and is approximated
-    /// with 256 colours when it has no 24-bit colour. True colour until the binary
-    /// has looked (`COLORTERM`); the library never reads the environment.
-    color_depth: crate::components::ui::scheme::ColorDepth,
-    /// Everything loaded from `config.toml`. Its `theme` is only the value
-    /// read at startup: the theme being edited lives in `theme_config`.
-    config: config::Config,
-    keymap: keymap::Keymap,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     snapshot: git::Snapshot,
@@ -552,8 +544,6 @@ pub struct App {
     right: right_pane::RightPane,
     /// Where the last frame put the clickable things.
     hits: hit_areas::HitAreas,
-    /// The colours everything is drawn with (`[theme]` in `config.toml`).
-    palette: Palette,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
     /// Backdrop state for the commit editor modal.
@@ -592,6 +582,7 @@ pub mod help;
 pub mod hit_areas;
 mod modal;
 pub mod nav;
+mod prefs;
 pub mod right_pane;
 pub mod theme_editor;
 mod tree;
@@ -657,6 +648,7 @@ impl App {
             identity_source,
         });
         Self {
+            prefs: prefs::Prefs::new(config, keymap, palette),
             sheets: sheet::Sheets::default(),
             full_screens: full_screens::FullScreens::default(),
             nav: nav::Nav::default(),
@@ -666,16 +658,11 @@ impl App {
             repo_name,
             authorship: authorship::Authorship::new(profile, git_user_name),
             theme: theme_editor::ThemeEditor::new(theme_config),
-            config,
             right: right_pane::RightPane::new(),
-            keymap,
-            config_file: None,
-            color_depth: crate::components::ui::scheme::ColorDepth::TrueColor,
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
             hits: hit_areas::HitAreas::default(),
-            palette,
             mouse_pointer: MousePointer::default(),
             commit_overlay: OverlayState::new(),
             toast: None,
@@ -715,7 +702,7 @@ impl App {
             issues,
         } = load;
         let mut app = Self::base(Some(Box::new(crate::infra::git::Repo::open(path)?)), config);
-        app.config_file = file;
+        app.prefs.file = file;
         app.refresh();
         app.report_config_issues(&issues);
         Ok(app)
@@ -746,7 +733,8 @@ impl App {
             return;
         }
         let location = self
-            .config_file
+            .prefs
+            .file
             .as_deref()
             .map_or_else(String::new, |f| format!(" {}", f.display()));
         self.report_error(AppError::ConfigIssues {
@@ -765,7 +753,7 @@ impl App {
             issues,
         } = load;
         let mut app = Self::base(None, config);
-        app.config_file = file;
+        app.prefs.file = file;
         app.full_screens.active = FullScreen::Welcome;
         app.full_screens.welcome_dir =
             Some(dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()));
@@ -775,31 +763,31 @@ impl App {
 
     /// The help screen's content for the focused pane, from the live keymap.
     pub(crate) fn help_lines(&self) -> Vec<hints::HelpLine> {
-        hints::help_lines(&self.keymap, &self.key_contexts())
+        hints::help_lines(&self.prefs.keymap, &self.key_contexts())
     }
 
     /// `[ui] mouse`: should the terminal capture the mouse?
     pub fn mouse_enabled(&self) -> bool {
-        self.config.ui.mouse
+        self.prefs.config.ui.mouse
     }
 
     /// `[ui] poll_secs` as a duration.
     pub(crate) fn poll_interval(&self) -> Duration {
-        Duration::from_secs(self.config.ui.poll_secs)
+        Duration::from_secs(self.prefs.config.ui.poll_secs)
     }
 
     /// `[diff]` as the options `git diff` / `git show` are run with.
     pub(crate) fn diff_opts(&self) -> DiffOpts {
         DiffOpts {
-            context: self.config.diff.context,
-            ignore_whitespace: self.config.diff.ignore_whitespace,
-            rename_threshold: self.config.diff.rename_threshold,
+            context: self.prefs.config.diff.context,
+            ignore_whitespace: self.prefs.config.diff.ignore_whitespace,
+            rename_threshold: self.prefs.config.diff.rename_threshold,
         }
     }
 
     /// Where a settings save writes, if anywhere.
     pub fn config_file(&self) -> Option<&Path> {
-        self.config_file.as_deref()
+        self.prefs.file.as_deref()
     }
 
     /// Repo-free instance backed by `mock` data, for the render tests.
@@ -843,8 +831,8 @@ impl App {
     /// (`docs/PLAN_16_START_WITHOUT_REPO.md`). On error nothing changes.
     pub fn attach_repository(&mut self, path: &Path) -> GitResult<()> {
         let load = config::ConfigLoad {
-            config: self.config.clone(),
-            file: self.config_file.clone(),
+            config: self.prefs.config.clone(),
+            file: self.prefs.file.clone(),
             issues: Vec::new(),
         };
         let mut fresh = Self::open_with(path, load)?;
@@ -1311,7 +1299,7 @@ impl App {
                 });
                 if !cache_hit {
                     let text = diff.delta_output(width).map_or_else(
-                        || theme::render_diff(&self.palette, diff, focus, width),
+                        || theme::render_diff(&self.prefs.palette, diff, focus, width),
                         |formatted| theme::render_delta(&formatted, width),
                     );
                     *cache = Some(RenderedDiff {
@@ -1368,12 +1356,12 @@ impl App {
 
     /// Tell the app what the terminal can show (`ColorDepth::detect`).
     pub fn set_color_depth(&mut self, depth: crate::components::ui::scheme::ColorDepth) {
-        self.color_depth = depth;
+        self.prefs.color_depth = depth;
     }
 
     /// The palette every screen and line builder colours with.
     pub fn palette(&self) -> Palette {
-        self.palette
+        self.prefs.palette
     }
 
     /// Whether help is visible or still animating out.
@@ -1671,7 +1659,10 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![theme::error_line(&self.palette, &format!("error: {err}"))]
+            vec![theme::error_line(
+                &self.prefs.palette,
+                &format!("error: {err}"),
+            )]
         } else {
             let h = &self.snapshot.header;
             let mut line = format!("{} \u{2192} {}", self.repo_name, h.branch);
@@ -1684,10 +1675,10 @@ impl App {
             if h.upstream.is_some() && h.ahead == 0 && h.behind == 0 {
                 line.push_str(" \u{2713}");
             }
-            let mut lines = vec![theme::status_line(&self.palette, &line)];
+            let mut lines = vec![theme::status_line(&self.prefs.palette, &line)];
             if h.conflicts > 0 {
                 lines.push(theme::error_line(
-                    &self.palette,
+                    &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
             }
@@ -1698,15 +1689,15 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                theme::operation_line(&self.palette, &operation.label()),
+                theme::operation_line(&self.prefs.palette, &operation.label()),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(theme::busy_line(&self.palette, label));
+            out.push(theme::busy_line(&self.prefs.palette, label));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(theme::status_line(&self.palette, note));
+            out.push(theme::status_line(&self.prefs.palette, note));
         }
         out
     }
@@ -1733,7 +1724,7 @@ impl App {
             return drill
                 .commits
                 .iter()
-                .map(|entry| theme::commit_line(&self.palette, entry))
+                .map(|entry| theme::commit_line(&self.prefs.palette, entry))
                 .collect();
         }
         if self.nav.branches_tab == BranchesTab::Remotes {
@@ -1744,7 +1735,7 @@ impl App {
                 .snapshot
                 .remotes
                 .iter()
-                .map(|entry| theme::remote_line(&self.palette, entry))
+                .map(|entry| theme::remote_line(&self.prefs.palette, entry))
                 .collect();
         }
         if self.snapshot.branches.is_empty() {
@@ -1758,7 +1749,7 @@ impl App {
                     .is_head
                     .then(|| self.remote_branch_status())
                     .flatten();
-                theme::branch_line_with_status(&self.palette, branch, operation.as_deref())
+                theme::branch_line_with_status(&self.prefs.palette, branch, operation.as_deref())
             })
             .collect()
     }
@@ -1812,7 +1803,7 @@ impl App {
                         expanded,
                         ..
                     } => Some(theme::dir_line(
-                        &self.palette,
+                        &self.prefs.palette,
                         name,
                         *depth,
                         *expanded,
@@ -1821,7 +1812,7 @@ impl App {
                     FileRow::File { index, depth } => drill
                         .files
                         .get(*index)
-                        .map(|entry| theme::file_line(&self.palette, entry, *depth)),
+                        .map(|entry| theme::file_line(&self.prefs.palette, entry, *depth)),
                 })
                 .collect();
         }
@@ -1831,7 +1822,7 @@ impl App {
         self.snapshot
             .commits
             .iter()
-            .map(|entry| theme::commit_line(&self.palette, entry))
+            .map(|entry| theme::commit_line(&self.prefs.palette, entry))
             .collect()
     }
 
@@ -1853,7 +1844,7 @@ impl App {
         self.snapshot
             .stashes
             .iter()
-            .map(|entry| theme::stash_line(&self.palette, entry))
+            .map(|entry| theme::stash_line(&self.prefs.palette, entry))
             .collect()
     }
 
@@ -1889,7 +1880,7 @@ impl App {
                     depth,
                     expanded,
                 } => Some(theme::dir_line(
-                    &self.palette,
+                    &self.prefs.palette,
                     name,
                     *depth,
                     *expanded,
@@ -1899,7 +1890,7 @@ impl App {
                     .snapshot
                     .files
                     .get(*index)
-                    .map(|entry| theme::file_line(&self.palette, entry, *depth)),
+                    .map(|entry| theme::file_line(&self.prefs.palette, entry, *depth)),
             })
             .collect()
     }

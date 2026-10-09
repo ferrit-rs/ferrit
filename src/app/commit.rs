@@ -192,7 +192,7 @@ impl App {
             focus: CommitField::Summary,
             kind,
             reword: None,
-            sign_off: self.config.commit.sign_off,
+            sign_off: self.prefs.config.commit.sign_off,
             no_verify: false,
             history_index: None,
             saved_summary: String::new(),

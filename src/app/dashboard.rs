@@ -302,6 +302,7 @@ impl App {
     pub(super) fn dashboard_key(&mut self, key: KeyEvent) {
         // The key that opens the dashboard closes it, whatever it is bound to.
         let toggles = self
+            .prefs
             .keymap
             .resolve(&[Context::Global], KeyBinding::from_event(key))
             == Some(Action::Dashboard);
