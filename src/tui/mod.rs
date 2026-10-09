@@ -122,6 +122,7 @@ pub mod error;
 pub mod event;
 pub mod input;
 pub mod keymap;
+pub mod loading;
 pub mod prefs;
 pub mod publish;
 pub mod row_lines;

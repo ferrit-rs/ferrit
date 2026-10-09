@@ -121,3 +121,26 @@ fn impl_app_is_only_written_in_app() {
         .collect();
     assert!(offenders.is_empty(), "impl App outside tui/: {offenders:?}");
 }
+
+/// A component decides and returns events; it never writes behaviour on `App`.
+/// What changes the state is `tui/event.rs`, and the few flows that cross the
+/// popups, the workers and the repository are the files of `tui/` itself.
+#[test]
+fn no_component_writes_an_impl_app() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tui");
+    let offenders: Vec<String> = rust_files(&root.join("components"))
+        .into_iter()
+        .chain(rust_files(&root.join("widgets")))
+        .filter(|path| {
+            fs::read_to_string(path)
+                .unwrap()
+                .lines()
+                .any(|line| line.starts_with("impl App"))
+        })
+        .map(|path| path.strip_prefix(&root).unwrap().display().to_string())
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "impl App in components: {offenders:?}"
+    );
+}

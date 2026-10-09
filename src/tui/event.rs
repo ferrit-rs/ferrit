@@ -86,6 +86,12 @@ pub(crate) enum Event {
     Quit,
     /// Slide the side sheet out.
     CloseSheet,
+    /// Collapse or expand a directory row of the Files tree.
+    ToggleFilesDir(std::path::PathBuf),
+    /// Collapse or expand a directory row of a drilled commit's tree.
+    ToggleCommitDir(std::path::PathBuf),
+    /// Replace the Commits list with one commit's changed files.
+    DrillIntoCommit(crate::tui::components::panes::CommitDrill),
     /// Back from the dashboard to the panes, telling its computation to stop.
     CloseDashboard,
     /// Open the help screen.
@@ -233,6 +239,26 @@ impl App {
                 Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
                 Event::Quit => self.should_quit = true,
                 Event::CloseSheet => self.render.sheet.close(),
+                Event::ToggleFilesDir(path) => {
+                    if !self.nav.collapsed_dirs.remove(&path) {
+                        self.nav.collapsed_dirs.insert(path);
+                    }
+                    let last = self.row_count(Pane::Files).saturating_sub(1);
+                    self.nav.selection[Pane::Files] = self.nav.selection[Pane::Files].min(last);
+                },
+                Event::ToggleCommitDir(path) => {
+                    if let Some(drill) = &mut self.nav.commit_drill
+                        && !drill.collapsed.remove(&path)
+                    {
+                        drill.collapsed.insert(path);
+                    }
+                    let last = self.row_count(Pane::Commits).saturating_sub(1);
+                    self.nav.selection[Pane::Commits] = self.nav.selection[Pane::Commits].min(last);
+                },
+                Event::DrillIntoCommit(drill) => {
+                    self.nav.commit_drill = Some(drill);
+                    self.nav.selection[Pane::Commits] = 0;
+                },
                 Event::CloseDashboard => self.close_dashboard(),
                 Event::OpenHelp => self.open_help(),
                 Event::ShowGitConfig => self.full_screens.active = FullScreen::GitConfig,
