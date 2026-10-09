@@ -6,7 +6,6 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::git::actions::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
 use crate::git::host::Visibility;
 use crate::interface::components::tui_overlay::anchor::Anchor;
 use crate::interface::components::tui_overlay::backdrop::Backdrop;
@@ -21,6 +20,9 @@ use crate::interface::components::ui::select_list::SelectList;
 use crate::interface::components::ui::text_input::TextInput;
 use crate::interface::panes::row_lines;
 use crate::interface::panes::views::{CommandLogView, CommitPopupView, MenuView};
+use crate::interface::popups::create_remote_form::{
+    ConfirmView, CreateRemoteView, Field, FormView,
+};
 use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 

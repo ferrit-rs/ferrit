@@ -9,8 +9,6 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use std::time::Instant;
 
 use crate::app::App;
 use crate::app::error::AppError;
@@ -18,212 +16,19 @@ use crate::app::events::AppEvent;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::error::GitError;
 use crate::git::host::{
-    self, CreateRequest, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
-    ssh_remote_url, validate_description,
+    self, CreateDraft, CreateRequest, GhProgram, GhStatus, parse_target, sanitize_name,
+    ssh_remote_url,
 };
+use crate::git::remote::RemoteOp;
 use crate::git::ssh_config::read_github_aliases;
-use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::popups::create_remote_form::{
+    Consequences, CreateRemoteView, Form, FormKey, Step,
+};
 use crate::interface::popups::popup::Popup;
 use color_eyre::Result;
-use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::KeyEvent;
 use std::sync::mpsc;
 use std::thread;
-
-/// What the form holds, and all the user chooses: the name, the visibility and
-/// the description. Kept on the app while `gh` runs, so a refusal can reopen the
-/// form with every field as typed. The rest is not a choice: a repository with
-/// no commit gets the same first commit (an empty `README.md`), the branch is
-/// pushed, and `origin` is written over the user's SSH alias when they have one.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CreateDraft {
-    /// `name` or `owner/name`.
-    pub target: String,
-    pub visibility: Visibility,
-    pub description: String,
-}
-
-impl CreateDraft {
-    /// A draft named by `target`: private, no description.
-    #[must_use]
-    pub fn new(target: String) -> Self {
-        Self {
-            target,
-            visibility: Visibility::Private,
-            description: String::new(),
-        }
-    }
-}
-
-/// The field of the form that has the focus.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Field {
-    Name,
-    Visibility,
-    Description,
-}
-
-impl Field {
-    const ORDER: [Self; 3] = [Self::Name, Self::Visibility, Self::Description];
-
-    fn step(self, forward: bool) -> Self {
-        let at = Self::ORDER.iter().position(|f| *f == self).unwrap_or(0);
-        let next = if forward {
-            (at + 1) % Self::ORDER.len()
-        } else {
-            (at + Self::ORDER.len() - 1) % Self::ORDER.len()
-        };
-        Self::ORDER.get(next).copied().unwrap_or(Self::Name)
-    }
-}
-
-/// The form's fields as they are being typed.
-#[derive(Debug)]
-pub(crate) struct Form {
-    name: TextInput,
-    description: TextInput,
-    visibility: Visibility,
-    focus: Field,
-    error: Option<String>,
-}
-
-impl Form {
-    fn from_draft(draft: &CreateDraft, error: Option<String>) -> Self {
-        Self {
-            name: TextInput::from_text(&draft.target),
-            description: TextInput::from_text(&draft.description),
-            visibility: draft.visibility,
-            focus: Field::Name,
-            error,
-        }
-    }
-
-    fn draft(&self) -> CreateDraft {
-        CreateDraft {
-            target: self.name.text().trim().to_owned(),
-            visibility: self.visibility,
-            description: self.description.text(),
-        }
-    }
-
-    /// The draft, if what is typed would be accepted; else the reason.
-    fn validate(&self) -> Result<CreateDraft, HostError> {
-        let draft = self.draft();
-        parse_target(&draft.target)?;
-        validate_description(&draft.description)?;
-        Ok(draft)
-    }
-
-    /// One key in the form. `Visibility` is not text: arrows and `Space` change
-    /// it. The name and the description are text; the description is one line
-    /// of at most 350 characters that wraps over the rows of its box, like the
-    /// body of a commit, so what is typed stays in view.
-    fn key(&mut self, key: KeyEvent) -> Action {
-        match key.code {
-            KeyCode::Esc => return Action::Close,
-            KeyCode::Enter => return Action::Continue,
-            KeyCode::Tab | KeyCode::Down => self.focus = self.focus.step(true),
-            KeyCode::BackTab | KeyCode::Up => self.focus = self.focus.step(false),
-            _ => match self.focus {
-                Field::Name => {
-                    self.error = None;
-                    self.name.handle_key_event(key, TextInputMode::SingleLine);
-                },
-                Field::Description => {
-                    self.error = None;
-                    self.description
-                        .handle_key_event(key, TextInputMode::SingleLine);
-                },
-                Field::Visibility => {
-                    if matches!(
-                        key.code,
-                        KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
-                    ) {
-                        self.visibility = match self.visibility {
-                            Visibility::Private => Visibility::Public,
-                            Visibility::Public => Visibility::Private,
-                        };
-                    }
-                },
-            },
-        }
-        Action::None
-    }
-}
-
-/// Where the popup is.
-#[derive(Debug)]
-pub(crate) enum Step {
-    /// `gh` is being asked whether it is ready; the answer carries this number
-    /// so one that arrives after the popup was closed is ignored.
-    Checking {
-        generation: u64,
-    },
-    Form(Form),
-    /// The last question, over the form it came from.
-    Confirm(Form),
-}
-
-/// What a key asks the app to do with the popup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Action {
-    None,
-    Close,
-    /// From the form: validate and ask the last question.
-    Continue,
-    /// From the question: back to the form.
-    Back,
-    Create,
-}
-
-impl Step {
-    fn key(&mut self, key: KeyEvent) -> Action {
-        match self {
-            Self::Checking { .. } => {
-                if key.code == KeyCode::Esc {
-                    Action::Close
-                } else {
-                    Action::None
-                }
-            },
-            Self::Form(form) => form.key(key),
-            Self::Confirm(form) => match key.code {
-                KeyCode::Esc | KeyCode::Char('n' | 'N') => Action::Back,
-                KeyCode::Char('y' | 'Y') => Action::Create,
-                // Enter confirms a private repository like every other question
-                // of ferrit, and never a public one: that takes a `y`.
-                KeyCode::Enter if form.visibility == Visibility::Private => Action::Create,
-                _ => Action::None,
-            },
-        }
-    }
-}
-
-/// What the renderer draws of the popup.
-#[derive(Debug)]
-pub enum CreateRemoteView<'a> {
-    Checking,
-    Form(FormView<'a>),
-    Confirm(ConfirmView),
-}
-
-#[derive(Debug)]
-pub struct FormView<'a> {
-    pub name: &'a TextInput,
-    pub description: &'a TextInput,
-    pub visibility: Visibility,
-    pub focus: Field,
-    pub error: Option<&'a str>,
-}
-
-/// The last question: what will happen, and which keys answer it.
-#[derive(Debug)]
-pub struct ConfirmView {
-    pub title: String,
-    pub visibility: Visibility,
-    pub lines: Vec<String>,
-    pub hint: &'static str,
-}
 
 /// The creation's own state on `App`.
 #[derive(Debug, Default)]
@@ -377,51 +182,12 @@ impl App {
         let Some(Popup::CreateRemote(step)) = self.modal.popup() else {
             return None;
         };
-        Some(match step {
-            Step::Checking { .. } => CreateRemoteView::Checking,
-            Step::Form(form) => CreateRemoteView::Form(FormView {
-                name: &form.name,
-                description: &form.description,
-                visibility: form.visibility,
-                focus: form.focus,
-                error: form.error.as_deref(),
-            }),
-            Step::Confirm(form) => {
-                let draft = form.draft();
-                let word = match draft.visibility {
-                    Visibility::Private => "PRIVATE",
-                    Visibility::Public => "PUBLIC",
-                };
-                let mut lines = vec![format!("{word} repository")];
-                if draft.visibility == Visibility::Public {
-                    lines.push("Everyone can read its history.".to_owned());
-                }
-                // Not a choice: a repository with no commit always gets one.
-                if self.repo_has_no_commit() {
-                    lines.push("first: commit an empty README.md, made by Ferrit".to_owned());
-                }
-                let over = self
-                    .create_remote
-                    .ssh_aliases()
-                    .first()
-                    .map_or_else(String::new, |host| {
-                        format!(" using your SSH key for {host}")
-                    });
-                lines.push(format!(
-                    "then: add remote `origin`{over}, push {}",
-                    self.snapshot.header.branch
-                ));
-                CreateRemoteView::Confirm(ConfirmView {
-                    title: format!("Create {}", draft.target),
-                    visibility: draft.visibility,
-                    lines,
-                    hint: match draft.visibility {
-                        Visibility::Private => "Enter/y: create   n/Esc: back",
-                        Visibility::Public => "y: create (Enter does not)   n/Esc: back",
-                    },
-                })
-            },
-        })
+        let aliases = self.create_remote.ssh_aliases();
+        Some(step.view(&Consequences {
+            first_commit: self.repo_has_no_commit(),
+            ssh_host: aliases.first().map(String::as_str),
+            branch: &self.snapshot.header.branch,
+        }))
     }
 
     /// Every key while the popup is up.
@@ -430,9 +196,9 @@ impl App {
             return;
         };
         match step.key(key) {
-            Action::None => {},
-            Action::Close => self.close_create_remote(),
-            Action::Continue => {
+            FormKey::None => {},
+            FormKey::Close => self.close_create_remote(),
+            FormKey::Continue => {
                 let Some(Popup::CreateRemote(Step::Form(form))) = self.modal.take_popup() else {
                     return;
                 };
@@ -441,19 +207,18 @@ impl App {
                         .modal
                         .open_popup(Popup::CreateRemote(Step::Confirm(form))),
                     Err(reason) => {
-                        self.modal.open_popup(Popup::CreateRemote(Step::Form(Form {
-                            error: Some(reason.to_string()),
-                            ..form
-                        })));
+                        self.modal.open_popup(Popup::CreateRemote(Step::Form(
+                            form.with_error(reason.to_string()),
+                        )));
                     },
                 }
             },
-            Action::Back => {
+            FormKey::Back => {
                 if let Some(Popup::CreateRemote(Step::Confirm(form))) = self.modal.take_popup() {
                     self.modal.open_popup(Popup::CreateRemote(Step::Form(form)));
                 }
             },
-            Action::Create => {
+            FormKey::Create => {
                 let Some(Popup::CreateRemote(Step::Confirm(form))) = self.modal.take_popup() else {
                     return;
                 };
@@ -516,10 +281,8 @@ impl App {
         let author = self.authorship.author_arg();
         self.create_remote.draft = Some(draft);
         self.create_remote.error = None;
-        self.workers.remote_busy = Some(crate::git::remote::RemoteOp::Create);
-        self.workers.remote_started = Some(Instant::now());
+        self.workers.begin_remote(RemoteOp::Create);
         self.status_note = None;
-        self.workers.remote_cancel.store(false, Ordering::Release);
         let cancel = Arc::clone(&self.workers.remote_cancel);
         self.workers.remote_worker = Some(thread::spawn(move || {
             let result = run_worker(WorkerKind::Remote, || {
@@ -545,11 +308,7 @@ impl App {
     /// draft, then pushes; a refusal keeps the draft and says
     /// why, nothing was configured.
     pub fn on_remote_created(&mut self, result: Result<String, AppError>) {
-        self.workers.remote_busy = None;
-        self.workers.remote_started = None;
-        if let Some(worker) = self.workers.remote_worker.take() {
-            let _ = worker.join();
-        }
+        self.workers.end_remote();
         self.request_refresh();
         match result {
             Ok(url) => {

@@ -4,6 +4,7 @@
 pub(crate) mod commit_draft;
 pub(crate) mod confirm;
 pub mod context_menu;
+pub mod create_remote_form;
 pub mod keys;
 pub mod menu;
 pub(crate) mod modal;

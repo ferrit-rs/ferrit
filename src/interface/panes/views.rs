@@ -1,9 +1,9 @@
 //! What the screens and the tests are shown: the right pane's diff, the popups and the menus, as plain data.
 
 use crate::git;
-use crate::git::actions::create_remote;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::popups::create_remote_form;
 use std::path::PathBuf;
 
 /// What the right pane shows behind the image preview. A second cached,
@@ -87,7 +87,7 @@ pub enum PopupView<'a> {
     Menu(MenuView),
     Upstream(CommitPopupView<'a>),
     Askpass(CommitPopupView<'a>),
-    CreateRemote(create_remote::CreateRemoteView<'a>),
+    CreateRemote(create_remote_form::CreateRemoteView<'a>),
     Note(&'a str),
 }
 

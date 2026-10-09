@@ -1,8 +1,8 @@
 //! What a popup can be.
 
 use crate::git::actions::askpass;
-use crate::git::actions::create_remote;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::popups::create_remote_form;
 use crate::interface::popups::{commit_draft, context_menu, menu};
 
 /// Modal state that owns all input while it is up, the same idea as
@@ -36,7 +36,7 @@ pub(crate) enum Popup {
     },
     /// Creating the GitHub repository: the `gh` check, the form, the last
     /// question (`app::create_remote`).
-    CreateRemote(create_remote::Step),
+    CreateRemote(create_remote_form::Step),
     /// A dismissible message: a commit failure, "empty commit message", a
     /// branch-op failure, or a merge conflict.
     Note(String),

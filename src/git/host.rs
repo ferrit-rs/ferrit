@@ -324,3 +324,30 @@ fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
     run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
         .is_ok_and(|out| out.status.success())
 }
+
+/// What the form holds, and all the user chooses: the name, the visibility and
+/// the description. Kept on the app while `gh` runs, so a refusal can reopen the
+/// form with every field as typed. The rest is not a choice: a repository with
+/// no commit gets the same first commit (an empty `README.md`), the branch is
+/// pushed, and `origin` is written over the user's SSH alias when they have one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateDraft {
+    /// `name` or `owner/name`.
+    pub target: String,
+    /// Private or public.
+    pub visibility: Visibility,
+    /// At most 350 characters, one line.
+    pub description: String,
+}
+
+impl CreateDraft {
+    /// A draft named by `target`: private, no description.
+    #[must_use]
+    pub fn new(target: String) -> Self {
+        Self {
+            target,
+            visibility: Visibility::Private,
+            description: String::new(),
+        }
+    }
+}
