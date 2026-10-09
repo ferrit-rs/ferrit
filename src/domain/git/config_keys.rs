@@ -8,9 +8,11 @@ use crate::domain::git::config::ValueKind;
 /// What a known key accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyType {
+    /// `true` or `false`.
     Bool,
     /// One of these literals.
     Enum(&'static [&'static str]),
+    /// Free text.
     Text,
 }
 
@@ -26,10 +28,12 @@ impl KeyType {
     }
 }
 
+/// A key ferrit offers in the config editor, with what it accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KnownKey {
     /// Lower-case, as `git config --list` prints it.
     pub key: &'static str,
+    /// What the key accepts.
     pub kind: KeyType,
 }
 
@@ -37,6 +41,7 @@ const fn known(key: &'static str, kind: KeyType) -> KnownKey {
     KnownKey { key, kind }
 }
 
+/// The keys the config editor knows how to edit with a picker, instead of free text.
 pub const KNOWN_KEYS: &[KnownKey] = &[
     known("commit.gpgsign", KeyType::Bool),
     known("fetch.prune", KeyType::Bool),

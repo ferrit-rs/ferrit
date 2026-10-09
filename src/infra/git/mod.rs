@@ -652,6 +652,8 @@ impl Repo {
         )
     }
 
+    /// Whether `push.default` is `current`: a plain `git push` then creates the remote
+    /// branch of the same name.
     pub fn push_default_current(&self) -> bool {
         self.inner
             .config()

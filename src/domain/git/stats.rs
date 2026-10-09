@@ -48,10 +48,15 @@ pub const NUMSTAT_CAP: usize = 5_000;
 /// How far back the statistics look.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Window {
+    /// The last 7 days, drawn day by day.
     Days7,
+    /// The last 30 days, drawn day by day.
     Days30,
+    /// The last 90 days, drawn week by week.
     Days90,
+    /// The last 365 days, drawn month by month.
     Year,
+    /// The whole history.
     All,
 }
 
@@ -73,7 +78,9 @@ impl Window {
 pub struct StatsOptions {
     /// "Now" in unix seconds: the end of the window and of the series.
     pub now: i64,
+    /// Most commits the walk reads before it stops and reports `sampled`.
     pub walk_cap: usize,
+    /// Most commits `git log --numstat` reads before it stops and reports `sampled`.
     pub numstat_cap: usize,
     /// Read `git log --numstat` (lines and hot files). The app first asks for
     /// `false`, which is quick, paints it, then asks again with `true`.
@@ -96,10 +103,13 @@ impl Default for StatsOptions {
 /// Lines added and removed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Lines {
+    /// Lines added.
     pub added: u64,
+    /// Lines removed.
     pub removed: u64,
 }
 
+/// The headline numbers of the dashboard.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Totals {
     /// Commits in the window.
@@ -107,24 +117,30 @@ pub struct Totals {
     /// Distinct authors in the window, after `.mailmap` and after the merge of
     /// the emails that share a name.
     pub authors: usize,
+    /// Local branches.
     pub local_branches: usize,
     /// Remote-tracking branches, `HEAD` aliases left out.
     pub remote_branches: usize,
     /// Configured remotes: the screen hides remote counts at 0.
     pub remotes: usize,
+    /// Tags.
     pub tags: usize,
+    /// Stash entries.
     pub stashes: usize,
     /// Oldest and newest commit walked, whatever the window (`None` when empty).
     pub first_commit: Option<i64>,
+    /// Time of the newest commit walked, in unix seconds.
     pub last_commit: Option<i64>,
     /// Lines in the window, `None` when `git log` failed.
     pub lines: Option<Lines>,
 }
 
+/// One contributor, after `.mailmap` and after the emails that share a name are merged.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorStat {
     /// Name and `email` are those of the most frequent email.
     pub name: String,
+    /// The most frequent email of this author.
     pub email: String,
     /// Every distinct email of this author (same name), most commits first
     /// (ties alphabetical); at least one, `email` is the first.
@@ -133,28 +149,36 @@ pub struct AuthorStat {
     pub commits: usize,
     /// Summed over every email; `None` when `git log` failed.
     pub added: Option<u64>,
+    /// Lines removed, summed over every email; `None` when `git log` failed.
     pub removed: Option<u64>,
     /// The newest commit of any email.
     pub last_commit: i64,
 }
 
+/// The commits of one kind (`feat`, `fix`, `docs`, ...) in the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KindStat {
+    /// Which kind.
     pub kind: Kind,
+    /// Non-merge commits of this kind.
     pub commits: usize,
 }
 
 /// One hot file: how many commits of the window touched it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileStat {
+    /// The path, relative to the worktree root.
     pub path: String,
     /// `share.count` is the number of commits touching the file; the whole is
     /// the window's commits, so shares need not add to 100.
     pub share: Share,
+    /// Lines added to the file in the window.
     pub added: u64,
+    /// Lines removed from the file in the window.
     pub removed: u64,
 }
 
+/// The files that changed most in the window, and what was left out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HotFiles {
     /// Top 10, most commits first (ties by path), lockfiles and changelogs left
@@ -176,23 +200,35 @@ pub struct HotFiles {
 /// count in several of `changed`, `staged` and `untracked`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorkState {
+    /// Files with a change in the worktree (not untracked, not conflicted).
     pub changed: usize,
+    /// Files with a change in the index.
     pub staged: usize,
+    /// Files git does not track yet.
     pub untracked: usize,
+    /// Paths with an unresolved conflict.
     pub conflicted: usize,
+    /// Stash entries.
     pub stashes: usize,
+    /// The current branch's upstream, as `origin/main`.
     pub upstream: Option<String>,
+    /// Commits the branch has that its upstream does not.
     pub ahead: usize,
+    /// Commits the upstream has that the branch does not.
     pub behind: usize,
 }
 
+/// Everything the dashboard shows, read in one pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepoStats {
+    /// The window these figures are for.
     pub window: Window,
+    /// The headline numbers.
     pub totals: Totals,
     /// Oldest first, from the start of the window clipped to the repository's
     /// age up to now; empty when the window has no commits.
     pub series: Vec<Bucket>,
+    /// How `series` groups its buckets: days, weeks or months.
     pub granularity: Granularity,
     /// Commits per day over the last 26 weeks ending now, empty days included,
     /// whatever the window (the heat map draws this).
@@ -207,7 +243,9 @@ pub struct RepoStats {
     pub branches: Vec<BranchHealth>,
     /// Name of the main branch; `None` when HEAD's own branch is all there is.
     pub main_branch: Option<String>,
+    /// The working tree and upstream right now.
     pub work: WorkState,
+    /// Commits since the newest tag reachable from `HEAD`, if there is one.
     pub since_tag: Option<TagSince>,
     /// The repository is a shallow clone: history before `first_commit` is missing.
     pub shallow: bool,

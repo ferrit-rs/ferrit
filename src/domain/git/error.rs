@@ -5,6 +5,8 @@
 
 use std::path::PathBuf;
 
+/// Everything that can go wrong talking to git, one variant per kind of operation. Most hold the
+/// stderr git printed; the adapter's own errors are boxed in `Open` and `Read`.
 #[derive(Debug, thiserror::Error)]
 pub enum GitError {
     /// No git repository at or above the given path.
@@ -131,4 +133,5 @@ pub enum GitError {
     Cancelled,
 }
 
+/// A result whose error is [`GitError`].
 pub type GitResult<T> = Result<T, GitError>;

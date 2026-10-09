@@ -9,8 +9,11 @@ const DAY: i64 = 86_400;
 /// never has four points across the whole width.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Granularity {
+    /// One bucket per day.
     Day,
+    /// One bucket per ISO week, starting on Monday.
     Week,
+    /// One bucket per calendar month.
     Month,
 }
 
@@ -32,6 +35,7 @@ impl Granularity {
 pub struct Bucket {
     /// First second (UTC) of the day, of the ISO week (Monday) or of the month.
     pub start: i64,
+    /// Commits whose time falls in the bucket.
     pub commits: usize,
 }
 

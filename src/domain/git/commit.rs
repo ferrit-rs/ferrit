@@ -11,7 +11,9 @@
 /// What kind of commit to make.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommitKind {
+    /// A new commit with the message given.
     Normal,
+    /// Replace `HEAD`: its message and whatever is staged now.
     Amend,
     /// Amend the message only (`--amend --only`), ignoring whatever is
     /// currently staged.
@@ -20,10 +22,12 @@ pub enum CommitKind {
     /// writes the `fixup! <subject>` message itself, so `commit`'s own
     /// `message` argument is ignored for this kind.
     Fixup {
+        /// The full hash of the commit to fix up.
         target: String,
     },
     /// `git commit --squash=<target>`, with a caller-supplied message.
     Squash {
+        /// The full hash of the commit to squash into.
         target: String,
     },
 }
@@ -45,8 +49,11 @@ impl CommitKind {
 /// (`docs/PLAN_7_COMMIT.md` "Sign-off default": never a silent `-s`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CommitOpts {
+    /// Add a `Signed-off-by` trailer (`-s`).
     pub sign_off: bool,
+    /// Skip the `pre-commit` and `commit-msg` hooks (`--no-verify`).
     pub no_verify: bool,
+    /// `Name <email>` for `--author`; `None` lets git use its own identity.
     pub author: Option<String>,
 }
 

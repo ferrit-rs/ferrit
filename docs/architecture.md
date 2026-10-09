@@ -53,7 +53,8 @@ Known gaps, each with a plan:
 - `App` is smaller (87 fields to 30) but not small. Configuration and the create-remote flow
   are still loose on it, and `screens::draw` still takes `&mut App`
   (`PLAN_22_APP_SPLIT.md`).
-- The library exposes more than it needs to: the integration tests reach into most of it,
+- The library exposes more than it needs to (`domain` is fully documented and checked by
+  `missing_docs`; the rest is not): the integration tests reach into most of it,
   and `App`'s public fields force their types to be nameable. The test seams that can be
   separated (`replay`, `FakeGit`) are behind the `test-util` feature; `app::mock` is not,
   because the repo-free path of the production code reads its sample text

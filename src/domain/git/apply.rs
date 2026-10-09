@@ -15,7 +15,9 @@ use std::collections::HashSet;
 /// `git apply --reverse`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApplyDir {
+    /// Apply the patch as it reads.
     Forward,
+    /// Apply the patch reversed (`git apply --reverse`).
     Reverse,
 }
 
@@ -24,8 +26,11 @@ pub enum ApplyDir {
 /// index in step).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApplyTarget {
+    /// The index only: stage or unstage.
     Index,
+    /// The worktree only.
     Worktree,
+    /// The worktree and the index together.
     WorktreeAndIndex,
 }
 

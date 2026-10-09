@@ -10,10 +10,15 @@ use std::ops::Range;
 /// How a file changed, from the `diff --git` preamble lines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileStatus {
+    /// A new file (`new file mode`).
     Added,
+    /// A removed file (`deleted file mode`).
     Deleted,
+    /// The content changed; the default when no other marker is present.
     Modified,
+    /// Moved, with `rename from` / `rename to`.
     Renamed,
+    /// Copied, with `copy from` / `copy to`.
     Copied,
 }
 
@@ -26,9 +31,13 @@ pub struct HunkMeta {
     /// Lines after the header, up to the next hunk or the next file. Used
     /// verbatim as the patch body in phase 4.
     pub body: Range<usize>,
+    /// First line of the hunk in the old file.
     pub old_start: u32,
+    /// Lines the hunk spans in the old file.
     pub old_count: u32,
+    /// First line of the hunk in the new file.
     pub new_start: u32,
+    /// Lines the hunk spans in the new file.
     pub new_count: u32,
 }
 
@@ -40,10 +49,15 @@ pub struct FileMeta {
     /// (`index`, `---`, `+++`, mode / rename lines). `header.start
     /// ..hunk.body.end` is the whole slice a phase-4 hunk patch needs.
     pub header: Range<usize>,
+    /// The old path, as a range of the text (the `a/` side).
     pub old_path: Range<usize>,
+    /// The new path, as a range of the text (the `b/` side).
     pub new_path: Range<usize>,
+    /// How the file changed.
     pub status: FileStatus,
+    /// git printed `Binary files ... differ` instead of hunks.
     pub binary: bool,
+    /// The hunks in order; empty for a binary file, a pure rename or a mode change.
     pub hunks: Vec<HunkMeta>,
 }
 

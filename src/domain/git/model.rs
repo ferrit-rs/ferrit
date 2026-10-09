@@ -8,14 +8,19 @@ use std::path::PathBuf;
 /// from another shell. See `docs/PLAN_11_REBASE.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operation {
+    /// A merge that stopped, usually on a conflict.
     Merge,
     /// `step` of `total` commits; both `0` when git's progress files are
     /// missing or unreadable.
     Rebase {
+        /// The commit being applied, counting from 1.
         step: usize,
+        /// How many commits the rebase applies.
         total: usize,
     },
+    /// A `git cherry-pick` that stopped.
     CherryPick,
+    /// A `git revert` that stopped.
     Revert,
 }
 
@@ -45,24 +50,38 @@ impl Operation {
 /// One-glance summary of repository state.
 #[derive(Debug, Clone, Default)]
 pub struct StatusHeader {
+    /// The current branch's name, or `HEAD` when detached.
     pub branch: String,
+    /// `HEAD` points at a commit rather than a branch.
     pub detached: bool,
+    /// The branch's upstream, as `origin/main`, if it has one.
     pub upstream: Option<String>,
+    /// Commits on the branch that its upstream does not have.
     pub ahead: usize,
+    /// Commits on the upstream that the branch does not have.
     pub behind: usize,
+    /// Paths with an unresolved conflict.
     pub conflicts: usize,
 }
 
 /// How one side (index or worktree) of a path changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
+    /// Nothing on this side.
     None,
+    /// The content changed.
     Modified,
+    /// The path is new.
     Added,
+    /// The path is gone.
     Deleted,
+    /// The path was renamed.
     Renamed,
+    /// The type changed (a file became a symlink, say).
     Typechange,
+    /// Not tracked by git yet. Only ever a worktree change.
     Untracked,
+    /// An unresolved merge conflict.
     Conflicted,
 }
 
@@ -85,9 +104,13 @@ impl Change {
 /// One working-tree path and its staged/worktree changes.
 #[derive(Debug, Clone)]
 pub struct FileEntry {
+    /// The path relative to the worktree root.
     pub path: PathBuf,
+    /// What the index holds against `HEAD`.
     pub staged: Change,
+    /// What the worktree holds against the index.
     pub worktree: Change,
+    /// Whether git treats the file as binary. Not read yet: always `false`.
     pub binary: bool,
 }
 
@@ -120,19 +143,28 @@ impl FileEntry {
 /// One configured remote.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteEntry {
+    /// The remote's name, usually `origin`.
     pub name: String,
+    /// The URL fetches use.
     pub fetch_url: String,
+    /// The URL pushes use, which can differ from the fetch URL.
     pub push_url: String,
 }
 
 /// One local branch row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BranchEntry {
+    /// The branch's name, without `refs/heads/`.
     pub name: String,
+    /// It is the checked-out branch.
     pub is_head: bool,
+    /// The upstream, as `origin/main`, if there is one.
     pub upstream: Option<String>,
+    /// Commits the branch has that its upstream does not.
     pub ahead: usize,
+    /// Commits the upstream has that the branch does not.
     pub behind: usize,
+    /// Unix time of the tip commit, in seconds. Branches are listed newest first.
     pub tip_time: i64,
 }
 
@@ -142,8 +174,11 @@ pub struct BranchEntry {
 pub enum CommitRefKind {
     /// `HEAD -> main`, or a bare `HEAD` when detached.
     Head,
+    /// A local branch.
     Branch,
+    /// A tag.
     Tag,
+    /// A remote-tracking branch.
     Remote,
 }
 
@@ -152,6 +187,7 @@ pub enum CommitRefKind {
 pub struct CommitRef {
     /// As `git log --decorate` writes it: `HEAD -> main`, `feat/x`, `tag: v0.6.0`, `origin/main`.
     pub label: String,
+    /// What kind of name it is.
     pub kind: CommitRefKind,
 }
 
@@ -159,27 +195,36 @@ pub struct CommitRef {
 /// not pushed yet, yellow pushed, green merged into the remote's main branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PushState {
+    /// Only on this machine.
     #[default]
     Unpushed,
+    /// On the remote.
     Pushed,
+    /// Merged into the remote's main branch.
     Merged,
 }
 
 /// One commit row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitEntry {
+    /// The full hash, 40 hex characters.
     pub full_hash: String,
+    /// The abbreviated hash git shows by default, 7 characters.
     pub short_hash: String,
+    /// The author's name.
     pub author: String,
     /// The author's email, `Name <email>` in the branch Log header; empty when unknown.
     pub author_email: String,
+    /// The first line of the message.
     pub summary: String,
     /// The message under the subject, trimmed; empty for a subject-only commit.
     pub body: String,
+    /// Unix time of the commit, in seconds.
     pub time: i64,
     /// Names pointing at this commit, in `git log --decorate` order: `HEAD ->` and the
     /// branches, then tags, then remote branches. Empty when none, and in a branch's log.
     pub refs: Vec<CommitRef>,
+    /// Where the commit stands against the remote.
     pub push_state: PushState,
 }
 
@@ -220,7 +265,10 @@ impl CommitEntry {
 /// One stash row. The OID is stable when stack indices shift.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StashEntry {
+    /// The stash's position in the stack, 0 for the newest. It shifts when an entry is dropped; `oid` does not.
     pub index: usize,
+    /// The stash commit's id.
     pub oid: String,
+    /// The message git recorded, such as `On main: wip`.
     pub message: String,
 }

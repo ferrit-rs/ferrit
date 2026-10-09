@@ -1,14 +1,20 @@
 //! Profile settings model, independent of Git config and terminal UI.
 
+/// Who git thinks the user is, and where that comes from.
 #[derive(Debug, Clone, Default)]
 pub struct Settings {
+    /// The identities in the user's global git config (name and email pairs).
     pub global_identities: Vec<Identity>,
+    /// The identity the repository's own config sets, if it sets one.
     pub repository_identity: Option<Identity>,
+    /// The identity git would commit with here.
     pub effective_identity: Option<Identity>,
+    /// Which config level `effective_identity` comes from.
     pub identity_source: IdentitySource,
 }
 
 impl Settings {
+    /// The global identities that have an email, which is what a commit author needs.
     pub fn available_identities(&self) -> Vec<Identity> {
         self.global_identities
             .iter()
@@ -47,17 +53,25 @@ mod tests {
     }
 }
 
+/// Which config level an identity comes from.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum IdentitySource {
+    /// The repository's own config.
     Repository,
+    /// The user's global config.
     Global,
+    /// The system config.
     System,
+    /// No identity is configured.
     #[default]
     Unset,
 }
 
+/// A name and an email, as in `Name <email>`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Identity {
+    /// The name (`user.name`).
     pub name: String,
+    /// The email (`user.email`), if there is one.
     pub email: Option<String>,
 }

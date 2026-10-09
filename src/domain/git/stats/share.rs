@@ -6,6 +6,7 @@
 /// One part of a whole.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Share {
+    /// The part, in the unit of the whole (commits, lines).
     pub count: u64,
     /// Whole percent, or `None` when the whole is zero (the screen shows `–`,
     /// never a percentage of nothing).
@@ -38,7 +39,9 @@ impl Share {
 /// The parts of one whole, in the order given.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shares {
+    /// The whole the parts are taken of.
     pub total: u64,
+    /// The parts, in the order given.
     pub items: Vec<Share>,
 }
 

@@ -55,7 +55,9 @@ impl Default for DiffOpts {
 /// into it. Holds every file the diff touched (a `file_diff` yields one).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diff {
+    /// The diff as git printed it. The ranges in `files` index into this.
     pub text: String,
+    /// One entry per file the diff touches.
     pub files: Vec<FileMeta>,
 }
 
@@ -215,8 +217,11 @@ impl Diff {
 /// insertion(s)(+), Y deletion(s)(-)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiffStat {
+    /// Files changed.
     pub files: usize,
+    /// Lines added.
     pub insertions: usize,
+    /// Lines removed.
     pub deletions: usize,
 }
 

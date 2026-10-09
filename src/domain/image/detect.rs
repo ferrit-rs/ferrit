@@ -23,6 +23,7 @@ use ratatui_image::picker::{Picker, ProtocolType};
 /// Outcome of [`pick`]: the `Picker` to render with, plus the context that
 /// produced it so `FERRIT_DEBUG` can report it.
 pub struct Detected {
+    /// The picker to render images with.
     pub picker: Picker,
     host: Host,
     forced: Option<ProtocolType>,

@@ -37,10 +37,15 @@ use self::model::{BranchEntry, CommitEntry, FileEntry, RemoteEntry, StashEntry, 
 /// Everything the wired panes need from one refresh.
 #[derive(Debug, Clone, Default)]
 pub struct Snapshot {
+    /// The one-glance header: branch, upstream, ahead and behind.
     pub header: StatusHeader,
+    /// Every path with a change.
     pub files: Vec<FileEntry>,
+    /// Local branches, newest tip first.
     pub branches: Vec<BranchEntry>,
+    /// The newest commits on the current branch.
     pub commits: Vec<CommitEntry>,
+    /// Stash entries, newest first.
     pub stashes: Vec<StashEntry>,
     /// Feeds the Branches pane's Remotes tab. `docs/PLAN_9_REMOTE.md`.
     pub remotes: Vec<RemoteEntry>,

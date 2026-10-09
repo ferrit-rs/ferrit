@@ -9,9 +9,11 @@
 /// What the user asks of a stopped operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
+    /// Carry on after the user resolved what stopped it.
     Continue,
     /// Not available for a merge: git has no `merge --skip`.
     Skip,
+    /// Give up and return to where the operation started.
     Abort,
 }
 
@@ -22,7 +24,10 @@ pub enum OperationOutcome {
     Done,
     /// Git stopped again and waits for the user: on a conflict, or, for a
     /// rebase, at an `edit` step.
-    Stopped { conflicted: bool },
+    Stopped {
+        /// The index has unresolved conflicts.
+        conflicted: bool,
+    },
 }
 
 pub(crate) fn flag(step: Step) -> &'static str {

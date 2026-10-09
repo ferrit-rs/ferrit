@@ -13,25 +13,35 @@ use crate::domain::git::command_log::redact;
 /// The level a value was set at, in git's own precedence order (later wins).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Scope {
+    /// `/etc/gitconfig` and the like, for every user of the machine.
     System,
+    /// The user's own file (`~/.gitconfig`, `~/.config/git/config`).
     Global,
+    /// The repository's `.git/config`.
     Local,
+    /// The worktree's own file, with `extensions.worktreeConfig`.
     Worktree,
+    /// Set for one command: `-c` or the `GIT_CONFIG_*` variables.
     Command,
 }
 
 /// Where a value was read from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Origin {
+    /// A config file, as a path.
     File(PathBuf),
     /// `-c`, `GIT_CONFIG_COUNT` and the like.
     CommandLine,
+    /// Anything else git reports, as it writes it.
     Other(String),
 }
 
+/// One value of one key, with where it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigEntry {
+    /// The level it was set at.
     pub scope: Scope,
+    /// The file, or the command line, it was read from.
     pub origin: Origin,
     /// Section and variable names lower-cased by git; the subsection keeps its case.
     pub key: String,
@@ -42,6 +52,7 @@ pub struct ConfigEntry {
 /// Every value in git's order: for a key set several times the last one wins.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigView {
+    /// One entry per value, in git's order. A key set at several levels appears several times.
     pub entries: Vec<ConfigEntry>,
 }
 
@@ -146,7 +157,9 @@ pub fn parse(raw: &str) -> ConfigView {
 /// or an included file cannot be expressed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WriteScope {
+    /// The repository's `.git/config`.
     Local,
+    /// The user's `~/.gitconfig`.
     Global,
     /// Only meaningful with `extensions.worktreeConfig`; git decides.
     Worktree,
@@ -165,9 +178,13 @@ impl WriteScope {
 /// How git validates and normalises a value before storing it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueKind {
+    /// Stored as written.
     Text,
+    /// A boolean; git normalises it to `true` or `false`.
     Bool,
+    /// An integer; git accepts `k`, `m` and `g` suffixes.
     Int,
+    /// A path; git expands `~`.
     Path,
 }
 

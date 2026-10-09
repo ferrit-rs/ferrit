@@ -1,6 +1,6 @@
 # Plan: phase 23, test support and a narrow public API
 
-**Status: in progress (C0 to C3 and the property tests done; the API narrowing is open).** Fourth and last slice of the architecture clean-up. It makes the test
+**Status: done, except narrowing the rest of the public surface (see the last bullet).** Fourth and last slice of the architecture clean-up. It makes the test
 suite easy to read and extend, and makes the library surface say what is public on purpose.
 
 What differs from the sketch below, and why:
@@ -41,8 +41,12 @@ What differs from the sketch below, and why:
   The CI tape job and `.dev-tools/flow-compare.sh` build with it.
 - **`app::mock` stays public and un-gated:** the production repo-free path reads its sample
   text (`mock::RIGHT_DIFF`, `COMMAND_LOG`) and image bytes, so gating it would change behaviour.
-- **Not done:** `pub(crate)` for most of the library and `#![warn(missing_docs)]` on `domain`
-  (212 items without a doc today). Most modules are public because a type of theirs appears in
+- **`#![warn(missing_docs)]` is on for `domain`** (`src/domain/mod.rs`). 212 public items had
+  no doc (194 in `domain/git`, 48 of them in `model.rs`); each now says what it is, and where a
+  fact was not obvious it was read from the code first (what `WorkState.changed` counts, that
+  `FileEntry.binary` is not filled yet, that `push_default_current` only tests `push.default`).
+  CI runs clippy with `-D warnings`, so a new public item in `domain` without a doc fails the build.
+- **Not done:** `pub(crate)` for most of the rest of the library. Most modules are public because a type of theirs appears in
   a public signature (`App.help`, `App.theme`, the `*Completion` events), and `unnameable_types`
   is a warning here; making them private is a design change of `App`'s public surface, not a
   visibility sweep. Measured: 194 of the missing docs are in `domain/git`, 48 of them in

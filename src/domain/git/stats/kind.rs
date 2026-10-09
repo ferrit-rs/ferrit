@@ -5,20 +5,32 @@
 /// order is the tie-break when two kinds have the same count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Kind {
+    /// A new feature.
     Feat,
+    /// A bug fix.
     Fix,
+    /// Documentation only.
     Docs,
+    /// Tests only.
     Test,
+    /// A change that is neither a feature nor a fix.
     Refactor,
+    /// A performance improvement.
     Perf,
+    /// Formatting and style, no change of meaning.
     Style,
+    /// The build system or dependencies.
     Build,
+    /// Continuous integration.
     Ci,
+    /// Maintenance that touches neither source nor tests.
     Chore,
+    /// No recognised prefix.
     Other,
 }
 
 impl Kind {
+    /// Every kind, in the order the dashboard breaks ties.
     pub const ALL: [Self; 11] = [
         Self::Feat,
         Self::Fix,

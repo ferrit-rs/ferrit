@@ -31,9 +31,12 @@ const READ_ONLY: [&str; 9] = [
     "status",
 ];
 
+/// Whether a command only looked or changed something.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandKind {
+    /// It only read: status, log, rev-parse. Hidden from the log unless asked for.
     Read,
+    /// It changed the repository, the index or the config.
     Write,
 }
 
@@ -43,9 +46,11 @@ pub struct CommandRecord {
     /// `git checkout -b wip/x`: the working directory flag is left out and
     /// credentials in URLs are redacted.
     pub argv: String,
+    /// Read or write.
     pub kind: CommandKind,
     /// `None` when git could not be spawned, was killed, or was cancelled.
     pub exit: Option<i32>,
+    /// How long it ran.
     pub took: Duration,
     /// The non-empty lines git printed on stdout for a write, at most
     /// `MAX_OUTPUT_LINES` (`[main 3cd9f42] docs: demo`, `1 file changed, ...`
@@ -54,6 +59,7 @@ pub struct CommandRecord {
 }
 
 impl CommandRecord {
+    /// The command did not exit with status 0, or never ran to an exit.
     pub fn failed(&self) -> bool {
         self.exit != Some(0)
     }

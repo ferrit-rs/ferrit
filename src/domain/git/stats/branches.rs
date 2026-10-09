@@ -22,7 +22,9 @@ pub struct VsMain {
 /// One local branch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BranchHealth {
+    /// The branch's name.
     pub name: String,
+    /// It is the checked-out branch.
     pub current: bool,
     /// Committer time of the tip, unix seconds.
     pub tip_time: i64,
@@ -36,6 +38,7 @@ pub struct BranchHealth {
 /// The newest tag reachable from `HEAD`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TagSince {
+    /// The tag's name.
     pub name: String,
     /// Commits in `HEAD` that the tag does not have.
     pub commits: usize,

@@ -23,6 +23,7 @@ use std::path::Path;
 pub enum RebaseEdit {
     /// Replace its message (the new one, whole).
     Reword(String),
+    /// Remove it from history.
     Drop,
     /// Stop at it, leaving the rebase in progress.
     Edit,

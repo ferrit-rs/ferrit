@@ -69,13 +69,16 @@ pub enum GhStatus {
     Missing,
     /// Installed, no account: the user runs `gh auth login` in a shell.
     SignedOut,
+    /// Installed and signed in: a repository can be created.
     Ready,
 }
 
+/// Who can see the repository `gh` creates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Visibility {
     /// The default everywhere in ferrit.
     Private,
+    /// Anyone.
     Public,
 }
 
@@ -85,7 +88,9 @@ pub struct CreateRequest {
     /// An account or organisation; `None` is `gh`'s own default (the signed-in
     /// account).
     pub owner: Option<String>,
+    /// The repository's name, without the owner.
     pub name: String,
+    /// Private or public.
     pub visibility: Visibility,
     /// One line, may be empty.
     pub description: String,
@@ -94,26 +99,37 @@ pub struct CreateRequest {
 /// Why the typed text was refused, before any process starts.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HostError {
+    /// The name is empty.
     #[error("the repository needs a name")]
     EmptyName,
+    /// The name is longer than GitHub allows.
     #[error("the name is longer than {NAME_MAX} characters")]
     NameTooLong,
+    /// The name has a character GitHub refuses.
     #[error("'{0}' is not allowed in a name: letters, digits, '-', '_' and '.'")]
     NameChar(char),
+    /// The name is one GitHub reserves (`.` or `..`).
     #[error("'{0}' is not a usable name")]
     NameReserved(String),
+    /// The owner before the slash is empty.
     #[error("the owner is empty: write `owner/name`, or just the name")]
     EmptyOwner,
+    /// The owner is longer than GitHub allows.
     #[error("the owner is longer than {OWNER_MAX} characters")]
     OwnerTooLong,
+    /// The owner has a character GitHub refuses.
     #[error("'{0}' is not allowed in an owner: letters, digits and '-'")]
     OwnerChar(char),
+    /// More than one slash: only `owner/name` or `name` are understood.
     #[error("write `owner/name` or just the name, with one slash at most")]
     TooManySlashes,
+    /// The SSH host alias has a character an SSH config does not take.
     #[error("'{0}' is not allowed in an SSH host: letters, digits, '.', '-' and '_'")]
     SshHostChar(char),
+    /// The description has a line break.
     #[error("the description takes one line")]
     DescriptionLines,
+    /// The description is longer than GitHub allows.
     #[error("the description is longer than {DESCRIPTION_MAX} characters")]
     DescriptionTooLong,
 }
