@@ -176,7 +176,7 @@ pub(super) fn draw(
 ) {
     let accent = app.theme.config.color();
     let selected_row = app.settings().selected;
-    let Some(inner) = Drawer::new(&mut app.sheets.overlay, " Settings ")
+    let Some(inner) = Drawer::new(&mut app.render.sheet, " Settings ")
         .width(Constraint::Percentage(75))
         .border_style(Style::new().fg(accent))
         .render(frame, area)

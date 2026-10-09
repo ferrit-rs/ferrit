@@ -344,8 +344,8 @@ impl App {
         match ev.kind {
             MouseEventKind::Down(ratatui::crossterm::event::MouseButton::Left)
                 if !self
-                    .sheets
-                    .overlay
+                    .render
+                    .sheet
                     .overlay_rect()
                     .is_some_and(|rect| rect.contains(point)) =>
             {

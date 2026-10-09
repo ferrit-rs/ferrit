@@ -56,7 +56,7 @@ impl App {
         match kind {
             PopupKind::Commit => self.commit_popup().map(PopupView::Commit),
             PopupKind::CommitAllConfirm => {
-                Some(PopupView::CommitAllConfirm(&mut self.commit_overlay))
+                Some(PopupView::CommitAllConfirm(&mut self.render.commit))
             },
             PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
             PopupKind::Stash => self.stash_popup().map(PopupView::Stash),

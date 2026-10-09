@@ -1,8 +1,6 @@
 //! The `?` help screen: whether it is up, its scroll, and its `/` search. The
 //! key text it shows comes from `app::hints`; this is only its state.
 
-use std::time::Duration;
-
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 use crate::components::tui_overlay::state::OverlayState;
@@ -23,7 +21,6 @@ pub struct HelpState {
     rows: usize,
     query: TextInput,
     mode: HelpMode,
-    pub(crate) overlay: OverlayState,
 }
 
 impl Default for HelpState {
@@ -34,15 +31,14 @@ impl Default for HelpState {
             rows: 0,
             query: TextInput::default(),
             mode: HelpMode::Browse,
-            overlay: OverlayState::new().with_duration(Duration::from_millis(180)),
         }
     }
 }
 
 impl HelpState {
     /// Up, or still animating out.
-    pub(crate) fn is_visible(&self) -> bool {
-        self.open || !self.overlay.is_closed()
+    pub(crate) fn is_visible(&self, overlay: &OverlayState) -> bool {
+        self.open || !overlay.is_closed()
     }
 
     /// Show the help from the top, with an empty search.
@@ -52,10 +48,10 @@ impl HelpState {
     }
 
     /// Hide it, and start the slide-out.
-    pub(crate) fn dismiss(&mut self) {
+    pub(crate) fn dismiss(&mut self, overlay: &mut OverlayState) {
         self.open = false;
         self.reset();
-        self.overlay.close();
+        overlay.close();
     }
 
     fn reset(&mut self) {
@@ -64,15 +60,9 @@ impl HelpState {
         self.mode = HelpMode::Browse;
     }
 
-    /// What drawing needs, borrowed field by field so the overlay can be
-    /// `&mut` while the query is read: scroll, query, searching, overlay.
-    pub(crate) fn view_parts(&mut self) -> (usize, &TextInput, bool, &mut OverlayState) {
-        (
-            self.scroll,
-            &self.query,
-            self.mode == HelpMode::Search,
-            &mut self.overlay,
-        )
+    /// What drawing needs: scroll, query, whether the search box has the keyboard.
+    pub(crate) fn view_parts(&self) -> (usize, &TextInput, bool) {
+        (self.scroll, &self.query, self.mode == HelpMode::Search)
     }
 
     pub(crate) fn query(&self) -> &TextInput {

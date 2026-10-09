@@ -460,8 +460,8 @@ impl App {
                         Click::Step(up) => self.change_setting(row, up),
                     }
                 } else if !self
-                    .sheets
-                    .overlay
+                    .render
+                    .sheet
                     .overlay_rect()
                     .is_some_and(|rect| rect.contains(point))
                 {

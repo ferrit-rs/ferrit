@@ -58,11 +58,8 @@ impl App {
     /// Commit popup view for rendering.
     pub fn commit_popup(&mut self) -> Option<CommitPopupView<'_>> {
         let author = self.author_line();
-        let Self {
-            modal,
-            commit_overlay,
-            ..
-        } = self;
+        let Self { modal, render, .. } = self;
+        let commit_overlay = &mut render.commit;
         let Some(Popup::Commit(draft)) = modal.popup() else {
             return None;
         };
@@ -146,7 +143,7 @@ impl App {
                     .any(|f| f.staged != git::model::Change::None) =>
             {
                 self.modal.open_popup(Popup::CommitAllConfirm);
-                self.commit_overlay.open();
+                self.render.commit.open();
                 return;
             },
             git::commit::CommitKind::Amend | git::commit::CommitKind::Reword
@@ -201,7 +198,7 @@ impl App {
             draft.set_message(&prefill);
         }
         self.modal.open_popup(Popup::Commit(draft));
-        self.commit_overlay.open();
+        self.render.commit.open();
     }
 
     /// Handle the explicit "commit all" choice shown when the index is empty.
@@ -215,14 +212,14 @@ impl App {
                 match result {
                     Some(Ok(())) => {
                         self.modal.close_popup();
-                        self.commit_overlay.close();
+                        self.render.commit.close();
                         self.request_refresh();
                         let prefill = self.new_commit_prefill();
                         self.open_commit_editor(git::commit::CommitKind::Normal, prefill);
                     },
                     Some(Err(error)) => {
                         self.modal.close_popup();
-                        self.commit_overlay.close();
+                        self.render.commit.close();
                         self.report_error(error);
                     },
                     None => {},
@@ -230,7 +227,7 @@ impl App {
             },
             KeyCode::Char('n') | KeyCode::Esc => {
                 self.modal.close_popup();
-                self.commit_overlay.close();
+                self.render.commit.close();
             },
             _ => {},
         }
@@ -323,7 +320,7 @@ impl App {
                 self.commit_draft = Some(draft.message());
             }
             self.modal.close_popup();
-            self.commit_overlay.close();
+            self.render.commit.close();
         } else if commit {
             self.do_commit();
         }
@@ -351,7 +348,7 @@ impl App {
                 return;
             }
             self.modal.close_popup();
-            self.commit_overlay.close();
+            self.render.commit.close();
             self.finish_operation(result);
             return;
         }
@@ -368,7 +365,7 @@ impl App {
             Ok(head) => {
                 self.commit_draft = None;
                 self.modal.close_popup();
-                self.commit_overlay.close();
+                self.render.commit.close();
                 // The commit just made tops the list, and is the row selected
                 // once it shows up (lazygit).
                 if self.nav.commit_drill.is_none() {

@@ -48,7 +48,7 @@ impl App {
             return;
         }
 
-        if self.help.is_visible() {
+        if self.help.is_visible(&self.render.help) {
             if self.help.open {
                 self.help_key(key);
             }
@@ -65,7 +65,7 @@ impl App {
             return;
         }
 
-        if !self.sheets.overlay.is_closed() {
+        if !self.render.sheet.is_closed() {
             match self.sheets.kind {
                 Sheet::Settings => self.settings_key(key),
                 Sheet::Dashboard => self.dashboard_key(key),
@@ -91,7 +91,7 @@ impl App {
             return;
         }
         if matches!(key.code, KeyCode::Char('?' | 'q') | KeyCode::Esc) {
-            self.help.dismiss();
+            self.help.dismiss(&mut self.render.help);
             return;
         }
         let total = hints::filter_help_lines(&self.help_lines(), &self.help.query().text()).len();
@@ -112,9 +112,9 @@ impl App {
             return;
         }
         if matches!(ev.kind, MouseEventKind::Moved) {
-            let over_author = self.sheets.overlay.is_closed()
+            let over_author = self.render.sheet.is_closed()
                 && self.hits.author.contains(Position::new(ev.column, ev.row));
-            let over_dashboard = self.sheets.overlay.is_closed()
+            let over_dashboard = self.render.sheet.is_closed()
                 && self
                     .hits
                     .dashboard
@@ -134,7 +134,7 @@ impl App {
             return;
         }
 
-        if !self.sheets.overlay.is_closed() {
+        if !self.render.sheet.is_closed() {
             match self.sheets.kind {
                 Sheet::Settings => self.settings_mouse(ev),
                 Sheet::Dashboard => self.dashboard_mouse(ev),
@@ -150,8 +150,8 @@ impl App {
             _ => return, // middle click, drag, move
         }
 
-        if self.help.is_visible() {
-            self.help.dismiss(); // any click dismisses the overlay
+        if self.help.is_visible(&self.render.help) {
+            self.help.dismiss(&mut self.render.help); // any click dismisses the overlay
             return;
         }
 

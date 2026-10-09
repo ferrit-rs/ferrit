@@ -72,7 +72,8 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
             ..area
         };
         let accent = app.theme.config.color();
-        let (scroll, query, searching, overlay_state) = app.help.view_parts();
+        let (scroll, query, searching) = app.help.view_parts();
+        let overlay_state = &mut app.render.help;
         let rows = popups::draw_help(
             frame,
             above_bar,
@@ -113,7 +114,7 @@ fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
         },
         None => {},
     }
-    if let Some(toast) = &mut app.toast {
+    if let Some(toast) = &mut app.render.toast {
         toast.render(frame, area, &palette);
     }
 }
@@ -158,7 +159,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: R
     draw_command_log(frame, app, landed, log);
     draw_keybar(frame, keybar, app, landed);
 
-    if app.sheets.overlay.is_closed() {
+    if app.render.sheet.is_closed() {
         landed.settings_hits = Some(crate::app::settings::SettingsHits::default());
     } else {
         match app.sheets.kind {

@@ -546,10 +546,8 @@ pub struct App {
     hits: hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     mouse_pointer: MousePointer,
-    /// Backdrop state for the commit editor modal.
-    pub(crate) commit_overlay: OverlayState,
-    /// Persistent bottom-right error notification, dismissed by clicking `x`.
-    pub(crate) toast: Option<Toast>,
+    /// What ratatui needs mutable to show the app: animations and the toast.
+    render: render_state::RenderState,
     /// The new-branch prompt's title, naming the branch it starts from (lazygit).
     new_branch_title: String,
     /// What owns the keys on top of the panes: a popup (commit box, menu,
@@ -583,6 +581,7 @@ pub mod hit_areas;
 mod modal;
 pub mod nav;
 mod prefs;
+mod render_state;
 pub mod right_pane;
 pub mod theme_editor;
 mod tree;
@@ -664,8 +663,7 @@ impl App {
             watch_error: None,
             hits: hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
-            commit_overlay: OverlayState::new(),
-            toast: None,
+            render: render_state::RenderState::default(),
             new_branch_title: String::new(),
             modal: modal::Modal::default(),
             commit_draft: None,
@@ -1366,7 +1364,7 @@ impl App {
 
     /// Whether help is visible or still animating out.
     pub(crate) fn help_is_open(&self) -> bool {
-        self.help.is_visible()
+        self.help.is_visible(&self.render.help)
     }
 
     /// The keybar's rect and click targets, written by `ui::draw_keybar`
@@ -1423,8 +1421,8 @@ impl App {
         // Test frames have no event loop to advance the help animation. The
         // real terminal loop keeps the animation; this seam makes one fed key
         // produce a stable frame like the other synchronous test inputs.
-        if self.help.overlay.is_animating() {
-            self.help.overlay.tick(Duration::from_secs(1));
+        if self.render.help.is_animating() {
+            self.render.help.tick(Duration::from_secs(1));
         }
     }
 
@@ -1702,7 +1700,7 @@ impl App {
     pub(super) fn report_error(&mut self, error: impl Into<AppError>) {
         let error = Arc::new(error.into());
         self.last_error = Some(Arc::clone(&error));
-        self.toast = Some(Toast::error(error));
+        self.render.toast = Some(Toast::error(error));
     }
 
     pub(super) fn report_notice(&mut self, message: impl Into<String>) {
@@ -1955,9 +1953,9 @@ impl App {
             prev_was_image = is_image;
             terminal.draw(|frame| ui::draw_painted(frame, self))?;
 
-            let was_animating = self.sheets.overlay.is_animating();
-            let help_was_animating = self.help.overlay.is_animating();
-            let toast_animating = self.toast.as_ref().is_some_and(Toast::is_animating);
+            let was_animating = self.render.sheet.is_animating();
+            let help_was_animating = self.render.help.is_animating();
+            let toast_animating = self.render.toast.as_ref().is_some_and(Toast::is_animating);
             let remote_animating = self.workers.remote_busy.is_some();
             // Frames while something animates; a slower tick while a toast is up,
             // so it can time out without waiting for a key.
@@ -1965,7 +1963,8 @@ impl App {
                 (was_animating || help_was_animating || toast_animating || remote_animating)
                     .then_some(Duration::from_millis(16))
                     .or_else(|| {
-                        self.toast
+                        self.render
+                            .toast
                             .is_some()
                             .then_some(Duration::from_millis(TOAST_TICK_MS))
                     });
@@ -1975,8 +1974,8 @@ impl App {
                     Ok(Some(batch)) => batch,
                     Ok(None) => {
                         let elapsed = overlay_tick.elapsed();
-                        self.sheets.overlay.tick(elapsed);
-                        self.help.overlay.tick(elapsed);
+                        self.render.sheet.tick(elapsed);
+                        self.render.help.tick(elapsed);
                         self.tick_toast(elapsed);
                         overlay_tick = Instant::now();
                         continue;
@@ -1992,8 +1991,11 @@ impl App {
                         self.on_key(key);
                     },
                     AppEvent::Input(Event::Mouse(m)) => {
-                        let toast_consumed =
-                            self.toast.as_mut().is_some_and(|toast| toast.on_mouse(m));
+                        let toast_consumed = self
+                            .render
+                            .toast
+                            .as_mut()
+                            .is_some_and(|toast| toast.on_mouse(m));
                         if toast_consumed {
                             self.mouse_pointer.request(false);
                         } else {
@@ -2020,11 +2022,11 @@ impl App {
                 self.watch_error = watcher_error(&events);
                 self.last_error = self.watch_error.clone();
             }
-            if self.sheets.overlay.is_animating() && was_animating {
-                self.sheets.overlay.tick(overlay_tick.elapsed());
+            if self.render.sheet.is_animating() && was_animating {
+                self.render.sheet.tick(overlay_tick.elapsed());
             }
-            if self.help.overlay.is_animating() && help_was_animating {
-                self.help.overlay.tick(overlay_tick.elapsed());
+            if self.render.help.is_animating() && help_was_animating {
+                self.render.help.tick(overlay_tick.elapsed());
             }
             self.tick_toast(overlay_tick.elapsed());
             overlay_tick = Instant::now();
@@ -2047,16 +2049,16 @@ impl App {
     #[doc(hidden)]
     pub fn advance_clock(&mut self, elapsed: Duration) {
         self.tick_toast(elapsed);
-        self.sheets.overlay.tick(elapsed);
-        self.help.overlay.tick(elapsed);
+        self.render.sheet.tick(elapsed);
+        self.render.help.tick(elapsed);
     }
 
     /// Let the settings sheet's slide end now. Integration-test seam for the
     /// replay, which has no clock to wait on.
     #[doc(hidden)]
     pub fn finish_animations(&mut self) {
-        self.sheets.overlay.tick(Duration::from_secs(1));
-        self.help.overlay.tick(Duration::from_secs(1));
+        self.render.sheet.tick(Duration::from_secs(1));
+        self.render.help.tick(Duration::from_secs(1));
     }
 
     /// Close the error toast now (`Esc`), unless something else owns the key:
@@ -2065,7 +2067,7 @@ impl App {
         if self.modal.is_some() || self.help_is_open() {
             return false;
         }
-        match &mut self.toast {
+        match &mut self.render.toast {
             Some(toast) if !toast.is_closing() => {
                 toast.dismiss();
                 true
@@ -2075,10 +2077,10 @@ impl App {
     }
 
     fn tick_toast(&mut self, elapsed: Duration) {
-        if let Some(toast) = &mut self.toast {
+        if let Some(toast) = &mut self.render.toast {
             toast.tick(elapsed);
             if toast.is_closed() {
-                self.toast = None;
+                self.render.toast = None;
             }
         }
     }
