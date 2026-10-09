@@ -2,6 +2,7 @@
 //! (`docs/PLAN_17_SETTINGS.md`). Ferrit's own settings only; the keys and the
 //! clicks are in `app::settings`.
 
+use super::landed::Landed;
 use crate::app::App;
 use crate::app::settings::{Click, Kind, SaveState, SettingsHits, SettingsRow};
 use crate::app::theme_config::{Preset, ThemeMode};
@@ -166,7 +167,13 @@ fn hint(app: &App) -> &'static str {
 
 /// Draw the sheet and record where its clickable parts landed (nothing
 /// clickable when it is not on screen).
-pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &Palette) {
+pub(super) fn draw(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    app: &mut App,
+    palette: &Palette,
+    landed: &mut Landed,
+) {
     let accent = app.theme.config.color();
     let selected_row = app.settings().selected;
     let Some(inner) = Drawer::new(&mut app.sheets.overlay, " Settings ")
@@ -174,7 +181,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
         .border_style(Style::new().fg(accent))
         .render(frame, area)
     else {
-        app.hits.settings = SettingsHits::default();
+        landed.settings_hits = Some(SettingsHits::default());
         return;
     };
     let [content, foot] =
@@ -237,16 +244,20 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
 
     let viewport = usize::from(body.height);
     let max_scroll = lines.len().saturating_sub(viewport);
-    if app.sheets.settings.follow {
-        app.sheets.settings.follow = false;
-        if selected_line < app.sheets.settings.scroll {
-            app.sheets.settings.scroll = selected_line;
-        } else if viewport > 0 && selected_line >= app.sheets.settings.scroll + viewport {
-            app.sheets.settings.scroll = selected_line + 1 - viewport;
+    // Keep the selected row in view when it was just moved (`follow`), then keep
+    // the offset inside the page. The result is this frame's scroll, and what
+    // `App::land` stores for the next.
+    let followed = app.sheets.settings.follow;
+    let mut scroll = app.sheets.settings.scroll;
+    if followed {
+        if selected_line < scroll {
+            scroll = selected_line;
+        } else if viewport > 0 && selected_line >= scroll + viewport {
+            scroll = selected_line + 1 - viewport;
         }
     }
-    app.sheets.settings.scroll = app.sheets.settings.scroll.min(max_scroll);
-    let scroll = app.sheets.settings.scroll;
+    let scroll = scroll.min(max_scroll);
+    landed.settings_scroll = Some((scroll, followed));
 
     let on_screen = |line: usize| -> Option<u16> {
         (scroll..scroll + viewport)
@@ -280,7 +291,7 @@ pub(super) fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, palette: &P
                 .push((Rect::new(body.x, y, body.width, 1), row, Click::Row));
         }
     }
-    app.hits.settings = hits;
+    landed.settings_hits = Some(hits);
 
     frame.render_widget(
         Paragraph::new(lines).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),

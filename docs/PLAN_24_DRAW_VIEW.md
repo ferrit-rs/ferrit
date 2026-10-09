@@ -1,7 +1,29 @@
 # Plan: phase 24, drawing reads the app, it does not change it
 
-**Status: planned.** The step 6 that `PLAN_22_APP_SPLIT.md` left open ("a view for drawing").
+**Status: in progress (C0 to C3 done: the facts are out; `RenderState`, C4 to C7, is open).** The step 6 that `PLAN_22_APP_SPLIT.md` left open ("a view for drawing").
 Nothing a user sees changes; what changes is what the drawing code is allowed to touch.
+
+What differs from the sketch below, and why:
+
+- **C1 to C3 are one commit.** `Landed` (`screens/landed.rs`) has twelve fields, one per
+  write-back, `None` or empty meaning "this frame did not touch it". `App::land` applies it
+  after `draw` and is now the only place that writes `HitAreas`, the right pane's area and
+  viewport, the git config offset, the settings scroll, the help rows and the dashboard scroll
+  clamp. The old setters (`set_right_viewport`...) are kept: `land` is made of them, and tests
+  call a few.
+- **Not every write-back was a plain fact.** Three needed care, none changed a frame:
+  `set_right_viewport` also clamps the right scroll, but every call sits right before a `return`,
+  so deferring it to the end of the frame changes nothing; the settings sheet's follow-the-
+  selection scroll is used in the same frame, so it is computed into a local and recorded as
+  `(scroll, followed)`; `view_detached(&mut self)` cleared a stale marker as a side effect of
+  being read, so it is now `&self` and `land` does the clearing for the panes it drew.
+- **What `&mut App` is left, after clippy listed the ones it could drop:** `draw`,
+  `draw_painted`, `draw_into`, `draw_panes`, `draw_right_pane` (the image protocol and the
+  diff cache), `settings::draw` and `dashboard_sheet::draw` (the drawer's animation). That is
+  exactly the set `RenderState` is for, so the decision point of C3 is "go on".
+- **Checked:** `tests/draw_purity.rs` (C0, written first and shown to fail when `draw` changes
+  the focus), the 1,005 tests including every frame test, clippy with and without
+  `--all-features`.
 
 ## Goal
 

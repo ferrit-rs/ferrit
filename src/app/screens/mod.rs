@@ -4,6 +4,7 @@
 //! terminal, so `tests/render.rs` can call it against a `TestBackend`.
 //! Colours come from `theme`.
 
+use self::landed::Landed;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -29,6 +30,7 @@ pub mod dashboard;
 mod dashboard_sheet;
 mod diff;
 pub mod git_config;
+mod landed;
 mod popups;
 mod settings;
 pub mod welcome;
@@ -46,14 +48,20 @@ pub fn draw_painted(frame: &mut Frame<'_>, app: &mut App) {
 
 /// Render the full screen for the current `App` state.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
+    let mut landed = Landed::default();
+    draw_into(frame, app, &mut landed);
+    app.land(landed);
+}
+
+fn draw_into(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed) {
     let area = frame.area();
     let palette = app.palette();
 
     let show_help = app.help_is_open();
     let keybar = match app.full_screen() {
-        FullScreen::GitConfig => draw_git_config(frame, app, area),
-        FullScreen::Welcome => draw_welcome(frame, app, area),
-        FullScreen::None => draw_panes(frame, app, area),
+        FullScreen::GitConfig => draw_git_config(frame, app, landed, area),
+        FullScreen::Welcome => draw_welcome(frame, app, landed, area),
+        FullScreen::None => draw_panes(frame, app, landed, area),
     };
 
     if show_help {
@@ -78,7 +86,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
                 palette: &palette,
             },
         );
-        app.help.set_rows(rows);
+        landed.help_rows = Some(rows);
     }
     let accent = app.theme.config.color();
     match app.popup_view() {
@@ -111,7 +119,7 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 }
 
 /// The five panes, the command log and the key bar; returns the key bar's area.
-fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+fn draw_panes(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: Rect) -> Rect {
     let palette = app.palette();
     let log_rows = command_log_rows(app, area.height);
     let [content, log, keybar] = Layout::vertical([
@@ -139,29 +147,29 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
     let [left, right] =
         Layout::horizontal([Constraint::Length(side), Constraint::Min(0)]).areas(content);
 
-    draw_left_column(frame, app, left);
+    draw_left_column(frame, app, landed, left);
     if files_split {
-        diff::draw_files_columns(frame, app, right);
+        diff::draw_files_columns(frame, app, landed, right);
     } else if app.nav.focus == Pane::Files && matches!(app.diff_view(), DiffView::Files(_)) {
-        diff::draw_single_file_diff(frame, app, right);
+        diff::draw_single_file_diff(frame, app, landed, right);
     } else {
-        draw_right_pane(frame, app, right);
+        draw_right_pane(frame, app, landed, right);
     }
-    draw_command_log(frame, app, log);
-    draw_keybar(frame, keybar, app);
+    draw_command_log(frame, app, landed, log);
+    draw_keybar(frame, keybar, app, landed);
 
     if app.sheets.overlay.is_closed() {
-        app.hits.settings = crate::app::settings::SettingsHits::default();
+        landed.settings_hits = Some(crate::app::settings::SettingsHits::default());
     } else {
         match app.sheets.kind {
-            Sheet::Settings => settings::draw(frame, area, app, &palette),
+            Sheet::Settings => settings::draw(frame, area, app, &palette, landed),
             Sheet::Dashboard => {
                 // Above the key bar, which stays the dashboard's own.
                 let above = Rect {
                     height: area.height.saturating_sub(keybar.height),
                     ..area
                 };
-                dashboard_sheet::draw(frame, above, app);
+                dashboard_sheet::draw(frame, above, app, landed);
             },
         }
     }
@@ -169,7 +177,7 @@ fn draw_panes(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
 }
 
 /// The welcome screen above its key bar; returns the key bar's area.
-fn draw_welcome(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+fn draw_welcome(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) -> Rect {
     let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
     if let Some(dir) = app.welcome_dir() {
         let view = welcome::View {
@@ -180,12 +188,12 @@ fn draw_welcome(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
         };
         welcome::draw(frame, page, &view);
     }
-    draw_keybar(frame, keybar, app);
+    draw_keybar(frame, keybar, app, landed);
     keybar
 }
 
 /// The git config screen above its key bar; returns the key bar's area.
-fn draw_git_config(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
+fn draw_git_config(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) -> Rect {
     let [page, keybar] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
     let screen = app.git_config();
     let view = git_config::View {
@@ -200,8 +208,8 @@ fn draw_git_config(frame: &mut Frame<'_>, app: &mut App, area: Rect) -> Rect {
         palette: app.palette(),
     };
     let offset = git_config::draw(frame, page, &view);
-    app.set_git_config_offset(offset);
-    draw_keybar(frame, keybar, app);
+    landed.git_config_offset = Some(offset);
+    draw_keybar(frame, keybar, app, landed);
     keybar
 }
 
@@ -223,7 +231,7 @@ fn pane_lines(app: &App, pane: Pane) -> Vec<Line<'static>> {
     }
 }
 
-fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+fn draw_left_column(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) {
     let palette = &app.palette();
     // Status only ever shows 1 line, or 2 when there's a conflict to report
     // (`App::status_lines`): sized to that instead of a flat 4, so a short
@@ -301,7 +309,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     for (&pane, &row) in PANES.iter().zip(&rows) {
         // Remembered for click routing: written before the list body is
         // read, so this `&mut` borrow never overlaps the `&self` one below.
-        app.set_left_area(pane, row);
+        landed.left.push((pane, row));
 
         let focused = app.nav.focus == pane && !app.right_focused();
         let border = if focused {
@@ -355,7 +363,7 @@ fn draw_left_column(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .render(frame, row);
         // Ratatui may have moved the offset to keep the selection on screen;
         // copy it back so a click in a scrolled list maps to the right row.
-        app.set_list_offset(pane, offset);
+        landed.list_offset.push((pane, offset));
     }
 }
 
@@ -492,11 +500,11 @@ fn welcome_lines(
     lines
 }
 
-fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, landed: &mut Landed, area: Rect) {
     let palette = &app.palette();
     // Remembered for mouse-wheel routing: a wheel event over this rect scrolls
     // the diff, one over the left column moves the selection.
-    app.set_right_area(area);
+    landed.right_area = Some(area);
 
     let focused = Style::new()
         .fg(app.theme.config.color())
@@ -603,7 +611,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         frame.render_widget(panel, diff_area);
         let viewport = diff_area.height as usize;
         ScrollBar::new(total, viewport, display_scroll).render(frame, diff_area);
-        app.set_right_viewport(diff_area.height as usize);
+        landed.right_viewport = Some(diff_area.height as usize);
         return;
     }
 
@@ -646,7 +654,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         frame.render_widget(panel, inner);
         let viewport = inner.height as usize;
         ScrollBar::new(total, viewport, scroll).render(frame, inner);
-        app.set_right_viewport(viewport);
+        landed.right_viewport = Some(viewport);
         return;
     }
 
@@ -709,7 +717,7 @@ fn draw_right_pane(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
-fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+fn draw_command_log(frame: &mut Frame<'_>, app: &App, landed: &mut Landed, area: Rect) {
     let palette = &app.palette();
     let git_user_name = app.git_user_name().map(str::to_owned);
     let [heading, panel_area] =
@@ -731,8 +739,8 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
         Constraint::Length(1),
     ])
     .areas(inner);
-    app.set_author_click_area(Rect::ZERO);
-    app.set_dashboard_click_area(Rect::ZERO);
+    landed.author = Some(Rect::ZERO);
+    landed.dashboard = Some(Rect::ZERO);
 
     // The two newest commands ferrit ran (writes only; `@` lists everything),
     // oldest on top. A repo-free `App::mock()` keeps its fixed sample.
@@ -765,7 +773,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
                 .style(Style::new().fg(palette.idle)),
             author_area,
         );
-        app.set_author_click_area(author_area);
+        landed.author = Some(author_area);
     } else {
         frame.render_widget(Paragraph::new(first_line), first);
     }
@@ -788,7 +796,7 @@ fn draw_command_log(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             .style(Style::new().fg(palette.idle)),
         dashboard_area,
     );
-    app.set_dashboard_click_area(dashboard_area);
+    landed.dashboard = Some(dashboard_area);
 }
 
 /// Inner rows of the Infos box: the two it always has, grown to hold the newest
@@ -822,7 +830,7 @@ fn command_log_lines(app: &App) -> Vec<Line<'static>> {
 /// sensitive: an operation stopped mid-way wins, then the focused pane's own
 /// keys (`d` means delete, discard or drop depending on the pane). The help
 /// screen wins over all of it: only its own keys work while it is up.
-fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
+fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &App, landed: &mut Landed) {
     let palette = app.palette();
     let bar = if app.help_is_open() {
         Bar::Help
@@ -859,5 +867,5 @@ fn draw_keybar(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     }
     let layout = hints::keybar_layout(&app.prefs.keymap, bar, usize::from(area.width));
     KeyBar::hints(&layout.text, &palette).render(frame, area);
-    app.set_keybar_hits(area, layout.hits);
+    landed.keybar = Some((area, layout.hits));
 }

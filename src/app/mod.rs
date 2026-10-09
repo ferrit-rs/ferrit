@@ -1403,12 +1403,8 @@ impl App {
 
     /// Whether a wheel scroll left `pane`'s view away from its selection. Read
     /// by `ui::draw_left_column`; forgets a detachment the selection has left.
-    pub fn view_detached(&mut self, pane: Pane) -> bool {
-        let selected = self.nav.selection[pane];
-        if self.hits.view_detached_at[pane] != Some(selected) {
-            self.hits.view_detached_at[pane] = None;
-        }
-        self.hits.view_detached_at[pane].is_some()
+    pub fn view_detached(&self, pane: Pane) -> bool {
+        self.hits.view_detached_at[pane] == Some(self.nav.selection[pane])
     }
 
     /// Scroll `pane`'s list by `rows` (negative is up) and keep its selection

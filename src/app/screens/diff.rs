@@ -1,5 +1,6 @@
 //! Rendering for the two-sided working-tree diff view.
 
+use super::landed::Landed;
 use std::ops::Range;
 
 use ratatui::Frame;
@@ -15,8 +16,13 @@ use crate::components::ui::panel::Panel;
 use crate::components::ui::scroll_bar::ScrollBar;
 use crate::domain::git;
 
-pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
-    app.set_right_area(area);
+pub(super) fn draw_files_columns(
+    frame: &mut Frame<'_>,
+    app: &App,
+    landed: &mut Landed,
+    area: Rect,
+) {
+    landed.right_area = Some(area);
     let palette = app.palette();
 
     let DiffView::Files(files) = app.diff_view() else {
@@ -56,13 +62,18 @@ pub(super) fn draw_files_columns(frame: &mut Frame<'_>, app: &mut App, area: Rec
         staged_cursor,
         &palette,
     );
-    app.set_right_viewport(viewport);
+    landed.right_viewport = Some(viewport);
 }
 
 /// One-sided file changes use a single full-width panel, matching lazygit's
 /// default `gui.splitDiff: auto` behavior. Pick staged when no worktree diff.
-pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
-    app.set_right_area(area);
+pub(super) fn draw_single_file_diff(
+    frame: &mut Frame<'_>,
+    app: &App,
+    landed: &mut Landed,
+    area: Rect,
+) {
+    landed.right_area = Some(area);
     let palette = app.palette();
     let DiffView::Files(files) = app.diff_view() else {
         return;
@@ -105,7 +116,7 @@ pub(super) fn draw_single_file_diff(frame: &mut Frame<'_>, app: &mut App, area: 
         Paragraph::new(text).scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
         diff_area,
     );
-    app.set_right_viewport(diff_area.height as usize);
+    landed.right_viewport = Some(diff_area.height as usize);
     ScrollBar::new(total, diff_area.height as usize, scroll).render(frame, diff_area);
 }
 
