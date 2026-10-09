@@ -10,8 +10,8 @@
 //! the keymap existed, not from `keymap::DEFAULTS`: a default that drifts from
 //! the old behaviour fails here.
 
-use ferrit::app::pane::Pane;
 use ferrit::config::Config;
+use ferrit::interface::panes::pane::Pane;
 use ferrit::keybindings::keymap::{Action, Context, KeyBinding, Keymap};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

@@ -10,7 +10,7 @@ use crate::git;
 /// `App::files_tree_rows` builds these fresh from `self.snapshot.files` and
 /// `self.nav.collapsed_dirs` on every call — cheap at working-tree sizes, same
 /// "no cache" choice `branch_lines`/`commit_lines` already make.
-pub(super) enum FileRow {
+pub(crate) enum FileRow {
     /// A directory header, or the root ("/", the repo's own worktree, only
     /// when it has two or more children). `path` is empty for the root and
     /// the full path of the last folded directory otherwise.
@@ -26,7 +26,7 @@ pub(super) enum FileRow {
 
 /// How much of a directory (or of the whole tree, for the root) is staged.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(super) enum StageState {
+pub(crate) enum StageState {
     None,
     Partial,
     All,
@@ -35,7 +35,7 @@ pub(super) enum StageState {
 /// Staging aggregate over the files under `dir` (empty path: all of them),
 /// lazygit's rule: `All` when every file is fully staged, `Partial` when any
 /// has something in the index, `None` otherwise.
-pub(super) fn dir_stage_state(files: &[git::model::FileEntry], dir: &Path) -> StageState {
+pub(crate) fn dir_stage_state(files: &[git::model::FileEntry], dir: &Path) -> StageState {
     let mut under = files.iter().filter(|f| f.path.starts_with(dir)).peekable();
     if under.peek().is_none() {
         return StageState::None;
@@ -91,7 +91,7 @@ fn build_file_tree(files: &[git::model::FileEntry]) -> BTreeMap<String, TreeNode
 /// folded into one row (`x/y/z`), and a collapsible root ("/") only when the
 /// root has two or more children; a lone child (file or folded directory)
 /// sits at depth 0 with no root row. Empty when nothing changed.
-pub(super) fn tree_rows(
+pub(crate) fn tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
 ) -> Vec<FileRow> {
@@ -117,7 +117,7 @@ pub(super) fn tree_rows(
 /// A drilled commit's tree, as lazygit shows it: no root row, and a chain of
 /// single-child directories folded into one row (`test/flows`). `collapsed`
 /// is the drill's own set, keyed by the folded row's full path.
-pub(super) fn drill_tree_rows(
+pub(crate) fn drill_tree_rows(
     files: &[git::model::FileEntry],
     collapsed: &HashSet<PathBuf>,
 ) -> Vec<FileRow> {
@@ -172,7 +172,7 @@ fn flatten_folded(
 /// `worktree: <status>` so `row_lines::file_line` renders the single-letter code
 /// lazygit shows for a commit's file tree (` M`, not the two-sided `MM` a
 /// worktree entry can have). Feeds `CommitDrill::files`.
-pub(super) fn commit_drill_files(diff: &git::diff::Diff) -> Vec<git::model::FileEntry> {
+pub(crate) fn commit_drill_files(diff: &git::diff::Diff) -> Vec<git::model::FileEntry> {
     diff.files
         .iter()
         .map(|meta| {

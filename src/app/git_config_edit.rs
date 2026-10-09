@@ -7,11 +7,11 @@
 use super::context_menu::NameKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, KeyCode, KeyEvent};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::popup::Popup;
 use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use crate::git::config_keys::{KeyType, lookup};
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::popup::Popup;
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
 

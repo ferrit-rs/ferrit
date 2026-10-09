@@ -21,10 +21,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::app::pane::Pane;
-use ferrit::app::views::DiffView;
 use ferrit::config::error::ConfigError;
 use ferrit::config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
+use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::panes::views::DiffView;
 use ferrit::theme::config::{Preset, ThemeConfig};
 use git2::Repository;
 use ratatui::crossterm::event::{
@@ -629,7 +629,7 @@ fn mouse_and_poll_settings_reach_the_app() {
 
 #[test]
 fn with_the_mouse_off_clicks_and_the_wheel_do_nothing() {
-    use ferrit::app::pane::Pane;
+    use ferrit::interface::panes::pane::Pane;
     use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     use ratatui::layout::Rect;
 

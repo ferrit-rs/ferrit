@@ -2,13 +2,13 @@
 
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, git};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::drill::BranchDrill;
-use crate::app::pane::{BranchesTab, Pane};
-use crate::app::popup::Popup;
-use crate::app::selection::SelectionKey;
 use crate::git::error::GitResult;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::panes::drill::BranchDrill;
+use crate::interface::panes::pane::{BranchesTab, Pane};
+use crate::interface::panes::selection::SelectionKey;
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::popup::Popup;
 
 /// How a merge is done: the choices of the `M` menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

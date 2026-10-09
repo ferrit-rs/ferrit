@@ -138,7 +138,7 @@ pub fn file_line(p: &Palette, entry: &FileEntry, depth: usize) -> Line<'static> 
 /// lazygit) then the directory's own name, indented to its depth. No status
 /// code; the arrow and name are green when everything under the directory is
 /// staged and yellow when only part of it is, as in lazygit.
-pub(super) fn dir_line(
+pub(crate) fn dir_line(
     p: &Palette,
     name: &str,
     depth: usize,

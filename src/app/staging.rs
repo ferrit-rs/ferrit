@@ -3,17 +3,17 @@
 use std::path::{Path, PathBuf};
 
 use super::{App, Range, events, git};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::diff_cursor::{
-    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
-};
 use crate::app::error::AppError;
-use crate::app::pane::Pane;
-use crate::app::tree::FileRow;
-use crate::app::views::DiffView;
 use crate::git::apply::{ApplyDir, ApplyTarget};
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
+use crate::interface::panes::diff_cursor::{
+    DiffCursor, Granule, Mode, hunk_content_id, hunk_id_at, hunk_lines_for, selectable_lines,
+};
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::tree::FileRow;
+use crate::interface::panes::views::DiffView;
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
 
 impl App {
     /// The `FileEntry` behind the Files pane's current selection, or `None`

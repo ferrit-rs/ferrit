@@ -17,11 +17,11 @@ use std::time::Duration;
 
 use ferrit::app::App;
 use ferrit::app::full_screens::FullScreen;
-use ferrit::app::pane::Pane;
 use ferrit::config::ConfigLoad;
 use ferrit::git::error::GitError;
 use ferrit::git::fake::FakeGit;
 use ferrit::git::model::Change;
+use ferrit::interface::panes::pane::Pane;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 fn press(app: &mut App, code: KeyCode) {

@@ -5,10 +5,10 @@
 //! menu reuses it with more `MenuAction`s.
 
 use super::{App, KeyCode, KeyEvent, git, operation_noun};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::popup::Popup;
 use crate::git::error::GitResult;
 use crate::git::operation::{OperationOutcome, Step};
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::popup::Popup;
 
 /// What choosing a menu row does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

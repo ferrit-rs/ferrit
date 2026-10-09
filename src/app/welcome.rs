@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{App, KeyCode, KeyEvent, git};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
 
 /// The rows of the screen, in order: `git init`, then quit.
 const WELCOME_ROWS: usize = 2;

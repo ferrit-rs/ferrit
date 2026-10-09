@@ -15,7 +15,6 @@ use std::time::Instant;
 use super::{App, KeyCode, KeyEvent, Result, events, mpsc, thread};
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
-use crate::app::popup::Popup;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::error::GitError;
 use crate::git::host::{
@@ -24,6 +23,7 @@ use crate::git::host::{
 };
 use crate::git::ssh_config::read_github_aliases;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::popups::popup::Popup;
 
 /// What the form holds, and all the user chooses: the name, the visibility and
 /// the description. Kept on the app while `gh` runs, so a refusal can reopen the

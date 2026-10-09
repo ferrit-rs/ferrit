@@ -4,14 +4,14 @@
 use std::path::PathBuf;
 
 use super::{App, git};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::diff_cursor::Mode;
-use crate::app::pane::Pane;
-use crate::app::popup::Popup;
-use crate::app::selection::SelectionKey;
-use crate::app::views::DiffView;
 use crate::git::stash::StashOutcome;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::selection::SelectionKey;
+use crate::interface::panes::views::DiffView;
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
+use crate::interface::popups::popup::Popup;
 
 impl App {
     /// The selected stash entry's oid, only while Stash is focused, in

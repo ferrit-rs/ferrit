@@ -12,11 +12,11 @@
 
 use ferrit::app::App;
 use ferrit::app::mock::{mock_commits, mock_files};
-use ferrit::app::pane::Pane;
-use ferrit::app::row_lines;
 use ferrit::config::Config;
 use ferrit::git::diff::parse_diff;
 use ferrit::interface::components::ui::key_bar::KeyBar;
+use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::panes::row_lines;
 use ferrit::theme::palette::Palette;
 use ratatui::style::Color;
 

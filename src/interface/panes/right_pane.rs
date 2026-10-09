@@ -9,12 +9,12 @@ use ratatui::layout::Rect;
 use ratatui::text::Text;
 use ratatui_image::picker::Picker;
 
-use super::diff_query::RightKey;
 use super::row_lines;
-use crate::app::diff_cursor::{DiffCursor, hunk_content_id, hunk_lines_for};
-use crate::app::views::DiffView;
+use crate::app::diff_query::RightKey;
 use crate::git;
 use crate::git::diff::DiffSide;
+use crate::interface::panes::diff_cursor::{DiffCursor, hunk_content_id, hunk_lines_for};
+use crate::interface::panes::views::DiffView;
 use crate::interface::render_state::RenderedDiff;
 use crate::theme::palette::Palette;
 

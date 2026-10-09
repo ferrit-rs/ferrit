@@ -262,8 +262,8 @@ fn a_folder_below_a_repository_opens_that_repository() {
 
 #[test]
 fn the_injected_gh_survives_the_git_init() {
-    use ferrit::app::views::PopupView;
     use ferrit::git::host::GhProgram;
+    use ferrit::interface::panes::views::PopupView;
 
     let dir = TempDir::new("welcome-gh");
     let mut app = dir.welcome();

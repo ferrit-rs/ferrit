@@ -20,7 +20,7 @@ use std::path::Path;
 use std::process::Command;
 
 use ferrit::app::App;
-use ferrit::app::pane::Pane;
+use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens as ui;
 use git2::Repository;
 use ratatui::Terminal;

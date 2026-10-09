@@ -2,19 +2,19 @@
 
 use super::authorship::Authorship;
 use super::error::AppError;
-use super::tree::commit_drill_files;
 use crate::git;
 use crate::git::diff::DiffOpts;
 use crate::git::error::GitError;
 use crate::git::port::GitPort;
 use crate::git::profile::Profile;
+use crate::interface::panes::tree::commit_drill_files;
 use color_eyre::Result;
 use std::sync::Arc;
 
 /// Snapshot plus any active drill-down data loaded in the same worker.
 /// A result whose error is shared between the Status line, the toast and the
 /// refresh bookkeeping, none of which can own it alone.
-pub(super) type Shared<T> = Result<T, Arc<AppError>>;
+pub(crate) type Shared<T> = Result<T, Arc<AppError>>;
 
 #[doc(hidden)]
 #[derive(Debug)]

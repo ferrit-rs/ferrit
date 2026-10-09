@@ -4,10 +4,10 @@
 //! `docs/PLAN_9_REMOTE.md`, "Credentials").
 
 use super::{App, KeyCode, KeyEvent, mpsc};
-use crate::app::popup::Popup;
-use crate::app::views::CommitPopupView;
 use crate::git::askpass;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::panes::views::CommitPopupView;
+use crate::interface::popups::popup::Popup;
 
 /// One pending question and where its answer goes. `typed` holds the real
 /// text; `shown` is what the popup draws, dots when the answer is secret.

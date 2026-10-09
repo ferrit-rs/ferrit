@@ -3,13 +3,13 @@
 
 use super::{App, KeyCode, KeyEvent, KeyModifiers, git};
 use crate::app::error::AppError;
-use crate::app::pane::Pane;
-use crate::app::popup::Popup;
-use crate::app::selection::SelectionKey;
-use crate::app::views::CommitPopupView;
 use crate::git::apply::ApplyDir;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::{TextInput, TextInputMode};
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::selection::SelectionKey;
+use crate::interface::panes::views::CommitPopupView;
+use crate::interface::popups::popup::Popup;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommitField {

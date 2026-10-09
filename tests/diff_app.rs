@@ -20,8 +20,8 @@ use common::{TempDir, commit_all};
 use std::fs;
 
 use ferrit::app::App;
-use ferrit::app::pane::Pane;
-use ferrit::app::views::DiffView;
+use ferrit::interface::panes::pane::Pane;
+use ferrit::interface::panes::views::DiffView;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

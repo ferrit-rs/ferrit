@@ -7,7 +7,6 @@
 
 pub mod events;
 pub mod mock;
-pub mod row_lines;
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -50,7 +49,7 @@ pub struct App {
     /// The views that replace the panes: git config, welcome.
     pub(crate) full_screens: full_screens::FullScreens,
     /// Where the user is: focus, selection, drill-downs, tabs.
-    pub nav: nav::Nav,
+    pub nav: crate::interface::panes::nav::Nav,
     /// Whether the help overlay is up.
     pub help: crate::interface::help::HelpState,
     /// First visible line of the help screen, and how many lines it shows
@@ -74,9 +73,9 @@ pub struct App {
     pub(crate) watch_error: Option<Arc<AppError>>,
 
     /// The right column: image preview, diff, scroll and line cursor.
-    pub(crate) right: right_pane::RightPane,
+    pub(crate) right: crate::interface::panes::right_pane::RightPane,
     /// Where the last frame put the clickable things.
-    pub(crate) hits: hit_areas::HitAreas,
+    pub(crate) hits: crate::interface::panes::hit_areas::HitAreas,
     /// Whether the mouse is currently over that clickable author name.
     pub(crate) mouse_pointer: MousePointer,
     /// What ratatui needs mutable to show the app: animations and the toast.
@@ -86,7 +85,7 @@ pub struct App {
     /// What owns the keys on top of the panes: a popup (commit box, menu,
     /// note; `docs/PLAN_7_COMMIT.md`) or a key-bar question waiting on
     /// `y` / `n` / `Esc`. One at a time, hence one value.
-    pub(crate) modal: modal::Modal,
+    pub(crate) modal: crate::interface::popups::modal::Modal,
     /// The last commit popup's text, kept across an `Esc`-cancel so a
     /// mistyped keystroke never loses a paragraph. Cleared on a successful
     /// commit.
@@ -108,28 +107,15 @@ pub struct App {
 }
 
 mod authorship;
-mod confirm;
-mod diff_cursor;
-mod drill;
 pub mod full_screens;
-pub(crate) mod hit_areas;
-mod modal;
-pub mod nav;
-pub mod pane;
-mod pane_rows;
-mod popup;
 pub mod refresh;
-pub(crate) mod right_pane;
-pub mod selection;
-mod tree;
-pub mod views;
 mod welcome;
 pub mod workers;
 
-mod askpass;
+pub(crate) mod askpass;
 mod branch_actions;
-mod commit;
-mod context_menu;
+pub(crate) mod commit;
+pub(crate) mod context_menu;
 pub mod create_remote;
 pub mod dashboard;
 pub mod diff_query;
@@ -137,10 +123,10 @@ mod dispatch;
 mod drill_nav;
 pub mod error;
 pub mod git_config;
-mod git_config_edit;
+pub(crate) mod git_config_edit;
 pub mod image_query;
 mod input;
-mod menu;
+pub(crate) mod menu;
 mod popups;
 mod rebase_actions;
 mod remote;
@@ -154,16 +140,45 @@ pub(crate) use error::AppError;
 #[cfg(test)]
 mod tests;
 
-use self::diff_cursor::Mode;
 use self::full_screens::FullScreen;
-use self::pane::Pane;
-use self::pane_rows::PaneRows;
 use self::refresh::RefreshCompletion;
-use self::views::DiffView;
 use self::workers::{WorkerKind, run_worker};
-use tree::{FileRow, drill_tree_rows};
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::pane_rows::PaneRows;
+use crate::interface::panes::tree::{FileRow, drill_tree_rows};
+use crate::interface::panes::views::DiffView;
+
+use crate::interface::screens::landed::Landed;
 
 impl App {
+    /// Take in what a frame learned (`docs/PLAN_24_DRAW_VIEW.md`): each part
+    /// goes to the component it is about.
+    pub(crate) fn land(&mut self, mut landed: Landed) {
+        self.hits.land(&mut landed, &self.nav.selection);
+        if let Some(area) = landed.right_area {
+            self.right.area = area;
+        }
+        if let Some(rows) = landed.right_viewport {
+            self.set_right_viewport(rows);
+        }
+        if let Some((scroll, followed)) = landed.settings_scroll {
+            self.sheets.settings.scroll = scroll;
+            if followed {
+                self.sheets.settings.follow = false;
+            }
+        }
+        if let Some(offset) = landed.git_config_offset {
+            self.set_git_config_offset(offset);
+        }
+        if let Some(rows) = landed.help_rows {
+            self.help.set_rows(rows);
+        }
+        if let Some(max) = landed.dashboard_max_scroll {
+            self.clamp_dashboard_scroll(max);
+        }
+    }
+
     fn base(repo: Option<Box<dyn GitPort>>, config: crate::config::Config) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
@@ -176,22 +191,22 @@ impl App {
             prefs: crate::config::prefs::Prefs::new(config, keymap, palette),
             sheets: sheet::Sheets::default(),
             full_screens: full_screens::FullScreens::default(),
-            nav: nav::Nav::default(),
+            nav: crate::interface::panes::nav::Nav::default(),
             help: crate::interface::help::HelpState::default(),
             should_quit: false,
             repo,
             repo_name,
             authorship,
             theme: crate::theme::editor::ThemeEditor::new(theme_config),
-            right: right_pane::RightPane::new(),
+            right: crate::interface::panes::right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,
             watch_error: None,
-            hits: hit_areas::HitAreas::default(),
+            hits: crate::interface::panes::hit_areas::HitAreas::default(),
             mouse_pointer: MousePointer::default(),
             render: crate::interface::render_state::RenderState::default(),
             new_branch_title: String::new(),
-            modal: modal::Modal::default(),
+            modal: crate::interface::popups::modal::Modal::default(),
             commit_draft: None,
             workers: workers::Workers::new(),
             watch_request: None,
@@ -781,16 +796,19 @@ impl App {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub fn status_lines(&self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = &self.last_error {
-            vec![row_lines::error_line(
+            vec![crate::interface::panes::row_lines::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = row_lines::status_header(&self.repo_name, h);
-            let mut lines = vec![row_lines::status_line(&self.prefs.palette, &line)];
+            let line = crate::interface::panes::row_lines::status_header(&self.repo_name, h);
+            let mut lines = vec![crate::interface::panes::row_lines::status_line(
+                &self.prefs.palette,
+                &line,
+            )];
             if h.conflicts > 0 {
-                lines.push(row_lines::error_line(
+                lines.push(crate::interface::panes::row_lines::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -802,15 +820,24 @@ impl App {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                row_lines::operation_line(&self.prefs.palette, &operation.label()),
+                crate::interface::panes::row_lines::operation_line(
+                    &self.prefs.palette,
+                    &operation.label(),
+                ),
             );
         }
         if let Some(label) = self.remote_busy_label() {
-            out.push(row_lines::busy_line(&self.prefs.palette, label));
+            out.push(crate::interface::panes::row_lines::busy_line(
+                &self.prefs.palette,
+                label,
+            ));
         } else if self.last_error.is_none()
             && let Some(note) = &self.status_note
         {
-            out.push(row_lines::status_line(&self.prefs.palette, note));
+            out.push(crate::interface::panes::row_lines::status_line(
+                &self.prefs.palette,
+                note,
+            ));
         }
         out
     }

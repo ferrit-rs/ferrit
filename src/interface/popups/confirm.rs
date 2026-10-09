@@ -1,7 +1,7 @@
 //! The key-bar question and what a yes does.
 
-use super::diff_cursor::Granule;
-use super::git_config_edit;
+use crate::app::git_config_edit;
+use crate::interface::panes::diff_cursor::Granule;
 use std::path::PathBuf;
 
 /// A pending confirmation: a `d` discard (phase 6) or a branch delete

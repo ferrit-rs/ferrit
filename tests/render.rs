@@ -21,7 +21,7 @@ use std::sync::mpsc;
 use ferrit::app::App;
 use ferrit::app::events::RemoteOp;
 use ferrit::app::mock;
-use ferrit::app::pane::Pane;
+use ferrit::interface::panes::pane::Pane;
 use ferrit::interface::screens as ui;
 use git2::{IndexAddOption, Repository, Signature};
 use ratatui::Terminal;

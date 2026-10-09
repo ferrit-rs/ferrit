@@ -7,9 +7,8 @@
 
 use ratatui::layout::Rect;
 
-use crate::app::App;
-use crate::app::pane::Pane;
 use crate::app::settings::SettingsHits;
+use crate::interface::panes::pane::Pane;
 use crate::keybindings::hints;
 
 /// `None` and empty mean "this frame did not touch it": the previous value stays.
@@ -40,55 +39,4 @@ pub(crate) struct Landed {
     pub(crate) help_rows: Option<usize>,
     /// How far the dashboard page scrolls, at most.
     pub(crate) dashboard_max_scroll: Option<usize>,
-}
-
-impl App {
-    /// Take in what a frame learned.
-    pub(crate) fn land(&mut self, landed: Landed) {
-        for &(pane, rect) in &landed.left {
-            self.hits.left[pane] = rect;
-            // A wheel scroll leaves the view where it put it only while the
-            // selection stays on the row it left behind.
-            if self.hits.view_detached_at[pane] != Some(self.nav.selection[pane]) {
-                self.hits.view_detached_at[pane] = None;
-            }
-        }
-        for (pane, offset) in landed.list_offset {
-            self.hits.list_offset[pane] = offset;
-        }
-        if let Some(area) = landed.right_area {
-            self.right.area = area;
-        }
-        if let Some(rows) = landed.right_viewport {
-            self.set_right_viewport(rows);
-        }
-        if let Some(area) = landed.author {
-            self.hits.author = area;
-        }
-        if let Some(area) = landed.dashboard {
-            self.hits.dashboard = area;
-        }
-        if let Some((area, hits)) = landed.keybar {
-            self.hits.keybar = area;
-            self.hits.keybar_hits = hits;
-        }
-        if let Some(hits) = landed.settings_hits {
-            self.hits.settings = hits;
-        }
-        if let Some((scroll, followed)) = landed.settings_scroll {
-            self.sheets.settings.scroll = scroll;
-            if followed {
-                self.sheets.settings.follow = false;
-            }
-        }
-        if let Some(offset) = landed.git_config_offset {
-            self.set_git_config_offset(offset);
-        }
-        if let Some(rows) = landed.help_rows {
-            self.help.set_rows(rows);
-        }
-        if let Some(max) = landed.dashboard_max_scroll {
-            self.clamp_dashboard_scroll(max);
-        }
-    }
 }

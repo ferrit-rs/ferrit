@@ -7,8 +7,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use crate::app::create_remote::{ConfirmView, CreateRemoteView, Field, FormView};
-use crate::app::row_lines;
-use crate::app::views::{CommandLogView, CommitPopupView, MenuView};
 use crate::git::host::Visibility;
 use crate::interface::components::tui_overlay::anchor::Anchor;
 use crate::interface::components::tui_overlay::backdrop::Backdrop;
@@ -21,6 +19,8 @@ use crate::interface::components::ui::panel::Panel;
 use crate::interface::components::ui::scroll_bar::ScrollBar;
 use crate::interface::components::ui::select_list::SelectList;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::panes::row_lines;
+use crate::interface::panes::views::{CommandLogView, CommitPopupView, MenuView};
 use crate::keybindings::hints::{self, HelpLine};
 use crate::theme::palette::Palette;
 

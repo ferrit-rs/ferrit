@@ -20,8 +20,8 @@ use common::{TempDir, commit_all, configure_identity};
 use std::fs;
 
 use ferrit::app::App;
-use ferrit::app::pane::Pane;
 use ferrit::config::{Config, ConfigLoad};
+use ferrit::interface::panes::pane::Pane;
 use git2::Repository;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;

@@ -13,7 +13,7 @@ pub enum SelectionKey {
     Stash(String),
 }
 
-pub(super) fn selection_key_for_file_rows(
+pub(crate) fn selection_key_for_file_rows(
     rows: &[FileRow],
     files: &[git::model::FileEntry],
     selected: usize,
@@ -26,7 +26,7 @@ pub(super) fn selection_key_for_file_rows(
     }
 }
 
-pub(super) fn find_file_row_key(
+pub(crate) fn find_file_row_key(
     rows: &[FileRow],
     files: &[git::model::FileEntry],
     key: &SelectionKey,

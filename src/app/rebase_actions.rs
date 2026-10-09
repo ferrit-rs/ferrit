@@ -3,10 +3,10 @@
 //! `docs/PLAN_11_REBASE.md` R4.
 
 use super::{App, git};
-use crate::app::confirm::{ConfirmAction, ConfirmPrompt};
-use crate::app::diff_cursor::Mode;
-use crate::app::pane::Pane;
 use crate::git::rebase::RebaseEdit;
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::pane::Pane;
+use crate::interface::popups::confirm::{ConfirmAction, ConfirmPrompt};
 
 impl App {
     /// The selected commit, when a rewrite key may act on it: Commits focused

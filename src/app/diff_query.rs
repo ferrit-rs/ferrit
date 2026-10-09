@@ -5,13 +5,13 @@ use std::sync::mpsc;
 use std::thread;
 
 use super::App;
-use crate::app::diff_cursor::Mode;
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
-use crate::app::pane::Pane;
-use crate::app::tree::FileRow;
-use crate::app::views::{BranchLog, DiffView, FilesDiff};
 use crate::app::workers::{WorkerKind, run_worker};
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::tree::FileRow;
+use crate::interface::panes::views::{BranchLog, DiffView, FilesDiff};
 
 use crate::git;
 use crate::git::diff::{DiffOpts, DiffSide};

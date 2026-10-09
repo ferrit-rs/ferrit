@@ -6,8 +6,8 @@
 //! Methods live on `Modal`, not on `App`, so a caller can hold the popup
 //! mutably while it reads other fields of `App`.
 
-use crate::app::confirm::ConfirmPrompt;
-use crate::app::popup::Popup;
+use crate::interface::popups::confirm::ConfirmPrompt;
+use crate::interface::popups::popup::Popup;
 
 #[derive(Default)]
 pub(crate) enum Modal {
@@ -18,18 +18,18 @@ pub(crate) enum Modal {
 }
 
 impl Modal {
-    pub(super) fn is_some(&self) -> bool {
+    pub(crate) fn is_some(&self) -> bool {
         !matches!(self, Self::None)
     }
 
-    pub(super) fn popup(&self) -> Option<&Popup> {
+    pub(crate) fn popup(&self) -> Option<&Popup> {
         match self {
             Self::Popup(popup) => Some(popup),
             _ => None,
         }
     }
 
-    pub(super) fn popup_mut(&mut self) -> Option<&mut Popup> {
+    pub(crate) fn popup_mut(&mut self) -> Option<&mut Popup> {
         match self {
             Self::Popup(popup) => Some(popup),
             _ => None,
@@ -37,18 +37,18 @@ impl Modal {
     }
 
     /// Show `popup`, replacing whatever was up.
-    pub(super) fn open_popup(&mut self, popup: Popup) {
+    pub(crate) fn open_popup(&mut self, popup: Popup) {
         *self = Self::Popup(popup);
     }
 
     /// Close the popup. A question that is up is not a popup and stays.
-    pub(super) fn close_popup(&mut self) {
+    pub(crate) fn close_popup(&mut self) {
         if matches!(self, Self::Popup(_)) {
             *self = Self::None;
         }
     }
 
-    pub(super) fn take_popup(&mut self) -> Option<Popup> {
+    pub(crate) fn take_popup(&mut self) -> Option<Popup> {
         match std::mem::take(self) {
             Self::Popup(popup) => Some(popup),
             other => {
@@ -58,7 +58,7 @@ impl Modal {
         }
     }
 
-    pub(super) fn confirm(&self) -> Option<&ConfirmPrompt> {
+    pub(crate) fn confirm(&self) -> Option<&ConfirmPrompt> {
         match self {
             Self::Confirm(prompt) => Some(prompt),
             _ => None,
@@ -66,18 +66,18 @@ impl Modal {
     }
 
     /// Ask `prompt` on the key bar, replacing whatever was up.
-    pub(super) fn ask(&mut self, prompt: ConfirmPrompt) {
+    pub(crate) fn ask(&mut self, prompt: ConfirmPrompt) {
         *self = Self::Confirm(prompt);
     }
 
     /// Withdraw the question. A popup that is up is not a question and stays.
-    pub(super) fn cancel_confirm(&mut self) {
+    pub(crate) fn cancel_confirm(&mut self) {
         if matches!(self, Self::Confirm(_)) {
             *self = Self::None;
         }
     }
 
-    pub(super) fn take_confirm(&mut self) -> Option<ConfirmPrompt> {
+    pub(crate) fn take_confirm(&mut self) -> Option<ConfirmPrompt> {
         match std::mem::take(self) {
             Self::Confirm(prompt) => Some(prompt),
             other => {

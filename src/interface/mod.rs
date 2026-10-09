@@ -3,6 +3,8 @@
 
 pub mod components;
 pub mod help;
+pub mod panes;
+pub mod popups;
 pub(crate) mod render_state;
 pub mod screens;
 pub mod terminal;

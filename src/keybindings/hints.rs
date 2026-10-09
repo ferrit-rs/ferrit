@@ -4,7 +4,7 @@
 use unicode_width::UnicodeWidthStr;
 
 use super::keymap::{Action, Context, KeyBinding, Keymap};
-use crate::app::pane::Pane;
+use crate::interface::panes::pane::Pane;
 
 impl Action {
     /// The short word for a key hint (`Stage: <space>`).

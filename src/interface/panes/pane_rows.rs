@@ -7,16 +7,20 @@ use ratatui::text::Line;
 
 use super::nav::Nav;
 use super::row_lines;
-use crate::app::pane::{BranchesTab, Pane};
-use crate::app::selection::{SelectionKey, find_file_row_key, selection_key_for_file_rows};
-use crate::app::tree::{FileRow, StageState, dir_stage_state, drill_tree_rows, tree_rows};
 use crate::git::{self, Snapshot};
+use crate::interface::panes::pane::{BranchesTab, Pane};
+use crate::interface::panes::selection::{
+    SelectionKey, find_file_row_key, selection_key_for_file_rows,
+};
+use crate::interface::panes::tree::{
+    FileRow, StageState, dir_stage_state, drill_tree_rows, tree_rows,
+};
 use crate::theme::palette::Palette;
 
-pub(super) struct PaneRows<'a> {
-    pub(super) nav: &'a Nav,
-    pub(super) snapshot: &'a Snapshot,
-    pub(super) palette: &'a Palette,
+pub(crate) struct PaneRows<'a> {
+    pub(crate) nav: &'a Nav,
+    pub(crate) snapshot: &'a Snapshot,
+    pub(crate) palette: &'a Palette,
 }
 
 impl PaneRows<'_> {
@@ -25,13 +29,13 @@ impl PaneRows<'_> {
     /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
     /// `self.snapshot.files` and `self.nav.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
-    pub(super) fn files_tree_rows(&self) -> Vec<FileRow> {
+    pub(crate) fn files_tree_rows(&self) -> Vec<FileRow> {
         tree_rows(&self.snapshot.files, &self.nav.collapsed_dirs)
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
     /// changed files instead of the worktree's. Empty while not drilled.
-    pub(super) fn commit_tree_rows(&self) -> Vec<FileRow> {
+    pub(crate) fn commit_tree_rows(&self) -> Vec<FileRow> {
         match &self.nav.commit_drill {
             Some(drill) => drill_tree_rows(&drill.files, &drill.collapsed),
             None => Vec::new(),
@@ -40,7 +44,7 @@ impl PaneRows<'_> {
 
     /// Selectable row count for a pane, for clamping the cursor and deciding
     /// whether to draw a highlight.
-    pub(super) fn row_count(&self, pane: Pane) -> usize {
+    pub(crate) fn row_count(&self, pane: Pane) -> usize {
         match pane {
             Pane::Status => 0,
             Pane::Files => self.files_tree_rows().len(),
@@ -58,7 +62,7 @@ impl PaneRows<'_> {
         }
     }
 
-    pub(super) fn selection_key(&self, pane: Pane) -> Option<SelectionKey> {
+    pub(crate) fn selection_key(&self, pane: Pane) -> Option<SelectionKey> {
         match pane {
             Pane::Status => None,
             Pane::Files => selection_key_for_file_rows(
@@ -104,7 +108,7 @@ impl PaneRows<'_> {
         }
     }
 
-    pub(super) fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
+    pub(crate) fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
         match (pane, key) {
             (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
                 find_file_row_key(&self.files_tree_rows(), &self.snapshot.files, key)
@@ -141,7 +145,7 @@ impl PaneRows<'_> {
 
     /// `(current, total)` for the pane's `N of M` border counter, or `None`
     /// when the pane has no selectable rows.
-    pub(super) fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
+    pub(crate) fn counter(&self, pane: Pane) -> Option<(usize, usize)> {
         let total = self.row_count(pane);
         (total > 0).then(|| (self.nav.selection[pane].min(total - 1) + 1, total))
     }
@@ -149,7 +153,7 @@ impl PaneRows<'_> {
     /// Files pane rows, or a single "working tree clean" line: a flat list,
     /// or lazygit's directory tree once any changed file sits below the
     /// repo root (`files_tree_rows`).
-    pub(super) fn file_lines(&self) -> Vec<Line<'static>> {
+    pub(crate) fn file_lines(&self) -> Vec<Line<'static>> {
         if self.snapshot.files.is_empty() {
             return vec![Line::raw("working tree clean")];
         }
@@ -181,7 +185,7 @@ impl PaneRows<'_> {
     /// string for a directory row. Debug/probe helper; keyed by the same
     /// row index `file_lines`/`row_count` use, not a flat index into
     /// `self.snapshot.files`.
-    pub(super) fn file_display(&self, i: usize) -> String {
+    pub(crate) fn file_display(&self, i: usize) -> String {
         match self.files_tree_rows().get(i) {
             Some(&FileRow::File { index, .. }) => self
                 .snapshot
@@ -194,7 +198,7 @@ impl PaneRows<'_> {
     }
 
     /// Is the selected Files row a directory (the root row included)?
-    pub(super) fn files_selection_is_dir(&self) -> bool {
+    pub(crate) fn files_selection_is_dir(&self) -> bool {
         matches!(
             self.files_tree_rows().get(self.nav.selection[Pane::Files]),
             Some(FileRow::Dir { .. })
@@ -204,7 +208,7 @@ impl PaneRows<'_> {
     /// Branches pane rows: the branch list, or one branch's own commit log
     /// while drilled in (`branch_drill`, `enter_branch_log`), each with its
     /// own empty-state line.
-    pub(super) fn branch_lines(&self, head_status: Option<&str>) -> Vec<Line<'static>> {
+    pub(crate) fn branch_lines(&self, head_status: Option<&str>) -> Vec<Line<'static>> {
         if let Some(drill) = &self.nav.branch_drill {
             if drill.commits.is_empty() {
                 return vec![Line::raw("no commits yet")];
@@ -242,7 +246,7 @@ impl PaneRows<'_> {
     /// `[3] Local branches - Remotes - Tags`, or `[3] Commits (<branch>)`
     /// while drilled into a branch's log (Enter on a branch, `Esc` to back
     /// out; see `enter_branch_log`).
-    pub(super) fn branches_title(&self) -> String {
+    pub(crate) fn branches_title(&self) -> String {
         match &self.nav.branch_drill {
             Some(drill) => format!("[3] Commits ({})", drill.branch),
             None => Pane::Branches.title().to_owned(),
@@ -252,7 +256,7 @@ impl PaneRows<'_> {
     /// Commits pane rows: the commit list, or one commit's own changed-file
     /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
     /// shape `branch_lines` gives the Branches pane.
-    pub(super) fn commit_lines(&self) -> Vec<Line<'static>> {
+    pub(crate) fn commit_lines(&self) -> Vec<Line<'static>> {
         if let Some(drill) = &self.nav.commit_drill {
             return self
                 .commit_tree_rows()
@@ -290,7 +294,7 @@ impl PaneRows<'_> {
     /// `[4] Commits - Reflog`, or `[4] Diff files (<hash> <summary>)` while
     /// drilled into a commit's own changed-file tree (Enter on a commit,
     /// `Esc` to back out; see `enter_commit_files`).
-    pub(super) fn commits_title(&self) -> String {
+    pub(crate) fn commits_title(&self) -> String {
         match &self.nav.commit_drill {
             Some(drill) => format!("[4] Diff files ({})", drill.title),
             None => Pane::Commits.title().to_owned(),
@@ -298,7 +302,7 @@ impl PaneRows<'_> {
     }
 
     /// Stash pane rows, or the empty-state line.
-    pub(super) fn stash_lines(&self) -> Vec<Line<'static>> {
+    pub(crate) fn stash_lines(&self) -> Vec<Line<'static>> {
         if self.snapshot.stashes.is_empty() {
             return vec![Line::raw("(no stash entries)")];
         }

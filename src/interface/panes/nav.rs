@@ -13,11 +13,11 @@ use crate::git::model::{CommitEntry, FileEntry};
 use crate::theme::palette::Palette;
 
 use super::pane_rows::PaneRows;
-use super::refresh::Shared;
-use crate::app::diff_cursor::Mode;
-use crate::app::drill::{BranchDrill, CommitDrill};
-use crate::app::pane::{BranchesTab, PANES, Pane};
-use crate::app::selection::SelectionKey;
+use crate::app::refresh::Shared;
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::drill::{BranchDrill, CommitDrill};
+use crate::interface::panes::pane::{BranchesTab, PANES, Pane};
+use crate::interface::panes::selection::SelectionKey;
 
 #[derive(Default)]
 pub struct Nav {
@@ -29,36 +29,36 @@ pub struct Nav {
     /// `files_tree_rows`). Empty means "everything expanded", lazygit's own
     /// default; paths persist across `refresh()`, only `Enter` on a
     /// directory row changes this.
-    pub(super) collapsed_dirs: HashSet<PathBuf>,
+    pub(crate) collapsed_dirs: HashSet<PathBuf>,
     /// `Some` while the Branches pane is drilled into one branch's own log
     /// (Enter on a branch, `Esc` to back out); `None` shows the branch list.
-    pub(super) branch_drill: Option<BranchDrill>,
+    pub(crate) branch_drill: Option<BranchDrill>,
     /// Which of the Branches pane's own two tabs is showing.
     /// `Ctrl-Right`/`Ctrl-Left` switch it, Branches focused.
-    pub(super) branches_tab: BranchesTab,
+    pub(crate) branches_tab: BranchesTab,
     /// `Some` while the Commits pane is drilled into one commit's own
     /// changed-file tree (Enter on a commit, `Esc` to back out); `None`
     /// shows the commit list.
-    pub(super) commit_drill: Option<CommitDrill>,
+    pub(crate) commit_drill: Option<CommitDrill>,
     /// Rows an action just created (the new branch, the new `HEAD`) that the
     /// selection moves to once a refresh lists them, as lazygit does. Kept
     /// until found, so a refresh already in flight when the action ran, which
     /// cannot list them yet, does not lose it.
-    pub(super) select_when_listed: Vec<(Pane, SelectionKey)>,
+    pub(crate) select_when_listed: Vec<(Pane, SelectionKey)>,
     /// A click landed on the right pane. Purely a border-highlight flag for
     /// now (see `docs/PLAN_5_CLICK_BEHAVIOR.md`, "right-pane-focus plan");
     /// left-pane navigation and selection are untouched. Cleared by `Esc` or
     /// a click back on a left pane.
-    pub(super) right_focused: bool,
+    pub(crate) right_focused: bool,
     /// Whether keys go to the left panes or to the Files diff cursor
     /// (`docs/PLAN_6_STAGING.md`).
-    pub(super) mode: Mode,
+    pub(crate) mode: Mode,
 }
 
 impl Nav {
     /// The branch and the commit the user is drilled into, if any: what a
     /// refresh has to re-read besides the snapshot.
-    pub(super) fn drill_targets(&self) -> (Option<String>, Option<String>) {
+    pub(crate) fn drill_targets(&self) -> (Option<String>, Option<String>) {
         (
             self.branch_drill.as_ref().map(|drill| drill.branch.clone()),
             self.commit_drill.as_ref().map(|drill| drill.hash.clone()),
@@ -70,32 +70,32 @@ impl Nav {
     /// default keybar there — `<space>`/`n`/`d`/`u`/`M` act on a branch
     /// list row, not a commit row, so the Branches-specific hints would be
     /// misleading while drilled in.
-    pub(super) fn branches_drilled(&self) -> bool {
+    pub(crate) fn branches_drilled(&self) -> bool {
         self.branch_drill.is_some()
     }
 
     /// Is the Commits pane showing one commit's changed files instead of the
     /// commit list? The commit rewrite keys and their keybar apply only to the
     /// list.
-    pub(super) fn commits_drilled(&self) -> bool {
+    pub(crate) fn commits_drilled(&self) -> bool {
         self.commit_drill.is_some()
     }
 
     /// Selection cursor for a given pane.
-    pub(super) fn selected(&self, pane: Pane) -> usize {
+    pub(crate) fn selected(&self, pane: Pane) -> usize {
         self.selection[pane]
     }
 
     /// After an action that created `key`'s row, select it in `pane` as soon as
     /// a refresh lists it.
-    pub(super) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
+    pub(crate) fn select_when_listed(&mut self, pane: Pane, key: SelectionKey) {
         self.select_when_listed.retain(|(p, _)| *p != pane);
         self.select_when_listed.push((pane, key));
     }
 }
 
 /// What each pane had selected: its row index and the key of that row.
-pub(super) type Remembered = [(Pane, usize, Option<SelectionKey>); 5];
+pub(crate) type Remembered = [(Pane, usize, Option<SelectionKey>); 5];
 
 impl Nav {
     fn rows<'a>(&'a self, snapshot: &'a Snapshot, palette: &'a Palette) -> PaneRows<'a> {
@@ -107,7 +107,7 @@ impl Nav {
     }
 
     /// Note what is selected in every pane, to find it again after a refresh.
-    pub(super) fn remember(&self, snapshot: &Snapshot, palette: &Palette) -> Remembered {
+    pub(crate) fn remember(&self, snapshot: &Snapshot, palette: &Palette) -> Remembered {
         let rows = self.rows(snapshot, palette);
         PANES.map(|pane| (pane, self.selection[pane], rows.selection_key(pane)))
     }
@@ -115,7 +115,7 @@ impl Nav {
     /// Put each pane's cursor back on the row it had (by key), or on the same
     /// index when that row is gone, clamped to the new length. Rows an action
     /// just created and is waiting for are selected once they are listed.
-    pub(super) fn restore(&mut self, snapshot: &Snapshot, palette: &Palette, old: Remembered) {
+    pub(crate) fn restore(&mut self, snapshot: &Snapshot, palette: &Palette, old: Remembered) {
         let rows = self.rows(snapshot, palette);
         let moved = old.map(|(pane, old_index, key)| {
             let last = rows.row_count(pane).saturating_sub(1);
@@ -143,7 +143,7 @@ impl Nav {
     /// A drilled branch log stays live across a background refresh instead of
     /// going stale; a branch that vanished (deleted, renamed) backs out of the
     /// drill-down instead of erroring the whole refresh.
-    pub(super) fn refresh_branch_log(&mut self, branch: &str, result: Shared<Vec<CommitEntry>>) {
+    pub(crate) fn refresh_branch_log(&mut self, branch: &str, result: Shared<Vec<CommitEntry>>) {
         if self
             .branch_drill
             .as_ref()
@@ -164,7 +164,7 @@ impl Nav {
     /// Same for a drilled commit's file tree: re-read so it reflects the diff
     /// as of this refresh; a commit that vanished (a reword or rebase changed
     /// its hash) backs out rather than erroring the refresh.
-    pub(super) fn refresh_commit_files(&mut self, hash: &str, result: Shared<Vec<FileEntry>>) {
+    pub(crate) fn refresh_commit_files(&mut self, hash: &str, result: Shared<Vec<FileEntry>>) {
         if self
             .commit_drill
             .as_ref()

@@ -22,7 +22,7 @@ use std::fs;
 
 use ferrit::app::App;
 use ferrit::app::mock;
-use ferrit::app::pane::Pane;
+use ferrit::interface::panes::pane::Pane;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

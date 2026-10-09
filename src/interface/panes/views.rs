@@ -1,6 +1,6 @@
 //! What the screens and the tests are shown: the right pane's diff, the popups and the menus, as plain data.
 
-use super::create_remote;
+use crate::app::create_remote;
 use crate::git;
 use crate::interface::components::tui_overlay::state::OverlayState;
 use crate::interface::components::ui::text_input::TextInput;

@@ -63,7 +63,7 @@ impl Pane {
 /// same as the Local tab's list was for the entirety of phase 2 before
 /// phase 8 made it actionable. `docs/PLAN_9_REMOTE.md`.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub(super) enum BranchesTab {
+pub(crate) enum BranchesTab {
     #[default]
     Local,
     Remotes,

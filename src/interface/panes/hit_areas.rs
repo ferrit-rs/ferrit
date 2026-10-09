@@ -6,8 +6,9 @@
 use enum_map::EnumMap;
 use ratatui::layout::Rect;
 
-use super::settings::SettingsHits;
-use crate::app::pane::Pane;
+use crate::app::settings::SettingsHits;
+use crate::interface::panes::pane::Pane;
+use crate::interface::screens::landed::Landed;
 use crate::keybindings::hints;
 
 #[derive(Default)]
@@ -57,5 +58,35 @@ impl HitAreas {
     pub(crate) fn scroll_list(&mut self, pane: Pane, selected: usize, rows: isize) {
         self.view_detached_at[pane] = Some(selected);
         self.list_offset[pane] = self.list_offset[pane].saturating_add_signed(rows);
+    }
+}
+
+impl HitAreas {
+    /// Take in the parts of a frame's `Landed` that are about where things are.
+    /// `selection` is each pane's selected row: a wheel scroll leaves the view
+    /// where it put it only while the selection stays on the row it left behind.
+    pub(crate) fn land(&mut self, landed: &mut Landed, selection: &EnumMap<Pane, usize>) {
+        for &(pane, rect) in &landed.left {
+            self.left[pane] = rect;
+            if self.view_detached_at[pane] != Some(selection[pane]) {
+                self.view_detached_at[pane] = None;
+            }
+        }
+        for &(pane, offset) in &landed.list_offset {
+            self.list_offset[pane] = offset;
+        }
+        if let Some(area) = landed.author {
+            self.author = area;
+        }
+        if let Some(area) = landed.dashboard {
+            self.dashboard = area;
+        }
+        if let Some((area, hits)) = landed.keybar.take() {
+            self.keybar = area;
+            self.keybar_hits = hits;
+        }
+        if let Some(hits) = landed.settings_hits.take() {
+            self.settings = hits;
+        }
     }
 }

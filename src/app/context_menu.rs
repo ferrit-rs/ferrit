@@ -12,10 +12,10 @@
 use super::branch_actions::MergeKind;
 use super::menu::{MenuAction, MenuItem, MenuState};
 use super::{App, git};
-use crate::app::diff_cursor::Mode;
-use crate::app::pane::{BranchesTab, Pane};
-use crate::app::popup::Popup;
 use crate::interface::components::ui::text_input::TextInput;
+use crate::interface::panes::diff_cursor::Mode;
+use crate::interface::panes::pane::{BranchesTab, Pane};
+use crate::interface::popups::popup::Popup;
 
 /// What a name popup will do with the text typed into it.
 #[derive(Debug, Clone, PartialEq, Eq)]

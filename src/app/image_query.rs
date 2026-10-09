@@ -6,13 +6,13 @@ use std::sync::mpsc;
 use super::{App, git, mock, thread};
 use crate::app::error::AppError;
 use crate::app::events::AppEvent;
-use crate::app::pane::Pane;
-use crate::app::tree::FileRow;
 use crate::app::workers::{WorkerKind, run_worker};
 use crate::git::error::GitResult;
 use crate::git::image::preview;
 use crate::git::image::preview::Preview;
 use crate::git::port::GitPort;
+use crate::interface::panes::pane::Pane;
+use crate::interface::panes::tree::FileRow;
 
 /// Image worker result, applied only if selection and generation still match.
 #[doc(hidden)]

@@ -1,6 +1,6 @@
 //! What a popup can be.
 
-use super::{askpass, commit, context_menu, create_remote, menu};
+use crate::app::{askpass, commit, context_menu, create_remote, menu};
 use crate::interface::components::ui::text_input::TextInput;
 
 /// Modal state that owns all input while it is up, the same idea as
