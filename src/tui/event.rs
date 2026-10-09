@@ -12,11 +12,12 @@ use crate::git::staging;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::diff::{Mode, RightPane};
+use crate::tui::components::menu::{self, NameKind};
 use crate::tui::components::panes::{Nav, PaneRows};
 use crate::tui::components::panes::{Pane, SelectionKey};
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::components::popups::Popup;
-use crate::tui::components::stash;
+use crate::tui::components::{branches, remote, stash};
 use crate::tui::error::AppError;
 
 /// One change a component asks for.
@@ -85,13 +86,19 @@ pub(crate) enum Event {
     PickConfigValue(usize),
     /// Open the create-a-repository flow.
     OpenCreateRemote,
-    /// A config key or value was typed: hand it to the git config screen.
-    SubmitGitConfigName {
-        /// Key or value.
-        kind: crate::tui::components::menu::NameKind,
+    /// The new-branch popup was submitted with this name.
+    SubmitNewBranch(String),
+    /// The stash popup was submitted with this message.
+    PushStash(String),
+    /// A name popup was submitted.
+    SubmitName {
+        /// What it was for.
+        kind: NameKind,
         /// What was typed, spaces kept.
         text: String,
     },
+    /// The upstream prompt was submitted.
+    SubmitUpstream(String),
     /// Forget the start of a V-selection.
     ClearAnchor,
     /// Apply or pop a stash entry (needs the repository for writing).
@@ -213,10 +220,28 @@ impl App {
                 Event::Quit => self.should_quit = true,
                 Event::PickConfigValue(index) => self.pick_config_value(index),
                 Event::OpenCreateRemote => self.open_create_remote(),
-                Event::SubmitGitConfigName { kind, text } => {
-                    if self.submit_git_config_name(&kind, &text) {
-                        self.modal.close_popup();
+                Event::SubmitNewBranch(name) => {
+                    let events = branches::create(&name, &self.env());
+                    self.apply(events);
+                },
+                Event::PushStash(message) => {
+                    let events = stash::push(&message, self.repo.as_deref());
+                    self.apply(events);
+                },
+                Event::SubmitName { kind, text } => {
+                    if matches!(kind, NameKind::ConfigKey | NameKind::ConfigValue(_)) {
+                        // A value keeps its spaces; a refusal keeps the popup.
+                        if self.submit_git_config_name(&kind, &text) {
+                            self.modal.close_popup();
+                        }
+                    } else if let Some(repo) = &mut self.repo {
+                        let events = menu::submit_name(&kind, &text, repo.as_mut());
+                        self.apply(events);
                     }
+                },
+                Event::SubmitUpstream(value) => {
+                    let events = remote::submit_upstream(&value);
+                    self.apply(events);
                 },
                 Event::ClearAnchor => self.right.cursor.anchor = None,
                 Event::RestoreStash { oid, pop } => {
@@ -257,13 +282,11 @@ impl App {
     /// A popup asking for a name, for the screens that are not migrated yet.
     pub(crate) fn open_name(
         &mut self,
-        kind: crate::tui::components::menu::NameKind,
+        kind: NameKind,
         title: String,
         input: crate::tui::widgets::text_input::TextInput,
     ) {
-        self.apply(vec![crate::tui::components::menu::open_name(
-            kind, title, input,
-        )]);
+        self.apply(vec![menu::open_name(kind, title, input)]);
     }
 
     /// Run one step of the merge, rebase, cherry-pick or revert and say where

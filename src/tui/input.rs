@@ -7,7 +7,10 @@ use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::{PANES, Pane};
-use crate::tui::components::{branches, commits, files, menu, popups, remote, stash, welcome};
+use crate::tui::components::popups::Popup;
+use crate::tui::components::{
+    askpass, branches, commits, files, menu, popups, remote, stash, welcome,
+};
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
 use crate::tui::keymap::{Action, Context, KeyBinding};
@@ -334,7 +337,7 @@ impl App {
         match action {
             Action::Quit => self.should_quit = true,
             Action::Help => self.open_help(),
-            Action::CommandLog => self.open_command_log(),
+            Action::CommandLog => self.apply(popups::open_command_log(&self.env())),
             Action::Dashboard => self.open_dashboard(),
             Action::GitConfig => self.open_git_config(),
             Action::CreateRemote => self.open_create_remote(),
@@ -474,5 +477,30 @@ impl App {
             self.update_right_pane();
             self.apply(menu::open_context(&self.env()));
         }
+    }
+}
+
+impl App {
+    /// Every key while a popup is up: to the popup that has its own keys, else to
+    /// the text box, note or command log.
+    fn popup_key(&mut self, key: KeyEvent) {
+        let events = match self.modal.popup_mut() {
+            None => return,
+            Some(Popup::Commit(_)) => return self.commit_popup_key(key),
+            Some(Popup::CommitAllConfirm) => return self.commit_all_confirm_key(key),
+            Some(Popup::CreateRemote(_)) => return self.create_remote_key(key),
+            Some(Popup::Askpass(ask)) => askpass::key(ask, key),
+            Some(Popup::Menu(menu)) => match menu::on_key(menu, key) {
+                menu::MenuKey::Stay => Vec::new(),
+                menu::MenuKey::Close => vec![Event::ClosePopup],
+                menu::MenuKey::Choose(action) => {
+                    let mut events = vec![Event::ClosePopup];
+                    events.extend(menu::run_action(action, &self.env()));
+                    events
+                },
+            },
+            Some(popup) => popups::text_key(popup, key),
+        };
+        self.apply(events);
     }
 }

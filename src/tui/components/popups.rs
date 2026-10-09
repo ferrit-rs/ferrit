@@ -7,17 +7,13 @@ use crate::git::operation::Step;
 use crate::git::rebase::RebaseEdit;
 use crate::git::remote::RemoteRequest;
 use crate::theme::palette::Palette;
-use crate::tui::App;
 use crate::tui::components::askpass;
-use crate::tui::components::diff::{CommandLogView, CommitPopupView, MenuView, PopupView};
 use crate::tui::components::menu;
-use crate::tui::components::{branches, stash};
-use crate::tui::components::{commit_editor, create_remote, remote};
+use crate::tui::components::{commit_editor, create_remote};
 use crate::tui::components::{commits, files};
 use crate::tui::event::{Env, Event};
 use crate::tui::widgets::dialog::Dialog;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
-use crate::tui::widgets::tui_overlay::state::OverlayState;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
@@ -26,307 +22,67 @@ use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 use std::path::{Path, PathBuf};
 
-impl App {
-    /// Read active popup as one enum, without any animation state.
-    pub fn popup_view(&self) -> Option<PopupView<'_>> {
-        self.popup_view_with(None)
+/// `@`: open the command log viewer, scrolled to the newest entry.
+pub(crate) fn open_command_log(env: &Env<'_>) -> Vec<Event> {
+    if env.popup_up {
+        return Vec::new();
     }
+    vec![Event::OpenPopup(Popup::CommandLog { from_bottom: 0 })]
+}
 
-    /// The active popup for drawing: `overlay` is the commit popup's animation, which
-    /// the views of the commit editor and of the stage-everything question carry.
-    pub(crate) fn popup_view_with<'a>(
-        &'a self,
-        overlay: Option<&'a mut OverlayState>,
-    ) -> Option<PopupView<'a>> {
-        let kind = match self.modal.popup()? {
-            Popup::Commit(_) => PopupKind::Commit,
-            Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
-            Popup::NewBranch(_) => PopupKind::NewBranch,
-            Popup::Stash(_) => PopupKind::Stash,
-            Popup::Name(..) => PopupKind::Name,
-            Popup::CommandLog { .. } => PopupKind::CommandLog,
-            Popup::Menu(_) => PopupKind::Menu,
-            Popup::Upstream(_) => PopupKind::Upstream,
-            Popup::Askpass(_) => PopupKind::Askpass,
-            Popup::CreateRemote(_) => PopupKind::CreateRemote,
-            Popup::Note(_) => PopupKind::Note,
-        };
-        match kind {
-            PopupKind::Commit => self.commit_popup_with(overlay).map(PopupView::Commit),
-            PopupKind::CommitAllConfirm => Some(PopupView::CommitAllConfirm(overlay)),
-            PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
-            PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
-            PopupKind::Name => self.name_popup().map(PopupView::Name),
-            PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
-            PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
-            PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
-            PopupKind::Askpass => self.askpass_popup().map(PopupView::Askpass),
-            PopupKind::CreateRemote => self.create_remote_view().map(PopupView::CreateRemote),
-            PopupKind::Note => self.note_popup().map(PopupView::Note),
-        }
-    }
-
-    /// The pending discard / branch-delete confirmation message, for the
-    /// keybar prompt (`ui::draw_keybar`), or `None` when nothing is
-    /// pending.
-    pub fn confirm_message(&self) -> Option<&str> {
-        self.modal.confirm().map(|p| p.message.as_str())
-    }
-
-    /// The new-branch popup's render data, reusing `ui::draw_commit_popup`'s
-    /// shape (`docs/PLAN_8_BRANCHES.md`), or `None` when it is not up.
-    pub fn new_branch_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
-            return None;
-        };
-        Some(CommitPopupView {
-            title: &self.new_branch_title,
-            input: buf,
-            description: None,
-            summary_focused: false,
-            overlay_state: None,
-            lines: buf.lines(),
-            cursor: buf.cursor(),
-            toggles: None,
-            author: None,
-            hints: "Create: Enter | Cancel: Esc",
-        })
-    }
-
-    /// The stash popup's render data, same shape as the new-branch one.
-    pub fn stash_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Stash(buf)) = self.modal.popup() else {
-            return None;
-        };
-        Some(CommitPopupView {
-            title: "Stash changes",
-            input: buf,
-            description: None,
-            summary_focused: false,
-            overlay_state: None,
-            lines: buf.lines(),
-            cursor: buf.cursor(),
-            toggles: None,
-            author: None,
-            hints: "Stash: Enter | Cancel: Esc",
-        })
-    }
-
-    /// A name popup's render data, same shape as the new-branch one.
-    pub fn name_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Name(target, input)) = self.modal.popup() else {
-            return None;
-        };
-        Some(CommitPopupView {
-            title: target.title.as_str(),
-            input,
-            description: None,
-            summary_focused: false,
-            overlay_state: None,
-            lines: input.lines(),
-            cursor: input.cursor(),
-            toggles: None,
-            author: None,
-            hints: target.hints(),
-        })
-    }
-
-    /// The `@` viewer's render data: the whole ring, reads included.
-    pub fn command_log_popup(&self) -> Option<CommandLogView> {
-        let Some(Popup::CommandLog { from_bottom }) = self.modal.popup() else {
-            return None;
-        };
-        Some(CommandLogView {
-            records: crate::git::command_log::recent(usize::MAX, true),
-            from_bottom: *from_bottom,
-        })
-    }
-
-    /// The menu's render data: each row is `label (shortcut)`.
-    pub fn menu_popup(&self) -> Option<MenuView> {
-        let Some(Popup::Menu(menu)) = self.modal.popup() else {
-            return None;
-        };
-        Some(MenuView {
-            title: menu.title.clone(),
-            rows: menu
-                .items
-                .iter()
-                .map(|item| format!("{}  ({})", item.label, item.shortcut))
-                .collect(),
-            selected: menu.selected,
-            hint: menu.items.get(menu.selected).map_or("", |item| item.hint),
-        })
-    }
-
-    /// `@`: open the command log viewer, scrolled to the newest entry.
-    pub(crate) fn open_command_log(&mut self) {
-        if self.modal.popup().is_none() {
-            self.modal.open_popup(Popup::CommandLog { from_bottom: 0 });
-        }
-    }
-
-    /// A dismissible note's message (`ui::draw_note_popup`), or `None` when
-    /// none is up.
-    pub fn note_popup(&self) -> Option<&str> {
-        match self.modal.popup() {
-            Some(Popup::Note(msg)) => Some(msg),
-            _ => None,
-        }
-    }
-
-    pub fn upstream_value(&self) -> Option<String> {
-        match self.modal.popup() {
-            Some(Popup::Upstream(input)) => Some(input.text()),
-            _ => None,
-        }
-    }
-
-    pub fn upstream_popup(&self) -> Option<CommitPopupView<'_>> {
-        let Some(Popup::Upstream(input)) = self.modal.popup() else {
-            return None;
-        };
-        Some(CommitPopupView {
-            title: "Set upstream",
-            input,
-            description: None,
-            summary_focused: false,
-            overlay_state: None,
-            lines: input.lines(),
-            cursor: input.cursor(),
-            toggles: None,
-            author: None,
-            hints: "Push: Enter | Cancel: Esc",
-        })
-    }
-
-    /// Every key while a non-commit popup is up. Commit editor routes to
-    /// `app::commit`, which owns its separate summary/body key model.
-    pub(crate) fn popup_key(&mut self, key: KeyEvent) {
-        if matches!(self.modal.popup(), Some(Popup::Commit(_))) {
-            self.commit_popup_key(key);
-            return;
-        }
-        if matches!(self.modal.popup(), Some(Popup::CommitAllConfirm)) {
-            self.commit_all_confirm_key(key);
-            return;
-        }
-        if matches!(self.modal.popup(), Some(Popup::Askpass(_))) {
-            if let Some(Popup::Askpass(ask)) = self.modal.popup_mut() {
-                let events = askpass::key(ask, key);
-                self.apply(events);
-            }
-            return;
-        }
-        if matches!(self.modal.popup(), Some(Popup::Menu(_))) {
-            let outcome = match self.modal.popup_mut() {
-                Some(Popup::Menu(menu)) => menu::on_key(menu, key),
-                _ => return,
-            };
-            let events = match outcome {
-                menu::MenuKey::Stay => Vec::new(),
-                menu::MenuKey::Close => vec![Event::ClosePopup],
-                menu::MenuKey::Choose(action) => {
-                    let mut events = vec![Event::ClosePopup];
-                    events.extend(menu::run_action(action, &self.env()));
-                    events
-                },
-            };
-            self.apply(events);
-            return;
-        }
-        if matches!(self.modal.popup(), Some(Popup::CreateRemote(_))) {
-            self.create_remote_key(key);
-            return;
-        }
-        let mut dismiss = false;
-        let mut create_branch_now = false;
-        let mut stash_now = false;
-        let mut submit_name_now = false;
-        let mut submit_upstream = None;
-
-        match self.modal.popup_mut() {
-            None => return,
-            Some(Popup::Note(_)) => {
-                if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
-                    dismiss = true;
-                }
-            },
-            // Both are routed to their own handlers above.
-            Some(
-                Popup::Commit(_)
-                | Popup::CommitAllConfirm
-                | Popup::Menu(_)
-                | Popup::Askpass(_)
-                | Popup::CreateRemote(_),
-            ) => {},
-            Some(Popup::NewBranch(buf)) => match key.code {
-                KeyCode::Esc => dismiss = true,
-                KeyCode::Enter => create_branch_now = true,
-                _ => {
-                    buf.handle_key_event(key, TextInputMode::SingleLine);
-                },
-            },
-            Some(Popup::CommandLog { from_bottom }) => match key.code {
-                KeyCode::Esc | KeyCode::Char('@' | 'q') => dismiss = true,
-                other => *from_bottom = scrolled_command_log(*from_bottom, other),
-            },
-            Some(Popup::Name(_, input)) => match key.code {
-                KeyCode::Esc => dismiss = true,
-                KeyCode::Enter => submit_name_now = true,
-                _ => {
-                    input.handle_key_event(key, TextInputMode::SingleLine);
-                },
-            },
-            Some(Popup::Stash(buf)) => match key.code {
-                KeyCode::Esc => dismiss = true,
-                KeyCode::Enter => stash_now = true,
-                _ => {
-                    buf.handle_key_event(key, TextInputMode::SingleLine);
-                },
-            },
-            Some(Popup::Upstream(input)) => match key.code {
-                KeyCode::Esc => dismiss = true,
-                KeyCode::Enter => submit_upstream = Some(input.text()),
-                _ => {
-                    input.handle_key_event(key, TextInputMode::SingleLine);
-                },
-            },
-        }
-
-        if dismiss {
-            self.modal.close_popup();
-        }
-        if create_branch_now && let Some(Popup::NewBranch(buf)) = self.modal.popup() {
-            let name = buf.text();
-            let events = branches::create(&name, &self.env());
-            self.apply(events);
-        }
-        if stash_now && let Some(Popup::Stash(buf)) = self.modal.popup() {
-            let message = buf.text();
-            let events = stash::push(&message, self.repo.as_deref());
-            self.apply(events);
-        }
-        if submit_name_now && let Some(Popup::Name(target, input)) = self.modal.popup() {
-            let kind = target.kind.clone();
-            let text = input.text();
-            let events = if matches!(
-                kind,
-                menu::NameKind::ConfigKey | menu::NameKind::ConfigValue(_)
-            ) {
-                vec![Event::SubmitGitConfigName { kind, text }]
-            } else if let Some(repo) = &mut self.repo {
-                menu::submit_name(&kind, &text, repo.as_mut())
+/// Every key while a popup that is just a text box, a note or the command log is
+/// up. The ones with their own keys (the commit editor, the menus, the credential
+/// prompt, the create-a-repository flow) are routed before.
+pub(crate) fn text_key(popup: &mut Popup, key: KeyEvent) -> Vec<Event> {
+    match popup {
+        Popup::Note(_) => {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
+                vec![Event::ClosePopup]
             } else {
                 Vec::new()
-            };
-            self.apply(events);
-        }
-        if let Some(value) = submit_upstream {
-            let events = remote::submit_upstream(&value);
-            self.apply(events);
-        }
+            }
+        },
+        Popup::NewBranch(buf) => match key.code {
+            KeyCode::Esc => vec![Event::ClosePopup],
+            KeyCode::Enter => vec![Event::SubmitNewBranch(buf.text())],
+            _ => edit(buf, key),
+        },
+        Popup::CommandLog { from_bottom } => match key.code {
+            KeyCode::Esc | KeyCode::Char('@' | 'q') => vec![Event::ClosePopup],
+            other => {
+                *from_bottom = scrolled_command_log(*from_bottom, other);
+                Vec::new()
+            },
+        },
+        Popup::Name(target, input) => match key.code {
+            KeyCode::Esc => vec![Event::ClosePopup],
+            KeyCode::Enter => vec![Event::SubmitName {
+                kind: target.kind.clone(),
+                text: input.text(),
+            }],
+            _ => edit(input, key),
+        },
+        Popup::Stash(buf) => match key.code {
+            KeyCode::Esc => vec![Event::ClosePopup],
+            KeyCode::Enter => vec![Event::PushStash(buf.text())],
+            _ => edit(buf, key),
+        },
+        Popup::Upstream(input) => match key.code {
+            KeyCode::Esc => vec![Event::ClosePopup],
+            KeyCode::Enter => vec![Event::SubmitUpstream(input.text())],
+            _ => edit(input, key),
+        },
+        Popup::Commit(_)
+        | Popup::CommitAllConfirm
+        | Popup::Menu(_)
+        | Popup::Askpass(_)
+        | Popup::CreateRemote(_) => Vec::new(),
     }
+}
+
+fn edit(input: &mut TextInput, key: KeyEvent) -> Vec<Event> {
+    input.handle_key_event(key, TextInputMode::SingleLine);
+    Vec::new()
 }
 
 /// Modal state that owns all input while it is up, the same idea as

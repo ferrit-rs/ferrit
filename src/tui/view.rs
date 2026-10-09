@@ -1,5 +1,10 @@
 //! The read-only questions the screens and the tests ask of `App`.
 
+use crate::tui::components::diff::CommandLogView;
+use crate::tui::components::diff::MenuView;
+use crate::tui::components::diff::PopupView;
+use crate::tui::components::popups::PopupKind;
+use crate::tui::widgets::tui_overlay::state::OverlayState;
 use std::ops::Range;
 
 use crate::git::diff::DiffSide;
@@ -54,5 +59,173 @@ impl App {
     /// The folder the welcome screen offers to `git init`.
     pub fn welcome_dir(&self) -> Option<&std::path::Path> {
         self.full_screens.welcome_dir.as_deref()
+    }
+}
+
+impl App {
+    /// Read active popup as one enum, without any animation state.
+    pub fn popup_view(&self) -> Option<PopupView<'_>> {
+        self.popup_view_with(None)
+    }
+
+    /// The active popup for drawing: `overlay` is the commit popup's animation, which
+    /// the views of the commit editor and of the stage-everything question carry.
+    pub(crate) fn popup_view_with<'a>(
+        &'a self,
+        overlay: Option<&'a mut OverlayState>,
+    ) -> Option<PopupView<'a>> {
+        let kind = match self.modal.popup()? {
+            Popup::Commit(_) => PopupKind::Commit,
+            Popup::CommitAllConfirm => PopupKind::CommitAllConfirm,
+            Popup::NewBranch(_) => PopupKind::NewBranch,
+            Popup::Stash(_) => PopupKind::Stash,
+            Popup::Name(..) => PopupKind::Name,
+            Popup::CommandLog { .. } => PopupKind::CommandLog,
+            Popup::Menu(_) => PopupKind::Menu,
+            Popup::Upstream(_) => PopupKind::Upstream,
+            Popup::Askpass(_) => PopupKind::Askpass,
+            Popup::CreateRemote(_) => PopupKind::CreateRemote,
+            Popup::Note(_) => PopupKind::Note,
+        };
+        match kind {
+            PopupKind::Commit => self.commit_popup_with(overlay).map(PopupView::Commit),
+            PopupKind::CommitAllConfirm => Some(PopupView::CommitAllConfirm(overlay)),
+            PopupKind::NewBranch => self.new_branch_popup().map(PopupView::NewBranch),
+            PopupKind::Stash => self.stash_popup().map(PopupView::Stash),
+            PopupKind::Name => self.name_popup().map(PopupView::Name),
+            PopupKind::CommandLog => self.command_log_popup().map(PopupView::CommandLog),
+            PopupKind::Menu => self.menu_popup().map(PopupView::Menu),
+            PopupKind::Upstream => self.upstream_popup().map(PopupView::Upstream),
+            PopupKind::Askpass => self.askpass_popup().map(PopupView::Askpass),
+            PopupKind::CreateRemote => self.create_remote_view().map(PopupView::CreateRemote),
+            PopupKind::Note => self.note_popup().map(PopupView::Note),
+        }
+    }
+
+    /// The pending discard / branch-delete confirmation message, for the
+    /// keybar prompt (`ui::draw_keybar`), or `None` when nothing is
+    /// pending.
+    pub fn confirm_message(&self) -> Option<&str> {
+        self.modal.confirm().map(|p| p.message.as_str())
+    }
+
+    /// The new-branch popup's render data, reusing `ui::draw_commit_popup`'s
+    /// shape (`docs/PLAN_8_BRANCHES.md`), or `None` when it is not up.
+    pub fn new_branch_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::NewBranch(buf)) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: &self.new_branch_title,
+            input: buf,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: buf.lines(),
+            cursor: buf.cursor(),
+            toggles: None,
+            author: None,
+            hints: "Create: Enter | Cancel: Esc",
+        })
+    }
+
+    /// The stash popup's render data, same shape as the new-branch one.
+    pub fn stash_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Stash(buf)) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: "Stash changes",
+            input: buf,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: buf.lines(),
+            cursor: buf.cursor(),
+            toggles: None,
+            author: None,
+            hints: "Stash: Enter | Cancel: Esc",
+        })
+    }
+
+    /// A name popup's render data, same shape as the new-branch one.
+    pub fn name_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Name(target, input)) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: target.title.as_str(),
+            input,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: input.lines(),
+            cursor: input.cursor(),
+            toggles: None,
+            author: None,
+            hints: target.hints(),
+        })
+    }
+
+    /// The `@` viewer's render data: the whole ring, reads included.
+    pub fn command_log_popup(&self) -> Option<CommandLogView> {
+        let Some(Popup::CommandLog { from_bottom }) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommandLogView {
+            records: crate::git::command_log::recent(usize::MAX, true),
+            from_bottom: *from_bottom,
+        })
+    }
+
+    /// The menu's render data: each row is `label (shortcut)`.
+    pub fn menu_popup(&self) -> Option<MenuView> {
+        let Some(Popup::Menu(menu)) = self.modal.popup() else {
+            return None;
+        };
+        Some(MenuView {
+            title: menu.title.clone(),
+            rows: menu
+                .items
+                .iter()
+                .map(|item| format!("{}  ({})", item.label, item.shortcut))
+                .collect(),
+            selected: menu.selected,
+            hint: menu.items.get(menu.selected).map_or("", |item| item.hint),
+        })
+    }
+
+    /// A dismissible note's message (`ui::draw_note_popup`), or `None` when
+    /// none is up.
+    pub fn note_popup(&self) -> Option<&str> {
+        match self.modal.popup() {
+            Some(Popup::Note(msg)) => Some(msg),
+            _ => None,
+        }
+    }
+
+    pub fn upstream_value(&self) -> Option<String> {
+        match self.modal.popup() {
+            Some(Popup::Upstream(input)) => Some(input.text()),
+            _ => None,
+        }
+    }
+
+    pub fn upstream_popup(&self) -> Option<CommitPopupView<'_>> {
+        let Some(Popup::Upstream(input)) = self.modal.popup() else {
+            return None;
+        };
+        Some(CommitPopupView {
+            title: "Set upstream",
+            input,
+            description: None,
+            summary_focused: false,
+            overlay_state: None,
+            lines: input.lines(),
+            cursor: input.cursor(),
+            toggles: None,
+            author: None,
+            hints: "Push: Enter | Cancel: Esc",
+        })
     }
 }
