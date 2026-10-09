@@ -10,6 +10,7 @@ use crate::git::commit::CommitKind;
 use crate::tui::components::askpass;
 use crate::tui::components::commit_editor;
 use crate::tui::components::diff::CommitPopupView;
+use crate::tui::components::git_config::GitConfig;
 use crate::tui::components::keybar::HelpLine;
 use crate::tui::components::keybar::help_lines;
 use crate::tui::components::popups::Popup;
@@ -1120,5 +1121,29 @@ impl App {
         settings.set_choice(row, index);
         let events = settings.events;
         self.apply(events);
+    }
+}
+
+impl App {
+    /// The git config screen, with the parts of the app it needs.
+    pub(crate) fn git_config_ctx(&mut self) -> GitConfig<'_> {
+        GitConfig {
+            screen: &mut self.full_screens.git_config,
+            repo: self.repo.as_deref(),
+            events: Vec::new(),
+        }
+    }
+
+    /// Show the git config screen over the panes, with a fresh listing.
+    pub fn open_git_config(&mut self) {
+        let mut config = self.git_config_ctx();
+        config.open();
+        let events = config.events;
+        self.apply(events);
+    }
+
+    /// The renderer's word on where the git config list starts: keep it.
+    pub(crate) const fn set_git_config_offset(&mut self, offset: usize) {
+        self.full_screens.git_config.offset = offset;
     }
 }

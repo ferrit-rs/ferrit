@@ -18,6 +18,7 @@ use crate::tui::components::panes::{Pane, SelectionKey};
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::components::popups::Popup;
 use crate::tui::components::{branches, remote, stash};
+use crate::tui::draw::FullScreen;
 use crate::tui::error::AppError;
 
 /// One change a component asks for.
@@ -84,6 +85,10 @@ pub(crate) enum Event {
     Quit,
     /// Slide the side sheet out.
     CloseSheet,
+    /// Show the git config screen.
+    ShowGitConfig,
+    /// Leave the git config screen.
+    HideGitConfig,
     /// The mouse pointer leaves a clickable thing.
     HidePointer,
     /// Choose a value on the git config screen's menu.
@@ -223,8 +228,15 @@ impl App {
                 Event::WelcomeSelected(row) => self.full_screens.welcome_selected = row,
                 Event::Quit => self.should_quit = true,
                 Event::CloseSheet => self.render.sheet.close(),
+                Event::ShowGitConfig => self.full_screens.active = FullScreen::GitConfig,
+                Event::HideGitConfig => self.full_screens.active = FullScreen::None,
                 Event::HidePointer => self.mouse_pointer.request(false),
-                Event::PickConfigValue(index) => self.pick_config_value(index),
+                Event::PickConfigValue(index) => {
+                    let mut config = self.git_config_ctx();
+                    config.pick_value(index);
+                    let events = config.events;
+                    self.apply(events);
+                },
                 Event::OpenCreateRemote => self.open_create_remote(),
                 Event::SubmitNewBranch(name) => {
                     let events = branches::create(&name, &self.env());
@@ -237,9 +249,13 @@ impl App {
                 Event::SubmitName { kind, text } => {
                     if matches!(kind, NameKind::ConfigKey | NameKind::ConfigValue(_)) {
                         // A value keeps its spaces; a refusal keeps the popup.
-                        if self.submit_git_config_name(&kind, &text) {
-                            self.modal.close_popup();
+                        let mut config = self.git_config_ctx();
+                        let close = config.submit_name(&kind, &text);
+                        let mut events = config.events;
+                        if close {
+                            events.push(Event::ClosePopup);
                         }
+                        self.apply(events);
                     } else if let Some(repo) = &mut self.repo {
                         let events = menu::submit_name(&kind, &text, repo.as_mut());
                         self.apply(events);
@@ -269,9 +285,19 @@ impl App {
                     }
                 },
                 Event::OperationStep(step) => self.apply_operation_step(step),
-                Event::ResumeGitConfigEdit(resume) => self.resume_git_config_edit(resume),
+                Event::ResumeGitConfigEdit(resume) => {
+                    let mut config = self.git_config_ctx();
+                    config.resume(resume);
+                    let events = config.events;
+                    self.apply(events);
+                },
                 Event::InitRepo(dir) => self.init_here(&dir),
-                Event::ConfigUnset(op) => self.confirm_git_config_unset(&op),
+                Event::ConfigUnset(op) => {
+                    let mut config = self.git_config_ctx();
+                    config.confirm_unset(&op);
+                    let events = config.events;
+                    self.apply(events);
+                },
                 Event::MergeConflicted => {
                     let files = staging::conflicted_paths(&self.snapshot.files).join(", ");
                     self.modal.open_popup(Popup::Note(format!(
@@ -285,16 +311,6 @@ impl App {
 }
 
 impl App {
-    /// A popup asking for a name, for the screens that are not migrated yet.
-    pub(crate) fn open_name(
-        &mut self,
-        kind: NameKind,
-        title: String,
-        input: crate::tui::widgets::text_input::TextInput,
-    ) {
-        self.apply(vec![menu::open_name(kind, title, input)]);
-    }
-
     /// Run one step of the merge, rebase, cherry-pick or revert and say where
     /// git stopped.
     pub(crate) fn apply_operation_step(&mut self, step: crate::git::operation::Step) {

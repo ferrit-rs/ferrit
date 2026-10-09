@@ -263,3 +263,10 @@ impl App {
         settings::number_value(&self.prefs.config, row)
     }
 }
+
+impl App {
+    /// The git config screen's state, for the screen that draws it and for tests.
+    pub fn git_config(&self) -> &crate::tui::components::git_config::GitConfigScreen {
+        &self.full_screens.git_config
+    }
+}

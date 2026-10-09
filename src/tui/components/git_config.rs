@@ -7,13 +7,13 @@ use crate::git::config_edit::{
     ConfigOp, GlobalResume, PickTarget, scope_label, scope_name, scope_of, truthy,
 };
 use crate::git::config_keys::{KeyType, lookup};
+use crate::git::port::GitPort;
 use crate::theme::palette::Palette;
-use crate::tui::App;
+use crate::tui::components::menu::open_name;
 use crate::tui::components::menu::{MenuAction, MenuItem, MenuState, NameKind};
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt, Popup};
-use crate::tui::draw::FullScreen;
 use crate::tui::error::AppError;
-use crate::tui::keymap::{Action, Context, KeyBinding};
+use crate::tui::event::Event;
 use crate::tui::widgets::cut::cut_end;
 use crate::tui::widgets::panel::Panel;
 use crate::tui::widgets::scroll_bar::ScrollBar;
@@ -29,46 +29,47 @@ use unicode_width::UnicodeWidthStr;
 const PAGE: isize = 10;
 const WHEEL_ROWS: isize = 3;
 
-impl App {
-    /// The git config screen's state, for the screen that draws it and for tests.
-    pub fn git_config(&self) -> &GitConfigScreen {
-        &self.full_screens.git_config
-    }
+/// The git config screen with the parts of the app it needs: the repository to
+/// read and write, and `events` for what else follows.
+pub(crate) struct GitConfig<'a> {
+    /// The screen's own state.
+    pub(crate) screen: &'a mut GitConfigScreen,
+    /// The repository, if there is one.
+    pub(crate) repo: Option<&'a dyn GitPort>,
+    /// What the screen asks of the rest of the app.
+    pub(crate) events: Vec<Event>,
+}
 
+impl GitConfig<'_> {
     /// Show the git config screen over the panes, with a fresh listing.
-    pub fn open_git_config(&mut self) {
-        if self.reread_git_config() {
-            self.full_screens.git_config.filtering = false;
-            self.full_screens.git_config.note = None;
-            self.full_screens.active = FullScreen::GitConfig;
+    pub(crate) fn open(&mut self) {
+        if self.reread() {
+            self.screen.filtering = false;
+            self.screen.note = None;
+            self.events.push(Event::ShowGitConfig);
         }
     }
 
-    /// The renderer's word on where the list starts: keep it.
-    pub(crate) const fn set_git_config_offset(&mut self, offset: usize) {
-        self.full_screens.git_config.offset = offset;
+    pub(crate) fn close(&mut self) {
+        self.events.push(Event::HideGitConfig);
+        self.screen.filtering = false;
+        self.screen.set_filter(String::new());
     }
 
-    pub fn close_git_config(&mut self) {
-        self.full_screens.active = FullScreen::None;
-        self.full_screens.git_config.filtering = false;
-        self.full_screens.git_config.set_filter(String::new());
-    }
-
-    /// `git config --list` again; `false` (after an error toast) when git
-    /// could not answer or there is no repository.
-    pub(crate) fn reread_git_config(&mut self) -> bool {
-        let Some(repo) = &self.repo else {
-            self.report_error(AppError::NoRepository);
+    /// `git config --list` again; `false` (after an error toast) when git could
+    /// not answer or there is no repository.
+    pub(crate) fn reread(&mut self) -> bool {
+        let Some(repo) = self.repo else {
+            self.events.push(Event::Report(AppError::NoRepository));
             return false;
         };
         match repo.config() {
             Ok(view) => {
-                self.full_screens.git_config.set_view(view);
+                self.screen.set_view(view);
                 true
             },
             Err(e) => {
-                self.report_error(e);
+                self.events.push(Event::Report(e.into()));
                 false
             },
         }
@@ -76,58 +77,53 @@ impl App {
 
     /// Every key while the screen is up (after the popups, a pending
     /// confirmation and the help overlay, which own input before it).
-    pub(crate) fn git_config_key(&mut self, key: KeyEvent) {
-        if self.full_screens.git_config.filtering {
-            self.git_config_filter_key(key);
+    /// `toggles` is whether the key is the one that opens the screen, which
+    /// closes it whatever it is bound to.
+    pub(crate) fn key(&mut self, key: KeyEvent, toggles: bool) {
+        if self.screen.filtering {
+            self.filter_key(key);
             return;
         }
-        // The key that opens the screen closes it, whatever it is bound to.
-        let toggles = self
-            .prefs
-            .keymap
-            .resolve(&[Context::Global], KeyBinding::from_event(key))
-            == Some(Action::GitConfig);
         if toggles {
-            self.close_git_config();
+            self.close();
             return;
         }
         match key.code {
             // A kept filter goes first; the next `Esc` leaves.
-            KeyCode::Esc if !self.full_screens.git_config.filter.is_empty() => {
-                self.full_screens.git_config.set_filter(String::new());
+            KeyCode::Esc if !self.screen.filter.is_empty() => {
+                self.screen.set_filter(String::new());
             },
-            KeyCode::Esc | KeyCode::Char('q') => self.close_git_config(),
-            KeyCode::Char('j') | KeyCode::Down => self.full_screens.git_config.move_by(1),
-            KeyCode::Char('k') | KeyCode::Up => self.full_screens.git_config.move_by(-1),
-            KeyCode::PageDown => self.full_screens.git_config.move_by(PAGE),
-            KeyCode::PageUp => self.full_screens.git_config.move_by(-PAGE),
-            KeyCode::Home => self.full_screens.git_config.selected = 0,
+            KeyCode::Esc | KeyCode::Char('q') => self.close(),
+            KeyCode::Char('j') | KeyCode::Down => self.screen.move_by(1),
+            KeyCode::Char('k') | KeyCode::Up => self.screen.move_by(-1),
+            KeyCode::PageDown => self.screen.move_by(PAGE),
+            KeyCode::PageUp => self.screen.move_by(-PAGE),
+            KeyCode::Home => self.screen.selected = 0,
             KeyCode::End => {
-                self.full_screens.git_config.selected =
-                    self.full_screens.git_config.rows.len().saturating_sub(1);
+                self.screen.selected = self.screen.rows.len().saturating_sub(1);
             },
-            KeyCode::Char('/') => self.full_screens.git_config.filtering = true,
-            KeyCode::Char('s') => self.toggle_git_config_scope(),
+            KeyCode::Char('/') => self.screen.filtering = true,
+            KeyCode::Char('s') => self.toggle_scope(),
             KeyCode::Char('r') => {
-                self.reread_git_config();
+                self.reread();
             },
             _ => {
-                self.git_config_edit_key(key);
+                self.edit_key(key);
             },
         }
     }
 
     /// `Esc` clears the filter and leaves it, `Enter` leaves it as typed.
-    fn git_config_filter_key(&mut self, key: KeyEvent) {
-        let mut text = self.full_screens.git_config.filter.clone();
+    fn filter_key(&mut self, key: KeyEvent) {
+        let mut text = self.screen.filter.clone();
         match key.code {
             KeyCode::Esc => {
-                self.full_screens.git_config.filtering = false;
-                self.full_screens.git_config.set_filter(String::new());
+                self.screen.filtering = false;
+                self.screen.set_filter(String::new());
                 return;
             },
             KeyCode::Enter => {
-                self.full_screens.git_config.filtering = false;
+                self.screen.filtering = false;
                 return;
             },
             KeyCode::Backspace => {
@@ -136,21 +132,21 @@ impl App {
             KeyCode::Char(c) => text.push(c),
             _ => return,
         }
-        self.full_screens.git_config.set_filter(text);
+        self.screen.set_filter(text);
     }
 
-    fn toggle_git_config_scope(&mut self) {
-        self.full_screens.git_config.scope = match self.full_screens.git_config.scope {
+    fn toggle_scope(&mut self) {
+        self.screen.scope = match self.screen.scope {
             WriteScope::Local => WriteScope::Global,
             WriteScope::Global | WriteScope::Worktree => WriteScope::Local,
         };
     }
 
     /// Only the wheel does anything: it moves the selection.
-    pub(crate) fn git_config_mouse(&mut self, ev: MouseEvent) {
+    pub(crate) fn mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
-            MouseEventKind::ScrollUp => self.full_screens.git_config.move_by(-WHEEL_ROWS),
-            MouseEventKind::ScrollDown => self.full_screens.git_config.move_by(WHEEL_ROWS),
+            MouseEventKind::ScrollUp => self.screen.move_by(-WHEEL_ROWS),
+            MouseEventKind::ScrollDown => self.screen.move_by(WHEEL_ROWS),
             _ => {},
         }
     }
@@ -158,21 +154,21 @@ impl App {
 
 const BOOL_VALUES: &[&str] = &["true", "false"];
 
-impl App {
+impl GitConfig<'_> {
     /// `e` / `Enter`: edit the selected value in the write scope.
-    pub(crate) fn edit_git_config_value(&mut self) {
-        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
+    pub(crate) fn edit_value(&mut self) {
+        let Some(row) = self.screen.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
-        if let Some(reason) = Self::git_config_read_only(&row.entry.key, row.entry.scope) {
-            self.full_screens.git_config.note = Some(reason);
+        if let Some(reason) = git_config_read_only(&row.entry.key, row.entry.scope) {
+            self.screen.note = Some(reason);
             return;
         }
         if self.ask_before_global_write(GlobalResume::Edit) {
             return;
         }
-        let scope = self.full_screens.git_config.scope;
+        let scope = self.screen.scope;
         let replacing = self.replacing_in(scope, &row.entry.key, row.entry.scope, &row.entry.value);
         let known = lookup(&key).map(|k| k.kind);
         let title = format!("{key} ({})", scope_name(scope));
@@ -195,17 +191,17 @@ impl App {
                 .iter()
                 .position(|v| *v == row.entry.value)
                 .unwrap_or(0);
-            self.full_screens.git_config.pick = Some(PickTarget {
+            self.screen.pick = Some(PickTarget {
                 key,
                 kind: kind.value_kind(),
                 replacing,
                 values,
             });
-            self.modal.open_popup(Popup::Menu(MenuState {
+            self.events.push(Event::OpenPopup(Popup::Menu(MenuState {
                 title,
                 items,
                 selected,
-            }));
+            })));
             return;
         }
         let secret = is_secret_key(&key);
@@ -218,7 +214,7 @@ impl App {
         } else {
             (title, TextInput::from_text(&row.entry.value))
         };
-        self.open_name(
+        self.events.push(open_name(
             NameKind::ConfigValue(ConfigOp::Set {
                 key,
                 value: String::new(),
@@ -227,35 +223,34 @@ impl App {
             }),
             title,
             input,
-        );
+        ));
     }
 
     /// `Space`: flip a known boolean key.
-    pub(crate) fn toggle_git_config_bool(&mut self) {
-        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
+    pub(crate) fn toggle_bool(&mut self) {
+        let Some(row) = self.screen.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
         if lookup(&key).map(|k| k.kind) != Some(KeyType::Bool) {
-            self.full_screens.git_config.note =
-                Some(format!("{key} is not a boolean: Enter edits it"));
+            self.screen.note = Some(format!("{key} is not a boolean: Enter edits it"));
             return;
         }
-        if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
-            self.full_screens.git_config.note = Some(reason);
+        if let Some(reason) = git_config_read_only(&key, row.entry.scope) {
+            self.screen.note = Some(reason);
             return;
         }
         if self.ask_before_global_write(GlobalResume::Toggle) {
             return;
         }
-        let scope = self.full_screens.git_config.scope;
+        let scope = self.screen.scope;
         let replacing = self.replacing_in(scope, &key, row.entry.scope, &row.entry.value);
         let value = if truthy(&row.entry.value) {
             "false"
         } else {
             "true"
         };
-        self.perform_git_config_op(&ConfigOp::Set {
+        self.perform(&ConfigOp::Set {
             key,
             value: value.to_owned(),
             kind: ValueKind::Bool,
@@ -264,97 +259,95 @@ impl App {
     }
 
     /// `a`: ask for a key, then its value.
-    pub(crate) fn add_git_config_key(&mut self) {
+    pub(crate) fn add_key(&mut self) {
         if self.ask_before_global_write(GlobalResume::Add) {
             return;
         }
-        let scope = self.full_screens.git_config.scope;
-        self.open_name(
+        let scope = self.screen.scope;
+        self.events.push(open_name(
             NameKind::ConfigKey,
             format!("New key ({})", scope_name(scope)),
             TextInput::default(),
-        );
+        ));
     }
 
     /// `d`: unset the selected value in the write scope, after asking.
-    pub(crate) fn unset_git_config_value(&mut self) {
-        let Some(row) = self.full_screens.git_config.selected_row().cloned() else {
+    pub(crate) fn unset_value(&mut self) {
+        let Some(row) = self.screen.selected_row().cloned() else {
             return;
         };
         let key = row.entry.key.clone();
-        if let Some(reason) = Self::git_config_read_only(&key, row.entry.scope) {
-            self.full_screens.git_config.note = Some(reason);
+        if let Some(reason) = git_config_read_only(&key, row.entry.scope) {
+            self.screen.note = Some(reason);
             return;
         }
-        let scope = self.full_screens.git_config.scope;
+        let scope = self.screen.scope;
         if scope_of(row.entry.scope) != Some(scope) {
-            self.full_screens.git_config.note = Some(format!(
+            self.screen.note = Some(format!(
                 "{key} is not set in {}: press s to switch the scope",
                 scope_name(scope)
             ));
             return;
         }
         if row.included {
-            self.full_screens.git_config.note = Some(format!(
+            self.screen.note = Some(format!(
                 "{key} comes from an included file: edit that file directly"
             ));
             return;
         }
         let shown = display_value(&key, &row.entry.value);
-        let file = if scope == WriteScope::Global && !self.full_screens.git_config.global_confirmed
-        {
+        let file = if scope == WriteScope::Global && !self.screen.global_confirmed {
             format!(" ({})", self.global_file_label())
         } else {
             String::new()
         };
         let value = (!row.entry.value.is_empty()).then(|| row.entry.value.clone());
-        self.modal.ask(ConfirmPrompt {
+        self.events.push(Event::Ask(ConfirmPrompt {
             message: format!("unset {key} = {shown} in {}{file}?", scope_name(scope)),
             action: ConfirmAction::ConfigUnset(ConfigOp::Unset { key, value }),
-        });
+        }));
     }
 
-    /// `y` on the unset question. Asking named the file, so for the global
-    /// scope this is also the session's global confirmation.
-    pub(crate) fn confirm_git_config_unset(&mut self, op: &ConfigOp) {
-        if self.full_screens.git_config.scope == WriteScope::Global {
-            self.full_screens.git_config.global_confirmed = true;
+    /// `y` on the unset question. Asking named the file, so for the global scope
+    /// this is also the session's global confirmation.
+    pub(crate) fn confirm_unset(&mut self, op: &ConfigOp) {
+        if self.screen.scope == WriteScope::Global {
+            self.screen.global_confirmed = true;
         }
-        self.perform_git_config_op(op);
+        self.perform(op);
     }
 
     /// The first write to the global file of a session asks once, naming the
-    /// file. `true` when it asked (the caller stops; `resume_git_config_edit`
-    /// carries on after the yes).
+    /// file. `true` when it asked (the caller stops; `resume` carries on after
+    /// the yes).
     fn ask_before_global_write(&mut self, resume: GlobalResume) -> bool {
-        if self.full_screens.git_config.scope != WriteScope::Global
-            || self.full_screens.git_config.global_confirmed
-        {
+        if self.screen.scope != WriteScope::Global || self.screen.global_confirmed {
             return false;
         }
-        self.modal.ask(ConfirmPrompt {
-            message: format!(
-                "write to {}? Asked once this session.",
-                self.global_file_label()
-            ),
+        let message = format!(
+            "write to {}? Asked once this session.",
+            self.global_file_label()
+        );
+        self.events.push(Event::Ask(ConfirmPrompt {
+            message,
             action: ConfirmAction::ConfigGlobal(resume),
-        });
+        }));
         true
     }
 
     /// `y` on the global question: remember it, then do what was asked.
-    pub(crate) fn resume_git_config_edit(&mut self, resume: GlobalResume) {
-        self.full_screens.git_config.global_confirmed = true;
+    pub(crate) fn resume(&mut self, resume: GlobalResume) {
+        self.screen.global_confirmed = true;
         match resume {
-            GlobalResume::Edit => self.edit_git_config_value(),
-            GlobalResume::Toggle => self.toggle_git_config_bool(),
-            GlobalResume::Add => self.add_git_config_key(),
+            GlobalResume::Edit => self.edit_value(),
+            GlobalResume::Toggle => self.toggle_bool(),
+            GlobalResume::Add => self.add_key(),
         }
     }
 
     /// The global file as the user would write it: `~/.gitconfig`.
     fn global_file_label(&self) -> String {
-        let Some(path) = self.full_screens.git_config.global_file() else {
+        let Some(path) = self.screen.global_file() else {
             return "~/.gitconfig".to_owned();
         };
         std::env::var_os("HOME")
@@ -366,14 +359,14 @@ impl App {
     }
 
     /// A menu row of the allowed values was chosen.
-    pub(crate) fn pick_config_value(&mut self, index: usize) {
-        let Some(target) = self.full_screens.git_config.pick.take() else {
+    pub(crate) fn pick_value(&mut self, index: usize) {
+        let Some(target) = self.screen.pick.take() else {
             return;
         };
         let Some(value) = target.values.get(index) else {
             return;
         };
-        self.perform_git_config_op(&ConfigOp::Set {
+        self.perform(&ConfigOp::Set {
             key: target.key,
             value: (*value).to_owned(),
             kind: target.kind,
@@ -382,16 +375,17 @@ impl App {
     }
 
     /// `Enter` in a config popup. `true` when the popup should close.
-    pub(crate) fn submit_git_config_name(&mut self, kind: &NameKind, text: &str) -> bool {
+    pub(crate) fn submit_name(&mut self, kind: &NameKind, text: &str) -> bool {
         match kind {
             NameKind::ConfigKey => {
                 let key = text.trim().to_owned();
                 if key.is_empty() {
-                    self.report_notice("a key needs a name");
+                    self.events
+                        .push(Event::Notice("a key needs a name".to_owned()));
                     return false;
                 }
-                let scope = self.full_screens.git_config.scope;
-                let exists = self.full_screens.git_config.rows.iter().any(|r| {
+                let scope = self.screen.scope;
+                let exists = self.screen.rows.iter().any(|r| {
                     r.entry.key.eq_ignore_ascii_case(&key) && scope_of(r.entry.scope) == Some(scope)
                 });
                 let known = lookup(&key).map(|k| k.kind);
@@ -410,11 +404,11 @@ impl App {
                         replacing: None,
                     }
                 };
-                self.open_name(
+                self.events.push(open_name(
                     NameKind::ConfigValue(op),
                     format!("{key} ({})", scope_name(scope)),
                     TextInput::default(),
-                );
+                ));
                 false
             },
             NameKind::ConfigValue(op) => {
@@ -438,27 +432,14 @@ impl App {
                     // Never typed into a popup: it has its own question.
                     unset @ ConfigOp::Unset { .. } => unset,
                 };
-                self.perform_git_config_op(&op)
+                self.perform(&op)
             },
             _ => true,
         }
     }
 
-    /// Why this value cannot be edited here, if it cannot.
-    fn git_config_read_only(key: &str, scope: Scope) -> Option<String> {
-        let lower = key.to_ascii_lowercase();
-        if lower == "include.path" || lower.starts_with("includeif.") {
-            return Some("an include: edit that file directly".to_owned());
-        }
-        match scope {
-            Scope::System => Some("system, read-only".to_owned()),
-            Scope::Command => Some("set on the command line, read-only".to_owned()),
-            Scope::Global | Scope::Local | Scope::Worktree => None,
-        }
-    }
-
-    /// The value to change when `key` holds several in `target`: the selected
-    /// one, if it lives there.
+    /// The value to change when `key` holds several in `target`: the selected one,
+    /// if it lives there.
     fn replacing_in(
         &self,
         target: WriteScope,
@@ -467,8 +448,7 @@ impl App {
         value: &str,
     ) -> Option<String> {
         let held = self
-            .full_screens
-            .git_config
+            .screen
             .rows
             .iter()
             .filter(|r| r.entry.key == key && scope_of(r.entry.scope) == Some(target))
@@ -478,11 +458,11 @@ impl App {
 
     /// Run one change, re-read, and say what happened. `false` when git refused
     /// (its message is in the toast and nothing changed).
-    pub(crate) fn perform_git_config_op(&mut self, op: &ConfigOp) -> bool {
-        let Some(repo) = &self.repo else {
+    pub(crate) fn perform(&mut self, op: &ConfigOp) -> bool {
+        let Some(repo) = self.repo else {
             return false;
         };
-        let scope = self.full_screens.git_config.scope;
+        let scope = self.screen.scope;
         let result = match op {
             ConfigOp::Set {
                 key,
@@ -504,15 +484,15 @@ impl App {
             ConfigOp::Unset { key, value: None } => repo.config_unset(scope, key),
         };
         if let Err(e) = result {
-            self.report_error(e);
+            self.events.push(Event::Report(e.into()));
             return false;
         }
         let (ConfigOp::Set { key, .. } | ConfigOp::Add { key, .. } | ConfigOp::Unset { key, .. }) =
             op;
-        self.reread_git_config();
+        self.reread();
         let note = match op {
             ConfigOp::Unset { .. } => {
-                let wins = self.full_screens.git_config.effective(key).map(|e| {
+                let wins = self.screen.effective(key).map(|e| {
                     format!(
                         "{} value {} now wins",
                         scope_label(e.scope),
@@ -529,21 +509,34 @@ impl App {
                 format!("{key} changed in {}", scope_name(scope))
             },
         };
-        self.full_screens.git_config.note = Some(note);
-        self.request_refresh();
+        self.screen.note = Some(note);
+        self.events.push(Event::Refresh);
         true
     }
 
-    /// Keys of the config screen's edit actions, called from `git_config_key`.
-    pub(crate) fn git_config_edit_key(&mut self, key: KeyEvent) -> bool {
+    /// Keys of the config screen's edit actions, called from `key`.
+    pub(crate) fn edit_key(&mut self, key: KeyEvent) -> bool {
         match key.code {
-            KeyCode::Char('e') | KeyCode::Enter => self.edit_git_config_value(),
-            KeyCode::Char(' ') => self.toggle_git_config_bool(),
-            KeyCode::Char('a') => self.add_git_config_key(),
-            KeyCode::Char('d') => self.unset_git_config_value(),
+            KeyCode::Char('e') | KeyCode::Enter => self.edit_value(),
+            KeyCode::Char(' ') => self.toggle_bool(),
+            KeyCode::Char('a') => self.add_key(),
+            KeyCode::Char('d') => self.unset_value(),
             _ => return false,
         }
         true
+    }
+}
+
+/// Why this value cannot be edited here, if it cannot.
+fn git_config_read_only(key: &str, scope: Scope) -> Option<String> {
+    let lower = key.to_ascii_lowercase();
+    if lower == "include.path" || lower.starts_with("includeif.") {
+        return Some("an include: edit that file directly".to_owned());
+    }
+    match scope {
+        Scope::System => Some("system, read-only".to_owned()),
+        Scope::Command => Some("set on the command line, read-only".to_owned()),
+        Scope::Global | Scope::Local | Scope::Worktree => None,
     }
 }
 

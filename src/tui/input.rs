@@ -67,7 +67,15 @@ impl App {
 
         // A full-screen view owns the keys after the overlays above.
         if self.full_screens.active == FullScreen::GitConfig {
-            self.git_config_key(key);
+            let toggles = self
+                .prefs
+                .keymap
+                .resolve(&[Context::Global], KeyBinding::from_event(key))
+                == Some(Action::GitConfig);
+            let mut config = self.git_config_ctx();
+            config.key(key, toggles);
+            let events = config.events;
+            self.apply(events);
             return;
         }
         if self.full_screens.active == FullScreen::Welcome {
@@ -146,7 +154,10 @@ impl App {
         // The panes are not on screen: their areas from the last frame must not
         // answer clicks. The wheel scrolls the dashboard.
         if self.full_screens.active == FullScreen::GitConfig {
-            self.git_config_mouse(ev);
+            {
+                let mut config = self.git_config_ctx();
+                config.mouse(ev);
+            };
             return;
         }
         // Nothing to click without a repository.
