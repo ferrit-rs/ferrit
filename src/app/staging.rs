@@ -3,15 +3,13 @@
 //! port, then refresh and tell the user how it went.
 
 use std::ops::Range;
-use std::path::Path;
 
 use super::{App, events, git};
 use crate::app::error::AppError;
-use crate::git::apply::{ApplyDir, ApplyTarget, Granule};
 use crate::git::diff::DiffSide;
 use crate::git::error::GitResult;
 use crate::git::model::Change;
-use crate::git::staging;
+use crate::git::staging::{self, Plan, Refusal};
 use crate::interface::panes::diff_cursor::Mode;
 use crate::interface::panes::pane::Pane;
 use crate::interface::panes::tree::FileRow;
@@ -39,24 +37,8 @@ impl App {
         self.nav.mode = Mode::Nav;
     }
 
-    /// Run a `Granule` through the repository, if there is one.
-    fn apply_granule(
-        &self,
-        granule: &Granule,
-        dir: ApplyDir,
-        target: ApplyTarget,
-    ) -> GitResult<()> {
-        match &self.repo {
-            Some(repo) => staging::apply_granule(repo.as_ref(), granule, dir, target),
-            None => Ok(()),
-        }
-    }
-
     /// Refresh after a stage / unstage / discard, then surface a failure in
-    /// the Status pane. `git apply` is atomic per invocation, so a failure
-    /// leaves the repository exactly as it was; the refresh still runs so a
-    /// failed attempt (context drift from an external edit) re-reads the
-    /// current diff for the retry (`docs/PLAN_6_STAGING.md` "apply fails").
+    /// the Status pane.
     pub(super) fn finish_apply(&mut self, result: GitResult<()>) {
         self.request_refresh();
         if let Err(e) = result {
@@ -64,80 +46,52 @@ impl App {
         }
     }
 
+    /// Make a stage's call, then refresh and surface a failure in the Status
+    /// pane. `git apply` is atomic per invocation, so a failure leaves the
+    /// repository exactly as it was; the refresh still runs so a failed attempt
+    /// (context drift from an external edit) re-reads the current diff for the
+    /// retry (`docs/PLAN_6_STAGING.md` "apply fails").
+    pub(super) fn run_stage(&mut self, plan: Plan) {
+        let action = match plan {
+            Plan::Nothing => return,
+            Plan::Refuse(Refusal::ConflictMarkers(path)) => {
+                self.report_error(AppError::ConflictMarkers(path));
+                return;
+            },
+            Plan::Do(action) => action,
+        };
+        let Some(repo) = &self.repo else {
+            return;
+        };
+        let result = staging::run(repo.as_ref(), &action);
+        self.finish_apply(result);
+        if let Some(left_out) = action.left_out() {
+            self.report_error(AppError::PartlyStaged(left_out.to_vec()));
+        }
+    }
+
     /// `<space>` on a Files row (`Mode::Nav`): stage or unstage the whole
-    /// file, direction inferred from which side has a change
+    /// file or directory, direction inferred from which side has a change
     /// (`docs/PLAN_6_STAGING.md` "Stage vs unstage is one key").
     pub(super) fn stage_selected_file(&mut self) {
         if self.nav.focus != Pane::Files {
             return;
         }
-        let directory = match self
-            .rows()
-            .files_tree_rows()
-            .get(self.selected(Pane::Files))
-        {
-            Some(FileRow::Dir { path, .. }) => Some(path.clone()),
-            _ => None,
-        };
-        if let Some(path) = directory {
-            self.stage_directory(&path);
-            return;
-        }
-        let Some(entry) = self.rows().selected_file() else {
-            return;
-        };
-        let Some(dir) = staging::direction([entry]) else {
-            return;
-        };
-        let path = entry.path.clone();
-        // `git add` on an unmerged path marks it resolved whatever the file
-        // holds; refuse while conflict markers remain.
-        if dir == ApplyDir::Forward && entry.is_conflicted() && self.has_markers(&path) {
-            self.report_error(AppError::ConflictMarkers(path));
-            return;
-        }
+        let rows = self.rows().files_tree_rows();
         let Some(repo) = &self.repo else {
             return;
         };
-        let result = repo.stage_file(&path, dir);
-        self.finish_apply(result);
-    }
-
-    /// `<space>` on a directory row: stage every change under it, or unstage them
-    /// all when none is left to stage, as lazygit does. The root row (an empty
-    /// path) is every file. Conflicted files that still hold markers block it.
-    fn stage_directory(&mut self, directory: &Path) {
-        let under = self
-            .snapshot
-            .files
-            .iter()
-            .filter(|f| directory.as_os_str().is_empty() || f.path.starts_with(directory));
-        let Some(dir) = staging::direction(under.clone()) else {
-            return;
+        let plan = match rows.get(self.selected(Pane::Files)) {
+            Some(FileRow::Dir { path, .. }) => {
+                staging::plan_directory(repo.as_ref(), &self.snapshot.files, path)
+            },
+            Some(FileRow::File { index, .. }) => match self.snapshot.files.get(*index) {
+                Some(entry) => staging::plan_file(repo.as_ref(), entry),
+                None => return,
+            },
+            None => return,
         };
-        let Some(repo) = &self.repo else {
-            return;
-        };
-        let blocked = staging::unresolved_conflicts(repo.as_ref(), under);
-        if dir == ApplyDir::Forward && !blocked.is_empty() {
-            if let Some(first) = blocked.first() {
-                self.report_error(AppError::ConflictMarkers(first.clone()));
-            }
-            return;
-        }
-        let result = if directory.as_os_str().is_empty() {
-            repo.stage_all(dir)
-        } else {
-            repo.stage_file(directory, dir)
-        };
-        self.finish_apply(result);
-    }
-
-    /// Conflict markers still in `path`.
-    fn has_markers(&self, path: &Path) -> bool {
-        self.repo
-            .as_ref()
-            .is_some_and(|repo| staging::has_markers(repo.as_ref(), path))
+        self.run_stage(plan);
     }
 
     /// `<space>` in `Mode::Diff`: stage/unstage the hunk under the cursor,
@@ -146,13 +100,9 @@ impl App {
         let Some(granule) = self.right.current_granule() else {
             return;
         };
-        let dir = match self.right.cursor.side {
-            DiffSide::Worktree => ApplyDir::Forward,
-            DiffSide::Staged => ApplyDir::Reverse,
-        };
-        let result = self.apply_granule(&granule, dir, ApplyTarget::Index);
+        let action = staging::plan_granule(granule, self.right.cursor.side);
         self.right.cursor.anchor = None;
-        self.finish_apply(result);
+        self.run_stage(Plan::Do(action));
     }
 
     /// `a` (Nav, Files focused): stage every changed file if any is
@@ -162,26 +112,11 @@ impl App {
         if self.nav.focus != Pane::Files {
             return;
         }
-        let Some(dir) = staging::direction(&self.snapshot.files) else {
-            return;
-        };
         let Some(repo) = &self.repo else {
             return;
         };
-        let blocked = if dir == ApplyDir::Forward {
-            staging::unresolved_conflicts(repo.as_ref(), &self.snapshot.files)
-        } else {
-            Vec::new()
-        };
-        let result = if blocked.is_empty() {
-            repo.stage_all(dir)
-        } else {
-            repo.stage_all_except(&blocked)
-        };
-        self.finish_apply(result);
-        if !blocked.is_empty() {
-            self.report_error(AppError::PartlyStaged(blocked));
-        }
+        let plan = staging::plan_all(repo.as_ref(), &self.snapshot.files);
+        self.run_stage(plan);
     }
 
     /// `d`: ask before discarding a worktree change, at the file granularity
@@ -226,23 +161,13 @@ impl App {
         };
         match prompt.action {
             ConfirmAction::DiscardFile(path) => {
-                let untracked = self
-                    .snapshot
-                    .files
-                    .iter()
-                    .find(|f| f.path == path)
-                    .is_some_and(|f| f.worktree == Change::Untracked);
-                let result = match &self.repo {
-                    Some(repo) => repo.discard_file(&path, untracked),
-                    None => return,
-                };
+                let action = staging::plan_discard_file(&self.snapshot.files, &path);
                 self.right.cursor.anchor = None;
-                self.finish_apply(result);
+                self.run_stage(Plan::Do(action));
             },
             ConfirmAction::DiscardGranule(granule) => {
-                let result = self.apply_granule(&granule, ApplyDir::Reverse, ApplyTarget::Worktree);
                 self.right.cursor.anchor = None;
-                self.finish_apply(result);
+                self.run_stage(Plan::Do(staging::plan_discard_granule(granule)));
             },
             ConfirmAction::DeleteBranch { name, force } => {
                 let Some(repo) = &self.repo else { return };
