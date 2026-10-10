@@ -39,14 +39,14 @@ struct FileAcc {
 
 /// What one `git log --numstat` said, before it becomes `HotFiles`.
 #[derive(Default)]
-pub(super) struct Churn {
+pub(crate) struct Churn {
     /// Non-merge commits read.
-    pub(super) commits: usize,
+    pub(crate) commits: usize,
     /// The cap was hit: older commits exist that were not read.
-    pub(super) sampled: bool,
-    pub(super) lines: Lines,
+    pub(crate) sampled: bool,
+    pub(crate) lines: Lines,
     /// Lines by lower-cased mailmap-resolved author email.
-    pub(super) authors: BTreeMap<String, Lines>,
+    pub(crate) authors: BTreeMap<String, Lines>,
     files: BTreeMap<String, FileAcc>,
 }
 
@@ -62,7 +62,7 @@ fn is_ignored(path: &str) -> bool {
 
 /// Read the churn of the non-merge commits reachable from `rev` (the main
 /// branch's tip, or `HEAD`) since `since`, at most `cap` of them, newest first.
-pub(super) fn read(repo: &Repository, rev: &str, since: Option<i64>, cap: usize) -> Option<Churn> {
+pub(crate) fn read(repo: &Repository, rev: &str, since: Option<i64>, cap: usize) -> Option<Churn> {
     // An unborn HEAD has no history to read: that is an empty churn, not a failure.
     if rev == "HEAD" && repo.head().is_err() {
         return Some(parse("", cap));
@@ -135,7 +135,7 @@ impl Churn {
     /// The 10 files most commits touched that `exists` in HEAD, the ignored
     /// ones counted apart and the missing ones counted in `gone` (before the
     /// top 10 is taken; an ignored path is `hidden` whether it exists or not).
-    pub(super) fn hot_files(&self, exists: &dyn Fn(&str) -> bool) -> HotFiles {
+    pub(crate) fn hot_files(&self, exists: &dyn Fn(&str) -> bool) -> HotFiles {
         let mut kept = Vec::new();
         let mut hidden = Vec::new();
         let mut gone = 0;
@@ -175,7 +175,7 @@ impl Churn {
     reason = "a failed lookup is the assertion in a test"
 )]
 mod tests {
-    use super::{is_ignored, parse};
+    use crate::git::repo::statistics::churn::{is_ignored, parse};
 
     #[test]
     fn lockfiles_and_changelogs_are_ignored_at_any_depth() {

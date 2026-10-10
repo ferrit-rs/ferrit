@@ -230,7 +230,7 @@ mod tests {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    use super::{AppEvent, spawn_poll};
+    use crate::tui::events::{AppEvent, spawn_poll};
 
     #[test]
     fn the_poll_fires_at_the_configured_interval_not_a_fixed_one() {

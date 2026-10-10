@@ -3,7 +3,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-use super::{PaletteDirection, rgb};
+use crate::theme::color_picker::{PaletteDirection, rgb};
 
 const SPECTRUM_COLUMNS: usize = 12;
 const SPECTRUM_ROWS: usize = 5;
@@ -71,7 +71,7 @@ impl ColorPickerSpectrum {
     }
 }
 
-pub(super) fn color_at(index: usize) -> Option<Color> {
+pub(crate) fn color_at(index: usize) -> Option<Color> {
     if index >= SPECTRUM_LENGTH {
         return None;
     }
@@ -80,23 +80,23 @@ pub(super) fn color_at(index: usize) -> Option<Color> {
     Some(spectrum_color(column, row))
 }
 
-pub(super) fn all_colors() -> Vec<Color> {
+pub(crate) fn all_colors() -> Vec<Color> {
     (0..SPECTRUM_LENGTH).filter_map(color_at).collect()
 }
 
-pub(super) const fn columns() -> usize {
+pub(crate) const fn columns() -> usize {
     SPECTRUM_COLUMNS
 }
 
-pub(super) const fn rows() -> usize {
+pub(crate) const fn rows() -> usize {
     SPECTRUM_ROWS
 }
 
-pub(super) const fn cell_width() -> usize {
+pub(crate) const fn cell_width() -> usize {
     SPECTRUM_CELL_WIDTH
 }
 
-pub(super) fn move_selection(selected: usize, direction: PaletteDirection) -> usize {
+pub(crate) fn move_selection(selected: usize, direction: PaletteDirection) -> usize {
     let selected = selected.min(SPECTRUM_LENGTH - SPECTRUM_INDEX_STEP);
     let row = selected / SPECTRUM_COLUMNS;
     let column = selected % SPECTRUM_COLUMNS;
@@ -179,7 +179,7 @@ fn brightness(color: Color) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::channel;
+    use crate::theme::color_picker::color_picker_spectrum::channel;
 
     #[test]
     fn channel_rounds_half_up_across_the_byte_range() {

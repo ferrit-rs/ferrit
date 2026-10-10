@@ -216,7 +216,7 @@ fn fill_bg(buf: &mut Buffer, area: Rect, color: Color) {
 
 #[cfg(test)]
 mod tests {
-    use super::visible_cells;
+    use crate::tui::widgets::tui_overlay::overlay::visible_cells;
 
     #[test]
     fn visible_cells_rounds_half_up() {

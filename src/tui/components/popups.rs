@@ -422,7 +422,8 @@ pub(crate) fn confirm(action: ConfirmAction, env: &Env<'_>) -> Vec<Event> {
 
 #[cfg(test)]
 mod tests {
-    use super::{COMMAND_LOG_PAGE, KeyCode, scrolled_command_log};
+    use crate::tui::components::popups::{COMMAND_LOG_PAGE, scrolled_command_log};
+    use ratatui::crossterm::event::KeyCode;
 
     #[test]
     fn k_and_j_move_one_row_and_stop_at_the_newest() {

@@ -178,7 +178,11 @@ impl Widget for Donut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::tui::widgets::donut::{Donut, MIN_HEIGHT, MIN_WIDTH, Slice, fits, slice_at};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use ratatui::widgets::Widget;
 
     const RED: Color = Color::Red;
     const BLUE: Color = Color::Blue;

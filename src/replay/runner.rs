@@ -17,10 +17,10 @@ use ratatui::crossterm::event::{
 use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthStr;
 
-use super::fake_gh;
-use super::fixture::{self, Fixture};
-use super::script::{Directive, Expect, Script, Step};
 use crate::config::{Config, ConfigLoad};
+use crate::replay::fake_gh;
+use crate::replay::fixture::{self, Fixture};
+use crate::replay::script::{Directive, Expect, Script, Step};
 use crate::tui::App;
 use crate::tui::draw;
 use crate::tui::keymap::KeyBinding;

@@ -1,9 +1,9 @@
 //! The `git2` and subprocess half of `crate::git::refs`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
 use crate::git::refs::MergeOutcome;
 use crate::git::repo::exec;
+use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
 use git2::{BranchType, Repository};
 use std::path::Path;
@@ -33,7 +33,7 @@ fn run_git(
 /// that checkout would clobber; ferrit does not stash-and-pop on the
 /// user's behalf. A no-op, exit 0, on the already-checked-out branch —
 /// not special-cased.
-pub(super) fn checkout(repo: &Repository, name: &str) -> GitResult<()> {
+pub(crate) fn checkout(repo: &Repository, name: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
@@ -47,7 +47,7 @@ pub(super) fn checkout(repo: &Repository, name: &str) -> GitResult<()> {
 /// `git checkout -b <name>`, always from the current `HEAD` (branching
 /// from an arbitrary commit is a deferred nicety, see this plan's "After
 /// phase 8").
-pub(super) fn create_branch(repo: &Repository, name: &str) -> GitResult<()> {
+pub(crate) fn create_branch(repo: &Repository, name: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
@@ -61,7 +61,7 @@ pub(super) fn create_branch(repo: &Repository, name: &str) -> GitResult<()> {
 /// `git checkout -b <name> <start> --no-track`: a new branch at a commit or ref
 /// (`refs/heads/<branch>` for `n` on Branches), checked out, instead of always at
 /// `HEAD` (`docs/PLAN_12_POLISH.md` P4); never tracks the branch it starts from.
-pub(super) fn create_branch_at(repo: &Repository, name: &str, hash: &str) -> GitResult<()> {
+pub(crate) fn create_branch_at(repo: &Repository, name: &str, hash: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
@@ -78,7 +78,7 @@ pub(super) fn create_branch_at(repo: &Repository, name: &str, hash: &str) -> Git
 
 /// `git branch -m <old> <new>`. Git's own refusals (a name already taken, an
 /// invalid one) surface verbatim.
-pub(super) fn rename_branch(repo: &Repository, old: &str, new: &str) -> GitResult<()> {
+pub(crate) fn rename_branch(repo: &Repository, old: &str, new: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
@@ -93,7 +93,7 @@ pub(super) fn rename_branch(repo: &Repository, old: &str, new: &str) -> GitResul
 /// checked-out branch the same way `git` does; that error surfaces
 /// verbatim rather than being pre-checked here — `git` is the one source
 /// of truth for "is this actually `HEAD`".
-pub(super) fn delete_branch(repo: &Repository, name: &str, force: bool) -> GitResult<()> {
+pub(crate) fn delete_branch(repo: &Repository, name: &str, force: bool) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,
@@ -143,7 +143,7 @@ fn upstream_ref(repo: &Repository, name: &str) -> GitResult<String> {
 ///   forward a branch you're not on" trick. A plain (non-`+`-forced) `git
 ///   fetch` ref update already refuses a non-fast-forward, so no extra
 ///   safety check is needed on ferrit's side.
-pub(super) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
+pub(crate) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
     let workdir = workdir(repo)?;
     if is_checked_out(repo, name) {
         return run_git(
@@ -176,12 +176,12 @@ pub(super) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
 /// conflict is exit *non-zero* (`git merge` does not exit 0 and leave
 /// `MERGE_HEAD` behind, unlike the assumption this plan started from) —
 /// `repo.state()` is what tells a conflict apart from any other failure.
-pub(super) fn merge_branch(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
+pub(crate) fn merge_branch(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
     merge(repo, name, false)
 }
 
 /// `git merge --no-ff`: always a merge commit, even when a fast-forward would do.
-pub(super) fn merge_branch_no_ff(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
+pub(crate) fn merge_branch_no_ff(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
     merge(repo, name, true)
 }
 
@@ -189,7 +189,7 @@ pub(super) fn merge_branch_no_ff(repo: &Repository, name: &str) -> GitResult<Mer
 /// worktree, `HEAD` does not move. With `commit`, one ordinary commit follows.
 /// A conflict is an error here: `--squash` writes no `MERGE_HEAD`, so there is
 /// no merge in progress to continue; the conflicted files show in Files.
-pub(super) fn merge_squash(repo: &Repository, name: &str, commit: bool) -> GitResult<()> {
+pub(crate) fn merge_squash(repo: &Repository, name: &str, commit: bool) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(
         workdir,

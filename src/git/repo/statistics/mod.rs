@@ -15,12 +15,12 @@ use crate::git::stats::{
     DAY, HEAT_DAYS, KindStat, RepoStats, StatsOptions, Totals, Window, WorkState,
 };
 
-use super::read;
+use crate::git::repo::read;
 
 mod branch_health;
 mod churn;
 
-pub(super) fn repo_stats(
+pub(crate) fn repo_stats(
     repo: &Repository,
     window: Window,
     opts: &StatsOptions,

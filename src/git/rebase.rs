@@ -16,7 +16,7 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::history`.
 
-use super::model::CommitEntry;
+use crate::git::model::CommitEntry;
 use std::path::Path;
 
 /// What to do with the selected commit.

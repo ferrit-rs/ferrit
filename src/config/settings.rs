@@ -3,7 +3,7 @@
 //! sheet itself (keys, clicks, drawing) is in `app::settings` and
 //! `app::screens::settings`.
 
-use super::Section;
+use crate::config::Section;
 
 /// One line of the sheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter)]

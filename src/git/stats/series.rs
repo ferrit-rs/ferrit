@@ -126,7 +126,7 @@ pub fn series<I: IntoIterator<Item = i64>>(
     reason = "a failed setup is the assertion in a test"
 )]
 mod tests {
-    use super::{DAY, Granularity, civil_from_days, days_from_civil, series};
+    use crate::git::stats::series::{DAY, Granularity, civil_from_days, days_from_civil, series};
 
     fn day(y: i64, m: i64, d: i64) -> i64 {
         days_from_civil(y, m, d) * DAY

@@ -1,15 +1,15 @@
 //! The `git2` and subprocess half of `crate::git::config`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::config::{ConfigView, ValueKind, WriteScope, parse};
 use crate::git::error::{GitError, GitResult};
 use crate::git::repo::exec;
+use crate::git::repo::read::{stderr, workdir};
 use git2::Repository;
 use std::ffi::OsStr;
 use std::path::Path;
 
 // --- config ---
-pub(super) fn read(repo: &Repository, envs: &[(&str, &OsStr)]) -> GitResult<ConfigView> {
+pub(crate) fn read(repo: &Repository, envs: &[(&str, &OsStr)]) -> GitResult<ConfigView> {
     let mut cmd = exec::git(workdir(repo)?);
     cmd.args(["config", "--list", "--show-origin", "--show-scope", "-z"]);
     cmd.envs(envs.iter().copied());
@@ -60,7 +60,7 @@ fn write(
 
 /// Set `key` to `value` in `scope`. Git refuses a key that already has
 /// several values there; use `replace_all`.
-pub(super) fn set(
+pub(crate) fn set(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -72,7 +72,7 @@ pub(super) fn set(
 }
 
 /// Add one more value to a multi-valued key.
-pub(super) fn add(
+pub(crate) fn add(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -84,7 +84,7 @@ pub(super) fn add(
 }
 
 /// Replace every value of `key` in `scope` with this one.
-pub(super) fn replace_all(
+pub(crate) fn replace_all(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -105,7 +105,7 @@ pub(super) fn replace_all(
 
 /// Change the one value `old` of a multi-valued `key` in `scope`, leaving its
 /// siblings alone (`--fixed-value`: `old` is text, not a pattern).
-pub(super) fn replace_value(
+pub(crate) fn replace_value(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -121,7 +121,7 @@ pub(super) fn replace_value(
 }
 
 /// Remove only the value `old` of `key` in `scope`.
-pub(super) fn unset_value(
+pub(crate) fn unset_value(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -136,7 +136,7 @@ pub(super) fn unset_value(
 }
 
 /// Remove every value of `key` in `scope`; the other scopes keep theirs.
-pub(super) fn unset(
+pub(crate) fn unset(
     repo: &Repository,
     envs: &[(&str, &OsStr)],
     scope: WriteScope,
@@ -158,8 +158,11 @@ pub(super) fn unset(
 mod tests {
     use std::path::PathBuf;
 
-    use super::*;
-    use crate::git::config::Scope;
+    use crate::git::config::{Scope, ValueKind, WriteScope, parse};
+    use crate::git::error::{GitError, GitResult};
+    use crate::git::repo::exec;
+    use crate::git::repo::gitconfig::{run, write};
+    use std::ffi::OsStr;
 
     /// A repository plus global and system files of its own, so no test
     /// touches the real `~/.gitconfig`.

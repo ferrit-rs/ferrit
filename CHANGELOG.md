@@ -27,6 +27,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - TUI image decoding and terminal protocol detection now live under `tui/image`; Git backend stays terminal-independent.
 - TUI row renderers are split into explicit `tui::row_lines::{rows,diff,status}` namespaces; no compatibility re-export layer hides ownership.
 - Component intents and application state mutation now live in separate `event` and `reducer` modules.
+- Terminal event-loop routing now lives in `tui/runtime`; `tui/mod.rs` stays the application composition root, with no internal re-export alias.
+- Rust module paths and visibility now use explicit `crate::` and `pub(crate)` forms; the quality gate rejects `super` forms before commit.
 
 ## [0.10.0] - 2026-10-06
 

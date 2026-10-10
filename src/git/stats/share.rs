@@ -143,7 +143,7 @@ pub fn fold<T>(mut items: Vec<(T, u64)>, min_percent: u64, max_slices: usize) ->
     reason = "a failed setup is the assertion in a test"
 )]
 mod tests {
-    use super::{Share, fold, shares};
+    use crate::git::stats::share::{Share, fold, shares};
 
     fn percents(counts: &[u64]) -> Vec<Option<u8>> {
         shares(counts).items.iter().map(|s| s.percent).collect()

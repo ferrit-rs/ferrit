@@ -10,7 +10,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color as SynColor, Theme as SynTheme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
-use super::{META, fg};
+use crate::tui::row_lines::{META, fg};
 
 /// Bundled syntax definitions, loaded once. `_newlines` variant: its patterns
 /// expect the trailing `\n` syntect's own examples use, which we don't have

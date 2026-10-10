@@ -214,7 +214,7 @@ fn line_with_cursor(text: &str, col: usize) -> Line<'static> {
 
 #[cfg(test)]
 mod tests {
-    use super::{TextInput, TextInputMode};
+    use crate::tui::widgets::text_input::{TextInput, TextInputMode};
     use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
     #[test]

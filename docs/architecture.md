@@ -54,7 +54,7 @@ Rules that hold today, and that the tests and lints keep:
 Known gaps, each with a plan:
 - The code that only runs a subprocess (`exec`, `process`, `askpass`, `ssh_config`, and `gh`
   in `host`) is still beside the model in `git/`; it names no `git2`, but it is
-  infrastructure, and `app/` calls some of it directly (`PLAN_21_GIT_PORT.md`, C4).
+  infrastructure, and `tui/` calls some of it directly (`PLAN_21_GIT_PORT.md`, C4).
 - `tui/image` owns terminal image protocol detection and decoding; `git` only supplies image bytes.
 - `App` is smaller (87 fields to 26) but not small: the create-remote flow and what the user
   is told are still loose on it. Drawing reads `&App`: a frame returns what it learned as a
@@ -111,15 +111,15 @@ per feature), `tui/components/<x>.rs` everything the interface does with it.
 
 | Path | Holds |
 | --- | --- |
-| `src/tui/mod.rs` | `App` and the run loop (`api.rs` holds what tests and examples ask of it); `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
+| `src/tui/mod.rs` | `App` and the composition root (`api.rs` holds what tests and examples ask of it); `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
 | `src/tui/event.rs` | `Event` (what a component asks) and `Env` (what it may read) |
 | `src/tui/reducer.rs` | `App` state mutation for component events and runtime outcomes |
 | `src/tui/components/` | one file per piece: `panes/` (the five left panes: `nav`, `rows`, `tree`, `drills`, `hit_areas`, `keys`, `draw`), `files`, `branches`, `commits`, `stash` (what a key does in each), `diff/` (the right column: `right_pane` with its line cursor, `views`, `queries`, `draw`), `commit_editor`, `create_remote`, `menu`, `popups` (popup, question, note), `help`, `command_log`, `keybar`, `dashboard` (+ `dashboard/`), `settings`, `git_config/` (`keys`, `screen`, `draw`), `welcome`, `remote` |
-| `src/tui/` (the rest) | `input` (routing a key or a click), `scene` (what drawing may read of `App`: references to its state; drawing takes a `Scene`, never `App`), `view` (the read-only questions screens and tests ask), `publish` (creating the GitHub repository), `loading` (the diff and the image preview, off the UI thread), `keymap`, `events`, `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines::{rows,diff,status}` (explicit renderer ownership), `terminal`, `error`, `mock` |
+| `src/tui/` (the rest) | `input` (routing a key or a click), `scene` (what drawing may read of `App`: references to its state; drawing takes a `Scene`, never `App`), `view` (the read-only questions screens and tests ask), `publish` (creating the GitHub repository), `loading` (the diff and the image preview, off the UI thread), `keymap`, `events`, `runtime` (terminal loop and background-event routing), `workers` (background work and refresh), `draw` (the top-level layout, `Landed`, `RenderState`), `prefs`, `row_lines::{rows,diff,status}` (explicit renderer ownership), `terminal`, `error`, `mock` |
 | `src/tui/widgets/` | reusable widgets: `chrome` (panel, separator, scroll bar, drawer, dialog, lists, key bar), `donut`, `heatmap`, `share_bar`, `chart_palette`, `text_input`, `toast`, and `tui_overlay/` (vendored overlay code, with its upstream licence) |
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`) and `settings` (the rows of the settings sheet) |
 | `src/theme/` | how ferrit looks, and nothing else: `palette` (with its style helpers), the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`) and the colour picker |
-| `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `identity` (commit identities: the profile, the settings, the pick) and `image/` (format detection, preview) |
+| `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `identity` (commit identities: the profile, the settings, the pick) |
 | `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, in files that follow the traits of `git/port.rs` (`read`, `index`, `history`, `branches`, `stashes`, `remotes`, `gitconfig`, `statistics`) |
 | `src/replay/` | the scripted test harness (see ADR 2) |
 | `tests/` | integration tests, `app_*` drive `App`, `git_*` drive a real repository; `tests/common` holds the shared helpers, and the big ones are test crates in a folder (`main.rs`, `support.rs`, one module per behaviour) |

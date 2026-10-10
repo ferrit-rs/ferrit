@@ -4,9 +4,9 @@
     reason = "integration test scaffolding: a failed setup is the assertion"
 )]
 //! The dependency rule, checked on the sources. Inside `git`, only `git/repo`
-//! (the adapter) names `git2`, and nothing in `git` knows the terminal, and `git` never reaches into `app`. `app` reaches the adapter only where it builds
+//! (the adapter) names `git2`, and nothing in `git` knows the terminal, and `git` never reaches into `tui`. `tui` reaches the adapter only where it builds
 //! the app (`App::open`) and starts a repository (`git init`), and the adapter
-//! does not reach into `app`. See `docs/architecture.md` and
+//! does not reach into `tui`. See `docs/architecture.md` and
 //! `docs/PLAN_21_GIT_PORT.md`.
 
 use std::fs;
@@ -122,7 +122,7 @@ fn impl_app_is_only_written_in_app() {
 }
 
 /// A component decides and returns events; it never writes behaviour on `App`.
-/// What changes the state is `tui/event.rs`, and the few flows that cross the
+/// What changes the state is `tui/reducer.rs`, and the few flows that cross the
 /// popups, the workers and the repository are the files of `tui/` itself.
 #[test]
 fn no_component_writes_an_impl_app() {

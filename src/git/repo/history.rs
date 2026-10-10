@@ -2,13 +2,13 @@
 //! The `git2` and subprocess half of `crate::git::rebase`: the types are there.
 //! The `git2` and subprocess half of `crate::git::rebase`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::commit::{CommitKind, CommitOpts, INITIAL_FILE, INITIAL_MESSAGE};
 use crate::git::error::{GitError, GitResult};
 use crate::git::model::Operation;
 use crate::git::rebase::{OperationOutcome, Step, flag};
 use crate::git::rebase::{RebaseEdit, build_todo, shell_quote};
 use crate::git::repo::exec;
+use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
 use git2::{Oid, Repository, RepositoryState, Sort, Status, StatusOptions};
 use std::fs;
@@ -20,7 +20,7 @@ use std::process::Stdio;
 /// Run `git commit` with `message` on stdin (`-F -`), except for `Fixup`,
 /// which writes its own message and reads none. Returns the new `HEAD`'s
 /// full hash on success.
-pub(super) fn commit(
+pub(crate) fn commit(
     repo: &Repository,
     kind: &CommitKind,
     message: &str,
@@ -110,7 +110,7 @@ fn run(
 }
 
 /// Whether `HEAD` points at a commit (an unborn branch has none).
-pub(super) fn has_commits(repo: &Repository) -> bool {
+pub(crate) fn has_commits(repo: &Repository) -> bool {
     repo.head().is_ok()
 }
 
@@ -126,7 +126,7 @@ fn head_hash(repo: &Repository) -> GitResult<String> {
 
 /// `HEAD`'s current message, for pre-filling the Amend / Reword box.
 /// `None` on an unborn branch (nothing to amend or reword yet).
-pub(super) fn head_message(repo: &Repository) -> GitResult<Option<String>> {
+pub(crate) fn head_message(repo: &Repository) -> GitResult<Option<String>> {
     match repo.head() {
         Ok(head) => {
             let oid = head
@@ -146,7 +146,7 @@ pub(super) fn head_message(repo: &Repository) -> GitResult<Option<String>> {
 /// the work tree, where `git commit` runs. Lines starting with `#` are
 /// dropped, as `git commit` does when it opens an editor (ferrit commits with
 /// `-F`, which would keep them), and so is trailing whitespace.
-pub(super) fn template(repo: &Repository) -> Option<String> {
+pub(crate) fn template(repo: &Repository) -> Option<String> {
     let mut path = repo.config().ok()?.get_path("commit.template").ok()?;
     if path.is_relative() {
         path = repo.workdir()?.join(path);
@@ -163,7 +163,7 @@ pub(super) fn template(repo: &Repository) -> Option<String> {
 
 /// Count of paths staged relative to `HEAD`, the commit popup's
 /// precondition (`c` is disabled at 0).
-pub(super) fn staged_count(repo: &Repository) -> GitResult<usize> {
+pub(crate) fn staged_count(repo: &Repository) -> GitResult<usize> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(false);
     let statuses = repo.statuses(Some(&mut opts)).map_err(read_error)?;
@@ -185,7 +185,7 @@ pub(super) fn staged_count(repo: &Repository) -> GitResult<usize> {
 /// the repository already has a commit, so asking twice is harmless. Hooks,
 /// signing and the identity are `git commit`'s own. See
 /// `docs/PLAN_15_CREATE_REMOTE.md`.
-pub(super) fn initial_commit(repo: &Repository, author: Option<String>) -> GitResult<bool> {
+pub(crate) fn initial_commit(repo: &Repository, author: Option<String>) -> GitResult<bool> {
     match repo.head() {
         Ok(_) => return Ok(false),
         Err(e) if e.code() == git2::ErrorCode::UnbornBranch => {},
@@ -220,7 +220,7 @@ pub(super) fn initial_commit(repo: &Repository, author: Option<String>) -> GitRe
 
 // --- rebase ---
 /// Full message of the commit `hash`, for pre-filling the reword popup.
-pub(super) fn commit_message(repo: &Repository, hash: &str) -> GitResult<String> {
+pub(crate) fn commit_message(repo: &Repository, hash: &str) -> GitResult<String> {
     let commit = find_commit(repo, hash)?;
     Ok(commit.message().unwrap_or_default().trim_end().to_owned())
 }
@@ -232,7 +232,7 @@ fn find_commit<'r>(repo: &'r Repository, hash: &str) -> GitResult<git2::Commit<'
 }
 
 /// Reword, drop, edit, squash or fixup `hash` (a full `CommitEntry` hash).
-pub(super) fn rebase_edit(
+pub(crate) fn rebase_edit(
     repo: &Repository,
     hash: &str,
     edit: &RebaseEdit,
@@ -275,7 +275,7 @@ pub(super) fn rebase_edit(
 
 /// Fold every `fixup!` / `squash!` commit after `hash`'s parent into its
 /// target (`git rebase -i --autosquash`).
-pub(super) fn autosquash(repo: &Repository, hash: &str) -> GitResult<OperationOutcome> {
+pub(crate) fn autosquash(repo: &Repository, hash: &str) -> GitResult<OperationOutcome> {
     ensure_idle(repo)?;
     let target = find_commit(repo, hash)?;
     let anchor = target.parent(0).ok().map(|p| p.id());
@@ -383,7 +383,7 @@ fn write(path: &Path, text: &str) -> GitResult<()> {
 /// The operation in progress, or `None` for a clean repository. Bisect and
 /// mailbox (`git am`) states map to `None`: ferrit has no flow for them, and
 /// `ApplyMailboxOrRebase` cannot be told apart from a plain `am`.
-pub(super) fn current(repo: &Repository) -> Option<Operation> {
+pub(crate) fn current(repo: &Repository) -> Option<Operation> {
     match repo.state() {
         RepositoryState::Clean
         | RepositoryState::Bisect
@@ -426,7 +426,7 @@ fn rebase_progress(repo: &Repository, dir: &str, step_file: &str, total_file: &s
 /// is `Stopped`, while git refusing to continue over an unresolved file also
 /// exits non-zero and is an error. The two are told apart by git's
 /// `CONFLICT (` report, which only a fresh conflict prints.
-pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome> {
+pub(crate) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome> {
     let Some(operation) = current(repo) else {
         return Err(GitError::OperationFailed(
             "no operation in progress".to_owned(),
@@ -461,7 +461,7 @@ pub(super) fn step(repo: &Repository, step: Step) -> GitResult<OperationOutcome>
 /// unresolved file): the caller shows it, and the Status badge and `m` menu
 /// are how the user leaves that state. `refuse` wraps that text in the error
 /// variant of the operation that ran.
-pub(super) fn settle(
+pub(crate) fn settle(
     repo: &Repository,
     out: &std::process::Output,
     refuse: fn(String) -> GitError,

@@ -5,9 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
-use super::fixture::Fixture;
-use super::runner::{self, Options};
-use super::{script, tape};
+use crate::replay::fixture::Fixture;
+use crate::replay::runner::{self, Options};
+use crate::replay::{script, tape};
 
 /// The flags, as `main` parsed them.
 #[derive(Debug, Clone, Default)]

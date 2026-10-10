@@ -1,9 +1,9 @@
 //! The `git2` and subprocess half of `crate::git::apply`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::apply::{ApplyDir, ApplyTarget, transform_body};
 use crate::git::error::{GitError, GitResult};
 use crate::git::repo::exec;
+use crate::git::repo::read::{stderr, workdir};
 use git2::Repository;
 use std::collections::BTreeSet;
 use std::io::Write as _;
@@ -27,7 +27,7 @@ fn run_git(workdir: &Path, build: impl FnOnce(&mut Command)) -> GitResult<()> {
 
 /// Stage or unstage a whole file. No patch: `git add` / `git restore
 /// --staged`. Untracked files stage the same way `git add` always has.
-pub(super) fn stage_file(repo: &Repository, path: &Path, dir: ApplyDir) -> GitResult<()> {
+pub(crate) fn stage_file(repo: &Repository, path: &Path, dir: ApplyDir) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(workdir, |cmd| {
         match dir {
@@ -40,7 +40,7 @@ pub(super) fn stage_file(repo: &Repository, path: &Path, dir: ApplyDir) -> GitRe
 
 /// Stage or unstage every changed file in one call (`a`, `docs/PLAN_6_STAGING.md`
 /// milestone S4): `git add -A` / `git restore --staged .`.
-pub(super) fn stage_all(repo: &Repository, dir: ApplyDir) -> GitResult<()> {
+pub(crate) fn stage_all(repo: &Repository, dir: ApplyDir) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(workdir, |cmd| {
         match dir {
@@ -57,7 +57,7 @@ pub(super) fn stage_all(repo: &Repository, dir: ApplyDir) -> GitResult<()> {
 /// The paths are listed rather than excluded with `:(exclude,literal)<path>`:
 /// git 2.50 stages an unmerged path that a pathspec excludes, which is the
 /// marker-guard bypass this function exists to prevent.
-pub(super) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitResult<()> {
+pub(crate) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitResult<()> {
     let workdir = workdir(repo)?;
     let mut list = exec::git(workdir);
     list.args(["ls-files", "-z", "-m", "-d", "-o", "--exclude-standard"]);
@@ -84,7 +84,7 @@ pub(super) fn stage_all_except(repo: &Repository, excluded: &[PathBuf]) -> GitRe
 /// `git checkout --ours|--theirs -- <path>`: take one side of a conflicted
 /// file whole. The path stays unmerged until it is staged, which the marker
 /// guard now allows because the markers are gone.
-pub(super) fn take_side(repo: &Repository, path: &Path, ours: bool) -> GitResult<()> {
+pub(crate) fn take_side(repo: &Repository, path: &Path, ours: bool) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(workdir, |cmd| {
         cmd.arg("checkout")
@@ -101,7 +101,7 @@ pub(super) fn take_side(repo: &Repository, path: &Path, ours: bool) -> GitResult
 ///
 /// `git add` on an unmerged path marks it resolved whatever the file holds,
 /// so ferrit checks this first (`docs/PLAN_11_REBASE.md` R0).
-pub(super) fn has_conflict_markers(repo: &Repository, path: &Path) -> GitResult<bool> {
+pub(crate) fn has_conflict_markers(repo: &Repository, path: &Path) -> GitResult<bool> {
     let full = workdir(repo)?.join(path);
     let bytes = match std::fs::read(&full) {
         Ok(bytes) => bytes,
@@ -121,7 +121,7 @@ pub(super) fn has_conflict_markers(repo: &Repository, path: &Path) -> GitResult<
 /// Discard a whole file's worktree change: `git restore --worktree` for a
 /// tracked path, `git clean -f` for one git has never seen (there is nothing
 /// to restore it *to*). Never touches the index.
-pub(super) fn discard_file(repo: &Repository, path: &Path, untracked: bool) -> GitResult<()> {
+pub(crate) fn discard_file(repo: &Repository, path: &Path, untracked: bool) -> GitResult<()> {
     let workdir = workdir(repo)?;
     run_git(workdir, |cmd| {
         if untracked {
@@ -137,7 +137,7 @@ pub(super) fn discard_file(repo: &Repository, path: &Path, untracked: bool) -> G
 /// .. hunk.body.end` over a `Diff::text`, handed in by the caller so this
 /// module never re-runs the diff. The hunk's own `@@ -a,b +c,d @@` counts are
 /// already correct, so no `--recount`.
-pub(super) fn apply_hunk(
+pub(crate) fn apply_hunk(
     repo: &Repository,
     patch: &str,
     dir: ApplyDir,
@@ -152,7 +152,7 @@ pub(super) fn apply_hunk(
 /// (`transform_body`), which leaves the hunk header's counts wrong by
 /// construction, so this always passes `--recount` and lets `git` recompute
 /// them.
-pub(super) fn apply_lines(
+pub(crate) fn apply_lines(
     repo: &Repository,
     file_header: &str,
     hunk_header: &str,

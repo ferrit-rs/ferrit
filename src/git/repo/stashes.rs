@@ -1,10 +1,10 @@
 //! The `git2` and subprocess half of `crate::git::refs`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
 use crate::git::model::StashEntry;
 use crate::git::refs::StashOutcome;
 use crate::git::repo::exec;
+use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
 use git2::Repository;
 use std::process::Output;
@@ -12,7 +12,7 @@ use std::process::Output;
 // --- stash ---
 /// Read the stash list. `git2::Repository::stash_foreach` needs `&mut`, so
 /// this is the one read in `Repo::snapshot()` that borrows mutably.
-pub(super) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
+pub(crate) fn stashes(repo: &mut Repository) -> GitResult<Vec<StashEntry>> {
     let mut out = Vec::new();
     repo.stash_foreach(|index, message, oid| {
         out.push(StashEntry {
@@ -43,7 +43,7 @@ fn resolve(repo: &mut Repository, oid: &str) -> GitResult<String> {
 
 /// `git stash push --include-untracked [-m <message>]`. An empty message
 /// lets git write its own `WIP on <branch>: ...`.
-pub(super) fn push(repo: &Repository, message: &str, keep_index: bool) -> GitResult<()> {
+pub(crate) fn push(repo: &Repository, message: &str, keep_index: bool) -> GitResult<()> {
     let mut args = vec!["stash", "push", "--include-untracked"];
     if keep_index {
         args.push("--keep-index");
@@ -79,12 +79,12 @@ fn restore(repo: &mut Repository, oid: &str, verb: &str) -> GitResult<StashOutco
 }
 
 /// `git stash apply`: the entry stays.
-pub(super) fn apply(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
+pub(crate) fn apply(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
     restore(repo, oid, "apply")
 }
 
 /// `git stash pop`: the entry is removed only after a clean apply.
-pub(super) fn pop(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
+pub(crate) fn pop(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
     restore(repo, oid, "pop")
 }
 
@@ -94,7 +94,7 @@ pub(super) fn pop(repo: &mut Repository, oid: &str) -> GitResult<StashOutcome> {
 /// Storing the commit that is already on top changes nothing (git sees the same
 /// value and writes no reflog entry), so that entry is dropped first; its commit
 /// stays in the object database for the `store`.
-pub(super) fn rename(repo: &mut Repository, oid: &str, message: &str) -> GitResult<()> {
+pub(crate) fn rename(repo: &mut Repository, oid: &str, message: &str) -> GitResult<()> {
     let old = stashes(repo)?
         .into_iter()
         .find(|entry| entry.oid == oid)
@@ -120,7 +120,7 @@ fn run(repo: &Repository, args: &[&str]) -> GitResult<()> {
 }
 
 /// `git stash drop`.
-pub(super) fn drop_entry(repo: &mut Repository, oid: &str) -> GitResult<()> {
+pub(crate) fn drop_entry(repo: &mut Repository, oid: &str) -> GitResult<()> {
     let reference = resolve(repo, oid)?;
     run(repo, &["stash", "drop", &reference])
 }

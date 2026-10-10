@@ -20,10 +20,10 @@ use crate::git::refs::MergeOutcome;
 use crate::git::refs::StashOutcome;
 use crate::git::stats::{RepoStats, StatsOptions, Window};
 
-use super::Repo;
 use crate::git::port::{
     GitBranches, GitConfig, GitHistory, GitIndex, GitPort, GitRead, GitRemote, GitStash,
 };
+use crate::git::repo::Repo;
 
 impl GitPort for Repo {
     fn reopen(&self) -> GitResult<Box<dyn GitPort>> {

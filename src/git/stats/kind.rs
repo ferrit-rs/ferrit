@@ -59,7 +59,7 @@ pub fn parse_kind(subject: &str) -> Kind {
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, parse_kind};
+    use crate::git::stats::kind::{Kind, parse_kind};
 
     #[test]
     fn plain_scoped_and_breaking_prefixes() {

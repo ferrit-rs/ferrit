@@ -4,9 +4,9 @@
 
 use std::sync::atomic::AtomicBool;
 
-use super::error::GitResult;
-use super::model::{RemoteEntry, StatusHeader};
-use super::port::GitPort;
+use crate::git::error::GitResult;
+use crate::git::model::{RemoteEntry, StatusHeader};
+use crate::git::port::GitPort;
 
 /// Which network operation is in flight or just finished.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

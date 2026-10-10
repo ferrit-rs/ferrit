@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use super::AuthorStat;
+use crate::git::stats::AuthorStat;
 
 /// Commits of one email (or of one name, when the commit has no email).
 #[derive(Default)]
@@ -65,7 +65,7 @@ pub(crate) fn merge(accs: impl IntoIterator<Item = (String, AuthorAcc)>) -> Vec<
     reason = "a failed lookup is the assertion in a test"
 )]
 mod tests {
-    use super::{AuthorAcc, merge};
+    use crate::git::stats::authors::{AuthorAcc, merge};
 
     fn acc(name: &str, email: &str, commits: usize) -> (String, AuthorAcc) {
         (

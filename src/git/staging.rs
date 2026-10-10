@@ -4,11 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
-use super::apply::{ApplyDir, ApplyTarget, Granule};
-use super::diff::DiffSide;
-use super::error::GitResult;
-use super::model::{Change, FileEntry};
-use super::port::GitPort;
+use crate::git::apply::{ApplyDir, ApplyTarget, Granule};
+use crate::git::diff::DiffSide;
+use crate::git::error::GitResult;
+use crate::git::model::{Change, FileEntry};
+use crate::git::port::GitPort;
 
 /// Which way `<space>` goes over these files: stage when any has a change in
 /// the worktree, else unstage when any has one in the index, else nowhere.

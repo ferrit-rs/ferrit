@@ -7,8 +7,8 @@
 //! resolved by oid to `stash@{n}` right before the command
 //! (`docs/PLAN_10_STASH.md`).
 
-use super::error::GitResult;
-use super::port::GitPort;
+use crate::git::error::GitResult;
+use crate::git::port::GitPort;
 
 /// What a merge actually did. Not a plain `()`: "it worked" has two shapes
 /// ferrit's UI treats differently.

@@ -24,6 +24,14 @@ require_command() {
     }
 }
 
+check_explicit_paths() {
+    printf '%s\n' '==> explicit Rust module paths'
+    if rg -n --glob '*.rs' '\bsuper::|pub\(super\)' src tests examples; then
+        printf '%s\n' 'error: super paths are forbidden; use explicit crate:: paths and pub(crate)' >&2
+        return 1
+    fi
+}
+
 run_fast() {
     run_format
 
@@ -32,6 +40,8 @@ run_fast() {
 }
 
 run_format() {
+    check_explicit_paths
+
     printf '%s\n' '==> rustfmt'
     cargo fmt --all -- --check
 }

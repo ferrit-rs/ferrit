@@ -668,8 +668,8 @@ impl Repo {
 
 #[cfg(test)]
 mod identity_tests {
-    use super::unique_identities;
     use crate::git::identity::Identity;
+    use crate::git::repo::unique_identities;
 
     #[test]
     fn removes_duplicate_identity_pairs_and_preserves_first_seen_order() {

@@ -142,7 +142,9 @@ pub(crate) fn pad_label(label: &str, width: usize) -> String {
     reason = "test scaffolding: an out-of-range index is the failed assertion"
 )]
 mod tests {
-    use super::*;
+    use crate::tui::widgets::share_bar::{pad_label, percent_label, single_bar, stacked_bar};
+    use ratatui::style::{Color, Modifier};
+    use ratatui::text::{Line, Span};
 
     fn text(spans: &[Span<'_>]) -> String {
         spans.iter().map(|s| s.content.as_ref()).collect()

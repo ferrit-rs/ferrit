@@ -154,7 +154,7 @@ pub(crate) fn redact(arg: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandKind, classify, classify_program, redact};
+    use crate::git::command_log::{CommandKind, classify, classify_program, redact};
 
     #[test]
     fn only_the_status_checks_of_another_program_read() {

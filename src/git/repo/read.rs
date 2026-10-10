@@ -20,7 +20,7 @@ use std::process::Output;
 
 // --- status ---
 /// Read the header: branch, upstream, ahead/behind, conflict count.
-pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
+pub(crate) fn header(repo: &Repository) -> GitResult<StatusHeader> {
     let mut out = StatusHeader::default();
 
     match repo.head() {
@@ -28,7 +28,10 @@ pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
             out.detached = repo.head_detached().unwrap_or(false);
             let local_oid = head.target();
             out.branch = if out.detached {
-                local_oid.map_or_else(|| "HEAD".to_owned(), |oid| super::short_hash(&oid))
+                local_oid.map_or_else(
+                    || "HEAD".to_owned(),
+                    |oid| crate::git::repo::short_hash(&oid),
+                )
             } else {
                 head.shorthand().unwrap_or("HEAD").to_owned()
             };
@@ -71,7 +74,7 @@ pub(super) fn header(repo: &Repository) -> GitResult<StatusHeader> {
 
 /// Read the working-tree entries, sorted by path. Untracked files included,
 /// ignored files excluded.
-pub(super) fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
+pub(crate) fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
@@ -143,7 +146,7 @@ fn worktree_change(s: Status) -> Change {
 // --- log ---
 /// Walk HEAD's history, newest first, up to `max` entries. An unborn branch
 /// (fresh repo, no commits) comes back as an empty list, not an error.
-pub(super) fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
+pub(crate) fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntry>> {
     let mut revwalk = repo.revwalk().map_err(read_error)?;
     if revwalk.push_head().is_err() {
         return Ok(Vec::new());
@@ -158,7 +161,7 @@ pub(super) fn commits(repo: &Repository, max: usize) -> GitResult<Vec<CommitEntr
 /// branch that no longer exists, or one with no commits, comes back as an
 /// empty list, not an error — the caller (`App`) treats that as "drop the
 /// scope" rather than surfacing it.
-pub(super) fn commits_for(
+pub(crate) fn commits_for(
     repo: &Repository,
     branch: &str,
     max: usize,
@@ -336,7 +339,7 @@ fn walk(repo: &Repository, mut revwalk: Revwalk<'_>, max: usize) -> GitResult<Ve
 
 // --- diff ---
 /// One file's worktree-or-staged diff.
-pub(super) fn file_diff(
+pub(crate) fn file_diff(
     repo: &Repository,
     path: &Path,
     side: DiffSide,
@@ -382,7 +385,7 @@ pub(super) fn file_diff(
 /// A commit against its first parent (`git show`). Empty-tree diff for the root
 /// commit; first-parent diff for a merge (`-m --first-parent`). `hash` is a
 /// `CommitEntry::full_hash`.
-pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
+pub(crate) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitResult<Diff> {
     let workdir = workdir(repo)?;
 
     // `--decorate` puts `(HEAD -> main, tag: v1, origin/main)` on the commit line and
@@ -414,7 +417,7 @@ pub(super) fn commit_diff(repo: &Repository, hash: &str, opts: DiffOpts) -> GitR
 /// under lazygit's header: `header` (`stash@{0}: On main: msg`), a blank line,
 /// the stat, a blank line, the patch. `oid` is a `StashEntry::oid`; git accepts a
 /// stash-like commit directly, so a shifted `stash@{n}` cannot make this stale.
-pub(super) fn stash_diff(
+pub(crate) fn stash_diff(
     repo: &Repository,
     oid: &str,
     header: &str,
@@ -446,13 +449,13 @@ fn is_untracked(repo: &Repository, path: &Path) -> bool {
 
 /// Shared with `apply.rs`, which runs `git apply` / `add` / `restore` /
 /// `clean` against the same worktree.
-pub(super) fn workdir(repo: &Repository) -> GitResult<&Path> {
+pub(crate) fn workdir(repo: &Repository) -> GitResult<&Path> {
     repo.workdir()
         .ok_or_else(|| GitError::DiffFailed("bare repository has no working tree".to_owned()))
 }
 
 /// Shared with `apply.rs`.
-pub(super) fn stderr(out: &Output) -> String {
+pub(crate) fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).trim().to_owned()
 }
 
@@ -502,7 +505,7 @@ fn read_err(path: &Path, msg: impl std::fmt::Display) -> GitError {
 
 /// Read `path` at `rev`. Missing files, bare repos and non-blob entries all
 /// come back as `GitError::Read`, never a panic.
-pub(super) fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
+pub(crate) fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<Vec<u8>> {
     match rev {
         Rev::Workdir => {
             let root = repo
@@ -527,7 +530,7 @@ pub(super) fn blob_bytes(repo: &Repository, path: &Path, rev: Rev) -> GitResult<
 
 // --- refs ---
 /// Read the local branches, HEAD first, then alphabetical by name.
-pub(super) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
+pub(crate) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
     let mut out: Vec<BranchEntry> = repo
         .branches(Some(BranchType::Local))
         .map_err(read_error)?

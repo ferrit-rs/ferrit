@@ -8,7 +8,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::fmt::Write as _;
 
-use super::fg;
+use crate::tui::row_lines::fg;
 
 /// `git --shortstat` style summary shown above a diff: `N file(s) changed, X
 /// insertion(s)(+), Y deletion(s)(-)`, insertions in green, deletions in red.

@@ -12,7 +12,6 @@
 //! or hooks involved), same split the rest of `git::` already makes.
 //! The `git2` and subprocess half of `crate::git::host`: the types are there.
 
-use super::read::{stderr, workdir};
 use crate::git::error::{GitError, GitResult};
 use crate::git::host::{
     CreateRequest, CreatedRepo, GhProgram, GhStatus, build_create_args, web_url,
@@ -20,6 +19,7 @@ use crate::git::host::{
 use crate::git::model::RemoteEntry;
 use crate::git::repo::exec;
 use crate::git::repo::process::{combined_output, run_child, run_command, run_git};
+use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
 use git2::Repository;
 use std::path::Path;
@@ -27,7 +27,7 @@ use std::sync::atomic::AtomicBool;
 
 // --- remote ---
 /// Configured remotes, alphabetical.
-pub(super) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
+pub(crate) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
     let mut names: Vec<String> = repo
         .remotes()
         .map_err(read_error)?
@@ -59,7 +59,7 @@ pub(super) fn remotes(repo: &Repository) -> GitResult<Vec<RemoteEntry>> {
 
 /// `git fetch <remote>`, or plain `git fetch` (every remote, git's own
 /// default) when `remote` is `None`.
-pub(super) fn fetch(repo: &Repository, remote: Option<&str>) -> GitResult<String> {
+pub(crate) fn fetch(repo: &Repository, remote: Option<&str>) -> GitResult<String> {
     let workdir = workdir(repo)?;
     let mut args = vec!["fetch".to_owned()];
     if let Some(name) = remote {
@@ -83,7 +83,7 @@ pub(crate) fn fetch_cancellable(
 
 /// `git pull`. No flags: `pull.rebase` / `pull.ff` decide the shape, same
 /// as any other `git config` this backend already defers to.
-pub(super) fn pull(repo: &Repository) -> GitResult<String> {
+pub(crate) fn pull(repo: &Repository) -> GitResult<String> {
     let workdir = workdir(repo)?;
     run_git(workdir, &["pull".to_owned()], None, GitError::PullFailed)
 }
@@ -115,7 +115,7 @@ fn current_branch_name(repo: &Repository) -> GitResult<String> {
 /// `branch.rs`'s unmerged-delete detection already uses, and reported as
 /// `GitError::NoUpstream` rather than a generic `PushFailed` so `App` can
 /// act on it (offer `-u`) instead of just displaying it.
-pub(super) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<String> {
+pub(crate) fn push(repo: &Repository, set_upstream: Option<&str>) -> GitResult<String> {
     push_with_lease(repo, set_upstream, false)
 }
 
@@ -201,7 +201,7 @@ fn run_push(
 /// an `origin` (`gh` would fail on it halfway). `gh`'s own refusal (a name
 /// taken, no right to create there) comes back as its message. Nothing is
 /// configured locally unless `gh` succeeds: it adds the remote itself, last.
-pub(super) fn create_repo(
+pub(crate) fn create_repo(
     repo: &Repository,
     gh: &GhProgram,
     req: &CreateRequest,
@@ -228,7 +228,7 @@ pub(super) fn create_repo(
 
 /// `git remote set-url <name> <url>`. Git refuses a remote that does not exist
 /// and says so.
-pub(super) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitResult<()> {
+pub(crate) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitResult<()> {
     let mut cmd = exec::git(workdir(repo)?);
     cmd.args(["remote", "set-url", "--", name, url]);
     let out =
@@ -247,7 +247,7 @@ pub(super) fn set_remote_url(repo: &Repository, name: &str, url: &str) -> GitRes
 /// calls it from a worker, never from the UI thread. `gh auth status` also
 /// fails when the network is down: that reads as signed out, and `gh auth
 /// login` is then the thing to try either way.
-pub(super) fn gh_status(gh: &GhProgram) -> GhStatus {
+pub(crate) fn gh_status(gh: &GhProgram) -> GhStatus {
     if !gh_succeeds(gh, &["--version"]) {
         GhStatus::Missing
     } else if gh_succeeds(gh, &["auth", "status"]) {

@@ -564,7 +564,8 @@ impl MousePointer {
 
 #[cfg(test)]
 mod tests_cut {
-    use super::*;
+    use crate::tui::widgets::chrome::{cut_end, cut_middle};
+    use unicode_width::UnicodeWidthStr;
 
     #[test]
     fn cuts() {

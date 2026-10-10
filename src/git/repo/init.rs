@@ -2,10 +2,10 @@
 
 use std::path::Path;
 
-use super::Repo;
-use super::read::stderr;
 use crate::git::error::{GitError, GitResult};
+use crate::git::repo::Repo;
 use crate::git::repo::exec;
+use crate::git::repo::read::stderr;
 
 impl Repo {
     /// `git init` in `dir`, then open the repository it made. No flag: the

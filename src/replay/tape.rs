@@ -6,7 +6,7 @@
 
 use ratatui::crossterm::event::KeyCode;
 
-use super::script::{Directive, Script};
+use crate::replay::script::{Directive, Script};
 use crate::tui::keymap::KeyBinding;
 
 /// A pause between keys so the GIF can be followed.

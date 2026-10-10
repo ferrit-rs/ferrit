@@ -157,7 +157,7 @@ fn relay(_socket: &Path, _prompt: &str) -> io::Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_secret;
+    use crate::git::askpass::is_secret;
 
     #[test]
     fn passphrases_and_passwords_are_hidden() {

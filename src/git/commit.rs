@@ -8,11 +8,11 @@
 //! This file holds the types and the pure functions. The code that reads with
 //! `git2` or runs `git` is `crate::git::repo::history`.
 
-use super::error::GitResult;
-use super::model::{Change, FileEntry};
-use super::port::GitPort;
-use super::rebase::OperationOutcome;
-use super::rebase::RebaseEdit;
+use crate::git::error::GitResult;
+use crate::git::model::{Change, FileEntry};
+use crate::git::port::GitPort;
+use crate::git::rebase::OperationOutcome;
+use crate::git::rebase::RebaseEdit;
 
 /// What kind of commit to make.
 #[derive(Debug, Clone, PartialEq, Eq)]

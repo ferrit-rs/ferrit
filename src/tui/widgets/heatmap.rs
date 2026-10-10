@@ -191,9 +191,11 @@ impl Widget for HeatMap<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::style::Color;
-
-    use super::*;
+    use crate::tui::widgets::heatmap::{GUTTER, HeatMap, legend, level, thresholds, weekday};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use ratatui::widgets::Widget;
 
     /// 2024-01-01 was a Monday: unix day 19723.
     const MONDAY: i64 = 19723;

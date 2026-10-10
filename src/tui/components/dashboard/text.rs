@@ -151,7 +151,12 @@ pub(crate) fn figure_columns(figures: &[String], dim: Style) -> (Vec<Vec<Span<'s
     reason = "a failed setup or a bad index is the assertion in a test"
 )]
 mod tests {
-    use super::*;
+    use crate::git::stats::series::Granularity;
+    use crate::git::stats::share::Share;
+    use crate::tui::components::dashboard::text::{
+        DAY, axis_date, compact, date, figure, figure_columns, plural, relative_time, thousands,
+    };
+    use ratatui::style::Style;
 
     #[test]
     fn relative_times() {

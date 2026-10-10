@@ -177,7 +177,12 @@ pub fn kind_marker(kind: Kind) -> &'static str {
     reason = "test scaffolding: an out-of-range index is the failed assertion"
 )]
 mod tests {
-    use super::*;
+    use crate::git::stats::kind::Kind;
+    use crate::theme::palette::Palette;
+    use crate::tui::widgets::chart_palette::{
+        ChartMode, ChartPalette, OTHERS, charts_mode_auto, kind_marker, slot_marker,
+    };
+    use ratatui::style::{Color, Modifier, Style};
 
     #[test]
     fn dark_uses_ansi_names() {

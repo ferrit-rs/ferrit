@@ -11,7 +11,7 @@ use crate::git::stats::branch_health::{BranchHealth, STALE_SECONDS, TagSince, Vs
 /// `init.defaultBranch`, else the first of `main`, `master`. Named and
 /// resolved to its tip (the local branch when it exists, else the remote
 /// one). `None` means HEAD's own branch is all there is.
-pub(super) fn main_branch(repo: &Repository) -> Option<(String, Oid)> {
+pub(crate) fn main_branch(repo: &Repository) -> Option<(String, Oid)> {
     let tip = |name: &str, remote: Option<&str>| {
         repo.find_branch(name, BranchType::Local)
             .ok()
@@ -49,7 +49,7 @@ pub(super) fn main_branch(repo: &Repository) -> Option<(String, Oid)> {
 /// the current branch, then branches with work not in the main branch, then
 /// the rest (merged ones, the main branch itself), each group by most recent
 /// tip and then name.
-pub(super) fn health(
+pub(crate) fn health(
     repo: &Repository,
     now: i64,
 ) -> GitResult<(Option<String>, Vec<BranchHealth>)> {
@@ -104,7 +104,7 @@ pub(super) fn health(
 }
 
 /// How many references live under `prefix`, remote `HEAD` aliases excluded.
-pub(super) fn count_refs(repo: &Repository, prefix: &str) -> usize {
+pub(crate) fn count_refs(repo: &Repository, prefix: &str) -> usize {
     repo.references_glob(&format!("{prefix}*"))
         .map_or(0, |refs| {
             refs.flatten()
@@ -115,7 +115,7 @@ pub(super) fn count_refs(repo: &Repository, prefix: &str) -> usize {
 
 /// The tag whose commit is the newest among those reachable from `HEAD`
 /// (annotated and lightweight alike), with the commits since it.
-pub(super) fn since_tag(repo: &Repository) -> Option<TagSince> {
+pub(crate) fn since_tag(repo: &Repository) -> Option<TagSince> {
     let head = repo.head().ok()?.target()?;
     let (_, name, tag_oid) = repo
         .references_glob("refs/tags/*")

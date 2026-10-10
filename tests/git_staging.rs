@@ -83,7 +83,7 @@ mod plans {
         plan_granule, run,
     };
 
-    use super::{ApplyDir, file};
+    use crate::{ApplyDir, file};
 
     fn entry(path: &str, staged: Change, worktree: Change) -> FileEntry {
         FileEntry {

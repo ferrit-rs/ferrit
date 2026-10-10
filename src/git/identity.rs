@@ -147,7 +147,7 @@ impl Authorship {
 
 #[cfg(test)]
 mod tests_identity {
-    use super::{Identity, IdentitySource, Settings};
+    use crate::git::identity::{Identity, IdentitySource, Settings};
 
     #[test]
     fn available_identities_uses_global_config_only_and_requires_email() {

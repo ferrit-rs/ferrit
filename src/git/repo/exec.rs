@@ -147,12 +147,12 @@ impl Drop for Tracked {
 mod tests {
     use std::process::Command;
 
-    use super::output;
     use crate::git::command_log::recent;
+    use crate::git::repo::exec::output;
 
     #[test]
     fn a_write_keeps_its_non_empty_stdout_lines_up_to_the_cap() {
-        let mut cmd = super::git(std::path::Path::new("."));
+        let mut cmd = crate::git::repo::exec::git(std::path::Path::new("."));
         // `var -l` is a write to the log and prints one line per config entry.
         cmd.args(["-c", "zz.marker=1", "var", "-l"]);
         assert!(output(&mut cmd).is_ok());
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn another_program_is_recorded_under_its_own_name() {
-        let mut cmd = super::program(std::ffi::OsStr::new("true"));
+        let mut cmd = crate::git::repo::exec::program(std::ffi::OsStr::new("true"));
         cmd.args(["auth", "status", "zz-program-marker"]);
         assert!(output(&mut cmd).is_ok());
         let records: Vec<_> = recent(usize::MAX, true)

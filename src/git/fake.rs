@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use super::Snapshot;
+use crate::git::Snapshot;
 use crate::git::apply::{ApplyDir, ApplyTarget};
 use crate::git::commit::{CommitKind, CommitOpts};
 use crate::git::config::{ConfigView, ValueKind, WriteScope};

@@ -62,7 +62,7 @@ pub struct FileMeta {
 }
 
 /// Split `text` into one `FileMeta` per `diff --git` section.
-pub(super) fn parse(text: &str) -> Vec<FileMeta> {
+pub(crate) fn parse(text: &str) -> Vec<FileMeta> {
     let starts = section_starts(text);
     starts
         .iter()
