@@ -56,7 +56,7 @@ pub struct App {
     repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
     authorship: git::identity::Authorship,
-    pub theme: components::settings::ThemeEditor,
+    pub theme: components::settings::theme::ThemeEditor,
     /// What the last refresh read: header, files, branches, remotes, commits,
     /// stashes and any operation stopped mid-way.
     snapshot: git::Snapshot,
@@ -180,7 +180,7 @@ impl App {
             repo,
             repo_name,
             authorship,
-            theme: components::settings::ThemeEditor::new(theme_config),
+            theme: components::settings::theme::ThemeEditor::new(theme_config),
             right: components::diff::right_pane::RightPane::new(),
             snapshot: git::Snapshot::default(),
             last_error: None,

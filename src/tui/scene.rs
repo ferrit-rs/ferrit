@@ -16,7 +16,8 @@ use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::create_remote::CreateRemoteState;
 use crate::tui::components::create_remote::{Consequences, CreateRemoteView};
-use crate::tui::components::dashboard::{Dashboard, Sheet};
+use crate::tui::components::dashboard::Sheet;
+use crate::tui::components::dashboard::state::Dashboard;
 use crate::tui::components::diff::right_pane::{Mode, RightPane};
 use crate::tui::components::diff::views::{
     CommandLogView, CommitPopupView, DiffView, MenuView, PopupView,
@@ -40,7 +41,7 @@ use crate::tui::workers::Workers;
 pub(crate) struct Scene<'a> {
     pub(crate) nav: &'a Nav,
     pub(crate) snapshot: &'a Snapshot,
-    pub(crate) theme: &'a settings::ThemeEditor,
+    pub(crate) theme: &'a settings::theme::ThemeEditor,
     pub(crate) prefs: &'a Prefs,
     pub(crate) right: &'a RightPane,
     pub(crate) sheets: &'a crate::tui::components::dashboard::Sheets,

@@ -192,7 +192,7 @@ fn draw_panes(
                     height: area.height.saturating_sub(keybar.height),
                     ..area
                 };
-                dashboard::draw_sheet(frame, above, app, render, landed);
+                dashboard::view::draw_sheet(frame, above, app, render, landed);
             },
         }
     }

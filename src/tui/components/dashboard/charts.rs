@@ -13,7 +13,7 @@ use ratatui::widgets::{Paragraph, Sparkline, Widget};
 use crate::git::stats::series::{Bucket, Granularity};
 use crate::git::stats::share::{fold, shares};
 use crate::tui::components::dashboard::text::{axis_date, figure, figure_columns, plural};
-use crate::tui::components::dashboard::{Ctx, note};
+use crate::tui::components::dashboard::view::{Ctx, note};
 use crate::tui::widgets::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
 use crate::tui::widgets::donut::{self, Donut, Slice};
 use crate::tui::widgets::heatmap::{self, HeatMap};

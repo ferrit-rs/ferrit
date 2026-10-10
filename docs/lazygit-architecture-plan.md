@@ -211,6 +211,8 @@ src/
 └── tui/
     ├── components/               feature UI components
     │   ├── files/                 tree, projection, navigation and keys
+    │   ├── dashboard/              state/loading, view/rendering, charts, tables, text
+    │   ├── settings/               sheet orchestration, theme editor and row projection
     │   ├── panes/                 generic pane orchestration
     │   ├── diff/                  diff feature
     │   ├── dashboard/             dashboard feature

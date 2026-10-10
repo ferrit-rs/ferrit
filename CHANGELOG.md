@@ -34,6 +34,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Git diff line counting now uses a bounded byte iterator without a special lint exemption.
 - The Files feature now follows a dedicated tree, projection and navigation boundary; pane selection identities no longer live inside the file-tree module.
 - Added `docs/lazygit-architecture-plan.md` with the LazyGit/LazyGitRS architecture reference and the Rust-adapted convergence plan.
+- Dashboard state/loading and dashboard projection/rendering now live in separate `tui/components/dashboard/{state,view}.rs` modules.
+- Settings theme editing and settings-row projection now live in dedicated `tui/components/settings/{theme,rows}.rs` modules.
 - The Git adapter now separates status, log, blob and diff reads into capability modules; `repo/read.rs` only keeps shared command and worktree helpers.
 - Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `tui/controllers/actions.rs` instead of the input router.
 

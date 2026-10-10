@@ -44,7 +44,7 @@ pub enum AppEvent {
         reply: Sender<Option<String>>,
     },
     /// The dashboard statistics worker answered (`app::dashboard`).
-    StatsDone(crate::tui::components::dashboard::StatsCompletion),
+    StatsDone(crate::tui::components::dashboard::state::StatsCompletion),
     RemoteDone {
         op: crate::git::remote::RemoteOp,
         message: Result<String, AppError>,

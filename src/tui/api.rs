@@ -35,7 +35,7 @@ impl App {
     }
 
     /// The dashboard's state, for the screen that draws it and for tests.
-    pub fn dashboard(&self) -> &components::dashboard::Dashboard {
+    pub fn dashboard(&self) -> &components::dashboard::state::Dashboard {
         &self.sheets.dashboard
     }
 

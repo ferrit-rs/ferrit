@@ -1,18 +1,11 @@
 //! The settings sheet: its keys and clicks, the theme being edited, and how it is drawn.
 
-use crate::config::settings::{
-    Kind, SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped,
-};
+use crate::config::settings::{SaveState, SettingsRow, SettingsSheet, TerminalRequest, stepped};
 use crate::config::{Config, Section};
-use crate::theme::color_picker::{
-    self, ColorPicker, ColorPickerDisplay, PaletteDirection, grid_metrics, rgb,
-};
+use crate::theme::color_picker::{ColorPicker, PaletteDirection, grid_metrics, rgb};
 use crate::theme::palette::Palette;
 use crate::theme::scheme::ColorDepth;
-use crate::theme::theme_config::{
-    Preset, RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, SchemeChoice, ThemeConfig,
-    ThemeMode,
-};
+use crate::theme::theme_config::{Preset, SchemeChoice, ThemeMode};
 use crate::tui::draw::RenderedDiff;
 use crate::tui::draw::{Landed, RenderState};
 use crate::tui::event::Event;
@@ -25,11 +18,15 @@ use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Constraint, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::Style;
+use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use std::path::Path;
 use strum::IntoEnumIterator;
+
+mod rows;
+pub mod theme;
+use crate::tui::components::settings::theme::ThemeEditor;
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
@@ -319,10 +316,10 @@ impl Settings<'_> {
                         .position(|candidate| candidate == row)
                         .unwrap_or(0);
                     match click {
-                        Click::Row => {},
-                        Click::Choice(index) => self.set_choice(row, index),
-                        Click::Flip => self.change_setting(row, true),
-                        Click::Step(up) => self.change_setting(row, up),
+                        rows::Click::Row => {},
+                        rows::Click::Choice(index) => self.set_choice(row, index),
+                        rows::Click::Flip => self.change_setting(row, true),
+                        rows::Click::Step(up) => self.change_setting(row, up),
                     }
                 } else if !overlay.is_some_and(|rect| rect.contains(point)) {
                     self.events.push(Event::CloseSheet);
@@ -361,225 +358,16 @@ impl Settings<'_> {
     }
 }
 
-/// What a click on a part of a row does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Click {
-    /// Just highlight the row.
-    Row,
-    /// A radio: set the choice at this index.
-    Choice(usize),
-    /// A checkbox: flip it.
-    Flip,
-    /// The `‹` (down) or `›` (up) around a number.
-    Step(bool),
-}
-
 /// Where the sheet's clickable parts landed on the last frame.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SettingsHits {
     pub color_grid: Rect,
     pub color_grid_first_row: usize,
     /// Narrowest last: a part of a row comes before the row's whole line.
-    pub parts: Vec<(Rect, SettingsRow, Click)>,
+    pub parts: Vec<(Rect, SettingsRow, rows::Click)>,
 }
 
-pub struct ThemeEditor {
-    /// The theme as chosen: what the screen is painted with.
-    pub config: ThemeConfig,
-    pub(crate) mode: ThemeMode,
-    /// Which of red, green and blue `e` edits.
-    pub(crate) rgb_channel: usize,
-    /// The highlighted swatch of the picker.
-    pub(crate) palette_selected: usize,
-    pub(crate) picker_display: ColorPickerDisplay,
-}
-
-impl ThemeEditor {
-    pub(crate) fn new(config: ThemeConfig) -> Self {
-        let picker_display = ColorPickerDisplay::default();
-        Self {
-            palette_selected: color_picker::nearest_index(config.color(), picker_display),
-            config,
-            mode: ThemeMode::Idle,
-            rgb_channel: RGB_RED_CHANNEL,
-            picker_display,
-        }
-    }
-
-    /// Put the highlight on the swatch nearest the current accent.
-    pub(crate) fn sync_picker_selection(&mut self) {
-        self.palette_selected =
-            color_picker::nearest_index(self.config.color(), self.picker_display);
-    }
-
-    /// The highlighted swatch becomes the accent. `true` when it did.
-    fn apply_picker_selection(&mut self) -> bool {
-        let Some(color) = color_picker::color_at(self.picker_display, self.palette_selected) else {
-            return false;
-        };
-        self.config.accent = Some(color);
-        true
-    }
-
-    /// Move the highlight and take that swatch as the accent.
-    pub(crate) fn move_palette(&mut self, direction: PaletteDirection) -> bool {
-        self.palette_selected =
-            color_picker::move_selection(self.palette_selected, direction, self.picker_display);
-        self.apply_picker_selection()
-    }
-
-    /// Enter on the picker: take the highlighted swatch.
-    pub(crate) fn pick_selected(&mut self) -> bool {
-        self.apply_picker_selection()
-    }
-
-    /// A click on a swatch.
-    pub(crate) fn select_cell(&mut self, column: usize, row: usize) -> bool {
-        let Some(selected) = color_picker::selection_at(self.picker_display, column, row) else {
-            return false;
-        };
-        self.mode = ThemeMode::Palette;
-        self.palette_selected = selected;
-        self.apply_picker_selection()
-    }
-
-    /// Palette grid or spectrum.
-    pub(crate) fn toggle_picker_display(&mut self) {
-        self.picker_display = match self.picker_display {
-            ColorPickerDisplay::Palette => ColorPickerDisplay::Spectrum,
-            ColorPickerDisplay::Spectrum => ColorPickerDisplay::Palette,
-        };
-        self.sync_picker_selection();
-    }
-
-    pub(crate) fn next_rgb_channel(&mut self) {
-        self.rgb_channel = (self.rgb_channel + 1) % RGB_CHANNEL_COUNT;
-    }
-
-    /// Move the edited channel of the accent by `delta`, clamped to a byte.
-    pub(crate) fn adjust_rgb(&mut self, delta: i16) {
-        let (mut r, mut g, mut b) = rgb(self.config.color());
-        let channel = match self.rgb_channel {
-            RGB_RED_CHANNEL => &mut r,
-            RGB_GREEN_CHANNEL => &mut g,
-            _ => &mut b,
-        };
-        *channel = u8::try_from((i16::from(*channel) + delta).clamp(0, 255)).unwrap_or_default();
-        self.config.accent = Some(Color::Rgb(r, g, b));
-        self.sync_picker_selection();
-    }
-}
-
-const LABEL_WIDTH: usize = 22;
 const RGB_LABELS: [&str; 3] = ["R", "G", "B"];
-
-/// A clickable stretch of a row line: its first cell, width and meaning.
-struct Segment {
-    x: u16,
-    width: u16,
-    row: SettingsRow,
-    click: Click,
-}
-
-/// One row's line under construction: spans plus where each part sits.
-struct RowLine {
-    row: SettingsRow,
-    spans: Vec<Span<'static>>,
-    x: usize,
-    segments: Vec<Segment>,
-}
-
-impl RowLine {
-    fn text(&mut self, text: impl Into<String>, style: Style) {
-        let text = text.into();
-        self.x += Line::from(text.clone()).width();
-        self.spans.push(Span::styled(text, style));
-    }
-
-    fn clickable(&mut self, text: impl Into<String>, style: Style, click: Click) {
-        let text = text.into();
-        let width = Line::from(text.clone()).width();
-        self.segments.push(Segment {
-            x: u16::try_from(self.x).unwrap_or(u16::MAX),
-            width: u16::try_from(width).unwrap_or(u16::MAX),
-            row: self.row,
-            click,
-        });
-        self.text(text, style);
-    }
-}
-
-/// The row's line: the marker, the label and the value with its click parts.
-fn row_line(app: &Scene<'_>, row: SettingsRow, selected: bool, palette: &Palette) -> RowLine {
-    let accent = app.theme.config.color();
-    let mut line = RowLine {
-        row,
-        spans: Vec::new(),
-        x: 0,
-        segments: Vec::new(),
-    };
-    let label_style = if selected {
-        Style::new().fg(accent).add_modifier(Modifier::BOLD)
-    } else {
-        Style::new()
-    };
-    line.text(if selected { "\u{25b8} " } else { "  " }, label_style);
-    line.text(format!("{:<LABEL_WIDTH$}", row.label()), label_style);
-    let idle = Style::new().fg(palette.idle);
-    match row {
-        SettingsRow::Theme => {
-            let current = app.choice_index(row);
-            let Kind::Choice(names) = row.kind() else {
-                return line;
-            };
-            for (index, name) in names.iter().enumerate() {
-                let on = current == Some(index);
-                let mark = if on { "(\u{2022})" } else { "( )" };
-                let style = if on { Style::new().fg(accent) } else { idle };
-                line.clickable(format!("{mark} {name}"), style, Click::Choice(index));
-                line.text("   ", idle);
-            }
-        },
-        SettingsRow::Accent => {
-            let current = app.choice_index(row);
-            for (index, preset) in Preset::iter().enumerate() {
-                let on = current == Some(index);
-                let mark = if on { "\u{25cf}" } else { "\u{25cb}" };
-                let style = Style::new().fg(preset.color());
-                let style = if on {
-                    style.add_modifier(Modifier::BOLD)
-                } else {
-                    style
-                };
-                line.clickable(
-                    format!("{mark} {}", preset.name()),
-                    style,
-                    Click::Choice(index),
-                );
-                line.text("  ", idle);
-            }
-            if current.is_none() {
-                line.text("\u{25a0} custom", Style::new().fg(accent));
-            }
-        },
-        SettingsRow::Mouse
-        | SettingsRow::IgnoreWhitespace
-        | SettingsRow::SignOff
-        | SettingsRow::ShowReads => {
-            let on = app.toggle_value(row);
-            let style = if on { Style::new().fg(accent) } else { idle };
-            line.clickable(if on { "[x]" } else { "[ ]" }, style, Click::Flip);
-        },
-        SettingsRow::WheelStep | SettingsRow::DiffContext => {
-            let value = app.number_value(row);
-            let shown = value.to_string();
-            line.clickable("\u{2039}", idle, Click::Step(false));
-            line.text(format!(" {shown} "), Style::new());
-            line.clickable("\u{203a}", idle, Click::Step(true));
-        },
-    }
-    line
-}
 
 fn footer(app: &Scene<'_>, palette: &Palette) -> Line<'static> {
     let idle = Style::new().fg(palette.idle);
@@ -649,7 +437,7 @@ pub(crate) fn draw(
             .line(body.width)
     };
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let mut segments: Vec<(usize, Segment)> = Vec::new();
+    let mut segments: Vec<(usize, rows::Segment)> = Vec::new();
     let mut whole_rows: Vec<(usize, SettingsRow)> = Vec::new();
     let mut selected_line = 0;
     let mut grid_line = 0;
@@ -662,7 +450,7 @@ pub(crate) fn draw(
             lines.push(divider(row.group()));
             last_group = row.group();
         }
-        let built = row_line(app, row, index == selected_row, palette);
+        let built = rows::row_line(app, row, index == selected_row, palette);
         if index == selected_row {
             selected_line = lines.len();
         }
@@ -741,7 +529,7 @@ pub(crate) fn draw(
     for (line, row) in whole_rows {
         if let Some(y) = on_screen(line) {
             hits.parts
-                .push((Rect::new(body.x, y, body.width, 1), row, Click::Row));
+                .push((Rect::new(body.x, y, body.width, 1), row, rows::Click::Row));
         }
     }
     landed.settings_hits = Some(hits);

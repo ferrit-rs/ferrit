@@ -15,7 +15,7 @@ use crate::tui::components::dashboard::charts::NO_COMMITS;
 use crate::tui::components::dashboard::text::{
     MIN_WHOLE, compact, figure, figure_columns, plural, relative_time,
 };
-use crate::tui::components::dashboard::{Ctx, note};
+use crate::tui::components::dashboard::view::{Ctx, note};
 use crate::tui::widgets::chrome::{cut_end, cut_middle};
 use crate::tui::widgets::share_bar::{percent_label, single_bar, stacked_bar};
 

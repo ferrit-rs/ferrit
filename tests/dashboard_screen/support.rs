@@ -8,7 +8,7 @@ use ferrit::git::stats::{
     AuthorStat, FileStat, HotFiles, KindStat, Lines, RepoStats, Totals, Window, WorkState,
 };
 use ferrit::theme::palette::Palette;
-use ferrit::tui::components::dashboard::{self, Chrome, View};
+use ferrit::tui::components::dashboard::view::{self, Chrome, View};
 use ferrit::tui::widgets::chart_palette::{ChartMode, ChartPalette};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -178,7 +178,7 @@ pub(crate) fn buffer(view: &View<'_>, width: u16, height: u16) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
         .draw(|f| {
-            dashboard::draw(f, f.area(), view);
+            view::draw(f, f.area(), view);
         })
         .unwrap();
     terminal.backend().buffer().clone()

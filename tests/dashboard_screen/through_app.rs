@@ -9,7 +9,7 @@ use crate::support::{DAY, buffer, render, stats, text, view};
 use ferrit::git::repo::Repo;
 use ferrit::git::stats::{StatsOptions, Window};
 use ferrit::tui::App;
-use ferrit::tui::components::dashboard::Chrome;
+use ferrit::tui::components::dashboard::view::Chrome;
 use ferrit::tui::draw as ui;
 use ferrit::tui::widgets::chart_palette::ChartMode;
 use ratatui::Terminal;
