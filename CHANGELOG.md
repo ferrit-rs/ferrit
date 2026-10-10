@@ -24,6 +24,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - Deterministic local quality commands, Git hooks and one CI quality gate now share `scripts/quality.sh`; commits run only rustfmt, pushes run the full gate, and clippy has `fix` and full `scan` modes.
 - Architecture overview, five decision records and a documentation index under `docs/`.
+- TUI image decoding and terminal protocol detection now live under `tui/image`; Git backend stays terminal-independent.
+- TUI row renderers are split into explicit `tui::row_lines::{rows,diff,status}` namespaces; no compatibility re-export layer hides ownership.
+- Component intents and application state mutation now live in separate `event` and `reducer` modules.
 
 ## [0.10.0] - 2026-10-06
 

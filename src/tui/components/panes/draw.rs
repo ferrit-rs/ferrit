@@ -137,18 +137,18 @@ pub(crate) fn draw_left_column(
 
         let mut panel = Panel::new().title(title).border_style(border);
         if let Some((cur, total)) = app.counter(pane) {
-            panel = panel.bottom_title(row_lines::counter_line(palette, cur, total));
+            panel = panel.bottom_title(row_lines::rows::counter_line(palette, cur, total));
         }
         let block = panel.block();
 
         let row_ct = app.row_count(pane);
         let mut lines = pane_lines(app, pane);
-        let mut highlight = row_lines::selection_style(palette, focused);
+        let mut highlight = row_lines::rows::selection_style(palette, focused);
         if pane == Pane::Files && focused {
             // Files rows carry a staging colour that the bar must not repaint.
             highlight.fg = None;
             if let Some(line) = lines.get_mut(app.selected(pane)) {
-                row_lines::keep_colours_on_selection(palette, line);
+                row_lines::rows::keep_colours_on_selection(palette, line);
             }
         }
         let detached = app.view_detached(pane);

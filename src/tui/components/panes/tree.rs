@@ -198,7 +198,7 @@ pub(crate) fn flatten_folded(
 }
 
 /// One synthetic `FileEntry` per file in a commit's diff, `staged: None` /
-/// `worktree: <status>` so `row_lines::file_line` renders the single-letter code
+/// `worktree: <status>` so `row_lines::rows::file_line` renders the single-letter code
 /// lazygit shows for a commit's file tree (` M`, not the two-sided `MM` a
 /// worktree entry can have). Feeds `CommitDrill::files`.
 pub(crate) fn commit_drill_files(diff: &git::diff::Diff) -> Vec<FileEntry> {

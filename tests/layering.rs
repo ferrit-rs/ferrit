@@ -4,8 +4,7 @@
     reason = "integration test scaffolding: a failed setup is the assertion"
 )]
 //! The dependency rule, checked on the sources. Inside `git`, only `git/repo`
-//! (the adapter) names `git2`, and nothing but `git/image` (which draws the
-//! preview) knows the terminal, and `git` never reaches into `app`. `app` reaches the adapter only where it builds
+//! (the adapter) names `git2`, and nothing in `git` knows the terminal, and `git` never reaches into `app`. `app` reaches the adapter only where it builds
 //! the app (`App::open`) and starts a repository (`git init`), and the adapter
 //! does not reach into `app`. See `docs/architecture.md` and
 //! `docs/PLAN_21_GIT_PORT.md`.
@@ -61,9 +60,9 @@ fn only_the_adapter_names_git2() {
 
 #[test]
 fn the_git_code_knows_nothing_about_the_terminal() {
-    let offenders = files_with_code_except("git", &["git/image"], "ratatui");
+    let offenders = files_with_code("git", "ratatui");
     assert!(offenders.is_empty(), "ratatui used in {offenders:?}");
-    let offenders = files_with_code_except("git", &["git/image"], "crossterm");
+    let offenders = files_with_code("git", "crossterm");
     assert!(offenders.is_empty(), "crossterm used in {offenders:?}");
 }
 
@@ -153,7 +152,7 @@ fn only_the_draw_entry_points_name_app_among_the_drawing_code() {
     let offenders: Vec<String> = rust_files(&root.join("components"))
         .into_iter()
         .chain(rust_files(&root.join("widgets")))
-        .chain([root.join("row_lines.rs")])
+        .chain(rust_files(&root.join("row_lines")))
         .filter(|path| {
             fs::read_to_string(path).unwrap().lines().any(|line| {
                 let line = line.trim_start();

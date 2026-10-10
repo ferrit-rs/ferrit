@@ -38,7 +38,7 @@ pub(crate) fn draw_command_log_view(
     let all: Vec<Line<'static>> = view
         .records
         .iter()
-        .flat_map(|record| row_lines::command_lines(palette, record))
+        .flat_map(|record| row_lines::status::command_lines(palette, record))
         .collect();
     let total = all.len();
     let end = total.saturating_sub(view.from_bottom.min(total.saturating_sub(rows)));
@@ -66,7 +66,7 @@ pub(crate) fn draw_command_log_view(
 /// Unstaged Changes beside Staged Changes, in place of the single right
 /// pane every other selection uses (`draw_right_pane`). Deliberately
 /// simplified against that path: each side renders directly through
-/// `row_lines::render_diff` / `render_delta`, bypassing `App::rendered_diff`'s
+/// `row_lines::diff::render_diff` / `render_delta`, bypassing `App::rendered_diff`'s
 /// cache (it is keyed for one diff at a time) and skipping the `]` / `[`
 /// hunk-focus highlight — the two columns just scroll together on the one
 /// `app.right_scroll()`.
@@ -106,7 +106,7 @@ pub(crate) fn draw_command_log(
     let lines: Vec<Line<'static>> = if app.is_mock() {
         mock::COMMAND_LOG
             .iter()
-            .map(|command| row_lines::log_line(palette, command))
+            .map(|command| row_lines::status::log_line(palette, command))
             .collect()
     } else {
         let mut lines = command_log_lines(app);
@@ -167,7 +167,7 @@ pub(crate) fn command_log_rows(app: &Scene<'_>, screen_height: u16) -> u16 {
     let newest = command_log::recent(1, app.prefs.config.log.show_reads)
         .last()
         .map_or(0, |record| {
-            row_lines::command_lines(&app.palette(), record).len()
+            row_lines::status::command_lines(&app.palette(), record).len()
         });
     let wanted = u16::try_from(newest).unwrap_or(u16::MAX).max(2);
     wanted.min((screen_height / 3).saturating_sub(3).max(2))
@@ -177,6 +177,6 @@ pub(crate) fn command_log_rows(app: &Scene<'_>, screen_height: u16) -> u16 {
 fn command_log_lines(app: &Scene<'_>) -> Vec<Line<'static>> {
     command_log::recent(2, app.prefs.config.log.show_reads)
         .iter()
-        .flat_map(|record| row_lines::command_lines(&app.palette(), record))
+        .flat_map(|record| row_lines::status::command_lines(&app.palette(), record))
         .collect()
 }

@@ -1,6 +1,5 @@
 //! Drawing a frame: the top-level layout, what the frame learned (`Landed`), and what ratatui needs mutable.
 
-use crate::git::image::preview::Preview;
 use crate::tui::App;
 use crate::tui::components::command_log::command_log_rows;
 use crate::tui::components::command_log::draw_command_log;
@@ -25,6 +24,7 @@ use crate::tui::components::popups::draw_note;
 use crate::tui::components::settings::SettingsHits;
 use crate::tui::components::welcome::draw_welcome;
 use crate::tui::components::{dashboard, git_config, settings};
+use crate::tui::image::preview::Preview;
 use crate::tui::scene::Scene;
 use crate::tui::widgets::toast::Toast;
 use crate::tui::widgets::tui_overlay::state::OverlayState;

@@ -3,8 +3,6 @@
 //! it answers, a stale answer dropped. A flow across the selection, the workers,
 //! the repository and the right pane, so it is written on `App`.
 
-use crate::git::image::preview;
-use crate::git::image::preview::Preview;
 use crate::tui::App;
 use crate::tui::components::diff::queries::DiffCompletion;
 use crate::tui::components::diff::queries::DiffQueryResult;
@@ -20,6 +18,8 @@ use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::panes::tree::FileRow;
 use crate::tui::error::AppError;
 use crate::tui::events::AppEvent;
+use crate::tui::image::preview;
+use crate::tui::image::preview::Preview;
 use crate::tui::mock;
 use crate::tui::workers::WorkerKind;
 use crate::tui::workers::run_worker;

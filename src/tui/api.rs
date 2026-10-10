@@ -2,7 +2,6 @@
 //! outside the run loop: the read-only questions, and the seams that set a
 //! piece of state or feed one event.
 
-use crate::git::image::preview::Preview;
 use crate::theme::palette::Palette;
 use crate::tui::components;
 use crate::tui::components::diff::views::CommitPopupView;
@@ -11,6 +10,7 @@ use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::panes::rows::PaneRows;
 use crate::tui::draw::FullScreen;
 use crate::tui::events::AppEvent;
+use crate::tui::image::preview::Preview;
 use std::path::Path;
 use std::sync::mpsc;
 use std::time::Duration;

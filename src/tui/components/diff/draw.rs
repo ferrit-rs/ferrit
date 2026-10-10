@@ -2,12 +2,12 @@
 
 use crate::git;
 use crate::git::diff::DiffSide;
-use crate::git::image::preview::Preview;
 use crate::theme::palette::Palette;
 use crate::tui::components::diff::views::DiffView;
 use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::welcome::welcome_lines;
 use crate::tui::draw::{Landed, RenderState};
+use crate::tui::image::preview::Preview;
 use crate::tui::scene::Scene;
 use crate::tui::widgets::chrome::Panel;
 use crate::tui::widgets::chrome::ScrollBar;
@@ -103,12 +103,12 @@ pub(crate) fn draw_single_file_diff(
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
     frame.render_widget(
-        Paragraph::new(row_lines::stat_line(&palette, diff.stat())),
+        Paragraph::new(row_lines::status::stat_line(&palette, diff.stat())),
         stat_row,
     );
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || row_lines::render_diff(&palette, &diff, None, diff_area.width as usize),
-        |formatted| row_lines::render_delta(&formatted, diff_area.width as usize),
+        || row_lines::diff::render_diff(&palette, &diff, None, diff_area.width as usize),
+        |formatted| row_lines::diff::render_delta(&formatted, diff_area.width as usize),
     );
     overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, &palette);
     let total = text.lines.len();
@@ -149,7 +149,7 @@ pub(crate) fn diff_column_title(base: &str, active: bool, hint: Option<&str>) ->
 /// `cursor`, when this column is the `Mode::Diff` cursor's own side, is
 /// `(cursor line, V-select range)` — both indices into `diff`'s own lines,
 /// applied as a post-render overlay (`overlay_diff_cursor`) so it works the
-/// same whether the body came from `row_lines::render_diff` or from delta.
+/// same whether the body came from `row_lines::diff::render_diff` or from delta.
 pub(crate) fn draw_diff_column(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -172,13 +172,13 @@ pub(crate) fn draw_diff_column(
     let [stat_row, diff_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
     frame.render_widget(
-        Paragraph::new(row_lines::stat_line(palette, diff.stat())),
+        Paragraph::new(row_lines::status::stat_line(palette, diff.stat())),
         stat_row,
     );
 
     let mut text = diff.delta_output(diff_area.width as usize).map_or_else(
-        || row_lines::render_diff(palette, diff, None, diff_area.width as usize),
-        |formatted| row_lines::render_delta(&formatted, diff_area.width as usize),
+        || row_lines::diff::render_diff(palette, diff, None, diff_area.width as usize),
+        |formatted| row_lines::diff::render_delta(&formatted, diff_area.width as usize),
     );
     overlay_diff_cursor(&mut text, cursor, diff_area.width as usize, palette);
     let total = text.lines.len();
@@ -193,7 +193,7 @@ pub(crate) fn draw_diff_column(
 /// Paint the `Mode::Diff` cursor onto an already-rendered diff body: a
 /// full-width reversed bar on the cursor line, and the palette's selection colour
 /// background across a V-selection. Applied after rendering, not woven into
-/// `row_lines::render_diff`, so it works identically over that native path and
+/// `row_lines::diff::render_diff`, so it works identically over that native path and
 /// over delta's ANSI-derived one.
 pub(crate) fn overlay_diff_cursor(
     text: &mut Text<'static>,
@@ -368,7 +368,7 @@ pub(crate) fn draw_right_pane(
 
     // Branches focused, not drilled in: the selected branch's own commits,
     // shown passively (lazygit's live branch -> log preview, no Enter
-    // needed) as multi-line `git log`-style blocks (`row_lines::branch_log_block`)
+    // needed) as multi-line `git log`-style blocks (`row_lines::rows::branch_log_block`)
     // rather than the compact one-line rows the Commits pane uses — there is
     // a whole pane's width to spend here. No gutter/stat/hunk-jump, that
     // treatment is for an actual diff once Enter drills into a specific
@@ -382,7 +382,7 @@ pub(crate) fn draw_right_pane(
         } else {
             log.commits
                 .iter()
-                .flat_map(|commit| row_lines::branch_log_block(palette, commit))
+                .flat_map(|commit| row_lines::rows::branch_log_block(palette, commit))
                 .collect()
         };
         let total = lines.len();
@@ -441,7 +441,7 @@ pub(crate) fn draw_right_pane(
     };
 
     let text: Text<'_> = match app.nav.focus {
-        Pane::Files | Pane::Commits => row_lines::diff_lines(palette, body, None),
+        Pane::Files | Pane::Commits => row_lines::diff::diff_lines(palette, body, None),
         _ => body.into(),
     };
 

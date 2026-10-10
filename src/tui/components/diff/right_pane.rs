@@ -80,7 +80,7 @@ impl RightPane {
             DiffView::BranchLog(log) => log
                 .commits
                 .iter()
-                .map(row_lines::branch_log_block_lines)
+                .map(row_lines::rows::branch_log_block_lines)
                 .sum(),
             DiffView::None | DiffView::Note(_) => 0,
         }
@@ -234,8 +234,8 @@ impl RightPane {
                 });
                 if !cache_hit {
                     let text = diff.delta_output(width).map_or_else(
-                        || row_lines::render_diff(palette, diff, focus, width),
-                        |formatted| row_lines::render_delta(&formatted, width),
+                        || row_lines::diff::render_diff(palette, diff, focus, width),
+                        |formatted| row_lines::diff::render_delta(&formatted, width),
                     );
                     *cache = Some(RenderedDiff {
                         key: key.clone(),

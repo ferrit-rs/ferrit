@@ -3,13 +3,7 @@
 //! All types here are plain owned values. No `git2` type escapes this module.
 //! Recent commits on HEAD or on an arbitrary branch tip, newest first,
 //! bounded to a max count.
-//!
-//! All types here are plain owned values. No `git2` type escapes this module.
-//! The `git2` and subprocess half of `crate::git::diff`: the types are there.
-//! The `git2` and subprocess half of `crate::git::diff`: the types are there.
 //! Local branches: which one is HEAD, its upstream, ahead/behind.
-//!
-//! All types here are plain owned values. No `git2` type escapes this module.
 
 use crate::git::diff::Rev;
 use crate::git::diff::{Diff, DiffOpts, DiffSide};

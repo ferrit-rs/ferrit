@@ -165,7 +165,7 @@ impl PaneRows<'_> {
                     name,
                     depth,
                     expanded,
-                } => Some(row_lines::dir_line(
+                } => Some(row_lines::rows::dir_line(
                     self.palette,
                     name,
                     *depth,
@@ -176,7 +176,7 @@ impl PaneRows<'_> {
                     .snapshot
                     .files
                     .get(*index)
-                    .map(|entry| row_lines::file_line(self.palette, entry, *depth)),
+                    .map(|entry| row_lines::rows::file_line(self.palette, entry, *depth)),
             })
             .collect()
     }
@@ -216,7 +216,7 @@ impl PaneRows<'_> {
             return drill
                 .commits
                 .iter()
-                .map(|entry| row_lines::commit_line(self.palette, entry))
+                .map(|entry| row_lines::rows::commit_line(self.palette, entry))
                 .collect();
         }
         if self.nav.branches_tab == BranchesTab::Remotes {
@@ -227,7 +227,7 @@ impl PaneRows<'_> {
                 .snapshot
                 .remotes
                 .iter()
-                .map(|entry| row_lines::remote_line(self.palette, entry))
+                .map(|entry| row_lines::rows::remote_line(self.palette, entry))
                 .collect();
         }
         if self.snapshot.branches.is_empty() {
@@ -238,7 +238,7 @@ impl PaneRows<'_> {
             .iter()
             .map(|branch| {
                 let status = if branch.is_head { head_status } else { None };
-                row_lines::branch_line_with_status(self.palette, branch, status)
+                row_lines::rows::branch_line_with_status(self.palette, branch, status)
             })
             .collect()
     }
@@ -267,7 +267,7 @@ impl PaneRows<'_> {
                         depth,
                         expanded,
                         ..
-                    } => Some(row_lines::dir_line(
+                    } => Some(row_lines::rows::dir_line(
                         self.palette,
                         name,
                         *depth,
@@ -277,7 +277,7 @@ impl PaneRows<'_> {
                     FileRow::File { index, depth } => drill
                         .files
                         .get(*index)
-                        .map(|entry| row_lines::file_line(self.palette, entry, *depth)),
+                        .map(|entry| row_lines::rows::file_line(self.palette, entry, *depth)),
                 })
                 .collect();
         }
@@ -287,7 +287,7 @@ impl PaneRows<'_> {
         self.snapshot
             .commits
             .iter()
-            .map(|entry| row_lines::commit_line(self.palette, entry))
+            .map(|entry| row_lines::rows::commit_line(self.palette, entry))
             .collect()
     }
 
@@ -309,7 +309,7 @@ impl PaneRows<'_> {
         self.snapshot
             .stashes
             .iter()
-            .map(|entry| row_lines::stash_line(self.palette, entry))
+            .map(|entry| row_lines::rows::stash_line(self.palette, entry))
             .collect()
     }
 }

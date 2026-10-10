@@ -30,10 +30,10 @@ use ratatui::crossterm::event::{Event, KeyEvent, KeyEventKind};
 
 use crate::git;
 use crate::git::error::GitResult;
-use crate::git::image::detect;
 use crate::git::port::GitPort;
 use crate::tui::draw as ui;
 use crate::tui::events::{AppEvent, Events};
+use crate::tui::image::detect;
 use terminal::Tui;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
@@ -113,11 +113,13 @@ pub mod components;
 pub mod draw;
 pub mod error;
 pub mod event;
+pub mod image;
 pub mod input;
 pub mod keymap;
 pub mod loading;
 pub mod prefs;
 pub mod publish;
+mod reducer;
 pub mod row_lines;
 pub mod scene;
 pub mod terminal;

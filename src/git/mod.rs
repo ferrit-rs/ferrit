@@ -1,5 +1,5 @@
 //! The git types and pure logic (model, diff parsing, statistics, hosting rules)
-//! and the `GitPort` traits. Nothing under `domain::git` imports `ratatui` or
+//! and the `GitPort` traits. Nothing under `crate::git` imports `ratatui` or
 //! `git2`; the code that reads with `git2` or runs `git` for each module here
 //! is the module of the same name in `crate::git::repo`.
 //!
@@ -27,7 +27,6 @@ pub mod error;
 pub mod fake;
 pub mod host;
 pub mod identity;
-pub mod image;
 pub mod model;
 pub mod port;
 pub mod rebase;

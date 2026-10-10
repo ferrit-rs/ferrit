@@ -444,7 +444,7 @@ pub(crate) fn draw_commit(
         let description_style = if view.summary_focused { idle } else { focused };
         let summary_block = Panel::new()
             .title(Line::styled(" Summary ", summary_style))
-            .bottom_title(row_lines::subject_counter(
+            .bottom_title(row_lines::rows::subject_counter(
                 palette,
                 view.input.text().chars().count(),
             ))

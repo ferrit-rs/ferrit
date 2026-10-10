@@ -150,7 +150,7 @@ equatable_if_let = "warn"
 manual_string_new = "warn"
 
 # -- ALLOW: group lints that fight this codebase's style ------------------
-module_name_repetitions = "allow"   # git/mod.rs re-exports keep short call sites
+module_name_repetitions = "allow"   # repeated domain names carry useful ownership context
 missing_errors_doc = "allow"        # error types are thiserror enums, self-documenting
 missing_panics_doc = "allow"        # panics are denied outright above
 must_use_candidate = "allow"        # too noisy on a binary crate

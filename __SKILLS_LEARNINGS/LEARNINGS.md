@@ -12,6 +12,7 @@ not want.
 
 ## Inbox
 
+- 2026-10-10 [ferrit/rust] avoid `pub use` compatibility facades, use explicit module namespaces, because API ownership must stay visible and clippy must reject re-export shortcuts.
 - 2026-10-10 [ferrit/rust] avoid hand-written enum string conversions or order arrays when semantics are canonical, use `strum` derives such as `serialize_all` and `EnumIter`, because generated enum behavior removes duplication and stays idiomatic.
 - 2026-09-21 [ferrit/communication] avoid explaining visual UI behavior only in prose, show an ASCII diagram because it makes the intended layout or interaction clear.
 - 2026-09-20 [ferrit/changes] avoid removing existing features during improvements; preserve behavior and add or improve capabilities, because refactors must not silently reduce Ferrit's feature set.

@@ -318,7 +318,7 @@ fn a_commit_shows_git_s_own_answer_under_the_command() {
         record.output
     );
 
-    let lines = row_lines::command_lines(&Palette::DARK, &record);
+    let lines = row_lines::status::command_lines(&Palette::DARK, &record);
     assert_eq!(
         lines.len(),
         1 + record.output.len(),

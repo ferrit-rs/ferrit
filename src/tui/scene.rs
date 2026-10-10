@@ -200,16 +200,16 @@ impl<'a> Scene<'a> {
     /// line only when there are conflicts, or the error when `refresh()` failed.
     pub(crate) fn status_lines(self) -> Vec<Line<'static>> {
         let mut out = if let Some(err) = self.last_error {
-            vec![row_lines::error_line(
+            vec![row_lines::status::error_line(
                 &self.prefs.palette,
                 &format!("error: {err}"),
             )]
         } else {
             let h = &self.snapshot.header;
-            let line = row_lines::status_header(self.repo_name, h);
-            let mut lines = vec![row_lines::status_line(&self.prefs.palette, &line)];
+            let line = row_lines::status::status_header(self.repo_name, h);
+            let mut lines = vec![row_lines::status::status_line(&self.prefs.palette, &line)];
             if h.conflicts > 0 {
-                lines.push(row_lines::error_line(
+                lines.push(row_lines::status::error_line(
                     &self.prefs.palette,
                     &format!("\u{2717} {} merge conflict(s)", h.conflicts),
                 ));
@@ -221,15 +221,15 @@ impl<'a> Scene<'a> {
             // first thing read while git waits on the user.
             out.insert(
                 out.len().min(1),
-                row_lines::operation_line(&self.prefs.palette, &operation.label()),
+                row_lines::status::operation_line(&self.prefs.palette, &operation.label()),
             );
         }
         if let Some(label) = self.workers.remote_busy_label() {
-            out.push(row_lines::busy_line(&self.prefs.palette, label));
+            out.push(row_lines::status::busy_line(&self.prefs.palette, label));
         } else if self.last_error.is_none()
             && let Some(note) = self.status_note
         {
-            out.push(row_lines::status_line(&self.prefs.palette, note));
+            out.push(row_lines::status::status_line(&self.prefs.palette, note));
         }
         out
     }
