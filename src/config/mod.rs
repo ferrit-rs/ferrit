@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use strum::IntoStaticStr;
 
 pub mod settings;
 
@@ -44,25 +45,14 @@ pub struct Config {
 
 /// A section of `config.toml` that can be saved on its own
 /// (`Config::save_sections`). `[keys]` is not one: remapping stays in the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum Section {
     Theme,
     Ui,
     Diff,
     Commit,
     Log,
-}
-
-impl Section {
-    const fn name(self) -> &'static str {
-        match self {
-            Self::Theme => "theme",
-            Self::Ui => "ui",
-            Self::Diff => "diff",
-            Self::Commit => "commit",
-            Self::Log => "log",
-        }
-    }
 }
 
 /// `context name -> action name -> keys`, as written in the file. Names and
@@ -310,7 +300,8 @@ impl Config {
             },
         };
         for section in sections {
-            table.insert(section.name().to_owned(), config.section_value(*section)?);
+            let name: &'static str = (*section).into();
+            table.insert(name.to_owned(), config.section_value(*section)?);
         }
         let body = toml::to_string_pretty(&table)?;
 

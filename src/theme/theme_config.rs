@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
+use strum::{EnumIter, IntoStaticStr};
 
 use crate::theme::palette::Palette;
 use crate::theme::scheme::Scheme;
@@ -25,8 +26,11 @@ pub enum ThemeMode {
     EditingRgb,
 }
 
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, EnumIter, IntoStaticStr,
+)]
 #[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "title_case")]
 pub enum Preset {
     #[default]
     Green,
@@ -36,13 +40,8 @@ pub enum Preset {
 }
 
 impl Preset {
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Green => "Green",
-            Self::Blue => "Blue",
-            Self::Purple => "Purple",
-            Self::Amber => "Amber",
-        }
+    pub fn name(self) -> &'static str {
+        self.into()
     }
 
     pub const fn color(self) -> Color {
@@ -53,9 +52,6 @@ impl Preset {
             Self::Amber => Color::Yellow,
         }
     }
-
-    /// Every preset, in the order `next` walks them.
-    pub const ALL: [Self; 4] = [Self::Green, Self::Blue, Self::Purple, Self::Amber];
 
     #[must_use]
     pub const fn prev(self) -> Self {

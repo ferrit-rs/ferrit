@@ -21,6 +21,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use std::path::PathBuf;
 use std::sync::Arc;
+use strum::{EnumIter, IntoEnumIterator};
 
 /// The creation's own state on `App`.
 #[derive(Debug, Default)]
@@ -179,7 +180,7 @@ impl CreateRemoteState {
 }
 
 /// The field of the form that has the focus.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum Field {
     Name,
     Visibility,
@@ -187,16 +188,15 @@ pub enum Field {
 }
 
 impl Field {
-    const ORDER: [Self; 3] = [Self::Name, Self::Visibility, Self::Description];
-
     fn step(self, forward: bool) -> Self {
-        let at = Self::ORDER.iter().position(|f| *f == self).unwrap_or(0);
+        let at = Self::iter().position(|field| field == self).unwrap_or(0);
+        let count = Self::iter().count();
         let next = if forward {
-            (at + 1) % Self::ORDER.len()
+            (at + 1) % count
         } else {
-            (at + Self::ORDER.len() - 1) % Self::ORDER.len()
+            (at + count - 1) % count
         };
-        Self::ORDER.get(next).copied().unwrap_or(Self::Name)
+        Self::iter().nth(next).unwrap_or(Self::Name)
     }
 }
 

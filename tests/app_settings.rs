@@ -16,6 +16,7 @@ use ferrit::config::Config;
 use ferrit::config::settings::{Kind, SaveState, SettingsRow, TerminalRequest};
 use ferrit::theme::theme_config::{Preset, SchemeChoice};
 use ferrit::tui::App;
+use strum::IntoEnumIterator;
 
 struct Fixture {
     dir: PathBuf,
@@ -67,7 +68,7 @@ fn press(app: &mut App, row: SettingsRow, up: bool) {
 
 #[test]
 fn every_row_has_a_label_a_group_and_a_kind() {
-    for row in SettingsRow::ALL {
+    for row in SettingsRow::iter() {
         assert!(!row.label().is_empty() && !row.group().is_empty());
         match row.kind() {
             Kind::Choice(names) => assert!(names.len() >= 2),
@@ -75,7 +76,7 @@ fn every_row_has_a_label_a_group_and_a_kind() {
             Kind::Toggle => {},
         }
     }
-    let groups: Vec<_> = SettingsRow::ALL.iter().map(|r| r.group()).collect();
+    let groups: Vec<_> = SettingsRow::iter().map(SettingsRow::group).collect();
     assert_eq!(
         groups,
         [

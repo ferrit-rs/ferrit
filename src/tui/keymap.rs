@@ -18,6 +18,7 @@ use std::collections::hash_map::Entry as MapEntry;
 use std::fmt;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use strum::{EnumString, IntoStaticStr};
 
 use crate::config::KeyOverrides;
 use crate::tui::components::panes::nav::Pane;
@@ -25,7 +26,8 @@ use crate::tui::components::panes::nav::Pane;
 /// Where a binding applies. `resolve` tries the most specific context first,
 /// then `Global`, which is how `d` means discard on Files, delete on Branches
 /// and drop on Commits without a special case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum Context {
     Global,
     Files,
@@ -51,27 +53,11 @@ impl Context {
 
     /// The `[keys.<name>]` table name.
     pub fn name(self) -> &'static str {
-        match self {
-            Self::Global => "global",
-            Self::Files => "files",
-            Self::Diff => "diff",
-            Self::Branches => "branches",
-            Self::Commits => "commits",
-            Self::Stash => "stash",
-        }
+        self.into()
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
-        [
-            Self::Global,
-            Self::Files,
-            Self::Diff,
-            Self::Branches,
-            Self::Commits,
-            Self::Stash,
-        ]
-        .into_iter()
-        .find(|context| context.name() == name)
+        name.parse().ok()
     }
 
     /// The context of a focused pane, if it has bindings of its own.

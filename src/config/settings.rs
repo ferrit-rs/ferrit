@@ -6,7 +6,7 @@
 use super::Section;
 
 /// One line of the sheet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter)]
 pub enum SettingsRow {
     Theme,
     Accent,
@@ -32,17 +32,6 @@ pub enum Kind {
 }
 
 impl SettingsRow {
-    pub const ALL: [Self; 8] = [
-        Self::Theme,
-        Self::Accent,
-        Self::Mouse,
-        Self::WheelStep,
-        Self::DiffContext,
-        Self::IgnoreWhitespace,
-        Self::SignOff,
-        Self::ShowReads,
-    ];
-
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {

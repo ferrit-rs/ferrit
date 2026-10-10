@@ -29,6 +29,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use std::path::Path;
+use strum::IntoEnumIterator;
 
 const RGB_CHANNEL_STEP: i16 = 8;
 const WHEEL_ROWS: usize = 3;
@@ -68,7 +69,7 @@ pub(crate) fn choice_index(theme: &ThemeEditor, row: SettingsRow) -> Option<usiz
             if theme.config.accent.is_some() {
                 None
             } else {
-                Preset::ALL.iter().position(|p| *p == theme.config.preset)
+                Preset::iter().position(|preset| preset == theme.config.preset)
             }
         },
         _ => None,
@@ -187,8 +188,8 @@ impl Settings<'_> {
                 self.accent_changed();
             },
             SettingsRow::Accent => {
-                if let Some(preset) = Preset::ALL.get(index) {
-                    self.theme.config.preset = *preset;
+                if let Some(preset) = Preset::iter().nth(index) {
+                    self.theme.config.preset = preset;
                     self.theme.config.accent = None;
                     self.sync_theme_picker_selection();
                     self.accent_changed();
@@ -205,9 +206,8 @@ impl Settings<'_> {
     }
 
     fn selected_row(&self) -> SettingsRow {
-        SettingsRow::ALL
-            .get(self.sheet.selected)
-            .copied()
+        SettingsRow::iter()
+            .nth(self.sheet.selected)
             .unwrap_or(SettingsRow::Theme)
     }
 
@@ -234,7 +234,7 @@ impl Settings<'_> {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return;
         }
-        let last = SettingsRow::ALL.len() - 1;
+        let last = SettingsRow::iter().count() - 1;
         let row = self.selected_row();
         match key.code {
             KeyCode::Esc => self.events.push(Event::CloseSheet),
@@ -315,8 +315,9 @@ impl Settings<'_> {
                 } else if let Some(&(_, row, click)) =
                     hits.parts.iter().find(|(area, ..)| area.contains(point))
                 {
-                    self.sheet.selected =
-                        SettingsRow::ALL.iter().position(|r| *r == row).unwrap_or(0);
+                    self.sheet.selected = SettingsRow::iter()
+                        .position(|candidate| candidate == row)
+                        .unwrap_or(0);
                     match click {
                         Click::Row => {},
                         Click::Choice(index) => self.set_choice(row, index),
@@ -541,7 +542,7 @@ fn row_line(app: &Scene<'_>, row: SettingsRow, selected: bool, palette: &Palette
         },
         SettingsRow::Accent => {
             let current = app.choice_index(row);
-            for (index, preset) in Preset::ALL.into_iter().enumerate() {
+            for (index, preset) in Preset::iter().enumerate() {
                 let on = current == Some(index);
                 let mark = if on { "\u{25cf}" } else { "\u{25cb}" };
                 let style = Style::new().fg(preset.color());
@@ -653,7 +654,7 @@ pub(crate) fn draw(
     let mut selected_line = 0;
     let mut grid_line = 0;
     let mut last_group = "";
-    for (index, row) in SettingsRow::ALL.into_iter().enumerate() {
+    for (index, row) in SettingsRow::iter().enumerate() {
         if row.group() != last_group {
             if !lines.is_empty() {
                 lines.push(Line::default());

@@ -1,9 +1,12 @@
 //! The kind of change a commit is, read from the Conventional Commits prefix
 //! of its subject (`feat:`, `fix(scope):`, `feat!:`). No git here.
 
+use strum::{EnumIter, IntoEnumIterator, IntoStaticStr};
+
 /// Kinds the dashboard tells apart; anything else is `Other`. The variant
 /// order is the tie-break when two kinds have the same count.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum Kind {
     /// A new feature.
     Feat,
@@ -29,40 +32,6 @@ pub enum Kind {
     Other,
 }
 
-impl Kind {
-    /// Every kind, in the order the dashboard breaks ties.
-    pub const ALL: [Self; 11] = [
-        Self::Feat,
-        Self::Fix,
-        Self::Docs,
-        Self::Test,
-        Self::Refactor,
-        Self::Perf,
-        Self::Style,
-        Self::Build,
-        Self::Ci,
-        Self::Chore,
-        Self::Other,
-    ];
-
-    /// The prefix word, `other` for the rest.
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Feat => "feat",
-            Self::Fix => "fix",
-            Self::Docs => "docs",
-            Self::Test => "test",
-            Self::Refactor => "refactor",
-            Self::Perf => "perf",
-            Self::Style => "style",
-            Self::Build => "build",
-            Self::Ci => "ci",
-            Self::Chore => "chore",
-            Self::Other => "other",
-        }
-    }
-}
-
 /// `type[(scope)][!]: description`, the type case-insensitive. A subject that
 /// does not have that shape, or has another type (`revert:`, `wip:`), is
 /// `Other`, and so is `Revert "..."` and `Merge ...`.
@@ -79,10 +48,12 @@ pub fn parse_kind(subject: &str) -> Kind {
         Some(_) => return Kind::Other,
         None => head,
     };
-    Kind::ALL
-        .into_iter()
+    Kind::iter()
         .filter(|kind| *kind != Kind::Other)
-        .find(|kind| word.eq_ignore_ascii_case(kind.name()))
+        .find(|kind| {
+            let name: &'static str = (*kind).into();
+            word.eq_ignore_ascii_case(name)
+        })
         .unwrap_or(Kind::Other)
 }
 
