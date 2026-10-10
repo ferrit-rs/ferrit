@@ -32,8 +32,9 @@ use crate::ui::error::AppError;
 use crate::ui::events::AppEvent;
 use crate::ui::image::detect;
 use ferrit_domain::error::GitResult;
-use ferrit_domain::port::GitPort;
-use ferrit_git::repo::Repo;
+use ferrit_domain::port::{GitPort, GitRepositoryFactory};
+#[cfg(feature = "test-util")]
+use ferrit_git::repo::RepoFactory;
 
 /// `Operation::noun` as a function pointer for `Option::map_or`.
 pub(crate) fn operation_noun(operation: ferrit_domain::model::Operation) -> &'static str {
@@ -55,6 +56,7 @@ pub struct App {
 
     /// `None` in `App::mock()`; otherwise the open repository.
     repo: Option<Box<dyn GitPort>>,
+    repository_factory: Option<Arc<dyn GitRepositoryFactory>>,
     /// Repository directory name, shown in the status header (`ferrit -> main`).
     repo_name: String,
     /// Who commits are by: the identities git knows and ferrit's pick.
@@ -164,7 +166,11 @@ impl App {
         }
     }
 
-    fn base(repo: Option<Box<dyn GitPort>>, config: ferrit_config::Config) -> Self {
+    fn base(
+        repo: Option<Box<dyn GitPort>>,
+        config: ferrit_config::Config,
+        repository_factory: Option<Arc<dyn GitRepositoryFactory>>,
+    ) -> Self {
         let theme_config = config.theme.clone();
         let palette = theme_config.palette();
         let keymap = keymap::Keymap::from_overrides(&config.keys).0;
@@ -180,6 +186,7 @@ impl App {
             help: components::help::HelpState::default(),
             should_quit: false,
             repo,
+            repository_factory,
             repo_name,
             authorship,
             theme: components::settings::theme::ThemeEditor::new(theme_config),
@@ -204,6 +211,7 @@ impl App {
     /// Open the repo at or above `path` with the default configuration, then
     /// take one snapshot. Reads no config file and writes none: the seam tests
     /// and examples use. The binary uses `open_with` and `Config::load`.
+    #[cfg(feature = "test-util")]
     pub fn open(path: &Path) -> GitResult<Self> {
         Self::open_with(path, ferrit_config::ConfigLoad::default())
     }
@@ -212,24 +220,55 @@ impl App {
     /// snapshot. `open` is this with the real adapter; tests pass a
     /// `ferrit_domain::fake::FakeGit`.
     pub fn with_git(git: Box<dyn GitPort>) -> Self {
-        let mut app = Self::base(Some(git), ferrit_config::Config::default());
+        Self::with_git_and_config(git, ferrit_config::ConfigLoad::default())
+    }
+
+    /// The app on any git port with a loaded configuration. The concrete
+    /// repository factory is injected separately by the composition root.
+    pub fn with_git_and_config(git: Box<dyn GitPort>, load: ferrit_config::ConfigLoad) -> Self {
+        let ferrit_config::ConfigLoad {
+            config,
+            file,
+            issues,
+        } = load;
+        let mut app = Self::base(Some(git), config, None);
+        app.prefs.file = file;
         app.refresh();
+        app.report_config_issues(&issues);
+        app
+    }
+
+    /// Inject the concrete repository factory used by repository attachment
+    /// and `git init` actions.
+    pub fn set_repository_factory(&mut self, factory: Arc<dyn GitRepositoryFactory>) {
+        self.repository_factory = Some(factory);
+    }
+
+    #[cfg(feature = "test-util")]
+    fn with_test_repository_factory(mut app: Self) -> Self {
+        app.set_repository_factory(Arc::new(RepoFactory));
         app
     }
 
     /// Open the repo at or above `path` with a loaded configuration. Whatever
     /// was wrong with the file is reported once, as an error toast.
+    #[cfg(feature = "test-util")]
     pub fn open_with(path: &Path, load: ferrit_config::ConfigLoad) -> GitResult<Self> {
         let ferrit_config::ConfigLoad {
             config,
             file,
             issues,
         } = load;
-        let mut app = Self::base(Some(Box::new(Repo::open(path)?)), config);
-        app.prefs.file = file;
-        app.refresh();
-        app.report_config_issues(&issues);
-        Ok(app)
+        let factory = Arc::new(RepoFactory);
+        let app = Self::with_git_and_config(
+            factory.open(path)?,
+            ferrit_config::ConfigLoad {
+                config,
+                file,
+                issues,
+            },
+        );
+        Ok(Self::with_test_repository_factory(app))
     }
 
     /// The app `ferrit` starts with: the repository at or above `path`, or, when
@@ -237,15 +276,16 @@ impl App {
     /// welcome screen that offers `git init`. A path named on purpose keeps the
     /// error: scripts rely on it, and a typo must not offer to create a
     /// repository somewhere else. Any other failure is an error either way.
+    #[cfg(feature = "test-util")]
     pub fn open_or_welcome(
         path: &Path,
         explicit: bool,
         load: ferrit_config::ConfigLoad,
     ) -> GitResult<Self> {
         match Self::open_with(path, load.clone()) {
-            Err(ferrit_domain::error::GitError::NotARepository(_)) if !explicit => {
-                Ok(Self::welcome(path, load))
-            },
+            Err(ferrit_domain::error::GitError::NotARepository(_)) if !explicit => Ok(
+                Self::with_test_repository_factory(Self::welcome(path, load)),
+            ),
             other => other,
         }
     }
@@ -276,7 +316,9 @@ impl App {
             file,
             issues,
         } = load;
-        let mut app = Self::base(None, config);
+        let mut app = Self::base(None, config, None);
+        #[cfg(feature = "test-util")]
+        app.set_repository_factory(Arc::new(RepoFactory));
         app.prefs.file = file;
         app.full_screens.active = FullScreen::Welcome;
         app.full_screens.welcome_dir =
@@ -292,7 +334,9 @@ impl App {
 
     /// Repo-free instance backed by `mock` data, for the render tests.
     pub fn mock() -> Self {
-        let mut app = Self::base(None, ferrit_config::Config::default());
+        let mut app = Self::base(None, ferrit_config::Config::default(), None);
+        #[cfg(feature = "test-util")]
+        app.set_repository_factory(Arc::new(RepoFactory));
         app.snapshot.header = mock::mock_header();
         app.snapshot.files = mock::mock_files();
         app.snapshot.branches = mock::mock_branches();
@@ -325,18 +369,29 @@ impl App {
     /// Used after a `git init` from the welcome screen
     /// (`docs/PLAN_16_START_WITHOUT_REPO.md`). On error nothing changes.
     pub fn attach_repository(&mut self, path: &Path) -> GitResult<()> {
+        let factory = self.repository_factory.clone().ok_or_else(|| {
+            ferrit_domain::error::GitError::Open(Box::new(std::io::Error::other(
+                "no repository factory configured",
+            )))
+        })?;
+        self.replace_repository(factory.open(path)?);
+        Ok(())
+    }
+
+    fn replace_repository(&mut self, repo: Box<dyn GitPort>) {
         let load = ferrit_config::ConfigLoad {
             config: self.prefs.config.clone(),
             file: self.prefs.file.clone(),
             issues: Vec::new(),
         };
-        let mut fresh = Self::open_with(path, load)?;
+        let factory = self.repository_factory.clone();
+        let mut fresh = Self::with_git_and_config(repo, load);
+        fresh.repository_factory = factory;
         fresh.workers.sender = self.workers.sender.take();
         fresh.right.picker = self.right.picker.clone();
         fresh.create_remote.carry_program_from(&self.create_remote);
         fresh.watch_request = fresh.watch_root();
         *self = fresh;
-        Ok(())
     }
 
     /// The worktree `run` should watch, once, after `attach_repository`.
@@ -572,9 +627,14 @@ impl App {
 impl App {
     /// `git init` in `dir`, then open the repository it made.
     pub(crate) fn init_here(&mut self, dir: &Path) {
-        let made = Repo::init(dir).map(|_| dir.to_path_buf());
-        match made.and_then(|dir| self.attach_repository(&dir)) {
-            Ok(()) => {},
+        let Some(factory) = self.repository_factory.clone() else {
+            self.report_error(ferrit_domain::error::GitError::Open(Box::new(
+                std::io::Error::other("no repository factory configured"),
+            )));
+            return;
+        };
+        match factory.init(dir) {
+            Ok(repo) => self.replace_repository(repo),
             Err(error) => self.report_error(error),
         }
     }

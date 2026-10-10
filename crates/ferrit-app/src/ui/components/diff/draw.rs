@@ -8,7 +8,7 @@ use crate::ui::image::preview::Preview;
 use crate::ui::scene::Scene;
 use crate::ui::{mock, row_lines};
 use ferrit_domain::diff::DiffSide;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ferrit_tui::widgets::chrome::panel::Panel;
 use ratatui::Frame;

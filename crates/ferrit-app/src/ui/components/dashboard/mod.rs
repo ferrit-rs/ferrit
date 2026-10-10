@@ -1,5 +1,6 @@
 //! Dashboard feature: statistics state and terminal projection.
 
+pub mod chart_palette;
 pub mod state;
 pub mod view;
 

@@ -4,8 +4,8 @@
 use crate::ui::components::popups::{ConfirmAction, ConfirmPrompt, Popup};
 use crate::ui::error::AppError;
 use crate::ui::event::{Env, Event};
+use ferrit_domain::credentials::is_secret;
 use ferrit_domain::remote::{self, PushPlan, RemoteOp, RemoteRequest};
-use ferrit_git::askpass;
 use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::sync::mpsc;
@@ -91,7 +91,7 @@ pub(crate) fn ask(
         return Vec::new();
     }
     vec![Event::OpenPopup(Popup::Askpass(AskpassPrompt {
-        secret: askpass::is_secret(&prompt),
+        secret: is_secret(&prompt),
         prompt,
         typed: TextInput::default(),
         shown: TextInput::default(),

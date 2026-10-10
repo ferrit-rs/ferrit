@@ -875,8 +875,9 @@ dependencies = [
  "color-eyre",
  "ferrit-app",
  "ferrit-config",
+ "ferrit-domain",
  "ferrit-git",
- "ferrit-tui",
+ "ferrit-theme",
 ]
 
 [[package]]
@@ -889,6 +890,7 @@ dependencies = [
  "ferrit-config",
  "ferrit-domain",
  "ferrit-git",
+ "ferrit-theme",
  "ferrit-tui",
  "git2",
  "image",
@@ -907,7 +909,7 @@ name = "ferrit-config"
 version = "0.10.0"
 dependencies = [
  "directories",
- "ferrit-tui",
+ "ferrit-theme",
  "serde",
  "strum",
  "thiserror 2.0.20",
@@ -932,15 +934,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrit-theme"
+version = "0.10.0"
+dependencies = [
+ "ratatui",
+ "serde",
+ "strum",
+]
+
+[[package]]
 name = "ferrit-tui"
 version = "0.10.0"
 dependencies = [
- "ferrit-domain",
+ "ferrit-theme",
  "ratatui",
  "ratatui-core",
  "ratatui-widgets",
- "serde",
- "strum",
  "unicode-segmentation",
  "unicode-width",
 ]

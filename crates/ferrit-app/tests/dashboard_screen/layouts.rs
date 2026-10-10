@@ -1,7 +1,7 @@
 //! Layouts.
 
 use crate::support::{buffer, col_of, render, stats, text, view};
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::style::Color;
 
 #[test]

@@ -17,7 +17,7 @@ workspace = true
 
 [dependencies]
 directories.workspace = true
-ferrit-tui.workspace = true
+ferrit-theme.workspace = true
 serde.workspace = true
 strum.workspace = true
 thiserror.workspace = true

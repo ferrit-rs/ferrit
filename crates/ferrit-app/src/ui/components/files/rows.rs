@@ -12,7 +12,7 @@ use crate::ui::components::panes::selection::SelectionKey;
 use crate::ui::row_lines;
 use ferrit_domain::Snapshot;
 use ferrit_domain::model::FileEntry;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::text::Line;
 
 /// Read-only file-pane projection. Tree construction stays in `tree`; this

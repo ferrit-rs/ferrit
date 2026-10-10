@@ -2,8 +2,8 @@
 
 use crate::ui::keymap;
 use ferrit_domain::diff::DiffOpts;
-use ferrit_tui::theme::palette::Palette;
-use ferrit_tui::theme::scheme::ColorDepth;
+use ferrit_theme::palette::Palette;
+use ferrit_theme::scheme::ColorDepth;
 use std::path::PathBuf;
 use std::time::Duration;
 

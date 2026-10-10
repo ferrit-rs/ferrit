@@ -482,7 +482,7 @@ fn counter_colour(dir: &Path, subject: &str) -> (bool, Option<Color>) {
 fn the_summary_counts_its_length_and_warns_past_50() {
     let dir = staged_repo_with_template("app-commit-counter", "\n");
     // `commit.template` is a blank line: the editor starts empty.
-    let palette = ferrit_tui::theme::palette::Palette::DARK;
+    let palette = ferrit_theme::palette::Palette::DARK;
     let at_limit = "a".repeat(50);
     let over = "a".repeat(51);
     assert_eq!(

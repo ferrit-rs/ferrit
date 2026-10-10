@@ -1,9 +1,9 @@
 //! Rendering for status and command-log lines.
 
+use ferrit_domain::command_log::{CommandKind, CommandRecord};
 use ferrit_domain::diff::DiffStat;
 use ferrit_domain::model::StatusHeader;
-use ferrit_git::command_log::{CommandKind, CommandRecord};
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::fmt::Write as _;

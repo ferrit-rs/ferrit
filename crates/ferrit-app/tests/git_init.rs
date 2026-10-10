@@ -9,8 +9,8 @@
 use std::fs;
 use std::path::PathBuf;
 
+use ferrit_domain::command_log::{CommandKind, recent};
 use ferrit_domain::error::GitError;
-use ferrit_git::command_log::{CommandKind, recent};
 use ferrit_git::repo::Repo;
 
 struct TempDir(PathBuf);

@@ -27,6 +27,7 @@ use git2::Repository;
 use ferrit_domain::Snapshot;
 use ferrit_domain::error::{GitError, GitResult};
 use ferrit_domain::identity::{Identity, IdentitySource};
+use ferrit_domain::port::{GitPort, GitRepositoryFactory};
 
 /// A `git2` failure with the text git gave, kept as the `source` of
 /// `GitError::Read` and `GitError::Open`.
@@ -124,6 +125,20 @@ pub struct Repo {
     /// A throwaway global config file, set by `isolate_config`. `None` in
     /// real use: git then reads the user's own files.
     config_global: Option<std::path::PathBuf>,
+}
+
+/// The concrete repository factory used by the binary composition root.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RepoFactory;
+
+impl GitRepositoryFactory for RepoFactory {
+    fn open(&self, path: &Path) -> GitResult<Box<dyn GitPort>> {
+        Ok(Box::new(Repo::open(path)?))
+    }
+
+    fn init(&self, path: &Path) -> GitResult<Box<dyn GitPort>> {
+        Ok(Box::new(Repo::init(path)?))
+    }
 }
 
 /// Abbreviated hash, the 7 hex chars `git` shows by default. Shared by

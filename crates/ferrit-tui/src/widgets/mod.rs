@@ -1,6 +1,5 @@
 //! Small reusable UI building blocks (`components/ui/*`).
 
-pub mod chart_palette;
 pub mod chrome;
 pub mod donut;
 pub mod heatmap;

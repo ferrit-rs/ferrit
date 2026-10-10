@@ -7,8 +7,10 @@
 #![warn(missing_docs)]
 
 pub mod apply;
+pub mod command_log;
 pub mod commit;
 pub mod config;
+pub mod credentials;
 pub mod diff;
 pub mod error;
 pub mod host;

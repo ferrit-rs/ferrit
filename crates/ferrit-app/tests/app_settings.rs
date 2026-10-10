@@ -15,7 +15,7 @@ use std::process::Command;
 use ferrit_app::ui::App;
 use ferrit_app::ui::components::settings::state::{Kind, SaveState, SettingsRow, TerminalRequest};
 use ferrit_config::Config;
-use ferrit_tui::theme::theme_config::{Preset, SchemeChoice};
+use ferrit_theme::theme_config::{Preset, SchemeChoice};
 use strum::IntoEnumIterator;
 
 struct Fixture {

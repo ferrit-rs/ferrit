@@ -144,6 +144,7 @@ step "cargo package (all workspace packages, uploads nothing)"
 # The workspace checks above compile every package; cargo publish below packages
 # and validates each crate after its dependencies have been published.
 cargo package -p ferrit-domain --allow-dirty --no-verify
+cargo package -p ferrit-theme --allow-dirty --no-verify
 printf '%s\n' 'note: dependent package archives are validated by cargo publish in dependency order'
 
 step "cargo check ferrit"
@@ -153,7 +154,7 @@ cargo check --locked -p ferrit --all-targets
 # execute path publishes in dependency order, so each cargo publish can resolve
 # the package immediately before it.
 if [ "$execute" -eq 0 ]; then
-    printf '%s\n' 'note: package validation passed; publish order is domain, tui, config, git, app, binary'
+    printf '%s\n' 'note: package validation passed; publish order is domain, theme, tui, config, git, app, binary'
 fi
 
 # --- the release ---------------------------------------------------------
@@ -168,7 +169,7 @@ fi
 step "push $BRANCH to $REMOTE"
 act git push "$REMOTE" "$BRANCH"
 
-for package in ferrit-domain ferrit-tui ferrit-config ferrit-git ferrit-app ferrit; do
+for package in ferrit-domain ferrit-theme ferrit-tui ferrit-config ferrit-git ferrit-app ferrit; do
     step "publish $package $version to crates.io"
     act cargo publish -p "$package"
 done

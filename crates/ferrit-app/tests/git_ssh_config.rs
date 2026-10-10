@@ -5,7 +5,7 @@
 //! `git::ssh_config`: the GitHub host aliases of an ssh config
 //! (`docs/PLAN_15_CREATE_REMOTE.md`).
 
-use ferrit_git::ssh_config::{github_aliases, read_github_aliases};
+use ferrit_config::ssh_config::{github_aliases, read_github_aliases};
 
 #[test]
 fn the_users_own_config_shape_gives_its_alias() {

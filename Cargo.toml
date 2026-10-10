@@ -6,6 +6,7 @@ members = [
     "crates/ferrit-config",
     "crates/ferrit-domain",
     "crates/ferrit-git",
+    "crates/ferrit-theme",
     "crates/ferrit-tui",
 ]
 default-members = ["crates/ferrit"]
@@ -29,6 +30,7 @@ ferrit-app = { version = "0.10.0", path = "crates/ferrit-app" }
 ferrit-config = { version = "0.10.0", path = "crates/ferrit-config" }
 ferrit-domain = { version = "0.10.0", path = "crates/ferrit-domain" }
 ferrit-git = { version = "0.10.0", path = "crates/ferrit-git" }
+ferrit-theme = { version = "0.10.0", path = "crates/ferrit-theme" }
 ferrit-tui = { version = "0.10.0", path = "crates/ferrit-tui" }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }

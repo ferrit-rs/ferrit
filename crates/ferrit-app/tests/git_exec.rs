@@ -22,8 +22,8 @@ use common::{TempDir, commit_all, configure_identity, git};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use ferrit_domain::command_log::{CommandKind, CommandRecord, recent};
 use ferrit_domain::diff::{DiffOpts, DiffSide};
-use ferrit_git::command_log::{CommandKind, CommandRecord, recent};
 use ferrit_git::repo::Repo;
 use git2::Repository;
 
@@ -178,7 +178,7 @@ fn recent_returns_the_newest_entries_oldest_first() {
 /// log would silently miss it.
 #[test]
 fn a_command_that_never_completed_reads_as_an_error_line() {
-    use ferrit_tui::theme::palette::Palette;
+    use ferrit_theme::palette::Palette;
     let record = CommandRecord {
         argv: "git zz-never-completed".to_owned(),
         kind: CommandKind::Write,

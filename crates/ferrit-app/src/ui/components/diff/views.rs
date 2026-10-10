@@ -94,7 +94,7 @@ pub enum PopupView<'a> {
 /// is scrolled up from the newest.
 #[derive(Debug)]
 pub struct CommandLogView {
-    pub records: Vec<ferrit_git::command_log::CommandRecord>,
+    pub records: Vec<ferrit_domain::command_log::CommandRecord>,
     pub from_bottom: usize,
 }
 

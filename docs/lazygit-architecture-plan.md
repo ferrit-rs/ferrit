@@ -192,18 +192,20 @@ crates/
 ├── ferrit/                         thin binary and CLI contract tests
 ├── ferrit-app/                     App, runtime, controllers, components, replay
 │   └── src/ui/                    application-facing TUI composition
-├── ferrit-config/                  config.toml model, validation, persistence
-├── ferrit-domain/                  Git models, ports, parsers, rules and stats
+├── ferrit-config/                  config.toml model, validation, persistence, SSH config
+├── ferrit-domain/                  Git models, ports, parsers, rules, command log and stats
 ├── ferrit-git/                     Repo adapter, subprocesses, askpass, FakeGit
-└── ferrit-tui/                     themes, color picker, widgets, chrome, overlays
+├── ferrit-theme/                   palettes, schemes and persisted theme values
+└── ferrit-tui/                     color picker, widgets, chrome and overlays
 ```
 
 Dependency direction:
 
 ```text
 ferrit -> ferrit-app -> ferrit-domain
-                    -> ferrit-config -> ferrit-tui
+                    -> ferrit-config -> ferrit-theme
                     -> ferrit-git -> ferrit-domain
+                    -> ferrit-theme
                     -> ferrit-tui
 ```
 

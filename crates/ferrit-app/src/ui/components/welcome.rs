@@ -7,7 +7,7 @@ use crate::ui::draw::TAGLINE_WHAT;
 use crate::ui::draw::{Landed, RenderState};
 use crate::ui::event::Event;
 use crate::ui::scene::Scene;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ferrit_tui::widgets::chrome::text::cut_middle;
 use ratatui::Frame;

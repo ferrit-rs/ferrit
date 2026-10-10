@@ -18,7 +18,7 @@ use ferrit_domain::error::GitResult;
 use ferrit_domain::model::CommitEntry;
 use ferrit_domain::port::GitPort;
 use ferrit_domain::rebase::OperationOutcome;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 
 /// One change a component asks for.
 pub(crate) enum Event {

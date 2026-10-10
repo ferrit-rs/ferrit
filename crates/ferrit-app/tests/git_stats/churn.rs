@@ -3,8 +3,8 @@
 use std::sync::atomic::AtomicBool;
 
 use crate::support::{NOW, TempDir, git, init, project, stats_at};
+use ferrit_domain::command_log;
 use ferrit_domain::stats::{StatsOptions, Window};
-use ferrit_git::command_log;
 use ferrit_git::repo::Repo;
 
 #[test]

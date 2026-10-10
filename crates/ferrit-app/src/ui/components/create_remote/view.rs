@@ -2,7 +2,7 @@
 
 use crate::ui::components::create_remote::{Field, Step};
 use ferrit_domain::host::Visibility;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ferrit_tui::widgets::chrome::panel::Panel;

@@ -151,7 +151,7 @@ fn the_chosen_author_signs_it_and_the_log_shows_the_commit() {
         "Chosen One <chosen@example.com>"
     );
 
-    let logged = ferrit_git::command_log::recent(usize::MAX, true)
+    let logged = ferrit_domain::command_log::recent(usize::MAX, true)
         .iter()
         .any(|r| r.argv.contains("--only -- README.md") && r.exit == Some(0));
     assert!(logged, "the commit is in the command log");

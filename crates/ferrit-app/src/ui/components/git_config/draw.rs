@@ -2,7 +2,7 @@
 
 use crate::ui::components::git_config::screen::ConfigRow;
 use ferrit_domain::config::{Scope, WriteScope, display_value};
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ferrit_tui::widgets::chrome::panel::Panel;
 use ferrit_tui::widgets::chrome::text::cut_end;

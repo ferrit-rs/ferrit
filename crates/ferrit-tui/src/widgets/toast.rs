@@ -8,12 +8,12 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
-use crate::theme::palette::Palette;
 use crate::widgets::tui_overlay::anchor::Anchor;
 use crate::widgets::tui_overlay::backdrop::Backdrop;
 use crate::widgets::tui_overlay::overlay::Overlay;
 use crate::widgets::tui_overlay::slide::Slide;
 use crate::widgets::tui_overlay::state::OverlayState;
+use ferrit_theme::palette::Palette;
 
 const ANIMATION_TIME: Duration = Duration::from_millis(160);
 

@@ -22,8 +22,9 @@ path = "src/main.rs"
 [dependencies]
 ferrit-app.workspace = true
 ferrit-config.workspace = true
+ferrit-domain.workspace = true
 ferrit-git.workspace = true
-ferrit-tui.workspace = true
+ferrit-theme.workspace = true
 clap.workspace = true
 color-eyre.workspace = true
 

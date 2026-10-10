@@ -17,13 +17,15 @@
 //!   `Config::load`, which the binary calls, and `tests/config.rs` checks that.
 
 use directories::ProjectDirs;
-use ferrit_tui::theme::theme_config::ThemeConfig;
+use ferrit_theme::theme_config::ThemeConfig;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use strum::IntoStaticStr;
+
+pub mod ssh_config;
 
 const FILE_HEADER: &str = "# Ferrit configuration. Ferrit rewrites this file when it saves a\n\
                            # setting: unknown sections are kept, comments are not.\n\n";

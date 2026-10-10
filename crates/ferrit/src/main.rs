@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::Result;
@@ -8,6 +9,9 @@ use color_eyre::Result;
 use ferrit_app::ui::App;
 use ferrit_app::ui::terminal as tui;
 use ferrit_config::Config;
+use ferrit_domain::error::GitError;
+use ferrit_domain::port::GitRepositoryFactory;
+use ferrit_git::repo::RepoFactory;
 
 /// The everyday git manager for the terminal: a full TUI for your repository, and
 /// an empty folder to GitHub without leaving it.
@@ -86,8 +90,19 @@ fn main() -> Result<ExitCode> {
     // welcome screen instead (`docs/PLAN_16_START_WITHOUT_REPO.md`).
     let explicit = cli.path.is_some();
     let path = cli.path.unwrap_or_else(|| PathBuf::from("."));
-    let mut app = match App::open_or_welcome(&path, explicit, Config::load()) {
-        Ok(app) => app,
+    let factory: Arc<dyn GitRepositoryFactory> = Arc::new(RepoFactory);
+    let load = Config::load();
+    let mut app = match factory.open(&path) {
+        Ok(repo) => {
+            let mut app = App::with_git_and_config(repo, load);
+            app.set_repository_factory(Arc::clone(&factory));
+            app
+        },
+        Err(GitError::NotARepository(_)) if !explicit => {
+            let mut app = App::welcome(&path, load);
+            app.set_repository_factory(factory);
+            app
+        },
         Err(e) => {
             // The TUI has not taken the screen yet: stderr is the only channel,
             // and a non-zero exit is the contract for "could not open the repo".
@@ -108,12 +123,12 @@ fn main() -> Result<ExitCode> {
     app.detect_graphics();
     // The painted theme is RGB: a terminal without 24-bit colour gets the nearest
     // of its 256 (`docs/PLAN_18_THEMES.md`).
-    app.set_color_depth(ferrit_tui::theme::scheme::ColorDepth::detect(
+    app.set_color_depth(ferrit_theme::scheme::ColorDepth::detect(
         std::env::var("COLORTERM").ok().as_deref(),
     ));
 
     let mut terminal = tui::init(app.mouse_enabled())?;
-    let result = app.run(&mut terminal);
+    let result = app.run_with_askpass(&mut terminal, ferrit_git::askpass::serve);
     tui::restore()?;
     result.map(|()| ExitCode::SUCCESS)
 }

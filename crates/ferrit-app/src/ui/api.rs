@@ -10,7 +10,7 @@ use crate::ui::components::panes::rows::PaneRows;
 use crate::ui::draw::FullScreen;
 use crate::ui::events::AppEvent;
 use crate::ui::image::preview::Preview;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use std::path::Path;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -75,7 +75,7 @@ impl App {
     }
 
     /// Tell the app what the terminal can show (`ColorDepth::detect`).
-    pub fn set_color_depth(&mut self, depth: ferrit_tui::theme::scheme::ColorDepth) {
+    pub fn set_color_depth(&mut self, depth: ferrit_theme::scheme::ColorDepth) {
         self.prefs.color_depth = depth;
     }
 

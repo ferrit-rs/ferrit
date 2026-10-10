@@ -7,8 +7,8 @@ use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoStaticStr};
 
-use crate::theme::palette::Palette;
-use crate::theme::scheme::Scheme;
+use crate::palette::Palette;
+use crate::scheme::Scheme;
 
 pub const RGB_RED_CHANNEL: usize = 0;
 pub const RGB_GREEN_CHANNEL: usize = 1;

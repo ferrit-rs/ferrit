@@ -1,7 +1,7 @@
 //! Rendering for parsed diffs and ANSI pager output.
 
 use ferrit_domain::diff::Diff;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use std::ops::Range;

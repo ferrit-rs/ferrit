@@ -20,16 +20,6 @@ use std::thread;
 /// listening ferrit.
 const SOCKET_ENV: &str = "FERRIT_ASKPASS_SOCKET";
 
-/// Whether typing for `prompt` should be hidden: passwords, passphrases and
-/// PINs, not a username or ssh's "continue connecting (yes/no)?".
-#[must_use]
-pub fn is_secret(prompt: &str) -> bool {
-    let prompt = prompt.to_lowercase();
-    ["password", "passphrase", "pin"]
-        .iter()
-        .any(|word| prompt.contains(word))
-}
-
 static SOCKET: OnceLock<PathBuf> = OnceLock::new();
 
 /// The listening socket's directory, removed when dropped.
@@ -157,7 +147,7 @@ fn relay(_socket: &Path, _prompt: &str) -> io::Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::askpass::is_secret;
+    use ferrit_domain::credentials::is_secret;
 
     #[test]
     fn passphrases_and_passwords_are_hidden() {

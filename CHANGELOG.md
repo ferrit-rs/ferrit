@@ -18,6 +18,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Release packaging now respects unpublished workspace dependencies: local checks run before ordered `cargo publish` validation.
 - Application manifests now declare only dependencies used by their own source; shared versions remain centralized at workspace level.
 - Reusable themes, color editing, terminal chrome, overlays and widgets now live in `ferrit-tui`; application state stays in `ferrit-app`.
+- Dashboard-specific chart palette logic now lives in `ferrit-app`; `ferrit-tui` no longer depends on `ferrit-domain`.
+- Theme data now lives in `ferrit-theme`; config no longer depends on the TUI widget crate, and `ferrit-tui` keeps only interactive theme controls.
+- Repository opening/init, command logging, credential classification and SSH config parsing now cross explicit domain ports or owning crates; normal `ferrit-app` builds no longer depend on the concrete Git adapter.
+- TUI line rendering now stays in `ferrit-tui`; `ferrit-theme` owns theme data without presentation helpers.
 - `config.toml` parsing, validation and section persistence now live in `ferrit-config`; settings-sheet state lives with the TUI settings component.
 - Git scope names now use `strum`, and pane indexing uses `enum-map`'s enum index.
 - Rebase integration tests now pin pull strategy instead of inheriting user Git config.

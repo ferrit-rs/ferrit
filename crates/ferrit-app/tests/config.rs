@@ -25,7 +25,7 @@ use ferrit_app::ui::components::diff::views::DiffView;
 use ferrit_app::ui::components::panes::nav::Pane;
 use ferrit_config::ConfigError;
 use ferrit_config::{CommitConfig, Config, ConfigLoad, DiffConfig, LogConfig, UiConfig};
-use ferrit_tui::theme::theme_config::{Preset, ThemeConfig};
+use ferrit_theme::theme_config::{Preset, ThemeConfig};
 use git2::Repository;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -160,7 +160,7 @@ fn saving_from_the_drawer_keeps_the_base() {
     Config::save_theme(&path, &loaded).unwrap();
 
     let reread = Config::load_from(&path).config.theme;
-    assert_eq!(reread.base, ferrit_tui::theme::theme_config::Base::Light);
+    assert_eq!(reread.base, ferrit_theme::theme_config::Base::Light);
     assert_eq!(reread.preset, Preset::Purple);
 }
 
@@ -669,7 +669,7 @@ fn several_sections_are_written_in_one_save_and_read_back() {
     config.diff.ignore_whitespace = true;
     config.commit.sign_off = true;
     config.log.show_reads = true;
-    config.theme.base = ferrit_tui::theme::theme_config::Base::Light;
+    config.theme.base = ferrit_theme::theme_config::Base::Light;
 
     Config::save_sections(
         &path,

@@ -1,10 +1,10 @@
 //! Section detail.
 
 use crate::support::{author, branch, buffer, col_of, is_braille, render, stats, text, view};
+use ferrit_app::ui::components::dashboard::chart_palette::{ChartMode, ChartPalette};
 use ferrit_domain::stats::KindStat;
 use ferrit_domain::stats::kind::Kind;
-use ferrit_tui::theme::palette::Palette;
-use ferrit_tui::widgets::chart_palette::{ChartMode, ChartPalette};
+use ferrit_theme::palette::Palette;
 use ratatui::style::Color;
 
 #[test]

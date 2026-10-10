@@ -10,11 +10,11 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Points};
 use ratatui::widgets::{Paragraph, Sparkline, Widget};
 
+use crate::ui::components::dashboard::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
 use crate::ui::components::dashboard::text::{axis_date, figure, figure_columns, plural};
 use crate::ui::components::dashboard::view::{Ctx, note};
 use ferrit_domain::stats::series::{Bucket, Granularity};
 use ferrit_domain::stats::share::{fold, shares};
-use ferrit_tui::widgets::chart_palette::{ChartMode, OTHERS, kind_slot, slot_marker};
 use ferrit_tui::widgets::donut::{self, Donut, Slice};
 use ferrit_tui::widgets::heatmap::{self, HeatMap};
 use ferrit_tui::widgets::share_bar::stacked_bar;

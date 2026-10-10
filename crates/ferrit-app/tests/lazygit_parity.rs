@@ -286,8 +286,8 @@ fn space_on_a_directory_stages_and_unstages_everything_under_it() {
 #[test]
 fn a_commit_shows_git_s_own_answer_under_the_command() {
     use ferrit_app::ui::row_lines;
-    use ferrit_git::command_log;
-    use ferrit_tui::theme::palette::Palette;
+    use ferrit_domain::command_log;
+    use ferrit_theme::palette::Palette;
 
     let repo = Repo::new("commit-output");
     repo.commit("a.txt", "one\n", "init");

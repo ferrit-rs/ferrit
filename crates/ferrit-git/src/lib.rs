@@ -7,8 +7,6 @@
 #![warn(missing_docs)]
 
 pub mod askpass;
-pub mod command_log;
 #[cfg(feature = "test-util")]
 pub mod fake;
 pub mod repo;
-pub mod ssh_config;

@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
-use ferrit_domain::config::is_secret_key;
+use crate::config::is_secret_key;
 
 /// Entries kept; older ones are dropped.
 const CAPACITY: usize = 200;

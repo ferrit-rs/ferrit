@@ -11,7 +11,7 @@ use ferrit_domain::error::GitError;
 use ferrit_domain::port::GitPort;
 use ferrit_domain::rebase::Step;
 use ferrit_domain::refs::MergeKind;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ferrit_tui::widgets::chrome::lists::SelectList;
 use ferrit_tui::widgets::text_input::TextInput;

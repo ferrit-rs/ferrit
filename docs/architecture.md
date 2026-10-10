@@ -1,8 +1,8 @@
 # Architecture
 
 Ferrit is a Cargo workspace. The binary is a thin `clap` composition root. Application
-state, Git domain, concrete Git adapter, configuration, and terminal presentation have
-separate package ownership:
+state, Git domain, concrete Git adapter, configuration, theme data, and terminal
+presentation have separate package ownership:
 
 ```
             crates/ferrit/src/main.rs  (clap, terminal setup)
@@ -12,11 +12,11 @@ separate package ownership:
         │ crates/ferrit-app/   │  application state, controllers, runtime
         └──────┬───────────────┘
                │ uses
-       ┌───────┼────────┬───────────────┐
-       ▼       ▼        ▼               ▼
-  domain    git      config           tui
-  models    adapter  config.toml      themes/widgets
-  ports     git2     persistence      Ratatui primitives
+       ┌───────┼────────┬──────────┬───────────────┐
+       ▼       ▼        ▼          ▼               ▼
+  domain    git      config      theme            tui
+  models    adapter  config.toml data             widgets
+  ports     git2     persistence palettes          Ratatui primitives
 ```
 
 - `ferrit-domain/` is the Git domain and port boundary. It knows no terminal or concrete
@@ -25,8 +25,10 @@ separate package ownership:
 - `ferrit-app/src/ui/` is the application-facing UI: `App`, events, controllers, components and the run
   loop; `ui/components/` has one file per piece (a pane, a popup, a sheet, a screen): its
   state, its keys and how it is drawn, so a feature is in one place.
-- `ferrit-tui/` owns reusable widgets, terminal chrome, palettes, schemes and color editing.
-  It knows no `App` or Git adapter.
+- `ferrit-theme/` owns palettes, schemes and persisted theme values. It knows no
+  config file, `App`, or Git adapter.
+- `ferrit-tui/` owns reusable widgets, terminal chrome, overlays and interactive
+  color controls. It knows no `App` or Git adapter.
 - `ferrit-config/` owns `config.toml` parsing, validation, section persistence and paths.
 
 Rules that hold today, and that the tests and lints keep:
@@ -34,15 +36,14 @@ Rules that hold today, and that the tests and lints keep:
 - Only `ferrit-git/src/repo` names `git2`, and nothing in `ferrit-domain` imports `ratatui`
   or `crossterm`. `ui/image` draws the preview. Rows handed to the UI are owned core
   model types. `tests/layering.rs` checks it on the
-  sources, along with `ui/` reaching `git/repo` only in `App::open` and `git init`, and
-  `git` never reaching into `app`.
+  sources, along with `ui/` reaching the adapter only through the injected repository
+  factory, and `git` never reaching into `app`.
 - `ferrit-tui/` is the reusable terminal toolkit. It knows nothing about `App`; its
-  widgets and themes know nothing of Git.
-- `ui/` reaches git only through the `GitPort` traits (`ferrit-domain::port`). The real adapter is
-  `Repo`; tests can use `FakeGit` (`ferrit-git/src/fake.rs`). `ui/` names the concrete `Repo` in one
-  place, `App::open`, and for `git init`, which runs before any repository exists. A
-  contract suite (`tests/fake_git_contract.rs`) runs the same scenarios on both so the fake
-  cannot drift.
+  widgets and controls know nothing of Git or theme persistence.
+- `ui/` reaches git through `GitPort` and `GitRepositoryFactory` (`ferrit-domain::port`).
+  The concrete `RepoFactory` is injected by the binary; tests can use `FakeGit`
+  (`ferrit-git/src/fake.rs`). A contract suite (`tests/fake_git_contract.rs`) runs
+  the same scenarios on both so the fake cannot drift.
 - Errors keep their type up to the screen: `GitError`, `ConfigError`, `ImageError` and
   `AppError` (`thiserror`), with no `Result<_, String>` in `ui/` or `git/`. The only
   `String`s are in view state that is already text (a diff note, a settings footer).
@@ -51,8 +52,6 @@ Rules that hold today, and that the tests and lints keep:
 - No `unsafe`, no `unwrap`/`expect`/`panic` outside tests (`Cargo.toml` `[lints]`).
 
 Known gaps, each with a plan:
-- The code that only runs a subprocess (`exec`, `process`, `askpass`, `ssh_config`, and `gh`
-  in `host`) remains in the app adapter package; the core package stays dependency-light.
 - `ui/image` owns terminal image protocol detection and decoding; `git` only supplies image bytes.
 - `App` is smaller (87 fields to 26) but not small: the create-remote flow and what the user
   is told are still loose on it. Drawing reads `&App`: a frame returns what it learned as a
@@ -111,11 +110,12 @@ capability modules, `ferrit-git/src/repo/` adapter modules, and
 | --- | --- |
 | `crates/ferrit/src/main.rs` | CLI parsing, askpass dispatch and terminal bootstrap |
 | `crates/ferrit-app/src/ui/` | `App`, input, controllers, feature components, projections and workers |
-| `crates/ferrit-config/src/` | `config.toml` model, validation and persistence |
-| `crates/ferrit-tui/src/theme/` | palette, terminal scheme, theme config and colour picker |
+| `crates/ferrit-config/src/` | `config.toml` model, validation, persistence and SSH config parsing |
+| `crates/ferrit-theme/src/` | palette, terminal scheme and persisted theme config |
+| `crates/ferrit-tui/src/theme/` | interactive colour picker controls |
 | `crates/ferrit-tui/src/widgets/` | reusable terminal widgets, chrome and overlays |
-| `crates/ferrit-git/src/` | concrete adapters: `repo`, askpass, SSH config, command log and feature-gated `FakeGit` |
-| `crates/ferrit-domain/src/` | Git models, ports, errors, parsers, plans, stats and hosting/config rules; no TUI or `git2` |
+| `crates/ferrit-git/src/` | concrete adapters: `repo`, askpass and feature-gated `FakeGit` |
+| `crates/ferrit-domain/src/` | Git models, ports, command log, credential rules, errors, parsers, plans, stats and hosting/config rules; no concrete adapter |
 | `crates/ferrit-app/src/replay/` | the scripted test harness (see ADR 2) |
 | `crates/ferrit-app/tests/` | app and headless integration tests; shared helpers live in `tests/common` |
 | `crates/ferrit/tests/` | binary contract tests requiring `CARGO_BIN_EXE_ferrit` |

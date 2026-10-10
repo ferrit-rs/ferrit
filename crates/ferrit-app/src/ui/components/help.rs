@@ -2,7 +2,7 @@
 
 use crate::ui::components::keybar::help::HelpLine;
 use crate::ui::components::keybar::help::filter_help_lines;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ferrit_tui::widgets::tui_overlay::anchor::Anchor;

@@ -13,7 +13,7 @@ use std::path::Path;
 use std::process::{Command, Output};
 use std::time::Instant;
 
-use crate::command_log::{self, CommandRecord, classify, redact};
+use ferrit_domain::command_log::{self, CommandRecord, classify, redact};
 
 /// `git -C <workdir>`, ready for the caller to add arguments. The only
 /// constructor of a git `Command` in this crate (`tests/git_exec.rs` scans
@@ -147,8 +147,8 @@ impl Drop for Tracked {
 mod tests {
     use std::process::Command;
 
-    use crate::command_log::recent;
     use crate::repo::exec::output;
+    use ferrit_domain::command_log::recent;
 
     #[test]
     fn a_write_keeps_its_non_empty_stdout_lines_up_to_the_cap() {
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(records.len(), 1, "{records:?}");
         let lines: Vec<_> = records.iter().flat_map(|r| r.output.clone()).collect();
         assert!(lines.len() > 1, "more than the first line");
-        assert!(lines.len() <= crate::command_log::MAX_OUTPUT_LINES);
+        assert!(lines.len() <= ferrit_domain::command_log::MAX_OUTPUT_LINES);
         assert!(lines.iter().all(|line| !line.is_empty()));
     }
 

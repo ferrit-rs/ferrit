@@ -34,7 +34,7 @@ use ferrit_config::Config;
 use ferrit_domain::Snapshot;
 use ferrit_domain::diff::DiffSide;
 use ferrit_domain::port::GitPort;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::tui_overlay::state::OverlayState;
 
 /// A read-only view of the app for one frame, or one question.
@@ -435,7 +435,7 @@ impl<'a> Scene<'a> {
             return None;
         };
         Some(CommandLogView {
-            records: ferrit_git::command_log::recent(usize::MAX, true),
+            records: ferrit_domain::command_log::recent(usize::MAX, true),
             from_bottom: *from_bottom,
         })
     }

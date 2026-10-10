@@ -16,7 +16,7 @@ use ferrit_app::ui::mock::{mock_commits, mock_files};
 use ferrit_app::ui::row_lines;
 use ferrit_config::Config;
 use ferrit_domain::diff::parse_diff;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ratatui::style::Color;
 

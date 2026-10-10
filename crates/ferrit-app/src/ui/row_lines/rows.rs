@@ -5,7 +5,7 @@ use crate::ui::row_lines::fg;
 use ferrit_domain::model::{
     BranchEntry, Change, CommitEntry, CommitRefKind, FileEntry, PushState, RemoteEntry, StashEntry,
 };
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 

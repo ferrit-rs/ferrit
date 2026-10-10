@@ -1,9 +1,9 @@
 //! Mutable theme picker state used by the settings sheet.
 
-use ferrit_tui::theme::color_picker::{self, ColorPickerDisplay, PaletteDirection, rgb};
-use ferrit_tui::theme::theme_config::{
+use ferrit_theme::theme_config::{
     RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, ThemeConfig, ThemeMode,
 };
+use ferrit_tui::theme::color_picker::{self, ColorPickerDisplay, PaletteDirection, rgb};
 use ratatui::style::Color;
 
 pub struct ThemeEditor {

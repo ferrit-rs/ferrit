@@ -1,9 +1,4 @@
-//! How ferrit looks: the colour palette every screen is painted with, the
-//! terminal colour depth it is approximated for, the `[theme]` section of
-//! `config.toml`, the colour picker, and the state of the theme being edited
-//! in the settings sheet. Knows nothing of git or of what is drawn with it.
+//! Interactive theme controls. Theme data and color policy live in
+//! `ferrit_theme`; this module owns only terminal-facing picker widgets.
 
 pub mod color_picker;
-pub mod palette;
-pub mod scheme;
-pub mod theme_config;

@@ -3,7 +3,7 @@
 use crate::ui::components::commit_editor::{CommitDraft, CommitField};
 use crate::ui::components::diff::views::CommitPopupView;
 use crate::ui::row_lines;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ferrit_tui::widgets::chrome::panel::Panel;

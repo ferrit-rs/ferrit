@@ -9,7 +9,7 @@ use crate::ui::workers::Shared;
 use enum_map::{Enum, EnumMap};
 use ferrit_domain::Snapshot;
 use ferrit_domain::model::{CommitEntry, FileEntry};
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

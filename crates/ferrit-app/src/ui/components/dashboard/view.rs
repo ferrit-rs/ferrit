@@ -1,12 +1,14 @@
 //! Dashboard projections and rendering.
 
+use crate::ui::components::dashboard::chart_palette::{
+    ChartMode, ChartPalette, charts_mode_from_env,
+};
 use crate::ui::components::dashboard::charts;
 use crate::ui::components::dashboard::tables;
 use crate::ui::components::dashboard::text::{date, thousands, window_label};
 use crate::ui::draw::{Landed, RenderState, unix_now};
 use crate::ui::scene::Scene;
 use ferrit_domain::stats::{NUMSTAT_CAP, RepoStats, WALK_CAP};
-use ferrit_tui::widgets::chart_palette::{ChartMode, ChartPalette, charts_mode_from_env};
 use ferrit_tui::widgets::chrome::drawer::Drawer;
 use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ferrit_tui::widgets::chrome::panel::Panel;

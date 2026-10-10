@@ -1,24 +1,21 @@
 [package]
-name = "ferrit-tui"
+name = "ferrit-theme"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "Reusable terminal widgets and themes for ferrit"
+description = "Ferrit's terminal color model, palettes and theme configuration"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-keywords = ["tui", "terminal", "ratatui"]
+keywords = ["tui", "terminal", "theme"]
 categories = ["command-line-utilities", "gui"]
 
 [lints]
 workspace = true
 
 [dependencies]
-ferrit-theme.workspace = true
 ratatui.workspace = true
-ratatui-core.workspace = true
-ratatui-widgets.workspace = true
-unicode-segmentation.workspace = true
-unicode-width.workspace = true
+serde.workspace = true
+strum.workspace = true

@@ -17,8 +17,8 @@ use ferrit_app::ui::App;
 use ferrit_app::ui::draw as ui;
 use ferrit_config::{Config, ConfigLoad};
 use ferrit_domain::error::GitError;
-use ferrit_tui::theme::scheme::{ColorDepth, Scheme, contrast};
-use ferrit_tui::theme::theme_config::{Base, SchemeChoice};
+use ferrit_theme::scheme::{ColorDepth, Scheme, contrast};
+use ferrit_theme::theme_config::{Base, SchemeChoice};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -330,7 +330,7 @@ fn colours(buf: &Buffer) -> Vec<Color> {
 
 #[test]
 fn nearest_256_picks_the_cube_or_the_grey_ramp_whichever_is_closer() {
-    use ferrit_tui::theme::scheme::nearest_256;
+    use ferrit_theme::scheme::nearest_256;
     assert_eq!(nearest_256(0, 0, 0), 16, "black is the cube's corner");
     assert_eq!(nearest_256(255, 255, 255), 231, "white is the other");
     assert_eq!(nearest_256(255, 0, 0), 196);

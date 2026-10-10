@@ -3,11 +3,11 @@
 use crate::ui::components::popups::{Modal, Popup};
 use crate::ui::error::AppError;
 use color_eyre::Result;
+use ferrit_config::ssh_config::read_github_aliases;
 use ferrit_domain::host::{
     CreateDraft, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
     validate_description,
 };
-use ferrit_git::ssh_config::read_github_aliases;
 use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::path::PathBuf;

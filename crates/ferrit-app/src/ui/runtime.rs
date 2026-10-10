@@ -1,5 +1,6 @@
 //! Terminal event loop and background-event routing.
 
+use std::io;
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
@@ -37,12 +38,21 @@ impl App {
         }
     }
 
+    /// Run without an external askpass server. The binary uses
+    /// [`Self::run_with_askpass`] to connect the concrete Git adapter.
+    pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
+        self.run_with_askpass(terminal, |_handler| Ok(NoopAskpass))
+    }
+
     /// Draw, then block for the next event batch, until `should_quit`. Events
     /// come from terminal input, a recursive worktree watch, and a poll (`[ui]
     /// poll_secs`, 10s by default).
     /// Bounded batches avoid repainting for every auto-repeat key while still
     /// guaranteeing regular redraws during sustained input.
-    pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
+    pub fn run_with_askpass<S, F>(&mut self, terminal: &mut Tui, serve: F) -> Result<()>
+    where
+        F: FnOnce(AskpassHandler) -> io::Result<S>,
+    {
         let mut events = Events::new(self.watch_root().as_deref(), self.prefs.poll_interval())?;
         self.watch_error = watcher_error(&events);
         self.last_error = self.watch_error.clone();
@@ -55,13 +65,13 @@ impl App {
         // Answers ssh/git credential prompts in a popup (`app::askpass`);
         // without it a passphrase question would hang on the raw terminal.
         let askpass_sender = events.sender();
-        let _askpass = ferrit_git::askpass::serve(move |prompt| {
+        let _askpass = serve(Box::new(move |prompt| {
             let (reply, answer) = mpsc::channel();
             askpass_sender
                 .send(AppEvent::Askpass { prompt, reply })
                 .ok()?;
             answer.recv().ok().flatten()
-        });
+        }))?;
         let mut prev_was_image = false;
         let mut overlay_tick = Instant::now();
         while !self.should_quit {
@@ -150,6 +160,10 @@ impl App {
         self.render.dismiss_toast()
     }
 }
+
+type AskpassHandler = Box<dyn Fn(String) -> Option<String> + Send>;
+
+struct NoopAskpass;
 
 /// The Status line for a filesystem watcher that could not start, if any.
 fn watcher_error(events: &Events) -> Option<Arc<AppError>> {

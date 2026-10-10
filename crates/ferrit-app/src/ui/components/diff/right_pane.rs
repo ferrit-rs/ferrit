@@ -6,7 +6,7 @@ use crate::ui::draw::RenderedDiff;
 use crate::ui::row_lines;
 use ferrit_domain::apply::Granule;
 use ferrit_domain::diff::DiffSide;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ratatui::layout::Rect;
 use ratatui::text::Text;
 use ratatui_image::picker::Picker;

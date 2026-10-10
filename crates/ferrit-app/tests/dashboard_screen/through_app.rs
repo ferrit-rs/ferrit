@@ -7,11 +7,11 @@ use std::sync::atomic::AtomicBool;
 
 use crate::support::{DAY, buffer, render, stats, text, view};
 use ferrit_app::ui::App;
+use ferrit_app::ui::components::dashboard::chart_palette::ChartMode;
 use ferrit_app::ui::components::dashboard::view::Chrome;
 use ferrit_app::ui::draw as ui;
 use ferrit_domain::stats::{StatsOptions, Window};
 use ferrit_git::repo::Repo;
-use ferrit_tui::widgets::chart_palette::ChartMode;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

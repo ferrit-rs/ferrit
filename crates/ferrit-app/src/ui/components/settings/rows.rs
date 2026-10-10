@@ -2,8 +2,8 @@
 
 use crate::ui::components::settings::state::{Kind, SettingsRow};
 use crate::ui::scene::Scene;
-use ferrit_tui::theme::palette::Palette;
-use ferrit_tui::theme::theme_config::Preset;
+use ferrit_theme::palette::Palette;
+use ferrit_theme::theme_config::Preset;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use strum::IntoEnumIterator;

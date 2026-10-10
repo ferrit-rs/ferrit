@@ -19,7 +19,7 @@ use std::time::Duration;
 use ferrit_app::ui::App;
 use ferrit_app::ui::draw as ui;
 use ferrit_config::{Config, ConfigLoad};
-use ferrit_tui::theme::scheme::Scheme;
+use ferrit_theme::scheme::Scheme;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{

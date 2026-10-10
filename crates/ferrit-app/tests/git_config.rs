@@ -264,7 +264,7 @@ global\0file:/home/u/.gitconfig\0pull.rebase\ntrue\0",
 
 #[test]
 fn secrets_are_hidden_on_screen_and_in_the_command_log() {
-    use ferrit_git::command_log::recent;
+    use ferrit_domain::command_log::recent;
 
     assert!(is_secret_key("http.proxyPassword"));
     assert!(is_secret_key("credential.https://x.example.token"));
@@ -321,7 +321,7 @@ fn secrets_are_hidden_on_screen_and_in_the_command_log() {
         .find(|r| r.argv.contains("--show-origin"))
         .unwrap();
     assert!(listing.output.is_empty());
-    assert_eq!(listing.kind, ferrit_git::command_log::CommandKind::Read);
+    assert_eq!(listing.kind, ferrit_domain::command_log::CommandKind::Read);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

@@ -1,5 +1,6 @@
 //! Hand-built data and render helpers shared by the dashboard screen tests.
 
+use ferrit_app::ui::components::dashboard::chart_palette::{ChartMode, ChartPalette};
 use ferrit_app::ui::components::dashboard::view::{self, Chrome, View};
 use ferrit_domain::stats::branch_health::{BranchHealth, TagSince, VsMain};
 use ferrit_domain::stats::kind::Kind;
@@ -8,8 +9,7 @@ use ferrit_domain::stats::share::Share;
 use ferrit_domain::stats::{
     AuthorStat, FileStat, HotFiles, KindStat, Lines, RepoStats, Totals, Window, WorkState,
 };
-use ferrit_tui::theme::palette::Palette;
-use ferrit_tui::widgets::chart_palette::{ChartMode, ChartPalette};
+use ferrit_theme::palette::Palette;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;

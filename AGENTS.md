@@ -37,11 +37,12 @@ Adding a new dependency, a new module, or an abstraction with a single caller
 needs a reason stated in the commit message.
 
 Keep distinct logic in separate crates. `crates/ferrit-domain/` owns Git types,
-ports and errors; `crates/ferrit-git/` owns identities, images, `git2` and
-the subprocess adapter; `crates/ferrit-app/src/ui/` owns `App`, events,
-components and terminal lifecycle; `crates/ferrit-config/` owns settings;
-`crates/ferrit-tui/` owns reusable themes and widgets. Avoid mixing those
-responsibilities in one file.
+ports, command-log models and errors; `crates/ferrit-git/` owns `git2`, Git
+subprocesses and the concrete repository factory; `crates/ferrit-app/src/ui/`
+owns `App`, events, components and terminal lifecycle; `crates/ferrit-config/`
+owns settings and SSH config parsing; `crates/ferrit-theme/` owns theme data;
+`crates/ferrit-tui/` owns reusable widgets and interactive color controls.
+Avoid mixing those responsibilities in one file.
 
 
 

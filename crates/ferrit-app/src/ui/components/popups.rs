@@ -11,7 +11,7 @@ use ferrit_domain::model::{CommitEntry, StashEntry};
 use ferrit_domain::rebase::RebaseEdit;
 use ferrit_domain::rebase::Step;
 use ferrit_domain::remote::RemoteRequest;
-use ferrit_tui::theme::palette::Palette;
+use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::Frame;

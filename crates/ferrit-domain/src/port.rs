@@ -230,3 +230,15 @@ pub trait GitPort:
     /// A fresh handle on the same repository, for a worker thread.
     fn reopen(&self) -> GitResult<Box<dyn GitPort>>;
 }
+
+/// Opens and initializes concrete repository handles for the application.
+///
+/// The application owns behavior and stores only [`GitPort`]. A concrete
+/// adapter supplies this factory at the composition root, keeping `git2` and
+/// subprocess policy out of the application crate.
+pub trait GitRepositoryFactory: Send + Sync {
+    /// Discover and open a repository at or above `path`.
+    fn open(&self, path: &Path) -> GitResult<Box<dyn GitPort>>;
+    /// Run `git init` in `path` and return the opened repository.
+    fn init(&self, path: &Path) -> GitResult<Box<dyn GitPort>>;
+}

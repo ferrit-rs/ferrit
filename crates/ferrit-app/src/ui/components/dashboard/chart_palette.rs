@@ -8,8 +8,8 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
-use crate::theme::palette::Palette;
 use ferrit_domain::stats::kind::Kind;
+use ferrit_theme::palette::Palette;
 
 /// Categorical slots: feat, fix, docs, test, refactor, then gray "others".
 pub const SLOTS: usize = 6;
@@ -177,11 +177,11 @@ pub fn kind_marker(kind: Kind) -> &'static str {
     reason = "test scaffolding: an out-of-range index is the failed assertion"
 )]
 mod tests {
-    use crate::theme::palette::Palette;
-    use crate::widgets::chart_palette::{
+    use crate::ui::components::dashboard::chart_palette::{
         ChartMode, ChartPalette, OTHERS, charts_mode_auto, kind_marker, slot_marker,
     };
     use ferrit_domain::stats::kind::Kind;
+    use ferrit_theme::palette::Palette;
     use ratatui::style::{Color, Modifier, Style};
 
     #[test]

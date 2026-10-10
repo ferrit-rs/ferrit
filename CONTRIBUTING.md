@@ -30,10 +30,12 @@ Source responsibilities are separated by crate:
 - `crates/ferrit-app/`: application state, events, screens, controllers, and
   terminal runtime.
 - `crates/ferrit-config/`: settings parsing, validation, and persistence.
+- `crates/ferrit-theme/`: theme data, palettes, schemes, and persisted theme values.
 - `crates/ferrit-domain/`: Git ports, domain types, and domain errors.
-- `crates/ferrit-git/`: identities, images, `git2`, subprocess adapter, and
-  command logging.
-- `crates/ferrit-tui/`: reusable themes and widgets.
+- `crates/ferrit-git/`: identities, `git2`, subprocess adapter, and concrete
+  repository factory.
+- `crates/ferrit-tui/`: reusable widgets, terminal chrome, overlays, and color
+  picker controls.
 
 `App` goes through `GitPort`; a test that only needs app logic can use `FakeGit`
 and `App::with_git` instead of building a repository.
