@@ -1,11 +1,11 @@
 //! The git config screen: `keys`.
 
 use crate::git::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
-use crate::git::config_edit::{
+use crate::git::port::GitPort;
+use crate::tui::components::git_config::catalog::{KeyType, lookup};
+use crate::tui::components::git_config::edit::{
     ConfigOp, GlobalResume, PickTarget, scope_label, scope_name, scope_of, truthy,
 };
-use crate::git::config_keys::{KeyType, lookup};
-use crate::git::port::GitPort;
 use crate::tui::components::git_config::screen::GitConfigScreen;
 use crate::tui::components::menu::open_name;
 use crate::tui::components::menu::{MenuAction, MenuItem, MenuState, NameKind};

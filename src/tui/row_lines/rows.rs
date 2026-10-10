@@ -4,7 +4,7 @@ use crate::git::model::{
     BranchEntry, Change, CommitEntry, CommitRefKind, FileEntry, PushState, RemoteEntry, StashEntry,
 };
 use crate::theme::palette::Palette;
-use crate::tui::components::panes::tree::StageState;
+use crate::tui::components::files::tree::StageState;
 use crate::tui::row_lines::fg;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};

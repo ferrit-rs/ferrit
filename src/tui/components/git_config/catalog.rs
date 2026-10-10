@@ -1,7 +1,4 @@
-//! The git keys people actually change, with the kind of value each takes.
-//! The table only adds toggles and pickers to the config screen: any other key
-//! stays editable as free text, and the validation is always git's own
-//! (`--type=` on the write). See `docs/PLAN_14_GIT_CONFIG.md`.
+//! Git keys that get a picker in the config screen.
 
 use crate::git::config::ValueKind;
 

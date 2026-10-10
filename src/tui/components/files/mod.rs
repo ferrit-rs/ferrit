@@ -1,12 +1,16 @@
 //! The Files pane: stage, unstage, discard.
 
+pub(crate) mod keys;
+pub(crate) mod rows;
+pub(crate) mod tree;
+
 use crate::git::diff::DiffSide;
 use crate::git::model::Change;
 use crate::git::port::GitPort;
 use crate::git::staging::{self, Plan, Refusal};
 use crate::tui::components::diff::right_pane::Mode;
+use crate::tui::components::files::tree::FileRow;
 use crate::tui::components::panes::nav::Pane;
-use crate::tui::components::panes::tree::FileRow;
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::error::AppError;
 use crate::tui::event::{Env, Event};

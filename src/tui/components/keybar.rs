@@ -2,7 +2,10 @@
 
 use crate::tui::components::panes::nav::Pane;
 use crate::tui::draw::{FullScreen, Landed, RenderState};
-use crate::tui::keymap::{Action, Context, KeyBinding, Keymap};
+use crate::tui::keymap::Keymap;
+use crate::tui::keymap::action::Action;
+use crate::tui::keymap::binding::KeyBinding;
+use crate::tui::keymap::context::Context;
 use crate::tui::scene::Scene;
 use crate::tui::widgets::chrome::KeyBar;
 use ratatui::Frame;

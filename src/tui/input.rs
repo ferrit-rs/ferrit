@@ -1,19 +1,17 @@
 //! Routing a key or a click to the part of the app that owns it, and running an action.
 
-use crate::git;
-use crate::git::remote::RemoteOp;
 use crate::tui::App;
 use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::right_pane::Mode;
 use crate::tui::components::keybar::filter_help_lines;
 use crate::tui::components::panes::nav::{PANES, Pane};
 use crate::tui::components::popups::Popup;
-use crate::tui::components::{
-    branches, commits, files, menu, popups, remote as askpass, remote, stash, welcome,
-};
+use crate::tui::components::{files, menu, popups, remote as askpass, welcome};
 use crate::tui::draw::FullScreen;
 use crate::tui::event::Event;
-use crate::tui::keymap::{Action, Context, KeyBinding};
+use crate::tui::keymap::action::Action;
+use crate::tui::keymap::binding::KeyBinding;
+use crate::tui::keymap::context::Context;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -245,7 +243,7 @@ impl App {
             // Enter — the whole row is the target, not just its arrow
             // glyph, same as it already is for plain selection.
             if landed && pane == Pane::Files {
-                let events = crate::tui::components::panes::keys::toggle_files_dir(&self.env());
+                let events = files::keys::toggle_files_dir(&self.env());
                 self.apply(events);
             }
             self.update_right_pane(); // step 7: rebuild for the new focus/selection
@@ -335,7 +333,7 @@ impl App {
         let binding = KeyBinding::from_event(key);
         let action = self.prefs.keymap.resolve(&self.key_contexts(), binding);
         if let Some(action) = action {
-            if is_scroll(action) && self.right.is_diff() {
+            if Self::is_scroll(action) && self.right.is_diff() {
                 self.run_scroll(action);
                 return;
             }
@@ -343,148 +341,6 @@ impl App {
         }
         self.update_right_pane();
     }
-
-    fn run_scroll(&mut self, action: Action) {
-        let half = isize::try_from((self.right.viewport / 2).max(1)).unwrap_or(isize::MAX);
-        let page =
-            isize::try_from(self.right.viewport.saturating_sub(1).max(1)).unwrap_or(isize::MAX);
-        match action {
-            Action::ScrollHalfDown => self.right.scroll_by(half),
-            Action::ScrollHalfUp => self.right.scroll_by(-half),
-            Action::ScrollLineDown => self.right.scroll_by(1),
-            Action::ScrollLineUp => self.right.scroll_by(-1),
-            Action::ScrollPageDown => self.right.scroll_by(page),
-            Action::ScrollPageUp => self.right.scroll_by(-page),
-            Action::ScrollBottom => self.right.scroll_by(isize::MAX),
-            Action::ScrollTop => self.right.scroll_by(isize::MIN),
-            Action::NextHunk => self.right.jump_anchor(1),
-            Action::PrevHunk => self.right.jump_anchor(-1),
-            _ => {},
-        }
-    }
-
-    pub(crate) fn run_action(&mut self, action: Action) {
-        match action {
-            Action::Quit => self.should_quit = true,
-            Action::Help => self.open_help(),
-            Action::CommandLog => self.apply(popups::open_command_log(&self.env())),
-            Action::Dashboard => self.open_dashboard(),
-            Action::GitConfig => self.open_git_config(),
-            Action::CreateRemote => self.open_create_remote(),
-            Action::OperationMenu => self.apply(menu::open_operation(&self.env())),
-            Action::ContextMenu => self.apply(menu::open_context(&self.env())),
-            Action::Back => self.go_back(),
-            Action::Enter => self.enter_selected(),
-            Action::EnterDiff => self.apply(files::enter_diff(&self.env())),
-            Action::Refresh => self.request_refresh(),
-            Action::Fetch => self.apply(remote::trigger(RemoteOp::Fetch)),
-            Action::Pull => self.apply(remote::trigger(RemoteOp::Pull)),
-            Action::Push => self.apply(remote::push(&self.env())),
-            Action::Commit => self.open_commit(git::commit::CommitKind::Normal),
-            Action::Amend => self.open_commit(git::commit::CommitKind::Amend),
-            Action::RewordHead => self.open_commit(git::commit::CommitKind::Reword),
-            Action::Focus(pane) => self.focus_pane(pane),
-            Action::NextPane => self.focus_pane(self.pane_offset(1)),
-            Action::PrevPane => self.focus_pane(self.pane_offset(PANES.len() - 1)),
-            Action::ToggleBranchesTab => self.nav.toggle_branches_tab(),
-            Action::SelectDown => self.select_down(),
-            Action::SelectUp => self.select_up(),
-            // Only meaningful over a real diff; anywhere else they do nothing.
-            Action::ScrollLineDown
-            | Action::ScrollLineUp
-            | Action::ScrollPageDown
-            | Action::ScrollPageUp
-            | Action::ScrollHalfDown
-            | Action::ScrollHalfUp
-            | Action::ScrollTop
-            | Action::ScrollBottom
-            | Action::NextHunk
-            | Action::PrevHunk => {},
-            Action::StageFile => self.apply(files::stage_selected(&self.env())),
-            Action::StageAll => self.apply(files::stage_all(&self.env())),
-            Action::Discard => self.apply(files::discard_prompt(&self.env())),
-            Action::StashPush => self.apply(stash::open_popup(&self.env())),
-            Action::LeaveDiff => self.apply(vec![Event::LeaveDiff]),
-            Action::CursorDown => self.right.move_cursor(1),
-            Action::CursorUp => self.right.move_cursor(-1),
-            Action::CursorNextHunk => self.right.jump_cursor_hunk(1),
-            Action::CursorPrevHunk => self.right.jump_cursor_hunk(-1),
-            Action::ToggleSelection => self.right.toggle_anchor(),
-            Action::StageCursor => self.apply(files::stage_cursor(&self.env())),
-            Action::Checkout => self.apply(branches::checkout(&self.env())),
-            Action::NewBranch => self.apply(branches::open_new_popup(&self.env())),
-            Action::FastForward => self.apply(branches::fast_forward(&self.env())),
-            Action::Merge => self.apply(branches::merge(&self.env())),
-            Action::DeleteBranch => self.apply(branches::delete_prompt(&self.env())),
-            Action::RewordCommit => self.apply(commits::reword(&self.env())),
-            Action::DropCommit => self.apply(commits::drop_prompt(&self.env())),
-            Action::Squash => self.apply(commits::fold(&self.env(), false)),
-            Action::Fixup => self.apply(commits::fold(&self.env(), true)),
-            Action::EditCommit => self.apply(commits::edit(&self.env())),
-            Action::NewFixup => self.apply(commits::new_fixup(&self.env())),
-            Action::Autosquash => self.apply(commits::autosquash(&self.env())),
-            Action::ApplyStash => self.apply(stash::restore_prompt(&self.env(), false)),
-            Action::PopStash => self.apply(stash::restore_prompt(&self.env(), true)),
-            Action::DropStash => self.apply(stash::drop_prompt(&self.env())),
-        }
-    }
-
-    /// `Esc` on a pane: back out of a drilled branch or commit, restoring the
-    /// cursor it was opened from.
-    fn go_back(&mut self) {
-        self.nav.right_focused = false;
-        if let Some(drill) = self.nav.branch_drill.take() {
-            self.nav.selection[Pane::Branches] = drill.return_index;
-        }
-        if let Some(drill) = self.nav.commit_drill.take() {
-            self.nav.selection[Pane::Commits] = drill.return_index;
-        }
-    }
-
-    /// `Enter` on a row: open a branch's log or a commit's files, else toggle
-    /// a directory, else enter the diff.
-    fn enter_selected(&mut self) {
-        self.apply(branches::enter_log(&self.env()));
-        // Opening a commit must not also toggle its first row.
-        let opts = self.prefs.diff_opts();
-        let (drilled, events) =
-            crate::tui::components::panes::keys::enter_commit_files(&self.env(), opts);
-        self.apply(events);
-        if !drilled {
-            self.apply(crate::tui::components::panes::keys::toggle_files_dir(
-                &self.env(),
-            ));
-            self.apply(crate::tui::components::panes::keys::toggle_commit_dir(
-                &self.env(),
-            ));
-            self.apply(files::enter_diff(&self.env()));
-        }
-    }
-
-    fn focus_pane(&mut self, pane: Pane) {
-        self.nav.right_focused = false;
-        self.nav.focus = pane;
-    }
-
-    pub(crate) fn open_help(&mut self) {
-        self.help.show();
-    }
-}
-
-const fn is_scroll(action: Action) -> bool {
-    matches!(
-        action,
-        Action::ScrollLineDown
-            | Action::ScrollLineUp
-            | Action::ScrollPageDown
-            | Action::ScrollPageUp
-            | Action::ScrollHalfDown
-            | Action::ScrollHalfUp
-            | Action::ScrollTop
-            | Action::ScrollBottom
-            | Action::NextHunk
-            | Action::PrevHunk
-    )
 }
 
 impl App {

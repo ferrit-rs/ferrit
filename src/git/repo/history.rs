@@ -7,9 +7,9 @@ use crate::git::error::{GitError, GitResult};
 use crate::git::model::Operation;
 use crate::git::rebase::{OperationOutcome, Step, flag};
 use crate::git::rebase::{RebaseEdit, build_todo, shell_quote};
-use crate::git::repo::exec;
 use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
+use crate::git::repo::{Repo, exec};
 use git2::{Oid, Repository, RepositoryState, Sort, Status, StatusOptions};
 use std::fs;
 use std::io::Write as _;
@@ -485,4 +485,71 @@ pub(crate) fn settle(
         return Ok(OperationOutcome::Stopped { conflicted: true });
     }
     Err(refuse(text.trim().to_owned()))
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` history role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// Run `git commit`. See `docs/PLAN_7_COMMIT.md`.
+    pub fn commit(&self, kind: &CommitKind, message: &str, opts: CommitOpts) -> GitResult<String> {
+        commit(&self.inner, kind, message, opts)
+    }
+
+    /// Whether the current branch has a commit; a new repository has none.
+    pub fn has_commits(&self) -> bool {
+        has_commits(&self.inner)
+    }
+
+    /// The first commit of a repository with none: an empty `README.md`.
+    /// `Ok(false)` when there is already a commit. See
+    /// `docs/PLAN_15_CREATE_REMOTE.md`.
+    pub fn initial_commit(&self, author: Option<String>) -> GitResult<bool> {
+        initial_commit(&self.inner, author)
+    }
+
+    /// The `commit.template` file's message, comments removed (`None`: no
+    /// template, or an empty one).
+    pub fn commit_template(&self) -> Option<String> {
+        template(&self.inner)
+    }
+
+    /// `HEAD`'s current message, for pre-filling the Amend / Reword popup.
+    pub fn head_message(&self) -> GitResult<Option<String>> {
+        head_message(&self.inner)
+    }
+
+    /// Count of paths staged relative to `HEAD`; the commit popup's
+    /// precondition.
+    pub fn staged_count(&self) -> GitResult<usize> {
+        staged_count(&self.inner)
+    }
+
+    /// Reword, drop, edit, squash or fixup the commit `hash` with one
+    /// `git rebase -i`. See `docs/PLAN_11_REBASE.md`.
+    pub fn rebase_edit(&self, hash: &str, edit: &RebaseEdit) -> GitResult<OperationOutcome> {
+        rebase_edit(&self.inner, hash, edit)
+    }
+
+    /// Fold every `fixup!` / `squash!` commit after `hash`'s parent into its
+    /// target.
+    pub fn autosquash(&self, hash: &str) -> GitResult<OperationOutcome> {
+        autosquash(&self.inner, hash)
+    }
+
+    /// The full message of a commit, for pre-filling a reword.
+    pub fn commit_message(&self, hash: &str) -> GitResult<String> {
+        commit_message(&self.inner, hash)
+    }
+
+    /// Continue, skip or abort the operation git is stopped in.
+    pub fn operation_step(&self, operation: Step) -> GitResult<OperationOutcome> {
+        step(&self.inner, operation)
+    }
+
+    /// The merge, rebase, cherry-pick or revert git is stopped in, if any.
+    pub fn operation(&self) -> Option<Operation> {
+        current(&self.inner)
+    }
 }

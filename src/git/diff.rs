@@ -7,8 +7,9 @@
 //! Nothing here imports `ratatui`. The parser (`parse.rs`) hands back byte
 //! `Range`s over one owned `String`, exactly like gitu's public `Diff`.
 //!
-//! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::read`.
+//! This file holds the types and pure functions. Repository reads live under
+//! `crate::git::repo::diff`, while shared command helpers live in
+//! `crate::git::repo::read`.
 
 use self::parse::FileMeta;
 use std::io::Write as _;
@@ -226,16 +227,7 @@ pub struct DiffStat {
 
 pub(crate) fn line_of(text: &str, byte: usize) -> usize {
     let end = byte.min(text.len());
-    #[expect(
-        clippy::naive_bytecount,
-        reason = "counts newlines in a header-length prefix; a bytecount dep is overkill for one call"
-    )]
-    text.as_bytes()
-        .get(..end)
-        .unwrap_or_default()
-        .iter()
-        .filter(|&&b| b == b'\n')
-        .count()
+    text.bytes().take(end).filter(|&byte| byte == b'\n').count()
 }
 
 /// Parse plain `git diff` text directly, no subprocess. For tests and any

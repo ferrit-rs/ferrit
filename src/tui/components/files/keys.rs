@@ -1,10 +1,10 @@
-//! The five left panes: `keys`.
+//! Files-pane navigation intents.
 
 use crate::git::diff::DiffOpts;
+use crate::tui::components::files::tree::FileRow;
+use crate::tui::components::files::tree::commit_drill_files;
 use crate::tui::components::panes::drills::CommitDrill;
 use crate::tui::components::panes::nav::Pane;
-use crate::tui::components::panes::tree::FileRow;
-use crate::tui::components::panes::tree::commit_drill_files;
 use crate::tui::event::Env;
 use crate::tui::event::Event;
 use std::collections::HashSet;

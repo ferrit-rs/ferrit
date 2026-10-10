@@ -3,9 +3,9 @@
 use crate::git::error::{GitError, GitResult};
 use crate::git::model::StashEntry;
 use crate::git::refs::StashOutcome;
-use crate::git::repo::exec;
 use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
+use crate::git::repo::{Repo, exec};
 use git2::Repository;
 use std::process::Output;
 
@@ -123,4 +123,40 @@ fn run(repo: &Repository, args: &[&str]) -> GitResult<()> {
 pub(crate) fn drop_entry(repo: &mut Repository, oid: &str) -> GitResult<()> {
     let reference = resolve(repo, oid)?;
     run(repo, &["stash", "drop", &reference])
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` stash role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// `git stash push --include-untracked`. See `docs/PLAN_10_STASH.md`.
+    pub fn stash_push(&self, message: &str) -> GitResult<()> {
+        push(&self.inner, message, false)
+    }
+
+    /// Like `stash_push` but the index stays staged (`--keep-index`).
+    pub fn stash_push_keeping_index(&self, message: &str) -> GitResult<()> {
+        push(&self.inner, message, true)
+    }
+
+    /// Give the stash entry with this oid a new message; it becomes `stash@{0}`.
+    pub fn stash_rename(&mut self, oid: &str, message: &str) -> GitResult<()> {
+        rename(&mut self.inner, oid, message)
+    }
+
+    /// `git stash apply` for the entry with this oid; the entry stays.
+    pub fn stash_apply(&mut self, oid: &str) -> GitResult<StashOutcome> {
+        apply(&mut self.inner, oid)
+    }
+
+    /// `git stash pop` for the entry with this oid.
+    pub fn stash_pop(&mut self, oid: &str) -> GitResult<StashOutcome> {
+        pop(&mut self.inner, oid)
+    }
+
+    /// `git stash drop` for the entry with this oid.
+    pub fn stash_drop(&mut self, oid: &str) -> GitResult<()> {
+        drop_entry(&mut self.inner, oid)
+    }
 }

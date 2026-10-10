@@ -17,10 +17,10 @@ use crate::git::host::{
     CreateRequest, CreatedRepo, GhProgram, GhStatus, build_create_args, web_url,
 };
 use crate::git::model::RemoteEntry;
-use crate::git::repo::exec;
 use crate::git::repo::process::{combined_output, run_child, run_command, run_git};
 use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
+use crate::git::repo::{Repo, exec};
 use git2::Repository;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -265,4 +265,96 @@ fn gh_succeeds(gh: &GhProgram, args: &[&str]) -> bool {
     cmd.args(args);
     run_child(cmd, "gh", gh.timeout, None, &GitError::HostFailed)
         .is_ok_and(|out| out.status.success())
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` remote role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// `git remote set-url <name> <url>`: where a remote points, rewritten.
+    pub fn set_remote_url(&self, name: &str, url: &str) -> GitResult<()> {
+        set_remote_url(&self.inner, name, url)
+    }
+
+    /// Whether `gh` can create a repository right now (see `remotes::gh_status`).
+    #[must_use]
+    pub fn gh_status(&self, gh: &GhProgram) -> GhStatus {
+        gh_status(gh)
+    }
+
+    /// Create the repository on GitHub through `gh` and add it as `origin`
+    /// (not pushed). Slow and network-crossing: call it off the main thread.
+    /// See `docs/PLAN_15_CREATE_REMOTE.md`.
+    pub fn create_repo(
+        &self,
+        gh: &GhProgram,
+        req: &CreateRequest,
+        cancel: &AtomicBool,
+    ) -> GitResult<CreatedRepo> {
+        create_repo(&self.inner, gh, req, cancel)
+    }
+
+    /// Configured remotes, alphabetical. See `docs/PLAN_9_REMOTE.md`.
+    pub fn remotes(&self) -> GitResult<Vec<RemoteEntry>> {
+        remotes(&self.inner)
+    }
+
+    /// `git fetch <remote>`, or every remote when `remote` is `None`. Slow:
+    /// run off the main thread, see `docs/PLAN_9_REMOTE.md` "Approach part 2".
+    pub fn fetch(&self, remote: Option<&str>) -> GitResult<String> {
+        fetch(&self.inner, remote)
+    }
+
+    pub(crate) fn fetch_cancellable(
+        &self,
+        remote: Option<&str>,
+        cancel: &AtomicBool,
+    ) -> GitResult<String> {
+        fetch_cancellable(&self.inner, remote, cancel)
+    }
+
+    /// `git pull`, honouring the user's `pull.rebase`/`pull.ff` config. Slow,
+    /// same as `fetch`.
+    pub fn pull(&self) -> GitResult<String> {
+        pull(&self.inner)
+    }
+
+    pub(crate) fn pull_cancellable(&self, cancel: &AtomicBool) -> GitResult<String> {
+        pull_cancellable(&self.inner, cancel)
+    }
+
+    /// `git push`, or `git push -u <remote> <branch>` when `set_upstream` is
+    /// `Some`. Slow, same as `fetch`.
+    pub fn push(&self, set_upstream: Option<&str>) -> GitResult<String> {
+        push(&self.inner, set_upstream)
+    }
+
+    pub(crate) fn push_cancellable(
+        &self,
+        set_upstream: Option<&str>,
+        upstream_branch: Option<&str>,
+        force_with_lease: bool,
+        set_upstream_current: bool,
+        cancel: &AtomicBool,
+    ) -> GitResult<String> {
+        push_cancellable(
+            &self.inner,
+            set_upstream,
+            upstream_branch,
+            force_with_lease,
+            set_upstream_current,
+            cancel,
+        )
+    }
+
+    /// Whether `push.default` is `current`: a plain `git push` then creates the remote
+    /// branch of the same name.
+    pub fn push_default_current(&self) -> bool {
+        self.inner
+            .config()
+            .ok()
+            .and_then(|config| config.get_string("push.default").ok())
+            .is_some_and(|value| value == "current")
+    }
 }

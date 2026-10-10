@@ -7,7 +7,7 @@ use crate::git::port::GitPort;
 use crate::theme::palette::Palette;
 use crate::tui::components::diff::views::CommitPopupView;
 use crate::tui::components::panes::nav::Pane;
-use crate::tui::components::panes::tree::SelectionKey;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::components::popups::Popup;
 use crate::tui::error::AppError;
 use crate::tui::event::Event;

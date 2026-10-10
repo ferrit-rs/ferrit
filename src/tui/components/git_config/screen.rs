@@ -1,7 +1,7 @@
 //! The git config screen: `screen`.
 
 use crate::git::config::{ConfigEntry, ConfigView, Origin, Scope, WriteScope, display_value};
-use crate::git::config_edit::PickTarget;
+use crate::tui::components::git_config::edit::PickTarget;
 
 /// One listed value and what the listing says about it.
 #[derive(Debug, Clone, PartialEq, Eq)]

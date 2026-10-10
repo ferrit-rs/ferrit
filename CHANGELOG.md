@@ -30,6 +30,12 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Terminal event-loop routing now lives in `tui/runtime`; `tui/mod.rs` stays the application composition root, with no internal re-export alias.
 - Rust module paths and visibility now use explicit `crate::` and `pub(crate)` forms; the quality gate rejects `super` forms before commit.
 - Removed throwaway Cargo examples; render and preview coverage stays in integration tests.
+- The Git adapter now keeps `Repo` forwarding methods beside their capability backend, and the Git config editor's edit state and key catalog live under `tui/components/git_config`; app settings and Git settings no longer look like one mixed layer.
+- Git diff line counting now uses a bounded byte iterator without a special lint exemption.
+- The Files feature now follows a dedicated tree, projection and navigation boundary; pane selection identities no longer live inside the file-tree module.
+- Added `docs/lazygit-architecture-plan.md` with the LazyGit/LazyGitRS architecture reference and the Rust-adapted convergence plan.
+- The Git adapter now separates status, log, blob and diff reads into capability modules; `repo/read.rs` only keeps shared command and worktree helpers.
+- Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `tui/controllers/actions.rs` instead of the input router.
 
 ## [0.10.0] - 2026-10-06
 

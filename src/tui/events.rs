@@ -78,9 +78,8 @@ pub struct Events {
     /// just receive (`docs/PLAN_9_REMOTE.md`'s background fetch/pull/push).
     tx: Sender<AppEvent>,
     rx: Receiver<AppEvent>,
-    /// Held only to keep the filesystem watch alive; never read. Boxed so the
-    /// debouncer's concrete type never leaks into this signature.
-    #[allow(dead_code, reason = "owning it is what keeps the watch running")]
+    /// Held only to keep the filesystem watch alive. Boxed so the debouncer's
+    /// concrete type never leaks into this signature.
     watcher: Option<Box<dyn Any + Send>>,
     watch_error: Option<String>,
 }
@@ -166,7 +165,10 @@ impl Events {
 
     /// Startup failure for the optional filesystem watch. Polling stays on.
     pub fn watch_error(&self) -> Option<&str> {
-        self.watch_error.as_deref()
+        self.watcher
+            .is_none()
+            .then_some(self.watch_error.as_deref())
+            .flatten()
     }
 }
 

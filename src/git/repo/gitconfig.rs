@@ -2,8 +2,8 @@
 
 use crate::git::config::{ConfigView, ValueKind, WriteScope, parse};
 use crate::git::error::{GitError, GitResult};
-use crate::git::repo::exec;
 use crate::git::repo::read::{stderr, workdir};
+use crate::git::repo::{Repo, exec};
 use git2::Repository;
 use std::ffi::OsStr;
 use std::path::Path;
@@ -147,6 +147,99 @@ pub(crate) fn unset(
         envs,
         &[scope.flag(), "--unset-all", "--", key],
     )
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` config role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// Point this handle's `git config` calls at `global` as the global file
+    /// and an empty system file, so a test can write the global scope without
+    /// touching the user's real `~/.gitconfig`. Nothing else is affected.
+    pub fn isolate_config(&mut self, global: &Path) {
+        self.config_global = Some(global.to_path_buf());
+    }
+
+    fn config_envs(&self) -> Vec<(&'static str, &OsStr)> {
+        self.config_global
+            .as_deref()
+            .map_or_else(Vec::new, |global| {
+                vec![
+                    ("GIT_CONFIG_GLOBAL", global.as_os_str()),
+                    ("GIT_CONFIG_SYSTEM", OsStr::new("/dev/null")),
+                ]
+            })
+    }
+
+    /// Every git config value with its scope and origin.
+    /// See `docs/PLAN_14_GIT_CONFIG.md`.
+    pub fn config(&self) -> GitResult<ConfigView> {
+        read(&self.inner, &self.config_envs())
+    }
+
+    /// `git config <scope> <key> <value>`; git validates a typed value.
+    pub fn config_set(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        set(&self.inner, &self.config_envs(), scope, key, value, kind)
+    }
+
+    /// `git config --add`: one more value for a multi-valued key.
+    pub fn config_add(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        add(&self.inner, &self.config_envs(), scope, key, value, kind)
+    }
+
+    /// `git config --replace-all`: every value of the key in `scope` becomes this one.
+    pub fn config_replace_all(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        replace_all(&self.inner, &self.config_envs(), scope, key, value, kind)
+    }
+
+    /// Change one value of a multi-valued key (`--fixed-value`), leaving the others.
+    pub fn config_replace_value(
+        &self,
+        scope: WriteScope,
+        key: &str,
+        value: &str,
+        old: &str,
+        kind: ValueKind,
+    ) -> GitResult<()> {
+        replace_value(
+            &self.inner,
+            &self.config_envs(),
+            scope,
+            key,
+            value,
+            old,
+            kind,
+        )
+    }
+
+    /// Remove one value of a multi-valued key, leaving the others.
+    pub fn config_unset_value(&self, scope: WriteScope, key: &str, old: &str) -> GitResult<()> {
+        unset_value(&self.inner, &self.config_envs(), scope, key, old)
+    }
+
+    /// `git config --unset-all`: drop the key from `scope` only.
+    pub fn config_unset(&self, scope: WriteScope, key: &str) -> GitResult<()> {
+        unset(&self.inner, &self.config_envs(), scope, key)
+    }
 }
 
 #[cfg(test)]

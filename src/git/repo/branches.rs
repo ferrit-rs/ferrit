@@ -1,13 +1,67 @@
 //! The `git2` and subprocess half of `crate::git::refs`: the types are there.
 
 use crate::git::error::{GitError, GitResult};
+use crate::git::model::BranchEntry;
 use crate::git::refs::MergeOutcome;
-use crate::git::repo::exec;
 use crate::git::repo::read::{stderr, workdir};
 use crate::git::repo::read_error;
+use crate::git::repo::{Repo, exec};
 use git2::{BranchType, Repository};
 use std::path::Path;
 use std::process::Command;
+
+/// Read local branches, HEAD first, then by recent tip and name.
+pub(crate) fn branches(repo: &Repository) -> GitResult<Vec<BranchEntry>> {
+    let mut out: Vec<BranchEntry> = repo
+        .branches(Some(BranchType::Local))
+        .map_err(read_error)?
+        .map(|res| {
+            let (branch, _) = res.map_err(read_error)?;
+            let is_head = branch.is_head();
+            let name = branch
+                .name()
+                .map_err(read_error)?
+                .unwrap_or("(invalid utf-8)")
+                .to_owned();
+            let (upstream, ahead, behind) = match branch.upstream() {
+                Ok(up) => {
+                    let up_name = up.name().ok().flatten().map(str::to_owned);
+                    let (ahead, behind) = match (branch.get().target(), up.get().target()) {
+                        (Some(local), Some(remote)) => {
+                            repo.graph_ahead_behind(local, remote).unwrap_or((0, 0))
+                        },
+                        _ => (0, 0),
+                    };
+                    (up_name, ahead, behind)
+                },
+                Err(_) => (None, 0, 0),
+            };
+            let tip_time = branch
+                .get()
+                .target()
+                .and_then(|oid| repo.find_commit(oid).ok())
+                .map_or(0, |commit| commit.time().seconds());
+            Ok(BranchEntry {
+                name,
+                is_head,
+                upstream,
+                ahead,
+                behind,
+                tip_time,
+            })
+        })
+        .collect::<GitResult<Vec<_>>>()?;
+
+    out.sort_by(|a, b| match (a.is_head, b.is_head) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => b
+            .tip_time
+            .cmp(&a.tip_time)
+            .then_with(|| a.name.cmp(&b.name)),
+    });
+    Ok(out)
+}
 
 // --- branch ---
 /// `git -C <workdir> <...args>`, run to completion, mapping a non-zero exit
@@ -178,6 +232,57 @@ pub(crate) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
 /// `repo.state()` is what tells a conflict apart from any other failure.
 pub(crate) fn merge_branch(repo: &Repository, name: &str) -> GitResult<MergeOutcome> {
     merge(repo, name, false)
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` branch role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// `git checkout <name>`. See `docs/PLAN_8_BRANCHES.md`.
+    pub fn checkout(&self, name: &str) -> GitResult<()> {
+        checkout(&self.inner, name)
+    }
+
+    /// `git checkout -b <name>` from the current `HEAD`.
+    pub fn create_branch(&self, name: &str) -> GitResult<()> {
+        create_branch(&self.inner, name)
+    }
+
+    /// `git branch -d <name>` (`-D` when `force`).
+    pub fn delete_branch(&self, name: &str, force: bool) -> GitResult<()> {
+        delete_branch(&self.inner, name, force)
+    }
+
+    /// Fast-forward `name` to its upstream, checked out or not.
+    pub fn fast_forward(&self, name: &str) -> GitResult<()> {
+        fast_forward(&self.inner, name)
+    }
+
+    /// `git checkout -b <name> <hash> --no-track`; `hash` may be a ref.
+    pub fn create_branch_at(&self, name: &str, hash: &str) -> GitResult<()> {
+        create_branch_at(&self.inner, name, hash)
+    }
+
+    /// `git branch -m <old> <new>`.
+    pub fn rename_branch(&self, old: &str, new: &str) -> GitResult<()> {
+        rename_branch(&self.inner, old, new)
+    }
+
+    /// `git merge --no-ff <name>`: always a merge commit.
+    pub fn merge_branch_no_ff(&self, name: &str) -> GitResult<MergeOutcome> {
+        merge_branch_no_ff(&self.inner, name)
+    }
+
+    /// `git merge --squash <name>`, then a commit when `commit` is set.
+    pub fn merge_squash(&self, name: &str, commit: bool) -> GitResult<()> {
+        merge_squash(&self.inner, name, commit)
+    }
+
+    /// `git merge <name>` into the current branch.
+    pub fn merge_branch(&self, name: &str) -> GitResult<MergeOutcome> {
+        merge_branch(&self.inner, name)
+    }
 }
 
 /// `git merge --no-ff`: always a merge commit, even when a fast-forward would do.

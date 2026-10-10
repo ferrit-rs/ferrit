@@ -236,10 +236,10 @@ pub(crate) enum ConfirmAction {
     /// Push a branch known to be behind its upstream, using a lease guard.
     ForcePush,
     /// First write to the global git config of this session: once confirmed,
-    /// the edit that asked carries on (`app::git_config_edit`).
-    ConfigGlobal(crate::git::config_edit::GlobalResume),
+    /// the edit that asked carries on (`git_config::edit`).
+    ConfigGlobal(crate::tui::components::git_config::edit::GlobalResume),
     /// `d` on the git config screen: unset one value.
-    ConfigUnset(crate::git::config_edit::ConfigOp),
+    ConfigUnset(crate::tui::components::git_config::edit::ConfigOp),
     /// `i` on the welcome screen: `git init` in this folder.
     InitRepo(PathBuf),
 }

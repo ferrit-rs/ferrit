@@ -3,7 +3,6 @@
 pub mod draw;
 pub mod drills;
 pub mod hit_areas;
-pub mod keys;
 pub mod nav;
 pub mod rows;
-pub mod tree;
+pub(crate) mod selection;

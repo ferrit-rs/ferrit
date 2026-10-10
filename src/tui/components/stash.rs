@@ -7,7 +7,7 @@ use crate::git::model::StashEntry;
 use crate::git::port::GitPort;
 use crate::git::refs::{self, StashOutcome};
 use crate::tui::components::panes::nav::Pane;
-use crate::tui::components::panes::tree::SelectionKey;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::components::popups::{ConfirmPrompt, Popup};
 use crate::tui::event::{Env, Event};
 use crate::tui::widgets::text_input::TextInput;

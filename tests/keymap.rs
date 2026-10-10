@@ -12,7 +12,10 @@
 
 use ferrit::config::Config;
 use ferrit::tui::components::panes::nav::Pane;
-use ferrit::tui::keymap::{Action, Context, KeyBinding, Keymap};
+use ferrit::tui::keymap::Keymap;
+use ferrit::tui::keymap::action::Action;
+use ferrit::tui::keymap::binding::KeyBinding;
+use ferrit::tui::keymap::context::Context;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use Action as A;

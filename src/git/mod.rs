@@ -19,8 +19,6 @@ pub mod askpass;
 pub mod command_log;
 pub mod commit;
 pub mod config;
-pub mod config_edit;
-pub mod config_keys;
 pub mod diff;
 pub mod error;
 #[cfg(feature = "test-util")]

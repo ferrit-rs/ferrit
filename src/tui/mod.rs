@@ -103,6 +103,7 @@ pub mod workers;
 
 pub mod api;
 pub mod components;
+mod controllers;
 pub mod draw;
 pub mod error;
 pub mod event;
@@ -127,8 +128,8 @@ use crate::tui::workers::RefreshCompletion;
 use crate::tui::workers::{WorkerKind, run_worker};
 use components::diff::right_pane::Mode;
 use components::diff::views::DiffView;
+use components::files::tree::{FileRow, drill_tree_rows};
 use components::panes::nav::Pane;
-use components::panes::tree::{FileRow, drill_tree_rows};
 use draw::FullScreen;
 
 use crate::tui::draw::Landed;

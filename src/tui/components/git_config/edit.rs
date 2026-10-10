@@ -1,8 +1,4 @@
-//! Changing a value on the git config screen (`docs/PLAN_14_GIT_CONFIG.md`,
-//! G3): `e` / `Enter` edits the selected value (a text popup, or a menu of the
-//! allowed values for a known boolean or enum), `Space` flips a boolean, `a`
-//! adds a key. Every change is one `git config` call at the screen's write
-//! scope (`Repo::config_*`); git validates the value.
+//! Pending actions for the git config screen.
 
 use crate::git::config::{Scope, ValueKind, WriteScope};
 

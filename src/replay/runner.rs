@@ -23,7 +23,7 @@ use crate::replay::fixture::{self, Fixture};
 use crate::replay::script::{Directive, Expect, Script, Step};
 use crate::tui::App;
 use crate::tui::draw;
-use crate::tui::keymap::KeyBinding;
+use crate::tui::keymap::binding::KeyBinding;
 
 /// How long `async-key` waits for background work before giving up. A safety
 /// net for a hung script, never part of a passing run's timing.

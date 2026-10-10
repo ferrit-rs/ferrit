@@ -25,7 +25,9 @@ use ferrit::tui::components::keybar::{
     Bar, HelpLine, filter_help_lines, help_lines, keybar_layout,
 };
 use ferrit::tui::components::panes::nav::Pane;
-use ferrit::tui::keymap::{Action, Context, Keymap};
+use ferrit::tui::keymap::Keymap;
+use ferrit::tui::keymap::action::Action;
+use ferrit::tui::keymap::context::Context;
 use git2::Repository;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

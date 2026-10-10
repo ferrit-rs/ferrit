@@ -408,8 +408,8 @@ pub(crate) enum NameKind {
         oid: String,
     },
     StashKeepIndex,
-    /// A git config value being typed (`app::git_config_edit`).
-    ConfigValue(git::config_edit::ConfigOp),
+    /// A git config value being typed (`git_config::edit`).
+    ConfigValue(crate::tui::components::git_config::edit::ConfigOp),
     /// The key of a config entry about to be added.
     ConfigKey,
 }

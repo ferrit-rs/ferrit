@@ -3,7 +3,7 @@
 use crate::git::refs::{self, MergeKind, MergeOutcome};
 use crate::tui::components::menu::MenuState;
 use crate::tui::components::panes::nav::{BranchesTab, Pane};
-use crate::tui::components::panes::tree::SelectionKey;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::components::popups::{ConfirmPrompt, Popup};
 use crate::tui::event::{Env, Event};
 use crate::tui::widgets::text_input::TextInput;

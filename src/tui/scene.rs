@@ -29,7 +29,7 @@ use crate::tui::components::popups::{Modal, Popup, PopupKind};
 use crate::tui::components::settings;
 use crate::tui::draw::FullScreen;
 use crate::tui::error::AppError;
-use crate::tui::keymap::Context;
+use crate::tui::keymap::context::Context;
 use crate::tui::prefs::Prefs;
 use crate::tui::row_lines;
 use crate::tui::widgets::tui_overlay::state::OverlayState;

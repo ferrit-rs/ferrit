@@ -7,7 +7,7 @@ use crate::tui::components::diff::right_pane::Mode;
 use crate::tui::components::panes::drills::BranchDrill;
 use crate::tui::components::panes::drills::CommitDrill;
 use crate::tui::components::panes::rows::PaneRows;
-use crate::tui::components::panes::tree::SelectionKey;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::workers::Shared;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashSet;

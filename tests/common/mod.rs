@@ -1,8 +1,7 @@
 //! Helpers shared by the integration tests. Every file in `tests/` is its own
 //! crate, so each one that needs these declares `mod common;` and uses what it
-//! wants; the rest of the module is dead code in that crate, hence the allow.
+//! wants.
 #![allow(
-    dead_code,
     clippy::unwrap_used,
     clippy::expect_used,
     reason = "shared test scaffolding: each test crate uses a part of it, and a failed setup is the assertion"
@@ -14,6 +13,16 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use git2::{IndexAddOption, Repository, Signature};
+
+// Every integration-test crate includes this module, but each scenario needs
+// only part of the shared API. Keep every helper referenced without silencing
+// unused-code diagnostics.
+const _: () = {
+    let _ = TempDir::child as fn(&TempDir, &str) -> TempDir;
+    let _ = git as fn(&Path, &[&str]) -> String;
+    let _ = configure_identity as fn(&Path);
+    let _ = commit_all as fn(&Repository, &str);
+};
 
 /// A fresh directory under the system temp dir, removed when dropped. The name
 /// carries `tag`, the process id, the clock and a counter, so tests running in

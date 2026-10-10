@@ -1,18 +1,10 @@
-//! The five left panes: `tree`.
+//! The Files pane's tree model and flattened rows.
 
 use crate::git;
 use crate::git::model::FileEntry;
+use crate::tui::components::panes::selection::SelectionKey;
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SelectionKey {
-    File(PathBuf),
-    Directory(PathBuf),
-    Branch(String),
-    Commit(String),
-    Stash(String),
-}
 
 pub(crate) fn selection_key_for_file_rows(
     rows: &[FileRow],

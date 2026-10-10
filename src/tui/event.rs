@@ -15,7 +15,7 @@ use crate::tui::components::menu::NameKind;
 use crate::tui::components::panes::nav::Nav;
 use crate::tui::components::panes::nav::Pane;
 use crate::tui::components::panes::rows::PaneRows;
-use crate::tui::components::panes::tree::SelectionKey;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::components::popups::ConfirmPrompt;
 use crate::tui::components::popups::Popup;
 use crate::tui::error::AppError;
@@ -133,11 +133,11 @@ pub(crate) enum Event {
     /// Carry on a merge, rebase, cherry-pick or revert, or abort it.
     OperationStep(crate::git::rebase::Step),
     /// The first global git config write was confirmed: go on with the edit.
-    ResumeGitConfigEdit(crate::git::config_edit::GlobalResume),
+    ResumeGitConfigEdit(crate::tui::components::git_config::edit::GlobalResume),
     /// `git init` in this folder.
     InitRepo(std::path::PathBuf),
     /// Unset a git config value.
-    ConfigUnset(crate::git::config_edit::ConfigOp),
+    ConfigUnset(crate::tui::components::git_config::edit::ConfigOp),
 }
 
 /// What a component may read of the app to decide: the model, and nothing it

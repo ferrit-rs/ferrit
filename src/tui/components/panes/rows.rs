@@ -3,17 +3,12 @@
 use crate::git::Snapshot;
 use crate::git::model::{BranchEntry, CommitEntry, FileEntry, StashEntry};
 use crate::theme::palette::Palette;
+use crate::tui::components::files::rows::FileRows;
+use crate::tui::components::files::tree::FileRow;
 use crate::tui::components::panes::nav::BranchesTab;
 use crate::tui::components::panes::nav::Nav;
 use crate::tui::components::panes::nav::Pane;
-use crate::tui::components::panes::tree::FileRow;
-use crate::tui::components::panes::tree::SelectionKey;
-use crate::tui::components::panes::tree::StageState;
-use crate::tui::components::panes::tree::dir_stage_state;
-use crate::tui::components::panes::tree::drill_tree_rows;
-use crate::tui::components::panes::tree::find_file_row_key;
-use crate::tui::components::panes::tree::selection_key_for_file_rows;
-use crate::tui::components::panes::tree::tree_rows;
+use crate::tui::components::panes::selection::SelectionKey;
 use crate::tui::row_lines;
 use ratatui::text::Line;
 
@@ -23,23 +18,24 @@ pub(crate) struct PaneRows<'a> {
     pub(crate) palette: &'a Palette,
 }
 
-impl PaneRows<'_> {
+impl<'a> PaneRows<'a> {
+    fn files(&self) -> FileRows<'a> {
+        FileRows::new(self.nav, self.snapshot, self.palette)
+    }
+
     /// Files pane rows, lazygit-style directory tree: single-child directory
     /// chains folded, a root ("/") first only when it has two or more
     /// children, changed files grouped under directory header rows. Empty when nothing changed. Built fresh from
     /// `self.snapshot.files` and `self.nav.collapsed_dirs` on every call; cheap at
     /// working-tree sizes, same choice `branch_lines`/`commit_lines` make.
     pub(crate) fn files_tree_rows(&self) -> Vec<FileRow> {
-        tree_rows(&self.snapshot.files, &self.nav.collapsed_dirs)
+        self.files().worktree_tree()
     }
 
     /// Same tree shape as `files_tree_rows`, over a drilled commit's own
     /// changed files instead of the worktree's. Empty while not drilled.
     pub(crate) fn commit_tree_rows(&self) -> Vec<FileRow> {
-        match &self.nav.commit_drill {
-            Some(drill) => drill_tree_rows(&drill.files, &drill.collapsed),
-            None => Vec::new(),
-        }
+        self.files().commit_tree()
     }
 
     /// Selectable row count for a pane, for clamping the cursor and deciding
@@ -65,11 +61,7 @@ impl PaneRows<'_> {
     pub(crate) fn selection_key(&self, pane: Pane) -> Option<SelectionKey> {
         match pane {
             Pane::Status => None,
-            Pane::Files => selection_key_for_file_rows(
-                &self.files_tree_rows(),
-                &self.snapshot.files,
-                self.nav.selection[pane],
-            ),
+            Pane::Files => self.files().worktree_selection_key(),
             Pane::Branches if self.nav.branches_tab == BranchesTab::Remotes => None,
             Pane::Branches => self.nav.branch_drill.as_ref().map_or_else(
                 || {
@@ -92,13 +84,7 @@ impl PaneRows<'_> {
                         .get(self.nav.selection[pane])
                         .map(|entry| SelectionKey::Commit(entry.full_hash.clone()))
                 },
-                |drill| {
-                    selection_key_for_file_rows(
-                        &self.commit_tree_rows(),
-                        &drill.files,
-                        self.nav.selection[pane],
-                    )
-                },
+                |_| self.files().commit_selection_key(),
             ),
             Pane::Stash => self
                 .snapshot
@@ -111,7 +97,7 @@ impl PaneRows<'_> {
     pub(crate) fn find_selection_key(&self, pane: Pane, key: &SelectionKey) -> Option<usize> {
         match (pane, key) {
             (Pane::Files, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                find_file_row_key(&self.files_tree_rows(), &self.snapshot.files, key)
+                self.files().find_worktree_selection(key)
             },
             (Pane::Branches, SelectionKey::Branch(name)) if self.nav.branch_drill.is_none() => self
                 .snapshot
@@ -131,8 +117,7 @@ impl PaneRows<'_> {
                 .iter()
                 .position(|entry| entry.full_hash == *hash),
             (Pane::Commits, SelectionKey::File(_) | SelectionKey::Directory(_)) => {
-                let drill = self.nav.commit_drill.as_ref()?;
-                find_file_row_key(&self.commit_tree_rows(), &drill.files, key)
+                self.files().find_commit_selection(key)
             },
             (Pane::Stash, SelectionKey::Stash(oid)) => self
                 .snapshot
@@ -154,31 +139,7 @@ impl PaneRows<'_> {
     /// or lazygit's directory tree once any changed file sits below the
     /// repo root (`files_tree_rows`).
     pub(crate) fn file_lines(&self) -> Vec<Line<'static>> {
-        if self.snapshot.files.is_empty() {
-            return vec![Line::raw("working tree clean")];
-        }
-        self.files_tree_rows()
-            .iter()
-            .filter_map(|row| match row {
-                FileRow::Dir {
-                    path,
-                    name,
-                    depth,
-                    expanded,
-                } => Some(row_lines::rows::dir_line(
-                    self.palette,
-                    name,
-                    *depth,
-                    *expanded,
-                    dir_stage_state(&self.snapshot.files, path),
-                )),
-                FileRow::File { index, depth } => self
-                    .snapshot
-                    .files
-                    .get(*index)
-                    .map(|entry| row_lines::rows::file_line(self.palette, entry, *depth)),
-            })
-            .collect()
+        self.files().worktree_lines()
     }
 
     /// Porcelain-style `XY path` text for one Files tree row, or an empty
@@ -186,23 +147,12 @@ impl PaneRows<'_> {
     /// row index `file_lines`/`row_count` use, not a flat index into
     /// `self.snapshot.files`.
     pub(crate) fn file_display(&self, i: usize) -> String {
-        match self.files_tree_rows().get(i) {
-            Some(&FileRow::File { index, .. }) => self
-                .snapshot
-                .files
-                .get(index)
-                .map(FileEntry::display)
-                .unwrap_or_default(),
-            _ => String::new(),
-        }
+        self.files().display(i)
     }
 
     /// Is the selected Files row a directory (the root row included)?
     pub(crate) fn files_selection_is_dir(&self) -> bool {
-        matches!(
-            self.files_tree_rows().get(self.nav.selection[Pane::Files]),
-            Some(FileRow::Dir { .. })
-        )
+        self.files().selected_is_directory()
     }
 
     /// Branches pane rows: the branch list, or one branch's own commit log
@@ -257,29 +207,8 @@ impl PaneRows<'_> {
     /// tree while drilled in (`commit_drill`, `enter_commit_files`), same
     /// shape `branch_lines` gives the Branches pane.
     pub(crate) fn commit_lines(&self) -> Vec<Line<'static>> {
-        if let Some(drill) = &self.nav.commit_drill {
-            return self
-                .commit_tree_rows()
-                .iter()
-                .filter_map(|row| match row {
-                    FileRow::Dir {
-                        name,
-                        depth,
-                        expanded,
-                        ..
-                    } => Some(row_lines::rows::dir_line(
-                        self.palette,
-                        name,
-                        *depth,
-                        *expanded,
-                        StageState::None,
-                    )),
-                    FileRow::File { index, depth } => drill
-                        .files
-                        .get(*index)
-                        .map(|entry| row_lines::rows::file_line(self.palette, entry, *depth)),
-                })
-                .collect();
+        if let Some(lines) = self.files().commit_lines() {
+            return lines;
         }
         if self.snapshot.commits.is_empty() {
             return vec![Line::raw("no commits yet")];
@@ -335,10 +264,6 @@ impl<'a> PaneRows<'a> {
     /// The `FileEntry` behind the Files pane's current selection, or `None` on
     /// a directory row or an empty pane.
     pub(crate) fn selected_file(&self) -> Option<&'a FileEntry> {
-        let rows = self.files_tree_rows();
-        let FileRow::File { index, .. } = rows.get(self.nav.selection[Pane::Files])? else {
-            return None;
-        };
-        self.snapshot.files.get(*index)
+        self.files().selected_file()
     }
 }

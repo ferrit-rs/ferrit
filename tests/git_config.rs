@@ -152,7 +152,7 @@ fn repo_writes_local_config_through_git_and_reads_it_back() {
 
 #[test]
 fn known_keys_are_real_git_keys_and_their_values_are_accepted_by_git() {
-    use ferrit::git::config_keys::{KNOWN_KEYS, KeyType, lookup};
+    use ferrit::tui::components::git_config::catalog::{KNOWN_KEYS, KeyType, lookup};
 
     let out = std::process::Command::new("git")
         .args(["help", "-c"])

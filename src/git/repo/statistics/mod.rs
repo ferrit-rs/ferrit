@@ -7,15 +7,13 @@ use git2::{Repository, Sort};
 
 use crate::git::error::{GitError, GitResult};
 use crate::git::model::Change;
-use crate::git::repo::read_error;
+use crate::git::repo::{Repo, read_error, status};
 use crate::git::stats::authors::{self, AuthorAcc};
 use crate::git::stats::kind::{self, Kind};
 use crate::git::stats::series::{self, Granularity};
 use crate::git::stats::{
     DAY, HEAT_DAYS, KindStat, RepoStats, StatsOptions, Totals, Window, WorkState,
 };
-
-use crate::git::repo::read;
 
 mod branch_health;
 mod churn;
@@ -186,7 +184,7 @@ pub(crate) fn repo_stats(
 /// worktree to read) gives the default.
 fn work_state(repo: &Repository) -> WorkState {
     let stashes = repo.reflog("refs/stash").map_or(0, |log| log.len());
-    let (Ok(files), Ok(header)) = (read::files(repo), read::header(repo)) else {
+    let (Ok(files), Ok(header)) = (status::files(repo), status::header(repo)) else {
         return WorkState {
             stashes,
             ..WorkState::default()
@@ -212,5 +210,27 @@ fn work_state(repo: &Repository) -> WorkState {
         upstream: header.upstream,
         ahead: header.ahead,
         behind: header.behind,
+    }
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` statistics role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// Dashboard statistics over `window`, polling `cancel` while it walks
+    /// (`GitError::Cancelled` when set). `docs/PLAN_13_DASHBOARD.md`.
+    pub fn stats(&self, window: Window, cancel: &AtomicBool) -> GitResult<RepoStats> {
+        self.stats_with(window, &StatsOptions::default(), cancel)
+    }
+
+    /// `stats` with the clock and the caps given (tests, tuning).
+    pub fn stats_with(
+        &self,
+        window: Window,
+        opts: &StatsOptions,
+        cancel: &AtomicBool,
+    ) -> GitResult<RepoStats> {
+        repo_stats(&self.inner, window, opts, cancel)
     }
 }

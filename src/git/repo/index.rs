@@ -2,8 +2,8 @@
 
 use crate::git::apply::{ApplyDir, ApplyTarget, transform_body};
 use crate::git::error::{GitError, GitResult};
-use crate::git::repo::exec;
 use crate::git::repo::read::{stderr, workdir};
+use crate::git::repo::{Repo, exec};
 use git2::Repository;
 use std::collections::BTreeSet;
 use std::io::Write as _;
@@ -216,4 +216,73 @@ fn run_apply(
         return Err(GitError::ApplyFailed(stderr(&out)));
     }
     Ok(())
+}
+
+#[allow(
+    clippy::same_name_method,
+    reason = "the `GitPort` index role forwards to these methods under the same names"
+)]
+impl Repo {
+    /// Stage or unstage a whole file. No patch: `git add` / `git restore
+    /// --staged`. See `docs/PLAN_6_STAGING.md`.
+    pub fn stage_file(&self, path: &Path, dir: ApplyDir) -> GitResult<()> {
+        stage_file(&self.inner, path, dir)
+    }
+
+    /// Stage or unstage every changed file (`a`): `git add -A` / `git
+    /// restore --staged .`.
+    pub fn stage_all(&self, dir: ApplyDir) -> GitResult<()> {
+        stage_all(&self.inner, dir)
+    }
+
+    /// Stage everything except `excluded` (paths that must stay unstaged).
+    pub fn stage_all_except(&self, excluded: &[PathBuf]) -> GitResult<()> {
+        stage_all_except(&self.inner, excluded)
+    }
+
+    /// Does the file still contain merge conflict markers?
+    pub fn has_conflict_markers(&self, path: &Path) -> GitResult<bool> {
+        has_conflict_markers(&self.inner, path)
+    }
+
+    /// Discard a whole file's worktree change, never the index. `untracked`
+    /// picks `git clean` (nothing to restore *to*) over `git restore
+    /// --worktree`.
+    pub fn discard_file(&self, path: &Path, untracked: bool) -> GitResult<()> {
+        discard_file(&self.inner, path, untracked)
+    }
+
+    /// Stage / unstage / discard one hunk. `patch` is `file.header.start
+    /// .. hunk.body.end` over a `Diff::text`; the caller slices it so this
+    /// module never re-runs the diff.
+    pub fn apply_hunk(&self, patch: &str, dir: ApplyDir, target: ApplyTarget) -> GitResult<()> {
+        apply_hunk(&self.inner, patch, dir, target)
+    }
+
+    /// Stage / unstage / discard a set of body lines within one hunk.
+    /// `lines` are 0-based indices into `hunk_body`'s own lines.
+    pub fn apply_lines(
+        &self,
+        file_header: &str,
+        hunk_header: &str,
+        hunk_body: &str,
+        lines: &[usize],
+        dir: ApplyDir,
+        target: ApplyTarget,
+    ) -> GitResult<()> {
+        apply_lines(
+            &self.inner,
+            file_header,
+            hunk_header,
+            hunk_body,
+            lines,
+            dir,
+            target,
+        )
+    }
+
+    /// Take one side of a conflicted file whole (`checkout --ours|--theirs`).
+    pub fn take_side(&self, path: &Path, ours: bool) -> GitResult<()> {
+        take_side(&self.inner, path, ours)
+    }
 }

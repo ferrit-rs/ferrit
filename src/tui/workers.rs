@@ -10,7 +10,7 @@ use crate::git::remote::RemoteOp;
 use crate::git::remote::{self as remote_ops, RemoteRequest};
 use crate::tui::App;
 use crate::tui::components::diff::queries::DiffQueryState;
-use crate::tui::components::panes::tree::commit_drill_files;
+use crate::tui::components::files::tree::commit_drill_files;
 use crate::tui::error::AppError;
 use crate::tui::events::AppEvent;
 use color_eyre::Result;
