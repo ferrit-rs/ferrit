@@ -29,6 +29,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Component intents and application state mutation now live in separate `event` and `reducer` modules.
 - Terminal event-loop routing now lives in `tui/runtime`; `tui/mod.rs` stays the application composition root, with no internal re-export alias.
 - Rust module paths and visibility now use explicit `crate::` and `pub(crate)` forms; the quality gate rejects `super` forms before commit.
+- Removed throwaway Cargo examples; render and preview coverage stays in integration tests.
 
 ## [0.10.0] - 2026-10-06
 

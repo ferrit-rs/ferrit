@@ -111,7 +111,7 @@ per feature), `tui/components/<x>.rs` everything the interface does with it.
 
 | Path | Holds |
 | --- | --- |
-| `src/tui/mod.rs` | `App` and the composition root (`api.rs` holds what tests and examples ask of it); `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
+| `src/tui/mod.rs` | `App` and the composition root (`api.rs` holds what tests ask of it); `impl App` blocks live only under `tui/` (`tests/layering.rs`) |
 | `src/tui/event.rs` | `Event` (what a component asks) and `Env` (what it may read) |
 | `src/tui/reducer.rs` | `App` state mutation for component events and runtime outcomes |
 | `src/tui/components/` | one file per piece: `panes/` (the five left panes: `nav`, `rows`, `tree`, `drills`, `hit_areas`, `keys`, `draw`), `files`, `branches`, `commits`, `stash` (what a key does in each), `diff/` (the right column: `right_pane` with its line cursor, `views`, `queries`, `draw`), `commit_editor`, `create_remote`, `menu`, `popups` (popup, question, note), `help`, `command_log`, `keybar`, `dashboard` (+ `dashboard/`), `settings`, `git_config/` (`keys`, `screen`, `draw`), `welcome`, `remote` |

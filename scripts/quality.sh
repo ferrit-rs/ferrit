@@ -26,7 +26,7 @@ require_command() {
 
 check_explicit_paths() {
     printf '%s\n' '==> explicit Rust module paths'
-    if rg -n --glob '*.rs' '\bsuper::|pub\(super\)' src tests examples; then
+    if rg -n --glob '*.rs' '\bsuper::|pub\(super\)' src tests; then
         printf '%s\n' 'error: super paths are forbidden; use explicit crate:: paths and pub(crate)' >&2
         return 1
     fi

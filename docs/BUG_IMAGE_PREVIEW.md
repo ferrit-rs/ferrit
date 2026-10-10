@@ -100,8 +100,8 @@ While first chasing the blank pane, two regressions from the
 - **`&mut App` render signature**: switching the preview from a `RefCell`-
   wrapped protocol to a live `StatefulProtocol` (matching the ratatui-image
   examples) means `StatefulImage` mutates the protocol at render time, so
-  `ui::draw` now takes `&mut App` instead of `&App`. `tests/render.rs` and
-  `examples/dump_frame.rs` still called it with `&app`; updated both.
+  `ui::draw` now takes `&mut App` instead of `&App`. `tests/render.rs` was
+  updated to pass the mutable application.
 - **Preview pane title**: the image branch in `ui.rs` was using
   `right_title` (the pane-focus title, e.g. "Unstaged changes") instead of
   the literal `" Preview "` title. Reverted to the hardcoded title so the

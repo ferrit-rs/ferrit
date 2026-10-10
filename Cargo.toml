@@ -54,9 +54,9 @@ proptest = "1"
 # Layout: lint GROUPS first at negative priority (single-lint overrides below
 # always win), then the curated deny list, then WARN nudges, then explicit
 # opt-outs. CI runs `cargo clippy --all-targets --all-features -- -D warnings`,
-# so every warn here is blocking. Integration tests and examples relax the
-# panic-family denies with a file-level `#![allow(..)]` (panicking on failed
-# setup is the assertion there).
+# so every warn here is blocking. Integration tests relax the panic-family
+# denies with a file-level `#![allow(..)]` (panicking on failed setup is the
+# assertion there).
 [lints.clippy]
 # -- groups -------------------------------------------------------------------
 all      = { level = "warn", priority = -2 }
