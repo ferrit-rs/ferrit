@@ -106,8 +106,8 @@ terminal ─► Events (one mpsc channel)  ◄── file watcher, poll timer, w
 The rule: a folder is a flat list of files named after what they do, with a subfolder
 only for a feature that has several files, and nothing deeper than two folders
 (`tests/layering.rs`). A feature keeps its name across the roles it plays: `git/<x>.rs`
-the types and rules, `git/repo/` how `Repo` does it (one file per trait of the port, not
-per feature), `tui/components/<x>.rs` everything the interface does with it.
+the types and rules, `git/repo/` how `Repo` does it (one capability per file), and
+`tui/components/<x>.rs` everything the interface does with it.
 
 | Path | Holds |
 | --- | --- |
@@ -120,7 +120,7 @@ per feature), `tui/components/<x>.rs` everything the interface does with it.
 | `src/config/` | `config.toml` (`mod.rs`, `error.rs`) and `settings` (the rows of the settings sheet) |
 | `src/theme/` | how ferrit looks, and nothing else: `palette` (with its style helpers), the terminal `scheme` (colour depth), the `[theme]` config (`theme_config`) and the colour picker |
 | `src/git/` | the git types and pure logic (model, diff parsing, statistics, config, hosting rules); `port.rs` (the traits) and `fake.rs` (the in-memory git); `identity` (commit identities: the profile, the settings, the pick) |
-| `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, in capability files that follow `git/port.rs` (`status`, `log`, `blob`, `diff`, `index`, `history`, `branches`, `stashes`, `remotes`, `gitconfig`, `statistics`); `read` holds only shared worktree and command-output helpers |
+| `src/git/repo/` | the `git2` and subprocess adapter: `Repo`, in capability files that follow `git/port.rs` (`status`, `log`, `blob`, `diff`, `index`, `commit`, `rebase`, `branches`, `stashes`, `remotes`, `gitconfig`, `statistics`); `read` holds only shared worktree and command-output helpers |
 | `src/replay/` | the scripted test harness (see ADR 2) |
 | `tests/` | integration tests, `app_*` drive `App`, `git_*` drive a real repository; `tests/common` holds the shared helpers, and the big ones are test crates in a folder (`main.rs`, `support.rs`, one module per behaviour) |
 | `test/scripts/` | replay scripts |

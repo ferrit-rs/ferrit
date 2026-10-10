@@ -14,7 +14,7 @@
 //! the run that created it; it is removed once the rebase is done.
 //!
 //! This file holds the types and the pure functions. The code that reads with
-//! `git2` or runs `git` is `crate::git::repo::history`.
+//! `git2` or runs `git` is `crate::git::repo::rebase`.
 
 use crate::git::model::CommitEntry;
 use std::path::Path;

@@ -199,7 +199,8 @@ src/
 │   │   ├── blob.rs               blob reads
 │   │   ├── diff.rs               diff reads
 │   │   ├── index.rs              index mutations
-│   │   ├── history.rs            history mutations
+│   │   ├── commit.rs             commit mutations and commit metadata
+│   │   ├── rebase.rs             rebase and stopped-operation mutations
 │   │   ├── remotes.rs            remote operations
 │   │   ├── stashes.rs            stash operations
 │   │   ├── gitconfig.rs          Git config operations

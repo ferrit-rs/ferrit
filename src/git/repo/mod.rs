@@ -4,16 +4,17 @@
 
 pub(crate) mod blob;
 pub(crate) mod branches;
+pub(crate) mod commit;
 pub(crate) mod diff;
 pub(crate) mod exec;
 pub(crate) mod gitconfig;
-pub(crate) mod history;
 pub(crate) mod index;
 mod init;
 pub(crate) mod log;
 pub(crate) mod port_impl;
 pub(crate) mod process;
 pub(crate) mod read;
+pub(crate) mod rebase;
 pub(crate) mod remotes;
 pub(crate) mod stashes;
 pub(crate) mod statistics;
@@ -226,7 +227,7 @@ impl Repo {
             commits: log::commits(&self.inner, COMMITS_LIMIT)?,
             stashes: stashes::stashes(&mut self.inner)?,
             remotes: remotes::remotes(&self.inner)?,
-            operation: history::current(&self.inner),
+            operation: rebase::current(&self.inner),
         })
     }
 }
