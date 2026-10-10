@@ -1,0 +1,26 @@
+[package]
+name = "ferrit-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Reusable terminal widgets and themes for ferrit"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["tui", "terminal", "ratatui"]
+categories = ["command-line-utilities", "gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+ferrit-domain.workspace = true
+ratatui.workspace = true
+ratatui-core.workspace = true
+ratatui-widgets.workspace = true
+serde.workspace = true
+strum.workspace = true
+unicode-segmentation.workspace = true
+unicode-width.workspace = true

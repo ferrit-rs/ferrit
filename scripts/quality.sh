@@ -26,7 +26,7 @@ require_command() {
 
 check_explicit_paths() {
     printf '%s\n' '==> explicit Rust module paths'
-    if rg -n --glob '*.rs' '\bsuper::|pub\(super\)' src tests; then
+    if rg -n --glob '*.rs' '\bsuper::|pub\(super\)' crates; then
         printf '%s\n' 'error: super paths are forbidden; use explicit crate:: paths and pub(crate)' >&2
         return 1
     fi
@@ -53,7 +53,7 @@ run_tests() {
     trap 'rm -f "$ferrit_git_config"' EXIT
 
     printf '%s\n' '==> nextest'
-    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$ferrit_git_config" \
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$ferrit_git_config" FERRIT_NO_DELTA=1 \
         cargo nextest run --locked --all-features
     rm -f "$ferrit_git_config"
     trap - EXIT

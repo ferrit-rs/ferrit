@@ -162,13 +162,15 @@ cargo run
 
 ## Architecture
 
-One crate in three parts: `git/` (the model, the `GitPort` traits and the adapter), `tui/` (the interface, one file per piece of it) and `config/` with `theme/`. The app talks to git
-through a trait (`GitPort`), implemented by `git2` for reads and the `git`
-subprocess for changes, so hooks and signing behave as in your shell, and by an
-in-memory fake for tests. Errors are typed all the way to the screen. Slow work
-runs in worker threads and comes back on one event channel. Behaviour is tested
-end to end by replay scripts that press keys on a deterministic repository, and
-the lints are strict (no `unwrap`, no `unsafe`, clippy pedantic as errors in CI).
+The workspace separates the thin `ferrit` binary from `ferrit-app`,
+`ferrit-config`, `ferrit-domain`, `ferrit-git`, and `ferrit-tui`. The app talks
+to git through `GitPort`, implemented by `ferrit-git` with `git2` for reads and
+the `git` subprocess for changes, so hooks and signing behave as in your shell.
+An in-memory fake supports app tests. Errors are typed all the way to the
+screen. Slow work runs in worker threads and comes back on one event channel.
+Behaviour is tested end to end by replay scripts on deterministic repositories.
+The lints are strict: no `unwrap`, no `unsafe`, no `pub use`, no `super`, and
+clippy warnings are errors in CI.
 
 See [`docs/architecture.md`](docs/architecture.md), the decisions in
 [`docs/adr/`](docs/adr/) and the design history in [`docs/`](docs/README.md).

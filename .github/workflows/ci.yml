@@ -45,7 +45,7 @@ jobs:
       - name: Blocking quality gates
         run: ./scripts/quality.sh check
 
-  # The declared minimum Rust version (`rust-version` in Cargo.toml, the one
+  # The declared minimum Rust version (`rust-version` in workspace package metadata, the one
   # source of truth) must build the crate. rust-toolchain.toml pins the
   # developer toolchain, so RUSTUP_TOOLCHAIN overrides it for this job.
   msrv:
@@ -56,7 +56,7 @@ jobs:
 
       - name: Install the toolchain named by rust-version
         run: |
-          msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
+          msrv=$(sed -n '/^\[workspace\.package\]/,/^\[/s/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
           echo "MSRV=$msrv" >> "$GITHUB_ENV"
           rustup toolchain install "$msrv" --profile minimal
 
@@ -65,7 +65,7 @@ jobs:
       - name: cargo check with the locked dependencies
         env:
           RUSTUP_TOOLCHAIN: ${{ env.MSRV }}
-        run: cargo check --locked --all-targets
+        run: cargo check --locked -p ferrit --all-targets
 
   # ferrit is used on macOS as much as on Linux: the same tests, on the macOS
   # runner (git, file watching and temp dirs all behave a little differently).
@@ -84,7 +84,7 @@ jobs:
           tool: cargo-nextest
 
       - name: nextest
-        run: cargo nextest run --all-features
+        run: FERRIT_NO_DELTA=1 cargo nextest run --all-features
 
   # Informational, never a gate: line coverage of the test suite, in the job
   # summary and as an lcov artifact.
@@ -140,7 +140,7 @@ jobs:
           cache: true
 
       - name: Build a debug binary, the harness flags are test-only
-        run: cargo build --features test-util
+        run: cargo build -p ferrit --features test-util
 
       - name: Generate tapes from test/scripts
         run: |

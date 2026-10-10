@@ -188,60 +188,30 @@ Rust adaptation rules:
 ## Ferrit current architecture
 
 ```text
-src/
-├── config/                       settings and app configuration
-├── git/
-│   ├── model.rs, port.rs         domain-facing Git types and boundary
-│   ├── repo/                     subprocess-backed repository adapter
-│   │   ├── status.rs             status reads
-│   │   ├── log.rs                commit history and decorations
-│   │   ├── branches.rs           branch reads
-│   │   ├── blob.rs               blob reads
-│   │   ├── diff.rs               diff reads
-│   │   ├── index.rs              index mutations
-│   │   ├── commit.rs             commit mutations and commit metadata
-│   │   ├── rebase.rs             rebase and stopped-operation mutations
-│   │   ├── remotes.rs            remote operations
-│   │   ├── stashes.rs            stash operations
-│   │   ├── gitconfig.rs          Git config operations
-│   │   ├── statistics/           statistics queries
-│   │   └── read.rs               shared worktree and command output helpers
-│   └── fake.rs                   test Git implementation
-├── replay/                       deterministic scenario harness
-├── theme/                        palette and theme configuration
-└── tui/
-    ├── components/               feature UI components
-    │   ├── files/                 tree, projection, navigation and keys
-    │   ├── dashboard/              state/loading, view/rendering, charts, tables, text
-    │   ├── settings/               sheet orchestration, theme editor and row projection
-    │   ├── create_remote/           state/form/input and popup projection/rendering
-    │   ├── commit_editor/           commit flow, draft/input state and popup rendering
-    │   ├── keybar/                  bar layout, generated help lines and screen rendering
-    │   ├── panes/                 generic pane orchestration
-    │   ├── diff/                  diff feature
-    │   ├── dashboard/             dashboard feature
-    │   ├── git_config/             Git config feature
-    │   └── ...                    branches, commits, remotes, stash, settings
-    ├── controllers/actions.rs     resolved action mutation and navigation
-    ├── keymap/                   actions, bindings, contexts and defaults
-    ├── event.rs, reducer.rs       intent and state mutation boundaries
-    ├── input.rs                   key/mouse/popup routing
-    ├── scene.rs, view.rs          read-only view context
-    ├── row_lines/                 render projections
-    ├── widgets/                   reusable widgets
-    │   └── chrome/                bar, dialog, drawer, lists, panel, pointer, separator, text
-    ├── runtime.rs                 event loop
-    └── terminal.rs                terminal lifecycle
+crates/
+├── ferrit/                         thin binary and CLI contract tests
+├── ferrit-app/                     App, runtime, controllers, components, replay
+│   └── src/ui/                    application-facing TUI composition
+├── ferrit-config/                  config.toml model, validation, persistence
+├── ferrit-domain/                  Git models, ports, parsers, rules and stats
+├── ferrit-git/                     Repo adapter, subprocesses, askpass, FakeGit
+└── ferrit-tui/                     themes, color picker, widgets, chrome, overlays
 ```
 
-Current result is already structurally close to the useful LazyGit shape:
+Dependency direction:
 
 ```text
-Git capability modules  ->  GitPort  ->  App snapshot  ->  TUI components
-                                              |
-input -> keymap -> action controller -> reducer/state
-                         |
-                         +---------- refresh/event
+ferrit -> ferrit-app -> ferrit-domain
+                    -> ferrit-config -> ferrit-tui
+                    -> ferrit-git -> ferrit-domain
+                    -> ferrit-tui
+```
+
+Runtime flow:
+
+```text
+CLI -> App -> input/keymap -> controller/reducer -> GitPort -> ferrit-git
+                         \\-> projection -> ferrit-tui widgets -> terminal
 ```
 
 ## Plan to converge further
@@ -257,7 +227,7 @@ input -> keymap -> action controller -> reducer/state
 
 ### Phase 1: finish the Rust domain boundary
 
-1. Audit `src/git/model.rs` and `src/git/port.rs` by capability. Move models that only belong to one capability beside that capability, while keeping shared domain models centralized.
+1. Audit `crates/ferrit-domain/src/model.rs` and `port.rs` by capability. Move models that only belong to one capability beside that capability, while keeping shared domain models centralized.
 2. Separate read models from mutation commands where names currently mix both.
 3. Introduce typed result/event names only where current strings or tuples obscure ownership.
 4. Keep `Repo` as a thin adapter facade. New behavior goes into capability modules first, forwarding method second.
@@ -265,13 +235,13 @@ input -> keymap -> action controller -> reducer/state
 
 ### Phase 2: make TUI boundaries match LazyGit
 
-1. Split `tui/components` by feature where a file owns multiple independent workflows.
+1. Split `crates/ferrit-app/src/ui/components` by feature where a file owns multiple independent workflows.
 2. Move screen-local state out of `App` only when a component has a stable state boundary. Do not create empty context wrappers.
-3. Grow `tui/controllers/` from `actions.rs` into feature modules as action groups become independent: files, commits, branches, remotes, stash, diff and settings.
+3. Grow `ui/controllers/` from `actions.rs` into feature modules as action groups become independent: files, commits, branches, remotes, stash, diff and settings.
 4. Keep `input.rs` as router only. It may identify context and produce intent, but must not contain feature mutation logic.
 5. Keep `scene.rs` and `view.rs` read-only. Push formatting and row conversion into feature projections.
 6. Extract a `tui/modes/` namespace when diff, rebase or another workflow gets temporary state and exit rules. Do not create it before a real mode exists.
-7. Keep `widgets/` terminal-generic. Feature-specific layout belongs under its component.
+7. Keep `ferrit-tui` terminal-generic. Feature-specific layout belongs under `ferrit-app` components.
 
 ### Phase 3: projection and refresh model
 
@@ -283,17 +253,17 @@ input -> keymap -> action controller -> reducer/state
 
 ### Phase 4: configuration and keymap
 
-1. Keep `keymap/action.rs`, `binding.rs`, `context.rs` and `defaults.rs` separate.
+1. Keep `crates/ferrit-app/src/ui/keymap/action.rs`, `binding.rs`, `context.rs` and `defaults.rs` separate.
 2. Use Strum for closed string enums and config-facing iteration. Keep explicit matches for payload actions such as `Focus(Pane)`.
 3. Separate config file parsing, normalized settings and runtime preferences.
 4. Validate key collisions and reserved actions at config load time.
-5. Keep Git config UI under `components/git_config`, separate from app config.
+5. Keep Git config UI under `components/git_config`, separate from `ferrit-config`.
 
 ### Phase 5: platform and Git edge isolation
 
 1. Consolidate process, askpass, SSH and terminal-specific code under explicit adapter boundaries.
 2. Keep `git2` and subprocess details out of TUI modules.
-3. Keep image decoding and terminal protocol detection under `tui/image` and terminal modules.
+3. Keep image decoding and terminal protocol detection under `ferrit-app/src/ui/image` and terminal modules.
 4. Add platform modules only when behavior differs. Do not abstract identical code prematurely.
 
 ### Phase 6: test architecture

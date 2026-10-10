@@ -1,0 +1,24 @@
+[package]
+name = "ferrit-config"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Ferrit's user configuration file model and persistence"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["configuration", "toml", "git"]
+categories = ["config", "development-tools"]
+
+[lints]
+workspace = true
+
+[dependencies]
+directories.workspace = true
+ferrit-tui.workspace = true
+serde.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+toml.workspace = true

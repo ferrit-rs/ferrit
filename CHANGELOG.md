@@ -10,6 +10,14 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 ### Changed
 
 - Fast-forwarding a non-checked-out branch now updates the local ref without deleting it first.
+- The repository is now a virtual Cargo workspace: `crates/ferrit` owns the app, TUI and concrete Git adapters, while `crates/ferrit-domain` owns Git models, ports and backend rules without terminal or `git2` dependencies.
+- The workspace now follows the Zed-style package pattern: `ferrit` is the default member for fast local commands, shared package metadata lives at the workspace root, and releases publish `ferrit-domain` before its `ferrit` consumer.
+- The workspace now separates the thin `ferrit` binary, `ferrit-app` application runtime, `ferrit-config` user configuration, `ferrit-domain` rules, `ferrit-git` adapters and `ferrit-tui` presentation primitives.
+- Architecture tests now validate boundaries across workspace crates instead of assuming one monolithic `src/` tree.
+- Test gates disable optional `delta` formatting so rendered-diff assertions stay deterministic across developer machines.
+- Release packaging now respects unpublished workspace dependencies: local checks run before ordered `cargo publish` validation.
+- Reusable themes, color editing, terminal chrome, overlays and widgets now live in `ferrit-tui`; application state stays in `ferrit-app`.
+- `config.toml` parsing, validation and section persistence now live in `ferrit-config`; settings-sheet state lives with the TUI settings component.
 - Git scope names now use `strum`, and pane indexing uses `enum-map`'s enum index.
 - Rebase integration tests now pin pull strategy instead of inheriting user Git config.
 - Enum iteration and string conversion now use `strum` where the enum is a stable string or ordered value (`Context`, config sections, dashboard kinds, settings rows, theme presets and remote-form fields), while domain-specific labels stay explicit.
@@ -24,24 +32,24 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 - Deterministic local quality commands, Git hooks and one CI quality gate now share `scripts/quality.sh`; commits run only rustfmt, pushes run the full gate, and clippy has `fix` and full `scan` modes.
 - Architecture overview, five decision records and a documentation index under `docs/`.
-- TUI image decoding and terminal protocol detection now live under `tui/image`; Git backend stays terminal-independent.
+- TUI image decoding and terminal protocol detection now live under `ui/image`; Git backend stays terminal-independent.
 - TUI row renderers are split into explicit `tui::row_lines::{rows,diff,status}` namespaces; no compatibility re-export layer hides ownership.
 - Component intents and application state mutation now live in separate `event` and `reducer` modules.
-- Terminal event-loop routing now lives in `tui/runtime`; `tui/mod.rs` stays the application composition root, with no internal re-export alias.
+- Terminal event-loop routing now lives in `ui/runtime`; `ui/mod.rs` stays the application composition root, with no internal re-export alias.
 - Rust module paths and visibility now use explicit `crate::` and `pub(crate)` forms; the quality gate rejects `super` forms before commit.
 - Removed throwaway Cargo examples; render and preview coverage stays in integration tests.
-- The Git adapter now keeps `Repo` forwarding methods beside their capability backend, and the Git config editor's edit state and key catalog live under `tui/components/git_config`; app settings and Git settings no longer look like one mixed layer.
+- The Git adapter now keeps `Repo` forwarding methods beside their capability backend, and the Git config editor's edit state and key catalog live under `ui/components/git_config`; app settings and Git settings no longer look like one mixed layer.
 - Git diff line counting now uses a bounded byte iterator without a special lint exemption.
 - The Files feature now follows a dedicated tree, projection and navigation boundary; pane selection identities no longer live inside the file-tree module.
 - Added `docs/lazygit-architecture-plan.md` with the LazyGit/LazyGitRS architecture reference and the Rust-adapted convergence plan.
-- Dashboard state/loading and dashboard projection/rendering now live in separate `tui/components/dashboard/{state,view}.rs` modules.
-- Settings theme editing and settings-row projection now live in dedicated `tui/components/settings/{theme,rows}.rs` modules.
+- Dashboard state/loading and dashboard projection/rendering now live in separate `ui/components/dashboard/{state,view}.rs` modules.
+- Settings theme editing and settings-row projection now live in dedicated `ui/components/settings/{theme,rows}.rs` modules.
 - Git commit and rebase adapters no longer share `repo/history.rs`; they now have explicit `repo/commit.rs` and `repo/rebase.rs` capability boundaries.
 - The Git adapter now separates status, log, blob and diff reads into capability modules; `repo/read.rs` only keeps shared command and worktree helpers.
-- Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `tui/controllers/actions.rs` instead of the input router.
-- Create-remote state/form input and popup projection/rendering now live in explicit `tui/components/create_remote/{mod,view}.rs` boundaries.
-- Commit-editor flow/draft input and popup rendering now live in explicit `tui/components/commit_editor/{mod,view}.rs` boundaries.
-- Keybar layout, generated help lines and screen rendering now live in explicit `tui/components/keybar/{mod,help,view}.rs` boundaries.
+- Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `ui/controllers/actions.rs` instead of the input router.
+- Create-remote state/form input and popup projection/rendering now live in explicit `ui/components/create_remote/{mod,view}.rs` boundaries.
+- Commit-editor flow/draft input and popup rendering now live in explicit `ui/components/commit_editor/{mod,view}.rs` boundaries.
+- Keybar layout, generated help lines and screen rendering now live in explicit `ui/components/keybar/{mod,help,view}.rs` boundaries.
 - Shared terminal chrome now has explicit widget modules for bars, dialogs, drawers, lists, panels, pointer state, separators and text truncation.
 
 ## [0.10.0] - 2026-10-06

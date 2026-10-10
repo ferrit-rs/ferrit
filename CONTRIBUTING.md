@@ -24,13 +24,16 @@ cargo run
 ./scripts/setup-hooks.sh
 ```
 
-Source responsibilities are separated by area:
+Source responsibilities are separated by crate:
 
-- `src/git/`: Git types, `GitPort`, identities, images, the `git2` reads and
-  subprocess adapter.
-- `src/tui/`: Ferrit state, events, screens, keymap, terminal lifecycle and
-  reusable widgets.
-- `src/config/` and `src/theme/`: settings and colours.
+- `crates/ferrit/`: thin binary and CLI integration tests.
+- `crates/ferrit-app/`: application state, events, screens, controllers, and
+  terminal runtime.
+- `crates/ferrit-config/`: settings parsing, validation, and persistence.
+- `crates/ferrit-domain/`: Git ports, domain types, and domain errors.
+- `crates/ferrit-git/`: identities, images, `git2`, subprocess adapter, and
+  command logging.
+- `crates/ferrit-tui/`: reusable themes and widgets.
 
 `App` goes through `GitPort`; a test that only needs app logic can use `FakeGit`
 and `App::with_git` instead of building a repository.

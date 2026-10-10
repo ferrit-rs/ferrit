@@ -1,0 +1,31 @@
+[package]
+name = "ferrit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The everyday git manager for the terminal"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["git", "tui", "terminal", "github", "dashboard"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ferrit"
+path = "src/main.rs"
+
+[dependencies]
+ferrit-app.workspace = true
+ferrit-config.workspace = true
+ferrit-git.workspace = true
+ferrit-tui.workspace = true
+clap.workspace = true
+color-eyre.workspace = true
+
+[features]
+test-util = ["ferrit-app/test-util"]

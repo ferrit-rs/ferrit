@@ -873,9 +873,24 @@ version = "0.10.0"
 dependencies = [
  "clap",
  "color-eyre",
- "directories",
+ "ferrit-app",
+ "ferrit-config",
+ "ferrit-git",
+ "ferrit-tui",
+]
+
+[[package]]
+name = "ferrit-app"
+version = "0.10.0"
+dependencies = [
+ "clap",
+ "color-eyre",
  "enum-map",
- "ferrit",
+ "ferrit-app",
+ "ferrit-config",
+ "ferrit-domain",
+ "ferrit-git",
+ "ferrit-tui",
  "git2",
  "image",
  "notify-debouncer-full",
@@ -884,11 +899,52 @@ dependencies = [
  "ratatui-core",
  "ratatui-image",
  "ratatui-widgets",
- "serde",
  "strum",
  "syntect",
  "thiserror 2.0.20",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
+name = "ferrit-config"
+version = "0.10.0"
+dependencies = [
+ "directories",
+ "ferrit-tui",
+ "serde",
+ "strum",
+ "thiserror 2.0.20",
  "toml",
+]
+
+[[package]]
+name = "ferrit-domain"
+version = "0.10.0"
+dependencies = [
+ "strum",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "ferrit-git"
+version = "0.10.0"
+dependencies = [
+ "ferrit-domain",
+ "git2",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "ferrit-tui"
+version = "0.10.0"
+dependencies = [
+ "ferrit-domain",
+ "ratatui",
+ "ratatui-core",
+ "ratatui-widgets",
+ "serde",
+ "strum",
  "unicode-segmentation",
  "unicode-width",
 ]

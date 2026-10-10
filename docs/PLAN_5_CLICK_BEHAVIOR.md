@@ -83,7 +83,7 @@ idx        = visual_row + self.state.offset() // ListState::offset, read live
 if idx < display_rows.len() { self.state.select(Some(idx)) }
 ```
 
-`../ferrit-references/tui/drydock/crates/drydock/src/tui/mod.rs`
+`../ferrit-references/tui/drydock/crates/drydock/src/ui/mod.rs`
 `select_at_row(row, first_row) -> bool`:
 
 ```

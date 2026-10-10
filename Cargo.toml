@@ -1,63 +1,52 @@
-[package]
-name = "ferrit"
+[workspace]
+resolver = "3"
+members = [
+    "crates/ferrit",
+    "crates/ferrit-app",
+    "crates/ferrit-config",
+    "crates/ferrit-domain",
+    "crates/ferrit-git",
+    "crates/ferrit-tui",
+]
+default-members = ["crates/ferrit"]
+
+[workspace.package]
 version = "0.10.0"
 edition = "2024"
 rust-version = "1.90"
-description = "The everyday git manager for the terminal: a full TUI for your repository, and an empty folder to GitHub without leaving it"
 authors = ["The ferrit Authors"]
 license = "MIT"
 repository = "https://github.com/ferrit-rs/ferrit"
 homepage = "https://github.com/ferrit-rs/ferrit"
 readme = "README.md"
-exclude = ["demo-ferrit.gif", "assets/ferrit/motion-design/ferrit-film.mp4"]
-keywords = ["git", "tui", "terminal", "github", "dashboard"]
-categories = ["command-line-utilities", "development-tools"]
 
-[[bin]]
-name = "ferrit"
-path = "src/main.rs"
-
-[dependencies]
+[workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
 directories = "6"
 enum-map = "2"
+ferrit-app = { version = "0.10.0", path = "crates/ferrit-app" }
+ferrit-config = { version = "0.10.0", path = "crates/ferrit-config" }
+ferrit-domain = { version = "0.10.0", path = "crates/ferrit-domain" }
+ferrit-git = { version = "0.10.0", path = "crates/ferrit-git" }
+ferrit-tui = { version = "0.10.0", path = "crates/ferrit-tui" }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
 notify-debouncer-full = "0.7"
+proptest = "1"
 ratatui = { version = "0.30", features = ["serde"] }
 ratatui-core = "0.1.0"
 ratatui-image = { version = "11", default-features = false, features = ["crossterm", "image-defaults"] }
 ratatui-widgets = "0.3.0"
+serde = { version = "1", features = ["derive"] }
 strum = { version = "0.27", features = ["derive"] }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
-serde = { version = "1", features = ["derive"] }
-toml = "0.9"
 thiserror = "2"
+toml = "0.9"
 unicode-segmentation = "1.13"
 unicode-width = "0.2"
 
-[features]
-# The test seams: the replay harness (`--replay`, `--fixture` and the other
-# hidden flags) and the in-memory `FakeGit`. Off in a normal build, so a
-# `cargo install ferrit` does not ship them. The integration tests turn it on
-# through the dev-dependency below; to use the flags by hand, build with
-# `--features test-util`.
-test-util = []
-
-[dev-dependencies]
-ferrit = { path = ".", features = ["test-util"] }
-proptest = "1"
-
-# See also clippy.toml and rust-toolchain.toml.
-#
-# Layout: lint GROUPS first at negative priority (single-lint overrides below
-# always win), then the curated deny list, then WARN nudges, then explicit
-# opt-outs. CI runs `cargo clippy --all-targets --all-features -- -D warnings`,
-# so every warn here is blocking. Integration tests relax the panic-family
-# denies with a file-level `#![allow(..)]` (panicking on failed setup is the
-# assertion there).
-[lints.clippy]
+[workspace.lints.clippy]
 # -- groups -------------------------------------------------------------------
 all      = { level = "warn", priority = -2 }
 pedantic = { level = "warn", priority = -2 }
@@ -166,7 +155,7 @@ struct_field_names = "allow"        # repeated prefixes here carry meaning, not 
 similar_names = "allow"             # short local bindings in the render/parse code collide by design
 match_same_arms = "allow"           # explicit arms document intent even when bodies match
 
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "forbid"              # zero unsafe in this crate, keep it that way
 irrefutable_let_patterns = "deny"
 unused_must_use = "deny"
@@ -189,7 +178,7 @@ meta_variable_misuse = "warn"
 unnameable_types = "warn"
 unused_crate_dependencies = "allow" # cargo-machete owns this
 
-[lints.rustdoc]
+[workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 invalid_html_tags = "deny"
 invalid_rust_codeblocks = "deny"
