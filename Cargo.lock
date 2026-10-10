@@ -883,7 +883,6 @@ dependencies = [
 name = "ferrit-app"
 version = "0.10.0"
 dependencies = [
- "clap",
  "color-eyre",
  "enum-map",
  "ferrit-app",
@@ -896,13 +895,10 @@ dependencies = [
  "notify-debouncer-full",
  "proptest",
  "ratatui",
- "ratatui-core",
  "ratatui-image",
- "ratatui-widgets",
  "strum",
  "syntect",
  "thiserror 2.0.20",
- "unicode-segmentation",
  "unicode-width",
 ]
 
