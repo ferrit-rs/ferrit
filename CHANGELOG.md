@@ -16,6 +16,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Architecture tests now validate boundaries across workspace crates instead of assuming one monolithic `src/` tree.
 - Test gates disable optional `delta` formatting so rendered-diff assertions stay deterministic across developer machines.
 - Release packaging now respects unpublished workspace dependencies: local checks run before ordered `cargo publish` validation.
+- Application manifests now declare only dependencies used by their own source; shared versions remain centralized at workspace level.
 - Reusable themes, color editing, terminal chrome, overlays and widgets now live in `ferrit-tui`; application state stays in `ferrit-app`.
 - `config.toml` parsing, validation and section persistence now live in `ferrit-config`; settings-sheet state lives with the TUI settings component.
 - Git scope names now use `strum`, and pane indexing uses `enum-map`'s enum index.
