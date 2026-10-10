@@ -8,10 +8,13 @@
 
 use std::path::PathBuf;
 
+use strum::{EnumString, IntoStaticStr};
+
 use crate::git::command_log::redact;
 
 /// The level a value was set at, in git's own precedence order (later wins).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumString, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum Scope {
     /// `/etc/gitconfig` and the like, for every user of the machine.
     System,
@@ -112,13 +115,7 @@ pub fn display_value(key: &str, value: &str) -> String {
 }
 
 pub(crate) fn parse_scope(text: &str) -> Scope {
-    match text {
-        "system" => Scope::System,
-        "global" => Scope::Global,
-        "worktree" => Scope::Worktree,
-        "command" => Scope::Command,
-        _ => Scope::Local,
-    }
+    text.parse().unwrap_or(Scope::Local)
 }
 
 pub(crate) fn parse_origin(text: &str) -> Origin {
@@ -155,7 +152,8 @@ pub fn parse(raw: &str) -> ConfigView {
 
 /// The files ferrit may write. No `System` variant: writing the system file
 /// or an included file cannot be expressed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum WriteScope {
     /// The repository's `.git/config`.
     Local,

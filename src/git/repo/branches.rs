@@ -119,22 +119,16 @@ fn is_checked_out(repo: &Repository, name: &str) -> bool {
         .is_ok_and(|b| b.is_head())
 }
 
-/// `name`'s upstream, in the short form (`origin/main`) usable as a fetch
-/// source. `git2` read, not a subprocess: this is a lookup, not a mutation.
-fn upstream_shorthand(repo: &Repository, name: &str) -> GitResult<String> {
+/// `name`'s upstream, as a full ref usable as a local fetch source.
+/// `git2` read, not a subprocess: this is a lookup, not a mutation.
+fn upstream_ref(repo: &Repository, name: &str) -> GitResult<String> {
     let branch = repo
         .find_branch(name, BranchType::Local)
         .map_err(read_error)?;
     let upstream = branch.upstream().map_err(|_| {
         GitError::BranchFailed(format!("no tracking information for branch '{name}'"))
     })?;
-    upstream
-        .name()
-        .map_err(read_error)?
-        .map(str::to_owned)
-        .ok_or_else(|| {
-            GitError::BranchFailed(format!("no tracking information for branch '{name}'"))
-        })
+    Ok(upstream.get().name().map_err(read_error)?.to_owned())
 }
 
 /// Fast-forward `name` to its upstream. Two mechanisms depending on whether
@@ -142,7 +136,7 @@ fn upstream_shorthand(repo: &Repository, name: &str) -> GitResult<String> {
 /// - checked out: `git merge --ff-only @{u}` (git refuses to let anything
 ///   else write to `HEAD`'s own branch, confirmed empirically — a local
 ///   `git fetch .` into the checked-out branch is rejected outright).
-/// - not checked out: `git fetch . <upstream-shorthand>:refs/heads/<name>`
+/// - not checked out: `git fetch . <upstream-ref>:refs/heads/<name>`
 ///   — a *local* fetch (source `.`, this same repository) that moves
 ///   `name`'s ref to match its already-known upstream ref, entirely from
 ///   data already on disk. No network, no auth: lazygit's own "fast-
@@ -160,7 +154,7 @@ pub(super) fn fast_forward(repo: &Repository, name: &str) -> GitResult<()> {
             GitError::BranchFailed,
         );
     }
-    let upstream = upstream_shorthand(repo, name)?;
+    let upstream = upstream_ref(repo, name)?;
     let refspec = format!("{upstream}:refs/heads/{name}");
     run_git(
         workdir,

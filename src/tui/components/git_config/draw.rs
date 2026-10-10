@@ -80,14 +80,8 @@ pub(crate) const fn scope_letter(scope: Scope) -> char {
     }
 }
 
-pub(crate) const fn scope_word(scope: Scope) -> &'static str {
-    match scope {
-        Scope::System => "system",
-        Scope::Global => "global",
-        Scope::Local => "local",
-        Scope::Worktree => "worktree",
-        Scope::Command => "command",
-    }
+pub(crate) fn scope_word(scope: Scope) -> &'static str {
+    scope.into()
 }
 
 /// What the marker column says about a row.

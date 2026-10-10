@@ -44,12 +44,8 @@ pub(crate) struct PickTarget {
     pub(crate) values: &'static [&'static str],
 }
 
-pub(crate) const fn scope_name(scope: WriteScope) -> &'static str {
-    match scope {
-        WriteScope::Local => "local",
-        WriteScope::Global => "global",
-        WriteScope::Worktree => "worktree",
-    }
+pub(crate) fn scope_name(scope: WriteScope) -> &'static str {
+    scope.into()
 }
 
 pub(crate) fn truthy(value: &str) -> bool {
@@ -60,13 +56,10 @@ pub(crate) fn truthy(value: &str) -> bool {
         )
 }
 
-pub(crate) const fn scope_label(scope: Scope) -> &'static str {
+pub(crate) fn scope_label(scope: Scope) -> &'static str {
     match scope {
-        Scope::System => "system",
-        Scope::Global => "global",
-        Scope::Local => "local",
-        Scope::Worktree => "worktree",
         Scope::Command => "command-line",
+        _ => scope.into(),
     }
 }
 

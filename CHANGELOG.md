@@ -9,6 +9,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Changed
 
+- Fast-forwarding a non-checked-out branch now updates the local ref without deleting it first.
+- Git scope names now use `strum`, and pane indexing uses `enum-map`'s enum index.
+- Rebase integration tests now pin pull strategy instead of inheriting user Git config.
 - Enum iteration and string conversion now use `strum` where the enum is a stable string or ordered value (`Context`, config sections, dashboard kinds, settings rows, theme presets and remote-form fields), while domain-specific labels stay explicit.
 - Library modules that nothing outside the crate used are now `pub(crate)` (the 17 submodules of `infra::git`, and a few dozen widgets and helpers), and the unused `RadioCard` widget and a few dead members of `Separator` and `Dialog` are removed.
 - The hidden test flags (`--replay`, `--fixture`, `--into`, `--dump-frames`, `--size`, `--tape`), the replay harness behind them and the in-memory `FakeGit` are no longer built into a normal `cargo install ferrit`: they are behind a `test-util` feature, which the integration tests turn on (`cargo run --features test-util -- --replay SCRIPT` by hand).

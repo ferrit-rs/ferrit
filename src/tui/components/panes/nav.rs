@@ -255,9 +255,9 @@ pub const PANES: [Pane; 5] = [
 
 impl Pane {
     /// Position in `PANES`, for the focus-cycling arithmetic in `pane_offset`.
-    /// The variant order is the `PANES` order, so the discriminant is it.
+    /// `enum-map`'s enum index follows the variant order used by `PANES`.
     pub fn index(self) -> usize {
-        self as usize
+        self.into_usize()
     }
 
     /// Bordered-box title, lazygit style: `[N] Tab - Tab - Tab`. The extra tab

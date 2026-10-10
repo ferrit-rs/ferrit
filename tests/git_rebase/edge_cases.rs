@@ -96,6 +96,7 @@ fn a_pull_that_starts_a_rebase_and_conflicts_is_a_stopped_rebase() {
     fs::write(work.path().join("f"), "local\n").unwrap();
     git(work.path(), &["commit", "-qam", "local change"]);
     git(work.path(), &["config", "pull.rebase", "true"]);
+    git(work.path(), &["config", "pull.ff", "false"]);
 
     let repo = Repo::open(work.path()).unwrap();
     assert!(repo.pull().is_err(), "the conflict is a failed pull");
