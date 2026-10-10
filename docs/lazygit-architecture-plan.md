@@ -214,6 +214,7 @@ src/
     │   ├── files/                 tree, projection, navigation and keys
     │   ├── dashboard/              state/loading, view/rendering, charts, tables, text
     │   ├── settings/               sheet orchestration, theme editor and row projection
+    │   ├── create_remote/           state/form/input and popup projection/rendering
     │   ├── panes/                 generic pane orchestration
     │   ├── diff/                  diff feature
     │   ├── dashboard/             dashboard feature

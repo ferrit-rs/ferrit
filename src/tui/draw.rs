@@ -6,7 +6,7 @@ use crate::tui::components::command_log::draw_command_log;
 use crate::tui::components::command_log::draw_command_log_view;
 use crate::tui::components::commit_editor::draw_commit;
 use crate::tui::components::commit_editor::draw_commit_all_confirm;
-use crate::tui::components::create_remote::draw_create_remote;
+use crate::tui::components::create_remote::view::draw_create_remote;
 use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::draw::draw_files_columns;
 use crate::tui::components::diff::draw::draw_right_pane;

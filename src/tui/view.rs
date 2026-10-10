@@ -8,7 +8,7 @@ use crate::config::settings::{SettingsRow, SettingsSheet};
 use crate::git::diff::DiffSide;
 use crate::tui::App;
 use crate::tui::components::create_remote::CreateRemoteState;
-use crate::tui::components::create_remote::CreateRemoteView;
+use crate::tui::components::create_remote::view::CreateRemoteView;
 use crate::tui::components::diff::views::{CommandLogView, CommitPopupView, MenuView, PopupView};
 
 impl App {

@@ -1,7 +1,7 @@
 //! The right column: `views`.
 
 use crate::git;
-use crate::tui::components::create_remote::CreateRemoteView;
+use crate::tui::components::create_remote::view::CreateRemoteView;
 use crate::tui::widgets::text_input::TextInput;
 use crate::tui::widgets::tui_overlay::state::OverlayState;
 use std::path::PathBuf;

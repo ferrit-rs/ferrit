@@ -39,6 +39,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Git commit and rebase adapters no longer share `repo/history.rs`; they now have explicit `repo/commit.rs` and `repo/rebase.rs` capability boundaries.
 - The Git adapter now separates status, log, blob and diff reads into capability modules; `repo/read.rs` only keeps shared command and worktree helpers.
 - Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `tui/controllers/actions.rs` instead of the input router.
+- Create-remote state/form input and popup projection/rendering now live in explicit `tui/components/create_remote/{mod,view}.rs` boundaries.
 
 ## [0.10.0] - 2026-10-06
 

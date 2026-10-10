@@ -15,7 +15,7 @@ use crate::git::port::GitPort;
 use crate::theme::palette::Palette;
 use crate::tui::App;
 use crate::tui::components::create_remote::CreateRemoteState;
-use crate::tui::components::create_remote::{Consequences, CreateRemoteView};
+use crate::tui::components::create_remote::view::{Consequences, CreateRemoteView};
 use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::dashboard::state::Dashboard;
 use crate::tui::components::diff::right_pane::{Mode, RightPane};
