@@ -67,12 +67,13 @@ Run the same blocking gate as CI:
 Short commands:
 
 ```bash
+./scripts/quality.sh format # fmt only, commit-safe
 ./scripts/quality.sh fast  # fmt + clippy
 ./scripts/quality.sh fix   # fmt + deterministic clippy suggestions
 ./scripts/quality.sh scan  # full clippy dump + compact tracker
 ```
 
-The pre-commit hook runs `fast`; pre-push runs `check`. The hooks are opt-in and
+The pre-commit hook runs `format`; pre-push runs `check`. The hooks are opt-in and
 are enabled by `scripts/setup-hooks.sh`.
 
 CI also builds on the minimum Rust version declared in `Cargo.toml` (`rust-version`),

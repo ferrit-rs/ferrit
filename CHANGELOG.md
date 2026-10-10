@@ -22,7 +22,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
-- Deterministic local quality commands, Git hooks and one CI quality gate now share `scripts/quality.sh`; clippy also has `fix` and full `scan` modes, and contributor module docs match the actual layout.
+- Deterministic local quality commands, Git hooks and one CI quality gate now share `scripts/quality.sh`; commits run only rustfmt, pushes run the full gate, and clippy has `fix` and full `scan` modes.
 - Architecture overview, five decision records and a documentation index under `docs/`.
 
 ## [0.10.0] - 2026-10-06

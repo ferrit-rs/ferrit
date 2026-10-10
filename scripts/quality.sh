@@ -7,8 +7,9 @@ cd "$repo_root"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/quality.sh <fast|check|fix|scan>
+Usage: scripts/quality.sh <format|fast|check|fix|scan>
 
+  format run rustfmt check
   fast   rustfmt check and strict clippy
   check  every blocking local and CI quality gate
   fix    deterministic rustfmt and clippy fixes, then fast checks
@@ -24,11 +25,15 @@ require_command() {
 }
 
 run_fast() {
-    printf '%s\n' '==> rustfmt'
-    cargo fmt --all -- --check
+    run_format
 
     printf '%s\n' '==> clippy'
     cargo clippy --locked --all-targets --all-features -- -D warnings
+}
+
+run_format() {
+    printf '%s\n' '==> rustfmt'
+    cargo fmt --all -- --check
 }
 
 run_tests() {
@@ -92,6 +97,7 @@ run_scan() {
 }
 
 case "${1:-}" in
+    format) run_format ;;
     fast) run_fast ;;
     check) run_check ;;
     fix) run_fix ;;
