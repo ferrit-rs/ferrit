@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -eu
+
+if git diff --cached --quiet -- \
+    ':(glob)**/*.rs' Cargo.toml Cargo.lock clippy.toml deny.toml rust-toolchain.toml rustfmt.toml; then
+    exit 0
+fi
+
+exec ./scripts/quality.sh fast

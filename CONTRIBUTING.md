@@ -19,16 +19,21 @@ Ferrit pins its Rust toolchain in `rust-toolchain.toml`.
 git clone https://github.com/ferrit-rs/ferrit
 cd ferrit
 cargo run
+
+# Optional local hooks. They use the same commands as CI.
+./scripts/setup-hooks.sh
 ```
 
 Source responsibilities are separated by area:
 
-- `src/domain/`: Git types, the `GitPort` traits, profile, and image logic.
-- `src/infra/git/`: the `git2` and subprocess adapter behind those traits.
-  `app/` goes through `GitPort`; a test that only needs app logic can use `FakeGit` and
-  `App::with_git` instead of building a repository.
-- `src/app/`: Ferrit state, events, screens, keymap, and terminal lifecycle.
-- `src/components/`: reusable UI primitives and isolated `tui_overlay` code.
+- `src/git/`: Git types, `GitPort`, identities, images, the `git2` reads and
+  subprocess adapter.
+- `src/tui/`: Ferrit state, events, screens, keymap, terminal lifecycle and
+  reusable widgets.
+- `src/config/` and `src/theme/`: settings and colours.
+
+`App` goes through `GitPort`; a test that only needs app logic can use `FakeGit`
+and `App::with_git` instead of building a repository.
 
 ## Making changes
 
@@ -45,16 +50,30 @@ fork and pull request.
 
 ## Checks
 
-Run the checks used by CI when possible:
+Install the external quality tools once:
 
 ```bash
-cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --document-private-items
-cargo machete
-cargo deny check
-cargo nextest run --all-features
+cargo install cargo-nextest --locked
+cargo install cargo-machete --locked
+cargo install cargo-deny --locked
 ```
+
+Run the same blocking gate as CI:
+
+```bash
+./scripts/quality.sh check
+```
+
+Short commands:
+
+```bash
+./scripts/quality.sh fast  # fmt + clippy
+./scripts/quality.sh fix   # fmt + deterministic clippy suggestions
+./scripts/quality.sh scan  # full clippy dump + compact tracker
+```
+
+The pre-commit hook runs `fast`; pre-push runs `check`. The hooks are opt-in and
+are enabled by `scripts/setup-hooks.sh`.
 
 CI also builds on the minimum Rust version declared in `Cargo.toml` (`rust-version`),
 runs the tests on macOS, and reports coverage. Test helpers shared by the integration

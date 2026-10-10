@@ -1,4 +1,6 @@
 /target
+/CLIPPY_FULL_DUMP.txt
+/CLIPPY_TRACKER.md
 **/*.rs.bk
 *.pdb
 Cargo.lock.orig
