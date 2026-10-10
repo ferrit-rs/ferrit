@@ -21,9 +21,9 @@ use std::fs;
 
 use ferrit::config::{Config, ConfigLoad};
 use ferrit::tui::App;
-use ferrit::tui::components::keybar::{
-    Bar, HelpLine, filter_help_lines, help_lines, keybar_layout,
-};
+use ferrit::tui::components::keybar::Bar;
+use ferrit::tui::components::keybar::help::{HelpLine, filter_help_lines, help_lines};
+use ferrit::tui::components::keybar::keybar_layout;
 use ferrit::tui::components::panes::nav::Pane;
 use ferrit::tui::keymap::Keymap;
 use ferrit::tui::keymap::action::Action;

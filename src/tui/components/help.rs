@@ -1,8 +1,8 @@
 //! The help screen.
 
 use crate::theme::palette::Palette;
-use crate::tui::components::keybar::HelpLine;
-use crate::tui::components::keybar::filter_help_lines;
+use crate::tui::components::keybar::help::HelpLine;
+use crate::tui::components::keybar::help::filter_help_lines;
 use crate::tui::widgets::chrome::ScrollBar;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
 use crate::tui::widgets::tui_overlay::anchor::Anchor;

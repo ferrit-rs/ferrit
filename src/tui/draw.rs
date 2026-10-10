@@ -16,7 +16,7 @@ use crate::tui::components::diff::views::{DiffView, PopupView};
 use crate::tui::components::help::HelpView;
 use crate::tui::components::help::draw_help;
 use crate::tui::components::keybar::KeybarHit;
-use crate::tui::components::keybar::draw_keybar;
+use crate::tui::components::keybar::view::draw_keybar;
 use crate::tui::components::menu::draw_menu;
 use crate::tui::components::panes::draw::draw_left_column;
 use crate::tui::components::panes::nav::Pane;

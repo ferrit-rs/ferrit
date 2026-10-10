@@ -23,7 +23,7 @@ use crate::tui::components::diff::views::{
     CommandLogView, CommitPopupView, DiffView, MenuView, PopupView,
 };
 use crate::tui::components::help::HelpState;
-use crate::tui::components::keybar::{HelpLine, help_lines};
+use crate::tui::components::keybar::help::{HelpLine, help_lines};
 use crate::tui::components::panes::nav::{Nav, Pane};
 use crate::tui::components::panes::rows::PaneRows;
 use crate::tui::components::popups::{Modal, Popup, PopupKind};

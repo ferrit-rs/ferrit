@@ -3,7 +3,7 @@
 use crate::tui::App;
 use crate::tui::components::dashboard::Sheet;
 use crate::tui::components::diff::right_pane::Mode;
-use crate::tui::components::keybar::filter_help_lines;
+use crate::tui::components::keybar::help::filter_help_lines;
 use crate::tui::components::panes::nav::{PANES, Pane};
 use crate::tui::components::popups::Popup;
 use crate::tui::components::{files, menu, popups, remote as askpass, welcome};

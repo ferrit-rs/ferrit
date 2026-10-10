@@ -1,7 +1,7 @@
 //! The welcome screen for a folder without a repository.
 
 use crate::theme::palette::Palette;
-use crate::tui::components::keybar::draw_keybar;
+use crate::tui::components::keybar::view::draw_keybar;
 use crate::tui::components::popups::{ConfirmAction, ConfirmPrompt};
 use crate::tui::draw::TAGLINE_PROMISE;
 use crate::tui::draw::TAGLINE_WHAT;

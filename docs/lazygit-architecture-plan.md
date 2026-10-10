@@ -216,6 +216,7 @@ src/
     │   ├── settings/               sheet orchestration, theme editor and row projection
     │   ├── create_remote/           state/form/input and popup projection/rendering
     │   ├── commit_editor/           commit flow, draft/input state and popup rendering
+    │   ├── keybar/                  bar layout, generated help lines and screen rendering
     │   ├── panes/                 generic pane orchestration
     │   ├── diff/                  diff feature
     │   ├── dashboard/             dashboard feature

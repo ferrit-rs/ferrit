@@ -41,6 +41,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Keymap actions, binding parsing, contexts and defaults now have explicit modules; resolved action mutation lives under `tui/controllers/actions.rs` instead of the input router.
 - Create-remote state/form input and popup projection/rendering now live in explicit `tui/components/create_remote/{mod,view}.rs` boundaries.
 - Commit-editor flow/draft input and popup rendering now live in explicit `tui/components/commit_editor/{mod,view}.rs` boundaries.
+- Keybar layout, generated help lines and screen rendering now live in explicit `tui/components/keybar/{mod,help,view}.rs` boundaries.
 
 ## [0.10.0] - 2026-10-06
 
