@@ -4,7 +4,7 @@ use crate::tui::components::keybar::{Bar, keybar_layout};
 use crate::tui::components::panes::nav::Pane;
 use crate::tui::draw::{FullScreen, Landed, RenderState};
 use crate::tui::scene::Scene;
-use crate::tui::widgets::chrome::KeyBar;
+use crate::tui::widgets::chrome::bar::KeyBar;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 

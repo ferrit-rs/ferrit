@@ -229,6 +229,7 @@ src/
     ├── scene.rs, view.rs          read-only view context
     ├── row_lines/                 render projections
     ├── widgets/                   reusable widgets
+    │   └── chrome/                bar, dialog, drawer, lists, panel, pointer, separator, text
     ├── runtime.rs                 event loop
     └── terminal.rs                terminal lifecycle
 ```

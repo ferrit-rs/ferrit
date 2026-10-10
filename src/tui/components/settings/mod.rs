@@ -10,9 +10,9 @@ use crate::tui::draw::RenderedDiff;
 use crate::tui::draw::{Landed, RenderState};
 use crate::tui::event::Event;
 use crate::tui::scene::Scene;
-use crate::tui::widgets::chrome::Drawer;
-use crate::tui::widgets::chrome::ScrollBar;
-use crate::tui::widgets::chrome::Separator;
+use crate::tui::widgets::chrome::drawer::Drawer;
+use crate::tui::widgets::chrome::lists::ScrollBar;
+use crate::tui::widgets::chrome::separator::Separator;
 use ratatui::Frame;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,

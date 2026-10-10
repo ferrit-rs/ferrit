@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
-use crate::tui::widgets::chrome::MousePointer;
+use crate::tui::widgets::chrome::pointer::MousePointer;
 use ratatui::crossterm::event::KeyEvent;
 
 use crate::git;

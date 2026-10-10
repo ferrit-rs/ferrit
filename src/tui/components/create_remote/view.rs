@@ -3,9 +3,9 @@
 use crate::git::host::Visibility;
 use crate::theme::palette::Palette;
 use crate::tui::components::create_remote::{Field, Step};
-use crate::tui::widgets::chrome::Dialog;
-use crate::tui::widgets::chrome::KeyBar;
-use crate::tui::widgets::chrome::Panel;
+use crate::tui::widgets::chrome::bar::KeyBar;
+use crate::tui::widgets::chrome::dialog::Dialog;
+use crate::tui::widgets::chrome::panel::Panel;
 use crate::tui::widgets::text_input::TextInput;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};

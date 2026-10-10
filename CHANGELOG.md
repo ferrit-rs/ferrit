@@ -42,6 +42,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Create-remote state/form input and popup projection/rendering now live in explicit `tui/components/create_remote/{mod,view}.rs` boundaries.
 - Commit-editor flow/draft input and popup rendering now live in explicit `tui/components/commit_editor/{mod,view}.rs` boundaries.
 - Keybar layout, generated help lines and screen rendering now live in explicit `tui/components/keybar/{mod,help,view}.rs` boundaries.
+- Shared terminal chrome now has explicit widget modules for bars, dialogs, drawers, lists, panels, pointer state, separators and text truncation.
 
 ## [0.10.0] - 2026-10-06
 

@@ -3,7 +3,7 @@
 use crate::theme::palette::Palette;
 use crate::tui::components::keybar::help::HelpLine;
 use crate::tui::components::keybar::help::filter_help_lines;
-use crate::tui::widgets::chrome::ScrollBar;
+use crate::tui::widgets::chrome::lists::ScrollBar;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
 use crate::tui::widgets::tui_overlay::anchor::Anchor;
 use crate::tui::widgets::tui_overlay::backdrop::Backdrop;

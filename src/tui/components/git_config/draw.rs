@@ -3,9 +3,9 @@
 use crate::git::config::{Scope, WriteScope, display_value};
 use crate::theme::palette::Palette;
 use crate::tui::components::git_config::screen::ConfigRow;
-use crate::tui::widgets::chrome::Panel;
-use crate::tui::widgets::chrome::ScrollBar;
-use crate::tui::widgets::chrome::cut_end;
+use crate::tui::widgets::chrome::lists::ScrollBar;
+use crate::tui::widgets::chrome::panel::Panel;
+use crate::tui::widgets::chrome::text::cut_end;
 use ratatui::Frame;
 use ratatui::layout::{Margin, Rect};
 use ratatui::style::{Modifier, Style};

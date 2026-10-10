@@ -12,7 +12,7 @@ use crate::tui::components::remote as askpass;
 use crate::tui::components::{commit_editor, create_remote};
 use crate::tui::components::{commits, files};
 use crate::tui::event::{Env, Event};
-use crate::tui::widgets::chrome::Dialog;
+use crate::tui::widgets::chrome::dialog::Dialog;
 use crate::tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
