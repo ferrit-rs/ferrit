@@ -3,7 +3,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-use crate::theme::color_picker::{PaletteDirection, rgb};
+use crate::widgets::color_picker::{PaletteDirection, rgb};
 
 const SPECTRUM_COLUMNS: usize = 12;
 const SPECTRUM_ROWS: usize = 5;
@@ -179,7 +179,7 @@ fn brightness(color: Color) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::theme::color_picker::color_picker_spectrum::channel;
+    use crate::widgets::color_picker::color_picker_spectrum::channel;
 
     #[test]
     fn channel_rounds_half_up_across_the_byte_range() {

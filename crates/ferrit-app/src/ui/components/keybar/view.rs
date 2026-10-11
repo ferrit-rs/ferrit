@@ -4,9 +4,9 @@ use crate::ui::components::keybar::{Bar, keybar_layout};
 use crate::ui::components::panes::nav::Pane;
 use crate::ui::draw::{FullScreen, Landed, RenderState};
 use crate::ui::scene::Scene;
-use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ratatui::Frame;
 use ratatui::layout::Rect;
+use termui::widgets::key_bar::KeyBar;
 
 /// Draw the bottom key-hint bar for the current screen and focus.
 pub(crate) fn draw_keybar(
@@ -47,10 +47,10 @@ pub(crate) fn draw_keybar(
         Bar::Default
     };
     if let Some(message) = app.confirm_message() {
-        KeyBar::confirm(message, &palette).render(frame, area);
+        KeyBar::confirm(message, palette.warn, palette.key).render(frame, area);
         return;
     }
     let layout = keybar_layout(&app.prefs.keymap, bar, usize::from(area.width));
-    KeyBar::hints(&layout.text, &palette).render(frame, area);
+    KeyBar::hints(&layout.text, palette.idle, palette.key).render(frame, area);
     landed.keybar = Some((area, layout.hits));
 }

@@ -92,13 +92,13 @@ fn the_git_domain_does_not_know_the_app() {
 
 /// A domain is a flat list of files named after what they do, with a folder only
 /// for a feature that has several files: nothing deeper than two folders under
-/// `src/<domain>/`, except the widgets of `ferrit-tui/widgets`.
+/// `src/<domain>/`, except reusable widgets under `termui/widgets`.
 #[test]
 fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
     let roots = [
         package_src("ferrit-app"),
         package_src("ferrit-git"),
-        package_src("ferrit-tui"),
+        package_src("termui"),
     ];
     let too_deep: Vec<String> = roots
         .into_iter()
@@ -115,7 +115,6 @@ fn the_tree_is_at_most_two_folders_deep_under_a_domain() {
         })
         .map(|(package, root, path)| (package, path.strip_prefix(root).unwrap().to_path_buf()))
         .filter(|(_, path)| path.components().count() > 4)
-        .filter(|(package, path)| !(package.ends_with("ferrit-tui") && path.starts_with("widgets")))
         .map(|(package, path)| format!("{package}/{}", path.display()))
         .collect();
     assert!(too_deep.is_empty(), "too deep: {too_deep:?}");
@@ -148,7 +147,7 @@ fn no_component_writes_an_impl_app() {
     let root = package_src("ferrit-app").join("ui");
     let offenders: Vec<String> = rust_files(&root.join("components"))
         .into_iter()
-        .chain(rust_files(&package_src("ferrit-tui").join("widgets")))
+        .chain(rust_files(&package_src("termui").join("widgets")))
         .filter(|path| {
             fs::read_to_string(path)
                 .unwrap()
@@ -170,7 +169,7 @@ fn only_the_draw_entry_points_name_app_among_the_drawing_code() {
     let root = package_src("ferrit-app").join("ui");
     let offenders: Vec<String> = rust_files(&root.join("components"))
         .into_iter()
-        .chain(rust_files(&package_src("ferrit-tui").join("widgets")))
+        .chain(rust_files(&package_src("termui").join("widgets")))
         .chain(rust_files(&root.join("row_lines")))
         .filter(|path| {
             fs::read_to_string(path).unwrap().lines().any(|line| {

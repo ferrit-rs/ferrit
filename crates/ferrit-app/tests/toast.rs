@@ -16,11 +16,11 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use ferrit_app::ui::App;
+use ferrit_app::ui::components::toast::Toast;
 use ferrit_app::ui::draw as ui;
 use ferrit_app::ui::error::AppError;
 use ferrit_app::ui::events::AppEvent;
 use ferrit_domain::remote::RemoteOp;
-use ferrit_tui::widgets::toast::Toast;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

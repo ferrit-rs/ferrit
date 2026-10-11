@@ -27,8 +27,8 @@ presentation have separate package ownership:
   state, its keys and how it is drawn, so a feature is in one place.
 - `ferrit-theme/` owns palettes, schemes and persisted theme values. It knows no
   config file, `App`, or Git adapter.
-- `ferrit-tui/` owns reusable widgets, terminal chrome, overlays and interactive
-  color controls. It knows no `App` or Git adapter.
+- `termui/` owns reusable Ratatui widgets, terminal chrome, overlays and
+  interactive color controls. It knows no `App` or Git adapter.
 - `ferrit-config/` owns `config.toml` parsing, validation, section persistence and paths.
 
 Rules that hold today, and that the tests and lints keep:
@@ -38,7 +38,7 @@ Rules that hold today, and that the tests and lints keep:
   model types. `tests/layering.rs` checks it on the
   sources, along with `ui/` reaching the adapter only through the injected repository
   factory, and `git` never reaching into `app`.
-- `ferrit-tui/` is the reusable terminal toolkit. It knows nothing about `App`; its
+- `termui/` is the reusable terminal toolkit. It knows nothing about `App`; its
   widgets and controls know nothing of Git or theme persistence.
 - `ui/` reaches git through `GitPort` and `GitRepositoryFactory` (`ferrit-domain::port`).
   The concrete `RepoFactory` is injected by the binary; tests can use `FakeGit`
@@ -112,8 +112,7 @@ capability modules, `ferrit-git/src/repo/` adapter modules, and
 | `crates/ferrit-app/src/ui/` | `App`, input, controllers, feature components, projections and workers |
 | `crates/ferrit-config/src/` | `config.toml` model, validation, persistence and SSH config parsing |
 | `crates/ferrit-theme/src/` | palette, terminal scheme and persisted theme config |
-| `crates/ferrit-tui/src/theme/` | interactive colour picker controls |
-| `crates/ferrit-tui/src/widgets/` | reusable terminal widgets, chrome and overlays |
+| `crates/termui/src/widgets/` | reusable terminal widgets, chrome, overlays and colour controls |
 | `crates/ferrit-git/src/` | concrete adapters: `repo`, askpass and feature-gated `FakeGit` |
 | `crates/ferrit-domain/src/` | Git models, ports, command log, credential rules, errors, parsers, plans, stats and hosting/config rules; no concrete adapter |
 | `crates/ferrit-app/src/replay/` | the scripted test harness (see ADR 2) |

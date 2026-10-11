@@ -3,8 +3,8 @@
 use ferrit_theme::theme_config::{
     RGB_CHANNEL_COUNT, RGB_GREEN_CHANNEL, RGB_RED_CHANNEL, ThemeConfig, ThemeMode,
 };
-use ferrit_tui::theme::color_picker::{self, ColorPickerDisplay, PaletteDirection, rgb};
 use ratatui::style::Color;
+use termui::widgets::color_picker::{self, ColorPickerDisplay, PaletteDirection, rgb};
 
 pub struct ThemeEditor {
     /// The theme as chosen: what the screen is painted with.

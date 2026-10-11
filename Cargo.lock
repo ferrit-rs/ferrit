@@ -891,7 +891,6 @@ dependencies = [
  "ferrit-domain",
  "ferrit-git",
  "ferrit-theme",
- "ferrit-tui",
  "git2",
  "image",
  "notify-debouncer-full",
@@ -941,15 +940,6 @@ dependencies = [
  "ratatui",
  "serde",
  "strum",
-]
-
-[[package]]
-name = "ferrit-tui"
-version = "0.10.0"
-dependencies = [
- "ferrit-theme",
- "ratatui",
- "termui",
 ]
 
 [[package]]

@@ -41,7 +41,8 @@ ports, command-log models and errors; `crates/ferrit-git/` owns `git2`, Git
 subprocesses and the concrete repository factory; `crates/ferrit-app/src/ui/`
 owns `App`, events, components and terminal lifecycle; `crates/ferrit-config/`
 owns settings and SSH config parsing; `crates/ferrit-theme/` owns theme data;
-`crates/ferrit-tui/` owns reusable widgets and interactive color controls.
+`crates/termui/` owns reusable Ratatui widgets and terminal controls; Ferrit-
+specific presentation stays under `crates/ferrit-app/src/ui/`.
 Avoid mixing those responsibilities in one file.
 
 

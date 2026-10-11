@@ -6,12 +6,12 @@ use crate::ui::scene::Scene;
 use crate::ui::{mock, row_lines};
 use ferrit_domain::command_log;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use termui::widgets::dialog_shell::Dialog;
 use termui::widgets::panel::Panel;
 use unicode_width::UnicodeWidthStr;
 

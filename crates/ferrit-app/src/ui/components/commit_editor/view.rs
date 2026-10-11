@@ -4,13 +4,13 @@ use crate::ui::components::commit_editor::{CommitDraft, CommitField};
 use crate::ui::components::diff::views::CommitPopupView;
 use crate::ui::row_lines;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::bar::KeyBar;
-use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph};
+use termui::widgets::dialog_shell::Dialog;
+use termui::widgets::key_bar::KeyBar;
 use termui::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState};
 use termui::widgets::panel::Panel;
 
@@ -126,7 +126,7 @@ pub(crate) fn draw_commit(
             description.render(frame, description_inner);
         }
 
-        let hints = KeyBar::hints(view.hints, palette).line();
+        let hints = KeyBar::hints(view.hints, palette.idle, palette.key).line();
         let footer = match view.toggles {
             Some((sign_off, no_verify)) => {
                 let on_off = |enabled: bool| if enabled { "on" } else { "off" };
@@ -161,7 +161,7 @@ pub(crate) fn draw_commit(
         .render(frame, area);
     view.input.render(frame, dialog.body);
 
-    let hints = KeyBar::hints(view.hints, palette).line();
+    let hints = KeyBar::hints(view.hints, palette.idle, palette.key).line();
     match view.toggles {
         Some((sign_off, no_verify)) => {
             let sign_off_span = if sign_off {
@@ -236,8 +236,10 @@ pub(crate) fn draw_commit_all_confirm(
         question,
     );
     frame.render_widget(
-        Paragraph::new(KeyBar::hints("Y: Yes, stage all | N / Esc: No", palette).line())
-            .alignment(Alignment::Center),
+        Paragraph::new(
+            KeyBar::hints("Y: Yes, stage all | N / Esc: No", palette.idle, palette.key).line(),
+        )
+        .alignment(Alignment::Center),
         footer,
     );
 }

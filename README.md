@@ -163,7 +163,7 @@ cargo run
 ## Architecture
 
 The workspace separates the thin `ferrit` binary from `ferrit-app`,
-`ferrit-config`, `ferrit-domain`, `ferrit-git`, `ferrit-theme`, and `ferrit-tui`.
+`ferrit-config`, `ferrit-domain`, `ferrit-git`, `ferrit-theme`, and `termui`.
 The app talks to git through `GitPort`, implemented by `ferrit-git` with `git2` for reads and
 the `git` subprocess for changes, so hooks and signing behave as in your shell.
 An in-memory fake supports app tests. Errors are typed all the way to the

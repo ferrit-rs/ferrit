@@ -14,7 +14,6 @@ use crate::ui::components::popups::Popup;
 use crate::ui::components::settings::Settings;
 use crate::ui::components::settings::state::SettingsRow;
 use ferrit_domain::commit::CommitKind;
-use ferrit_tui::widgets::toast::Toast;
 pub mod events;
 pub mod mock;
 
@@ -22,12 +21,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
-use ferrit_tui::widgets::chrome::pointer::MousePointer;
 use ratatui::crossterm::event::KeyEvent;
+use termui::pointer::MousePointer;
 
 mod authorship;
 
 use crate::ui::authorship::Authorship;
+use crate::ui::components::toast::Toast;
 use crate::ui::error::AppError;
 use crate::ui::events::AppEvent;
 use crate::ui::image::detect;

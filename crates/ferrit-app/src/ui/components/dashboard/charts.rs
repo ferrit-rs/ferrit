@@ -15,9 +15,9 @@ use crate::ui::components::dashboard::text::{axis_date, figure, figure_columns, 
 use crate::ui::components::dashboard::view::{Ctx, note};
 use ferrit_domain::stats::series::{Bucket, Granularity};
 use ferrit_domain::stats::share::{fold, shares};
-use ferrit_tui::widgets::donut::{self, Donut, Slice};
-use ferrit_tui::widgets::heatmap::{self, HeatMap};
-use ferrit_tui::widgets::share_bar::stacked_bar;
+use termui::widgets::donut::{self, Donut, Slice};
+use termui::widgets::heatmap::{self, HeatMap};
+use termui::widgets::share_bar::stacked_bar;
 
 const DAY: i64 = 86_400;
 /// Columns and rows the ring is drawn in: 32 x 32 dots, so it looks round.

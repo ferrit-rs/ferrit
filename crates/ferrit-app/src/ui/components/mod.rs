@@ -17,4 +17,5 @@ pub mod popups;
 pub mod remote;
 pub mod settings;
 pub mod stash;
+pub mod toast;
 pub mod welcome;

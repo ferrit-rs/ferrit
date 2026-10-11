@@ -14,7 +14,7 @@ use ratatui::crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
-use ferrit_tui::widgets::chrome::pointer::MousePointer;
+use termui::pointer::MousePointer;
 
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 

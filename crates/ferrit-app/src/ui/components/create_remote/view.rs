@@ -3,13 +3,13 @@
 use crate::ui::components::create_remote::{Field, Step};
 use ferrit_domain::host::Visibility;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::bar::KeyBar;
-use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use termui::widgets::dialog_shell::Dialog;
+use termui::widgets::key_bar::KeyBar;
 use termui::widgets::panel::Panel;
 use termui::widgets::text_input::TextInput;
 
@@ -114,7 +114,7 @@ pub(crate) fn draw_create_remote(
                 dialog.body,
             );
             frame.render_widget(
-                Paragraph::new(KeyBar::hints("Cancel: Esc", palette).line()),
+                Paragraph::new(KeyBar::hints("Cancel: Esc", palette.idle, palette.key).line()),
                 dialog.footer,
             );
         },
@@ -223,7 +223,14 @@ fn draw_create_form(
         );
     }
     frame.render_widget(
-        Paragraph::new(KeyBar::hints("Next: Tab   Continue: Enter   Cancel: Esc", palette).line()),
+        Paragraph::new(
+            KeyBar::hints(
+                "Next: Tab   Continue: Enter   Cancel: Esc",
+                palette.idle,
+                palette.key,
+            )
+            .line(),
+        ),
         dialog.footer,
     );
 }

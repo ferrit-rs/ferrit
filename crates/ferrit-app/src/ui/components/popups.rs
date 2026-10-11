@@ -12,7 +12,6 @@ use ferrit_domain::rebase::RebaseEdit;
 use ferrit_domain::rebase::Step;
 use ferrit_domain::remote::RemoteRequest;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
@@ -20,6 +19,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 use std::path::{Path, PathBuf};
+use termui::widgets::dialog_shell::Dialog;
 use termui::widgets::text_input::{TextInput, TextInputMode};
 
 /// `@`: open the command log viewer, scrolled to the newest entry.

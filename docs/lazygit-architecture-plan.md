@@ -196,7 +196,7 @@ crates/
 ├── ferrit-domain/                  Git models, ports, parsers, rules, command log and stats
 ├── ferrit-git/                     Repo adapter, subprocesses, askpass, FakeGit
 ├── ferrit-theme/                   palettes, schemes and persisted theme values
-└── ferrit-tui/                     color picker, widgets, chrome and overlays
+└── termui/                         color picker, widgets, chrome and overlays
 ```
 
 Dependency direction:
@@ -206,14 +206,14 @@ ferrit -> ferrit-app -> ferrit-domain
                     -> ferrit-config -> ferrit-theme
                     -> ferrit-git -> ferrit-domain
                     -> ferrit-theme
-                    -> ferrit-tui
+                    -> termui
 ```
 
 Runtime flow:
 
 ```text
 CLI -> App -> input/keymap -> controller/reducer -> GitPort -> ferrit-git
-                         \\-> projection -> ferrit-tui widgets -> terminal
+                         \\-> projection -> termui widgets -> terminal
 ```
 
 ## Plan to converge further
@@ -243,7 +243,7 @@ CLI -> App -> input/keymap -> controller/reducer -> GitPort -> ferrit-git
 4. Keep `input.rs` as router only. It may identify context and produce intent, but must not contain feature mutation logic.
 5. Keep `scene.rs` and `view.rs` read-only. Push formatting and row conversion into feature projections.
 6. Extract a `tui/modes/` namespace when diff, rebase or another workflow gets temporary state and exit rules. Do not create it before a real mode exists.
-7. Keep `ferrit-tui` terminal-generic. Feature-specific layout belongs under `ferrit-app` components.
+7. Keep `termui` terminal-generic. Feature-specific layout belongs under `ferrit-app` components.
 
 ### Phase 3: projection and refresh model
 

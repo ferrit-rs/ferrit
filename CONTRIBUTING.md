@@ -34,8 +34,8 @@ Source responsibilities are separated by crate:
 - `crates/ferrit-domain/`: Git ports, domain types, and domain errors.
 - `crates/ferrit-git/`: identities, `git2`, subprocess adapter, and concrete
   repository factory.
-- `crates/ferrit-tui/`: reusable widgets, terminal chrome, overlays, and color
-  picker controls.
+- `crates/termui/`: reusable Ratatui widgets, terminal chrome, overlays, and
+  color picker controls.
 
 `App` goes through `GitPort`; a test that only needs app logic can use `FakeGit`
 and `App::with_git` instead of building a repository.

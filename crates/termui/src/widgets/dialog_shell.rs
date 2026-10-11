@@ -1,11 +1,11 @@
-//! Centered dialog shell.
+//! Centered, content-region dialog shell.
 
+use crate::widgets::panel::Panel;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::Clear;
-use termui::widgets::panel::Panel;
 
 /// Rendered regions inside a dialog shell.
 #[derive(Debug, Clone, Copy)]

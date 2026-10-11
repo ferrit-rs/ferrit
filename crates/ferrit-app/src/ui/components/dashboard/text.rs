@@ -8,7 +8,7 @@ use unicode_width::UnicodeWidthStr;
 use ferrit_domain::stats::Window;
 use ferrit_domain::stats::series::{Granularity, civil_from_days};
 use ferrit_domain::stats::share::Share;
-use ferrit_tui::widgets::share_bar::{pad_label, percent_label};
+use termui::widgets::share_bar::{pad_label, percent_label};
 
 const DAY: i64 = 86_400;
 /// A share of fewer items than this misleads: the screen shows counts.

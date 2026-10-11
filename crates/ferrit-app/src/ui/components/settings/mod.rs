@@ -11,7 +11,6 @@ use ferrit_config::{Config, Section};
 use ferrit_theme::palette::Palette;
 use ferrit_theme::scheme::ColorDepth;
 use ferrit_theme::theme_config::{Preset, SchemeChoice, ThemeMode};
-use ferrit_tui::theme::color_picker::{ColorPicker, PaletteDirection, grid_metrics, rgb};
 use ratatui::Frame;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -22,6 +21,7 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use std::path::Path;
 use strum::IntoEnumIterator;
+use termui::widgets::color_picker::{ColorPicker, PaletteDirection, grid_metrics, rgb};
 use termui::widgets::drawer::Drawer;
 use termui::widgets::scrollbar::ScrollBar;
 use termui::widgets::separator::Separator;

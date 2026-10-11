@@ -3,6 +3,7 @@
 //! Components render themselves but do not own application actions. The
 //! parent app owns focus, events and domain state.
 
+pub mod pointer;
 pub mod state;
 pub mod text;
 pub mod widgets;

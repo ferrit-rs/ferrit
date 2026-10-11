@@ -12,13 +12,13 @@ use ferrit_domain::port::GitPort;
 use ferrit_domain::rebase::Step;
 use ferrit_domain::refs::MergeKind;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::dialog::Dialog;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use termui::widgets::dialog_shell::Dialog;
 use termui::widgets::select_list::SelectList;
 use termui::widgets::text_input::TextInput;
 

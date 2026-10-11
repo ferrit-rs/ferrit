@@ -155,7 +155,7 @@ cargo check --locked -p ferrit --all-targets
 # execute path publishes in dependency order, so each cargo publish can resolve
 # the package immediately before it.
 if [ "$execute" -eq 0 ]; then
-    printf '%s\n' 'note: package validation passed; publish order is domain, theme, termui, tui, config, git, app, binary'
+    printf '%s\n' 'note: package validation passed; publish order is domain, theme, termui, config, git, app, binary'
 fi
 
 # --- the release ---------------------------------------------------------
@@ -170,7 +170,7 @@ fi
 step "push $BRANCH to $REMOTE"
 act git push "$REMOTE" "$BRANCH"
 
-for package in ferrit-domain ferrit-theme termui ferrit-tui ferrit-config ferrit-git ferrit-app ferrit; do
+for package in ferrit-domain ferrit-theme termui ferrit-config ferrit-git ferrit-app ferrit; do
     step "publish $package $version to crates.io"
     act cargo publish -p "$package"
 done

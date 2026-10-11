@@ -26,7 +26,7 @@ impl MousePointer {
         Ok(())
     }
 
-    /// Reset OSC 22 state when Ferrit starts or restores the terminal.
+    /// Reset OSC 22 state when an app starts or restores the terminal.
     pub fn reset_terminal() -> io::Result<()> {
         Self::write_shape(false)
     }

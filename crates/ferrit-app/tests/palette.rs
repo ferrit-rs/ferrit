@@ -17,8 +17,8 @@ use ferrit_app::ui::row_lines;
 use ferrit_config::Config;
 use ferrit_domain::diff::parse_diff;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ratatui::style::Color;
+use termui::widgets::key_bar::KeyBar;
 
 /// A palette where every colour is different from `Palette::DARK`'s and from
 /// the others, so a builder that reads the wrong field shows up.
@@ -88,7 +88,7 @@ fn the_selection_bar_and_the_counter_use_the_palette() {
 #[test]
 fn the_keybar_takes_its_key_colour_from_the_palette() {
     let p = loud();
-    let line = KeyBar::hints("Stage: <space>", &p).line();
+    let line = KeyBar::hints("Stage: <space>", p.idle, p.key).line();
     assert_eq!(line.spans[0].style.fg, Some(p.idle));
     assert_eq!(line.spans[1].style.fg, Some(p.key));
 }
