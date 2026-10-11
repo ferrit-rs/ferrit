@@ -1,14 +1,14 @@
-//! Selectable and scrollable list widgets.
-
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListState};
-use termui::widgets::scrollbar::ScrollBar;
 
+use crate::widgets::scrollbar::ScrollBar;
+
+/// Stateful list with optional detached scrolling and a vertical scrollbar.
 #[must_use]
-pub struct PaneList<'a> {
+pub struct ScrollableList<'a> {
     items: Vec<Line<'static>>,
     block: ratatui::widgets::Block<'a>,
     selected: Option<usize>,
@@ -18,7 +18,7 @@ pub struct PaneList<'a> {
     scrollbar_style: Style,
 }
 
-impl<'a> PaneList<'a> {
+impl<'a> ScrollableList<'a> {
     pub fn new(items: Vec<Line<'static>>, block: ratatui::widgets::Block<'a>) -> Self {
         Self {
             items,
@@ -41,8 +41,7 @@ impl<'a> PaneList<'a> {
         self
     }
 
-    /// The view was scrolled on its own: keep `offset` even when selected is
-    /// off screen, and draw no highlight then.
+    /// Keep the supplied offset when selection is outside the viewport.
     pub fn detached(mut self, detached: bool) -> Self {
         self.detached = detached;
         self
@@ -58,6 +57,7 @@ impl<'a> PaneList<'a> {
         self
     }
 
+    /// Render list and return final viewport offset after selection adjustment.
     pub fn render(self, frame: &mut Frame<'_>, area: Rect) -> usize {
         let viewport_height = self.block.inner(area).height as usize;
         let row_count = self.items.len();

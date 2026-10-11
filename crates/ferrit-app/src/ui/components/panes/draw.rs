@@ -5,12 +5,12 @@ use crate::ui::components::panes::nav::Pane;
 use crate::ui::draw::Landed;
 use crate::ui::row_lines;
 use crate::ui::scene::Scene;
-use ferrit_tui::widgets::chrome::lists::PaneList;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use termui::widgets::panel::Panel;
+use termui::widgets::scrollable_list::ScrollableList;
 
 /// Colour each pane's rows by what they mean. Status and Files come from the
 /// live snapshot on `App`; the rest are still mock.
@@ -152,7 +152,7 @@ pub(crate) fn draw_left_column(
             }
         }
         let detached = app.view_detached(pane);
-        let offset = PaneList::new(lines, block)
+        let offset = ScrollableList::new(lines, block)
             .detached(detached)
             .selected((row_ct > 0).then(|| app.selected(pane).min(row_ct - 1)))
             .offset(app.list_offset(pane))

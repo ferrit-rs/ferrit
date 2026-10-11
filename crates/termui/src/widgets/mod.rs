@@ -15,6 +15,7 @@ pub mod overlay;
 pub mod panel;
 pub mod progress;
 pub mod radio;
+pub mod scrollable_list;
 pub mod scrollbar;
 pub mod select_list;
 pub mod separator;
