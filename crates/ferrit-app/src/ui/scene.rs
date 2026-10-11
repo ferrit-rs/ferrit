@@ -35,7 +35,7 @@ use ferrit_domain::Snapshot;
 use ferrit_domain::diff::DiffSide;
 use ferrit_domain::port::GitPort;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::tui_overlay::state::OverlayState;
+use termui::widgets::overlay::OverlayState;
 
 /// A read-only view of the app for one frame, or one question.
 #[derive(Clone, Copy)]

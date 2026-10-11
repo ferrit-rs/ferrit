@@ -10,6 +10,7 @@ pub mod empty_state;
 pub mod kbd;
 pub mod menu;
 pub mod multi_select;
+pub mod overlay;
 pub mod panel;
 pub mod progress;
 pub mod radio;

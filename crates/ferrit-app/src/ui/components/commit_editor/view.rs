@@ -6,15 +6,12 @@ use crate::ui::row_lines;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::tui_overlay::anchor::Anchor;
-use ferrit_tui::widgets::tui_overlay::backdrop::Backdrop;
-use ferrit_tui::widgets::tui_overlay::overlay::Overlay;
-use ferrit_tui::widgets::tui_overlay::state::OverlayState;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph};
+use termui::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState};
 use termui::widgets::panel::Panel;
 
 impl CommitDraft {

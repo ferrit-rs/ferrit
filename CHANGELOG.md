@@ -13,6 +13,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Added reusable `termui` `Badge`, `Checkbox`, `ProgressBar`, `Separator` and `Tabs` components; ferrit settings now use the generic separator.
 - Added reusable `termui` `Alert`, `EmptyState`, `Kbd`, `Radio`, `Spinner` and `Toggle` components.
 - Added reusable `termui` `Breadcrumbs`, `Dialog`, `Menu`, `MultiSelect` and `Tooltip` components, plus generic `ScrollState`.
+- Added generic animated `Overlay` state and backdrop primitives; `Dialog` now supports centered modals and side sheets.
 - Fast-forwarding a non-checked-out branch now updates the local ref without deleting it first.
 - The repository is now a virtual Cargo workspace: `crates/ferrit` owns the app, TUI and concrete Git adapters, while `crates/ferrit-domain` owns Git models, ports and backend rules without terminal or `git2` dependencies.
 - The workspace now follows the Zed-style package pattern: `ferrit` is the default member for fast local commands, shared package metadata lives at the workspace root, and releases publish `ferrit-domain` before its `ferrit` consumer.

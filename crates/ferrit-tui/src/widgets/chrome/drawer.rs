@@ -1,15 +1,11 @@
 //! Right-side drawer shell.
 
-use crate::widgets::tui_overlay::anchor::Anchor;
-use crate::widgets::tui_overlay::backdrop::Backdrop;
-use crate::widgets::tui_overlay::overlay::Overlay;
-use crate::widgets::tui_overlay::slide::Slide;
-use crate::widgets::tui_overlay::state::OverlayState;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType};
+use termui::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState, Slide};
 
 /// Right-side drawer shell. Returns its inner area for caller-owned content.
 #[must_use]

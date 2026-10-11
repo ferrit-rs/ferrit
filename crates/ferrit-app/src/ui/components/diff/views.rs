@@ -1,8 +1,8 @@
 //! The right column: `views`.
 
 use crate::ui::components::create_remote::view::CreateRemoteView;
-use ferrit_tui::widgets::tui_overlay::state::OverlayState;
 use std::path::PathBuf;
+use termui::widgets::overlay::OverlayState;
 use termui::widgets::text_input::TextInput;
 
 /// What the right pane shows behind the image preview. A second cached,

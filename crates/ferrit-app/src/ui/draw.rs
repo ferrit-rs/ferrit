@@ -27,7 +27,6 @@ use crate::ui::components::{dashboard, git_config, settings};
 use crate::ui::image::preview::Preview;
 use crate::ui::scene::Scene;
 use ferrit_tui::widgets::toast::Toast;
-use ferrit_tui::widgets::tui_overlay::state::OverlayState;
 use ratatui::Frame;
 use ratatui::crossterm::event::MouseEvent;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -35,6 +34,7 @@ use ratatui::text::Text;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::time::Duration;
+use termui::widgets::overlay::OverlayState;
 
 /// What the terminal gets: the screen, then the theme's paint pass over it, which
 /// turns the unset and the ANSI colours of the frame into the theme's own
