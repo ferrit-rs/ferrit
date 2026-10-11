@@ -5,4 +5,3 @@ pub mod dialog;
 pub mod drawer;
 pub mod lists;
 pub mod pointer;
-pub mod text;

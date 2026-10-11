@@ -18,3 +18,4 @@ workspace = true
 [dependencies]
 ratatui.workspace = true
 unicode-segmentation.workspace = true
+unicode-width.workspace = true

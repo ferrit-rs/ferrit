@@ -16,8 +16,8 @@ use crate::ui::components::dashboard::view::{Ctx, note};
 use ferrit_domain::stats::HotFiles;
 use ferrit_domain::stats::branch_health::BranchHealth;
 use ferrit_domain::stats::share::{Share, fold, shares};
-use ferrit_tui::widgets::chrome::text::{cut_end, cut_middle};
 use ferrit_tui::widgets::share_bar::{percent_label, single_bar, stacked_bar};
+use termui::text::{cut_end, cut_middle};
 
 /// Branch rows drawn before "+N more".
 pub(crate) const BRANCH_ROWS: usize = 8;

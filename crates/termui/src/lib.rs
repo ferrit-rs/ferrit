@@ -4,4 +4,5 @@
 //! parent app owns focus, events and domain state.
 
 pub mod state;
+pub mod text;
 pub mod widgets;

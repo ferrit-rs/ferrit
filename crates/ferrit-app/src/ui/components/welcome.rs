@@ -9,7 +9,6 @@ use crate::ui::event::Event;
 use crate::ui::scene::Scene;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::chrome::text::cut_middle;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -17,6 +16,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use std::path::Path;
+use termui::text::cut_middle;
 use unicode_width::UnicodeWidthStr;
 
 const WELCOME_ROWS: usize = 2;
