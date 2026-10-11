@@ -19,5 +19,6 @@ pub mod separator;
 pub mod spinner;
 pub mod tabs;
 pub mod text_input;
+pub mod toast;
 pub mod toggle;
 pub mod tooltip;
