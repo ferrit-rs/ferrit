@@ -3,7 +3,6 @@
 use crate::ui::components::keybar::help::HelpLine;
 use crate::ui::components::keybar::help::filter_help_lines;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -11,6 +10,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph};
 use termui::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState, Slide};
+use termui::widgets::scrollbar::ScrollBar;
 use termui::widgets::text_input::{TextInput, TextInputMode};
 
 /// Whether keys move through the help or type into its search box.

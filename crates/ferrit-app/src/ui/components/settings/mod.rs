@@ -13,7 +13,6 @@ use ferrit_theme::scheme::ColorDepth;
 use ferrit_theme::theme_config::{Preset, SchemeChoice, ThemeMode};
 use ferrit_tui::theme::color_picker::{ColorPicker, PaletteDirection, grid_metrics, rgb};
 use ferrit_tui::widgets::chrome::drawer::Drawer;
-use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ratatui::Frame;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -24,6 +23,7 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use std::path::Path;
 use strum::IntoEnumIterator;
+use termui::widgets::scrollbar::ScrollBar;
 use termui::widgets::separator::Separator;
 
 mod rows;

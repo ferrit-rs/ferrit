@@ -9,7 +9,6 @@ use crate::ui::scene::Scene;
 use crate::ui::{mock, row_lines};
 use ferrit_domain::diff::DiffSide;
 use ferrit_theme::palette::Palette;
-use ferrit_tui::widgets::chrome::lists::ScrollBar;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -18,6 +17,7 @@ use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 use std::ops::Range;
 use termui::widgets::panel::Panel;
+use termui::widgets::scrollbar::ScrollBar;
 
 pub(crate) fn draw_files_columns(
     frame: &mut Frame<'_>,
