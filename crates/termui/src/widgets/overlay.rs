@@ -185,7 +185,8 @@ impl OverlayState {
         self.inner_area
     }
 
-    fn visibility(&self) -> f32 {
+    /// Eased visibility fraction, from fully hidden to fully revealed.
+    pub fn visibility(&self) -> f32 {
         match self.phase {
             Phase::Closed => 0.0,
             Phase::Open => 1.0,

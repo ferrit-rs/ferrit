@@ -4,6 +4,8 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+use crate::state::list::ListState;
+
 /// Selectable rows with a full-width highlight on the active row.
 ///
 /// Selection movement stays owned by the parent app.
@@ -29,13 +31,28 @@ impl<'a> SelectList<'a> {
     }
 
     pub fn render(self, frame: &mut Frame<'_>, area: Rect) {
-        let lines = self
-            .items
+        let lines = self.lines(area, 0, self.selected);
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+
+    /// Render a viewport-aware list and keep selection state synchronized.
+    pub fn render_stateful(self, frame: &mut Frame<'_>, area: Rect, state: &mut ListState) {
+        state.set_len(self.items.len());
+        state.set_viewport_len(usize::from(area.height));
+        let selected = state.selected().unwrap_or(self.selected);
+        let lines = self.lines(area, state.offset(), selected);
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+
+    fn lines(&self, area: Rect, offset: usize, selected: usize) -> Vec<Line<'static>> {
+        self.items
             .iter()
             .cloned()
             .enumerate()
+            .skip(offset)
+            .take(usize::from(area.height))
             .map(|(index, mut line)| {
-                if index == self.selected {
+                if index == selected {
                     let padding = (area.width as usize).saturating_sub(line.width());
                     if padding > 0 {
                         line.spans.push(Span::raw(" ".repeat(padding)));
@@ -46,7 +63,6 @@ impl<'a> SelectList<'a> {
                 }
                 line
             })
-            .collect::<Vec<_>>();
-        frame.render_widget(Paragraph::new(lines), area);
+            .collect()
     }
 }

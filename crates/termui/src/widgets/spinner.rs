@@ -11,7 +11,7 @@ const DEFAULT_FRAMES: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦
 pub struct Spinner<'a> {
     label: &'a str,
     frame: usize,
-    frames: &'static [char],
+    frames: &'a [char],
     style: Style,
 }
 
@@ -30,7 +30,7 @@ impl<'a> Spinner<'a> {
         self
     }
 
-    pub fn frames(mut self, frames: &'static [char]) -> Self {
+    pub fn frames(mut self, frames: &'a [char]) -> Self {
         self.frames = frames;
         self
     }
