@@ -18,7 +18,5 @@ workspace = true
 [dependencies]
 ferrit-theme.workspace = true
 ratatui.workspace = true
-ratatui-core.workspace = true
-ratatui-widgets.workspace = true
 termui.workspace = true
 unicode-width.workspace = true
