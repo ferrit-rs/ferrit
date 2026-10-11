@@ -1,7 +1,8 @@
-//! Horizontal labeled divider.
-
+use ratatui::Frame;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
+use ratatui::widgets::Paragraph;
 
 const LABEL_PADDING_CELLS: usize = 2;
 const CENTER_SPLIT_DIVISOR: usize = 2;
@@ -9,6 +10,7 @@ const HORIZONTAL_MARGIN_MULTIPLIER: usize = 2;
 
 /// Horizontal divider, optionally labeled.
 #[derive(Debug, Clone)]
+#[must_use]
 pub struct Separator {
     label: String,
     style: Style,
@@ -26,13 +28,16 @@ impl Separator {
         }
     }
 
-    #[must_use]
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
-    #[must_use]
+    pub fn glyph(mut self, glyph: char) -> Self {
+        self.glyph = glyph;
+        self
+    }
+
     pub fn margin_x(mut self, cells: u16) -> Self {
         self.margin_x = cells;
         self
@@ -47,6 +52,10 @@ impl Separator {
             line.spans.insert(0, Span::raw(" ".repeat(margin)));
         }
         line
+    }
+
+    pub fn render(self, frame: &mut Frame<'_>, area: Rect) {
+        frame.render_widget(Paragraph::new(self.line(area.width)), area);
     }
 
     fn content_line(&self, width: usize) -> Line<'static> {
@@ -70,5 +79,23 @@ impl Separator {
             Span::styled(format!(" {label} "), self.style),
             Span::styled(self.glyph.to_string().repeat(right), self.style),
         ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::widgets::separator::Separator;
+
+    #[test]
+    fn labeled_separator_centers_label() {
+        assert_eq!(
+            Separator::new("Logs").line(14).to_string(),
+            "──── Logs ────"
+        );
+    }
+
+    #[test]
+    fn empty_separator_fills_width() {
+        assert_eq!(Separator::new("").line(4).to_string(), "────");
     }
 }
