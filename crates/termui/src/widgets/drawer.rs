@@ -5,9 +5,10 @@ use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType};
-use termui::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState, Slide};
 
-/// Right-side drawer shell. Returns its inner area for caller-owned content.
+use crate::widgets::overlay::{Anchor, Backdrop, Overlay, OverlayState, Slide};
+
+/// Right-side drawer shell. Returns inner area for caller-owned content.
 #[must_use]
 pub struct Drawer<'state, 'title> {
     state: &'state mut OverlayState,
@@ -36,7 +37,7 @@ impl<'state, 'title> Drawer<'state, 'title> {
         self
     }
 
-    /// Draw backdrop and frame, then return the area for drawer body widgets.
+    /// Draw backdrop and frame, then return area for drawer body widgets.
     pub fn render(self, frame: &mut Frame<'_>, area: Rect) -> Option<Rect> {
         let block = Block::bordered()
             .border_type(BorderType::Rounded)

@@ -20,6 +20,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 - Moved generic `ScrollBar` into `termui`; ferrit list, diff, help, settings and dashboard views now use it directly.
 - Moved Unicode-aware terminal text cutting helpers into `termui::text`; app views now use the generic namespace directly.
 - Moved generic stateful `ScrollableList` into `termui`; ferrit panes now use the reusable list with detached scrolling and scrollbar support.
+- Moved generic right-side `Drawer` shell into `termui`; settings and dashboard sheets now use it directly.
 - Fast-forwarding a non-checked-out branch now updates the local ref without deleting it first.
 - The repository is now a virtual Cargo workspace: `crates/ferrit` owns the app, TUI and concrete Git adapters, while `crates/ferrit-domain` owns Git models, ports and backend rules without terminal or `git2` dependencies.
 - The workspace now follows the Zed-style package pattern: `ferrit` is the default member for fast local commands, shared package metadata lives at the workspace root, and releases publish `ferrit-domain` before its `ferrit` consumer.

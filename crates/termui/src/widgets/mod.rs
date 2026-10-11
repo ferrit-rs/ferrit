@@ -6,6 +6,7 @@ pub mod breadcrumbs;
 pub mod button;
 pub mod checkbox;
 pub mod dialog;
+pub mod drawer;
 pub mod empty_state;
 pub mod form_field;
 pub mod kbd;

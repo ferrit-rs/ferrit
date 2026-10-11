@@ -9,13 +9,13 @@ use crate::ui::components::dashboard::text::{date, thousands, window_label};
 use crate::ui::draw::{Landed, RenderState, unix_now};
 use crate::ui::scene::Scene;
 use ferrit_domain::stats::{NUMSTAT_CAP, RepoStats, WALK_CAP};
-use ferrit_tui::widgets::chrome::drawer::Drawer;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
+use termui::widgets::drawer::Drawer;
 use termui::widgets::panel::Panel;
 use termui::widgets::scrollbar::ScrollBar;
 
