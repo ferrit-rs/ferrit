@@ -7,6 +7,7 @@ pub mod button;
 pub mod checkbox;
 pub mod dialog;
 pub mod empty_state;
+pub mod form_field;
 pub mod kbd;
 pub mod menu;
 pub mod multi_select;

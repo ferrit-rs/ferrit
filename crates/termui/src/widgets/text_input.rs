@@ -1,7 +1,7 @@
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use unicode_segmentation::UnicodeSegmentation;
@@ -19,6 +19,8 @@ pub struct TextInput {
     lines: Vec<String>,
     row: usize,
     col: usize,
+    placeholder: Option<String>,
+    placeholder_style: Style,
 }
 
 impl Default for TextInput {
@@ -27,6 +29,8 @@ impl Default for TextInput {
             lines: vec![String::new()],
             row: 0,
             col: 0,
+            placeholder: None,
+            placeholder_style: Style::default().add_modifier(Modifier::DIM),
         }
     }
 }
@@ -41,7 +45,13 @@ impl TextInput {
         let col = lines
             .get(row)
             .map_or(0, |line| line.graphemes(true).count());
-        Self { lines, row, col }
+        Self {
+            lines,
+            row,
+            col,
+            placeholder: None,
+            placeholder_style: Style::default().add_modifier(Modifier::DIM),
+        }
     }
 
     pub fn lines(&self) -> &[String] {
@@ -58,6 +68,18 @@ impl TextInput {
 
     pub fn is_blank(&self) -> bool {
         self.lines.iter().all(|line| line.trim().is_empty())
+    }
+
+    #[must_use]
+    pub fn placeholder<P: Into<String>>(mut self, placeholder: P) -> Self {
+        self.placeholder = Some(placeholder.into());
+        self
+    }
+
+    #[must_use]
+    pub fn placeholder_style(mut self, style: Style) -> Self {
+        self.placeholder_style = style;
+        self
     }
 
     /// Handle editing keys; return `true` when input consumed key.
@@ -78,24 +100,39 @@ impl TextInput {
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect) {
-        let lines: Vec<Line<'static>> = self
-            .lines
+        let lines = self.render_lines(true);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+    }
+
+    pub fn render_inactive(&self, frame: &mut Frame<'_>, area: Rect) {
+        let lines = self.render_lines(false);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+    }
+
+    fn render_lines(&self, active: bool) -> Vec<Line<'static>> {
+        if self.is_blank()
+            && let Some(placeholder) = self.placeholder.as_deref()
+        {
+            let mut line = Line::styled(placeholder.to_owned(), self.placeholder_style);
+            if active {
+                line.spans.insert(
+                    0,
+                    Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)),
+                );
+            }
+            return vec![line];
+        }
+        self.lines
             .iter()
             .enumerate()
             .map(|(row, text)| {
-                if row == self.row {
+                if active && row == self.row {
                     line_with_cursor(text, self.col)
                 } else {
                     Line::raw(text.clone())
                 }
             })
-            .collect();
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
-    }
-
-    pub fn render_inactive(&self, frame: &mut Frame<'_>, area: Rect) {
-        let lines: Vec<Line<'static>> = self.lines.iter().cloned().map(Line::raw).collect();
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+            .collect()
     }
 
     fn insert_char(&mut self, character: char) {
@@ -202,7 +239,7 @@ fn line_with_cursor(text: &str, col: usize) -> Line<'static> {
         Span::raw(before),
         Span::styled(
             cursor.to_owned(),
-            ratatui::style::Style::new().add_modifier(Modifier::REVERSED),
+            Style::new().add_modifier(Modifier::REVERSED),
         ),
         Span::raw(after),
     ])
@@ -239,5 +276,12 @@ mod tests {
             TextInputMode::SingleLine,
         );
         assert_eq!(input.text(), "x");
+    }
+
+    #[test]
+    fn placeholder_does_not_change_input_text() {
+        let input = TextInput::default().placeholder("Type a message");
+        assert!(input.is_blank());
+        assert_eq!(input.text(), "");
     }
 }
