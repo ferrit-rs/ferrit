@@ -10,7 +10,7 @@ use ferrit_domain::error::GitError;
 use ferrit_domain::model::StashEntry;
 use ferrit_domain::port::GitPort;
 use ferrit_domain::refs::{self, StashOutcome};
-use ferrit_tui::widgets::text_input::TextInput;
+use termui::widgets::text_input::TextInput;
 
 /// The selected stash entry, only while Stash is focused in `Mode::Nav` and no
 /// popup is up.

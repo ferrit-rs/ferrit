@@ -20,5 +20,5 @@ ferrit-theme.workspace = true
 ratatui.workspace = true
 ratatui-core.workspace = true
 ratatui-widgets.workspace = true
-unicode-segmentation.workspace = true
+termui.workspace = true
 unicode-width.workspace = true

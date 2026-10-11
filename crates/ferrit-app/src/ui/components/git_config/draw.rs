@@ -4,13 +4,13 @@ use crate::ui::components::git_config::screen::ConfigRow;
 use ferrit_domain::config::{Scope, WriteScope, display_value};
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::lists::ScrollBar;
-use ferrit_tui::widgets::chrome::panel::Panel;
 use ferrit_tui::widgets::chrome::text::cut_end;
 use ratatui::Frame;
 use ratatui::layout::{Margin, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
+use termui::widgets::panel::Panel;
 use unicode_width::UnicodeWidthStr;
 
 /// Full markers from this width.

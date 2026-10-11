@@ -6,9 +6,9 @@ use crate::ui::error::AppError;
 use crate::ui::event::{Env, Event};
 use ferrit_domain::credentials::is_secret;
 use ferrit_domain::remote::{self, PushPlan, RemoteOp, RemoteRequest};
-use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::sync::mpsc;
+use termui::widgets::text_input::{TextInput, TextInputMode};
 
 /// `f` / `p`: fetch / pull. Global, not Branches-only: these act on the repo and
 /// its current branch, not a selected row. A no-op with no event sender set

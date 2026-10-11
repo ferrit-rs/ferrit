@@ -6,7 +6,7 @@ use crate::ui::components::panes::selection::SelectionKey;
 use crate::ui::components::popups::{ConfirmPrompt, Popup};
 use crate::ui::event::{Env, Event};
 use ferrit_domain::refs::{self, MergeKind, MergeOutcome};
-use ferrit_tui::widgets::text_input::TextInput;
+use termui::widgets::text_input::TextInput;
 
 /// Enter on the Branches pane: lazygit's branch -> log drill-down. Read only, no
 /// checkout. `Esc` backs out.

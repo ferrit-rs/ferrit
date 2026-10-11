@@ -900,6 +900,7 @@ dependencies = [
  "ratatui-image",
  "strum",
  "syntect",
+ "termui",
  "thiserror 2.0.20",
  "unicode-width",
 ]
@@ -950,7 +951,7 @@ dependencies = [
  "ratatui",
  "ratatui-core",
  "ratatui-widgets",
- "unicode-segmentation",
+ "termui",
  "unicode-width",
 ]
 
@@ -2950,6 +2951,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "411c5bf740737c7918b8b1fe232dca4dc9f8e754b8ad5e20966814001ed0ac6b"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "termui"
+version = "0.10.0"
+dependencies = [
+ "ratatui",
+ "unicode-segmentation",
 ]
 
 [[package]]

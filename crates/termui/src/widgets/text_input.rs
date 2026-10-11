@@ -6,14 +6,14 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Whether Enter inserts a newline or remains available to the parent dialog.
+/// Whether Enter inserts a newline or remains available to the parent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextInputMode {
     SingleLine,
     MultiLine,
 }
 
-/// Editable UTF-8 text with character-based cursor and reusable rendering.
+/// Editable UTF-8 text with a grapheme-based cursor.
 #[derive(Debug, Clone)]
 pub struct TextInput {
     lines: Vec<String>,
@@ -60,8 +60,7 @@ impl TextInput {
         self.lines.iter().all(|line| line.trim().is_empty())
     }
 
-    /// Handle editing keys; return `true` when this input consumed the key.
-    /// Submission, cancellation and app-specific shortcuts stay with parent.
+    /// Handle editing keys; return `true` when input consumed key.
     pub fn handle_key_event(&mut self, key: KeyEvent, mode: TextInputMode) -> bool {
         match key.code {
             KeyCode::Enter if mode == TextInputMode::MultiLine => self.insert_newline(),
@@ -78,8 +77,6 @@ impl TextInput {
         true
     }
 
-    /// Render text with reverse-video cursor, matching Ferrit's existing
-    /// commit and branch editors.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect) {
         let lines: Vec<Line<'static>> = self
             .lines
@@ -96,16 +93,15 @@ impl TextInput {
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
     }
 
-    /// Render without cursor emphasis when this input is not focused.
     pub fn render_inactive(&self, frame: &mut Frame<'_>, area: Rect) {
         let lines: Vec<Line<'static>> = self.lines.iter().cloned().map(Line::raw).collect();
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
     }
 
-    fn insert_char(&mut self, c: char) {
+    fn insert_char(&mut self, character: char) {
         let byte = self.byte_col();
         if let Some(line) = self.lines.get_mut(self.row) {
-            line.insert(byte, c);
+            line.insert(byte, character);
             self.col += 1;
         }
     }
@@ -135,14 +131,14 @@ impl TextInput {
         } else if self.row > 0 {
             let current = self.lines.remove(self.row);
             self.row -= 1;
-            let prev_len = self
+            let previous_length = self
                 .lines
                 .get(self.row)
                 .map_or(0, |line| line.graphemes(true).count());
             if let Some(line) = self.lines.get_mut(self.row) {
                 line.push_str(&current);
             }
-            self.col = prev_len;
+            self.col = previous_length;
         }
     }
 

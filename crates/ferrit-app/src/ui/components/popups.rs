@@ -13,7 +13,6 @@ use ferrit_domain::rebase::Step;
 use ferrit_domain::remote::RemoteRequest;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
@@ -21,6 +20,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 use std::path::{Path, PathBuf};
+use termui::widgets::text_input::{TextInput, TextInputMode};
 
 /// `@`: open the command log viewer, scrolled to the newest entry.
 pub(crate) fn open_command_log(env: &Env<'_>) -> Vec<Event> {

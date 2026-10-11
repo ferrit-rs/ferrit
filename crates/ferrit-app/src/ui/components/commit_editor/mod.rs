@@ -9,8 +9,8 @@ use ferrit_domain::apply::ApplyDir;
 use ferrit_domain::commit::{self, CommitKind, CommitOpts, OpenPlan, Submitted};
 use ferrit_domain::model::{CommitEntry, FileEntry};
 use ferrit_domain::port::GitPort;
-use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use termui::widgets::text_input::{TextInput, TextInputMode};
 
 pub mod view;
 

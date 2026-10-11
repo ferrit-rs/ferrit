@@ -8,11 +8,11 @@ use ferrit_domain::host::{
     CreateDraft, GhProgram, GhStatus, HostError, Visibility, parse_target, sanitize_name,
     validate_description,
 };
-use ferrit_tui::widgets::text_input::{TextInput, TextInputMode};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::path::PathBuf;
 use std::sync::Arc;
 use strum::{EnumIter, IntoEnumIterator};
+use termui::widgets::text_input::{TextInput, TextInputMode};
 
 pub mod view;
 

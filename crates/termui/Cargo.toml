@@ -1,0 +1,20 @@
+[package]
+name = "termui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Copyable, reusable Ratatui components and terminal UI state"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["tui", "terminal", "ratatui", "widgets"]
+categories = ["command-line-utilities", "gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+ratatui.workspace = true
+unicode-segmentation.workspace = true

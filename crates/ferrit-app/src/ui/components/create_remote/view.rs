@@ -5,13 +5,13 @@ use ferrit_domain::host::Visibility;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::bar::KeyBar;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::chrome::panel::Panel;
-use ferrit_tui::widgets::text_input::TextInput;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use termui::widgets::panel::Panel;
+use termui::widgets::text_input::TextInput;
 
 #[derive(Debug)]
 pub enum CreateRemoteView<'a> {

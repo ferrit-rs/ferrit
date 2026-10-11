@@ -12,8 +12,8 @@ use crate::ui::error::AppError;
 use crate::ui::event::Event;
 use ferrit_domain::config::{Scope, ValueKind, WriteScope, display_value, is_secret_key};
 use ferrit_domain::port::GitPort;
-use ferrit_tui::widgets::text_input::TextInput;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
+use termui::widgets::text_input::TextInput;
 
 pub(crate) const PAGE: isize = 10;
 pub(crate) const WHEEL_ROWS: isize = 3;

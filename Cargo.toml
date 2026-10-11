@@ -8,6 +8,7 @@ members = [
     "crates/ferrit-git",
     "crates/ferrit-theme",
     "crates/ferrit-tui",
+    "crates/termui",
 ]
 default-members = ["crates/ferrit"]
 
@@ -32,6 +33,7 @@ ferrit-domain = { version = "0.10.0", path = "crates/ferrit-domain" }
 ferrit-git = { version = "0.10.0", path = "crates/ferrit-git" }
 ferrit-theme = { version = "0.10.0", path = "crates/ferrit-theme" }
 ferrit-tui = { version = "0.10.0", path = "crates/ferrit-tui" }
+termui = { version = "0.10.0", path = "crates/termui" }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
 notify-debouncer-full = "0.7"
@@ -60,7 +62,7 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 todo = "deny"
-pub_use = "deny"
+pub_use = "deny" # public APIs use explicit module paths, never re-export facades
 unimplemented = "deny"
 unreachable = "deny"
 indexing_slicing = "deny"

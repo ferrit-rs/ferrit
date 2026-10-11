@@ -7,12 +7,12 @@ use crate::ui::{mock, row_lines};
 use ferrit_domain::command_log;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::chrome::panel::Panel;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use termui::widgets::panel::Panel;
 use unicode_width::UnicodeWidthStr;
 
 /// The `@` viewer: every recorded command, newest at the bottom, scrolled up

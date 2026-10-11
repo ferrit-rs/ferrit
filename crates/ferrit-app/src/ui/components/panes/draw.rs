@@ -6,11 +6,11 @@ use crate::ui::draw::Landed;
 use crate::ui::row_lines;
 use crate::ui::scene::Scene;
 use ferrit_tui::widgets::chrome::lists::PaneList;
-use ferrit_tui::widgets::chrome::panel::Panel;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
+use termui::widgets::panel::Panel;
 
 /// Colour each pane's rows by what they mean. Status and Files come from the
 /// live snapshot on `App`; the rest are still mock.

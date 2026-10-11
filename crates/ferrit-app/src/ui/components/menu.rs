@@ -13,14 +13,14 @@ use ferrit_domain::rebase::Step;
 use ferrit_domain::refs::MergeKind;
 use ferrit_theme::palette::Palette;
 use ferrit_tui::widgets::chrome::dialog::Dialog;
-use ferrit_tui::widgets::chrome::lists::SelectList;
-use ferrit_tui::widgets::text_input::TextInput;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use termui::widgets::select_list::SelectList;
+use termui::widgets::text_input::TextInput;
 
 /// `m`: the menu for the merge, rebase, cherry-pick or revert git is stopped in.
 /// Inert when there is none.
