@@ -9,7 +9,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Changed
 
-- Added generic `termui` workspace crate with reusable Ratatui `Button`, `Panel`, `SelectList`, `TextInput` and `FocusRing` primitives; ferrit keeps compatibility re-exports.
+- Added generic `termui` workspace crate with reusable Ratatui `Button`, `Panel`, `SelectList`, `TextInput` and `FocusRing` primitives; ferrit apps now import generic components through explicit `termui` namespaces.
 - Fast-forwarding a non-checked-out branch now updates the local ref without deleting it first.
 - The repository is now a virtual Cargo workspace: `crates/ferrit` owns the app, TUI and concrete Git adapters, while `crates/ferrit-domain` owns Git models, ports and backend rules without terminal or `git2` dependencies.
 - The workspace now follows the Zed-style package pattern: `ferrit` is the default member for fast local commands, shared package metadata lives at the workspace root, and releases publish `ferrit-domain` before its `ferrit` consumer.
