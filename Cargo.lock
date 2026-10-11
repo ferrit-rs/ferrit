@@ -950,7 +950,6 @@ dependencies = [
  "ferrit-theme",
  "ratatui",
  "termui",
- "unicode-width",
 ]
 
 [[package]]
@@ -2957,6 +2956,7 @@ version = "0.10.0"
 dependencies = [
  "ratatui",
  "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
